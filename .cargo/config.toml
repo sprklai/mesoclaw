@@ -1,0 +1,68 @@
+# Cargo build configuration for better performance across all platforms
+
+[build]
+# Use multiple codegen units for faster compilation, especially in debug mode
+# More codegen units = faster compilation, slightly slower runtime
+codegen-units = 256
+
+# Enable pipelined compilation for better parallelism
+pipelining = true
+
+# Use faster linker depending on platform
+# This significantly improves both build times and runtime performance
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-ld64.lld"]
+# On macOS, also use the mold linker as fallback if available
+# rustflags = ["-C", "linker=/usr/local/bin/mold"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-ld64.lld"]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=/SUBSYSTEM:WINDOWS"]
+
+# Profile optimizations for faster builds
+[profile.dev]
+# Optimize dependencies in dev mode for better performance
+# This makes dev builds faster while keeping compilation quick
+opt-level = 0
+[profile.dev.package."*"]
+# Optimize dependencies for speed without slowing down compilation too much
+opt-level = 2
+
+# Split debug info to reduce binary size and improve link times
+split-debuginfo = "unpacked"
+
+[profile.release]
+# Maximize performance for release builds
+opt-level = 3
+lto = "fat" # Link-time optimization for better runtime performance
+codegen-units = 1 # Single codegen unit for best optimization
+strip = true # Strip symbols for smaller binary size
+panic = "abort" # Reduce binary size
+
+# Profile for development builds that are fast to compile but still performant
+[profile.dev-fast]
+inherits = "dev"
+opt-level = 2
+incremental = false
+codegen-units = 256
+
+# Profile for fast release builds during development
+[profile.release-fast]
+inherits = "release"
+lto = "thin"
+codegen-units = 16
+strip = false
+debug = true
+
+# Network optimizations for faster dependency downloads
+[net]
+git-fetch-with-cli = true
+offline = false

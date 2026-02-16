@@ -1,0 +1,82 @@
+[package]
+name = "tauri-ai-boilerplate"
+version = "0.0.1"
+description = "Clean Tauri 2 boilerplate with integrated AI capabilities."
+authors = ["NSR Technologies Inc."]
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "local_ts_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "unstable"] }
+tauri-plugin-opener = "2.5.2"
+tauri-plugin-log = "2.7.1"
+tauri-plugin-notification = "2.3.3"
+tauri-plugin-window-state = "2.4.1"
+tauri-plugin-stronghold = "2"
+tauri-plugin-store = "2"
+diesel = { version = "2", features = ["sqlite", "r2d2"] }
+diesel_migrations = "2"
+libsqlite3-sys = { version = "0.30", features = ["bundled"] }
+thiserror = "2"
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
+tokio = { version = "1", features = ["sync"] }
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+hex = "0.4"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+keyring = { version = "2.3", features = ["platform-all"] }
+zeroize = "1.7"
+futures = "0.3"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+eventsource-stream = "0.2"
+bytes = "1.5"
+lru = "0.12"
+regex = "1.10"
+dirs = "5.0"
+urlencoding = "2"
+serde_yaml = "0.9"
+tracing = "0.1"
+
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
+tauri-plugin-autostart = "2.5.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }
+tempfile = "3.13"
+
+# Optimized compilation settings for development
+[profile.dev]
+# Split debuginfo for faster compilation on all platforms
+split-debuginfo = "unpacked"
+# Enable incremental compilation
+incremental = true
+
+# Faster development builds
+[profile.dev.package."*"]
+# Optimize dependencies for better performance without slowing compilation
+opt-level = 2
+
+# Production optimizations
+[profile.release]
+# Link-time optimization for smaller, faster binaries
+lto = "thin"
+# Optimize for performance
+opt-level = 3
+# Strip debug symbols for smaller binary size
+strip = true
+# Use fewer codegen units for better optimization at cost of compile time
+codegen-units = 1

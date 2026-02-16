@@ -1,0 +1,11 @@
+pub mod ai_providers;
+pub mod chat;
+pub mod file_browser;
+pub mod keychain;
+pub mod llm;
+pub mod notifications;
+pub mod ollama;
+pub mod settings;
+pub mod skills;
+pub mod streaming_chat;
+pub mod window;

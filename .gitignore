@@ -1,0 +1,51 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Diesel
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# node_modules
+node_modules
+target
+dist
+dist-ssr
+*.local
+
+# Turborepo
+.turbo
+
+# Vitest
+coverage
+
+# TanStack Router
+src/routeTree.gen.ts
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.env*
+
+# Git worktrees
+.worktrees
+target
+.tanstack
+target
+dockertests
+worktrees/*

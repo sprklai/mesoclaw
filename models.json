@@ -1,0 +1,128 @@
+{
+  "openai": {
+    "name": "OpenAI",
+    "baseUrl": "https://api.openai.com/v1",
+    "requiresApiKey": true,
+    "models": [
+      {
+        "id": "gpt-5-nano-2025-08-07",
+        "displayName": "GPT-5 Nano",
+        "contextLimit": 200000
+      },
+      {
+        "id": "gpt-5-mini-2025-08-07",
+        "displayName": "GPT-5 Mini",
+        "contextLimit": 200000
+      }
+    ]
+  },
+  "anthropic": {
+    "name": "Anthropic",
+    "baseUrl": "https://api.anthropic.com/v1",
+    "requiresApiKey": true,
+    "models": [
+      {
+        "id": "claude-haiku-4-5",
+        "displayName": "Claude Haiku 4.5",
+        "contextLimit": 200000
+      },
+      {
+        "id": "claude-sonnet-4-5",
+        "displayName": "Claude Sonnet 4.5",
+        "contextLimit": 200000
+      },
+      {
+        "id": "claude-opus-4-5",
+        "displayName": "Claude Opus 4.5",
+        "contextLimit": 200000
+      }
+    ]
+  },
+  "gemini": {
+    "name": "Google Gemini",
+    "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "requiresApiKey": true,
+    "models": [
+      {
+        "id": "gemini-3-flash-preview",
+        "displayName": "Gemini 3 Flash Preview",
+        "contextLimit": 1000000
+      },
+      {
+        "id": "gemini-2.5-flash-lite",
+        "displayName": "Gemini 2.5 Flash Lite",
+        "contextLimit": 1000000
+      }
+    ]
+  },
+  "openrouter": {
+    "name": "OpenRouter",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "requiresApiKey": true,
+    "models": [
+      {
+        "id": "anthropic/claude-haiku-4.5",
+        "displayName": "Claude Haiku 4.5",
+        "contextLimit": 200000
+      },
+      {
+        "id": "anthropic/claude-sonnet-4.5",
+        "displayName": "Claude Sonnet 4.5",
+        "contextLimit": 200000
+      },
+      {
+        "id": "openai/gpt-5-nano",
+        "displayName": "GPT-5 Nano",
+        "contextLimit": 200000
+      },
+      {
+        "id": "google/gemini-2.5-flash",
+        "displayName": "Gemini 2.5 Flash",
+        "contextLimit": 1000000
+      },
+      {
+        "id": "xai/grok-code-fast-1",
+        "displayName": "Grok Code Fast 1",
+        "contextLimit": 200000
+      }
+    ]
+  },
+  "vercel-ai-gateway": {
+    "name": "Vercel AI Gateway",
+    "baseUrl": "https://ai-gateway.vercel.sh/v1",
+    "requiresApiKey": true,
+    "models": [
+      {
+        "id": "google/gemini-2.5-flash-lite",
+        "displayName": "Gemini 2.5 Flash Lite",
+        "contextLimit": 1000000
+      },
+      {
+        "id": "openai/gpt-5-mini",
+        "displayName": "GPT-5 Mini",
+        "contextLimit": 200000
+      },
+      {
+        "id": "anthropic/claude-haiku-4.5",
+        "displayName": "Claude Haiku 4.5",
+        "contextLimit": 200000
+      },
+      {
+        "id": "anthropic/claude-sonnet-4.5",
+        "displayName": "Claude Sonnet 4.5",
+        "contextLimit": 200000
+      },
+      {
+        "id": "xai/grok-code-fast-1",
+        "displayName": "Grok Code Fast 1",
+        "contextLimit": 200000
+      }
+    ]
+  },
+  "ollama": {
+    "name": "Ollama (Local)",
+    "baseUrl": "http://localhost:11434/v1",
+    "requiresApiKey": false,
+    "models": []
+  }
+}

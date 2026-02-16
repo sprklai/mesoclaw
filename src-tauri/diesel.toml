@@ -1,0 +1,15 @@
+# Diesel configuration file
+# See https://diesel.rs/guides/configuring-diesel-cli for more information
+
+[print_schema]
+file = "src/database/schema.rs"
+custom_type_derives = [
+  "diesel::query_builder::QueryId",
+  "Clone",
+  "Debug",
+  "serde::Serialize",
+  "serde::Deserialize",
+]
+
+[migrations_directory]
+dir = "migrations"
