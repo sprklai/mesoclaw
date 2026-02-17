@@ -40,7 +40,9 @@ export default defineConfig(async () => ({
 
   // Config for testing
   test: {
+    globals: true,
     environment: "happy-dom",
+    setupFiles: ["./vitest.setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
