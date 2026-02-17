@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Tauri AI Boilerplate** is an AI-powered database comprehension desktop application built with Tauri 2. It helps developers quickly understand unfamiliar databases through AI-powered schema analysis, relationship inference, and query understanding.
+**MesoClaw** is an AI-powered database comprehension desktop application built with Tauri 2. It helps developers quickly understand unfamiliar databases through AI-powered schema analysis, relationship inference, and query understanding.
 
 - **Frontend**: React 19 + TypeScript + Vite + TanStack Router + Zustand + Tailwind CSS 4
 - **Backend**: Rust 2024 + Tauri 2 + Diesel ORM + Tokio async runtime
@@ -146,6 +146,7 @@ Register in `src-tauri/src/skills/registry.rs` for built-in skills.
 ### Running Tests
 
 **Backend (120 unit tests)**:
+
 ```bash
 cd src-tauri
 cargo test --lib                              # All tests
@@ -154,6 +155,7 @@ cargo test --lib -- --nocapture               # With output
 ```
 
 **Frontend**:
+
 ```bash
 bun run test              # Run once
 bun run test:watch        # Watch mode
@@ -244,6 +246,7 @@ This project has **layered documentation**:
 ## Current Status
 
 **Complete**:
+
 - ✅ Phase 1: Backend Infrastructure (8 phases)
 - ✅ Phase 2: AI Integration (8 phases)
 - ✅ Phase 3: Frontend UI (8 phases)
@@ -253,9 +256,11 @@ This project has **layered documentation**:
 - ✅ AI Skill System (8 built-in skills)
 
 **In Progress**:
+
 - Phase 4.6-4.7: LLM commands and command registration
 
 **Planned**:
+
 - Supabase database integration
 - Local LLM support (Ollama integration complete)
 - Internationalization (i18n)

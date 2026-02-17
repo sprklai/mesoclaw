@@ -1,4 +1,4 @@
-# Tauri AI Boilerplate - Project Code Standards
+# MesoClaw - Project Code Standards
 
 ## Project Overview
 
@@ -151,18 +151,21 @@ Most formatting and common issues are automatically fixed by Biome. Run `bunx ul
 ### AI Integration Layer
 
 **Multi-Provider Support:**
+
 - Abstract `LLMProvider` trait for extensibility
 - Built-in providers: OpenAI, Anthropic, Google AI, Groq, Vercel AI Gateway
 - Streaming responses via Server-Sent Events (SSE)
 - Secure API key storage in OS keyring (via `keyring` crate)
 
 **Skills System:**
+
 - Reusable AI prompts with parameters
 - JSON-based skill definitions in `~/.config/<skillsConfigDirName>/skills/`
 - Dynamic skill discovery and loading
 - Type-safe invocation from frontend
 
 **Commands:**
+
 - `list_llm_providers_command` - Get available providers
 - `set_llm_provider_command` - Configure active provider
 - `get_llm_provider_config_command` - Get current configuration
@@ -175,17 +178,20 @@ Most formatting and common issues are automatically fixed by Biome. Run `bunx ul
 ### Frontend Architecture
 
 **UI Components:**
+
 - Base UI components (shadcn-style) in `src/components/ui/`
 - AI SDK Elements for chat interfaces
 - Theme support (light/dark mode)
 - Accessibility-first design
 
 **State Management:**
+
 - Zustand stores for global state
 - `llmStore.ts` - AI provider configuration
 - `skillsStore.ts` - Skills management
 
 **Routing:**
+
 - TanStack Router file-based routing
 - `index.tsx` - Home page
 - `settings.tsx` - App settings (AI config, skills)
@@ -193,15 +199,18 @@ Most formatting and common issues are automatically fixed by Biome. Run `bunx ul
 ### Backend Architecture
 
 **AI Layer (`src-tauri/src/ai/`):**
+
 - `llm_provider.rs` - Provider trait and implementations
 - `providers/` - Individual provider implementations
 - `skills.rs` - Skills system
 
 **Services (`src-tauri/src/services/`):**
+
 - `llm_service.rs` - LLM provider management
 - `skills_service.rs` - Skills CRUD operations
 
 **Commands (`src-tauri/src/commands/`):**
+
 - `llm_commands.rs` - AI provider commands
 - `skills_commands.rs` - Skills commands
 
@@ -259,6 +268,7 @@ Skills are JSON files in `~/.config/<skillsConfigDirName>/skills/` with the foll
 ```
 
 **Usage:**
+
 1. Create skills via UI or file system
 2. Load skills with `list_skills_command` and `get_skill_command`
 3. Execute with `execute_skill_command(skill_name, parameters)`
@@ -306,6 +316,7 @@ Frontend routes are defined in `src/routes/` using TanStack Router file-based co
 ### Adding New Skills
 
 Skills can be added via:
+
 - UI in Settings → Skills tab
 - Manually creating JSON files in `~/.config/<skillsConfigDirName>/skills/`
 - Programmatically via `create_skill_command`
