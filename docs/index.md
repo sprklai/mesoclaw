@@ -46,8 +46,8 @@ Design  Bite-sized  TDD     Unit/    Git    Code
 8. **Phase 7:** Channels & Mobile
 9. **Phase 8:** CI/CD & Community
 
-**Cross-cutting track:** i18n
-- Plan: [i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md)
+**Cross-cutting track:** i18n ✅ **COMPLETE** (2026-02-17)
+- Plan: [i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md) — all 12 tasks done
 - Design: [i18n Design](./plans/2026-02-16-i18n-design.md)
 
 ### Testing Sequence
@@ -89,11 +89,16 @@ Design  Bite-sized  TDD     Unit/    Git    Code
 
 **Current Focus:**
 
-- **[i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md)** 🔥 **START HERE**
-  - Frontend internationalization with react-i18next
-  - 12 bite-sized tasks (2-5 min each)
-  - Estimated: 3-4 hours
-  - Status: Ready to implement
+- **[Implementation Plan — Phase 0: Slim Down + Responsive](./implementation-plan.md#phase-0-slim-down-technical-debt-reduction)** 🔥 **START HERE**
+  - 8 tasks: Clippy lints, provider consolidation, prompt templates, Diesel→rusqlite, responsive layout, two-binary structure, CLI shell, feature flags
+  - Three parallel streams: Backend (0.1→0.2→0.3→0.4), Frontend (0.5), Architecture (0.6→0.7→0.8)
+  - Status: In progress
+  - Design: [Implementation Plan](./implementation-plan.md)
+
+**Recently Completed:**
+
+- **[i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md)** ✅ **COMPLETE** (2026-02-17)
+  - Frontend internationalization with react-i18next — all 12 tasks done, 24/24 tests passing
   - Design: [i18n Design](./plans/2026-02-16-i18n-design.md)
 
 **Recent Plans:**
@@ -236,7 +241,7 @@ Use phase checkpoints in `docs/implementation-plan.md` and wave/manual test sect
 ### For Developers
 1. Start: [CLAUDE.md](../CLAUDE.md)
 2. Architecture: [Architecture Diagram](./architecture-diagram.md)
-3. Active Work: [i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md)
+3. Active Work: [Phase 0: Slim Down + Responsive](./implementation-plan.md#phase-0-slim-down-technical-debt-reduction)
 4. Testing: [Test Plan](./test-plan.md)
 5. Standards: [.claude/CLAUDE.md](../.claude/CLAUDE.md)
 
