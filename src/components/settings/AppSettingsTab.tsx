@@ -1,3 +1,6 @@
+import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
+
 import type { LogLevel, Theme } from "@/lib/tauri/settings/types";
 import type { Settings } from "@/lib/tauri/settings/types";
 
@@ -5,7 +8,7 @@ import { SettingRow } from "@/components/setting-row";
 import { SettingsSection } from "@/components/settings-section";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { LOG_LEVEL_OPTIONS, THEME_OPTIONS } from "@/constants/settings";
+import { LANGUAGE_OPTIONS, LOG_LEVEL_OPTIONS, THEME_OPTIONS } from "@/constants/settings";
 
 interface AppSettingsTabProps {
   theme: Theme;
@@ -31,16 +34,32 @@ export function AppSettingsTab({
   onNotificationChange,
   autostartEnabled,
 }: AppSettingsTabProps) {
+  const { t, i18n } = useTranslation(["settings", "common"]);
+
+  const handleLanguageChange = async (newLanguage: string) => {
+    await i18n.changeLanguage(newLanguage);
+
+    // Persist to Tauri settings (backup storage)
+    try {
+      await invoke("update_setting_command", {
+        key: "language",
+        value: newLanguage,
+      });
+    } catch (error) {
+      console.error("Failed to persist language to Tauri settings:", error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Appearance Section */}
       <SettingsSection
-        title="Appearance"
-        description="Customize how the application looks"
+        title={t("settings:appearance.title")}
+        description={t("settings:appearance.description")}
       >
         <SettingRow
-          label="Theme"
-          description="Select your preferred color scheme"
+          label={t("settings:appearance.theme.label")}
+          description={t("settings:appearance.theme.description")}
         >
           <Select
             value={theme}
@@ -52,8 +71,21 @@ export function AppSettingsTab({
         </SettingRow>
 
         <SettingRow
-          label="Sidebar Expanded"
-          description="Keep the sidebar expanded by default"
+          label={t("settings:appearance.language.label")}
+          description={t("settings:appearance.language.description")}
+        >
+          <Select
+            value={i18n.language}
+            onValueChange={handleLanguageChange}
+            options={[...LANGUAGE_OPTIONS]}
+            disabled={isSaving}
+            className="w-full sm:w-40"
+          />
+        </SettingRow>
+
+        <SettingRow
+          label={t("settings:appearance.sidebarExpanded.label")}
+          description={t("settings:appearance.sidebarExpanded.description")}
           htmlFor="sidebar-expanded"
         >
           <Switch
@@ -69,12 +101,12 @@ export function AppSettingsTab({
 
       {/* Behavior Section */}
       <SettingsSection
-        title="Behavior"
-        description="Control how the application behaves"
+        title={t("settings:behavior.title")}
+        description={t("settings:behavior.description")}
       >
         <SettingRow
-          label="Show in System Tray"
-          description="Show the application icon in the system tray"
+          label={t("settings:behavior.showInTray.label")}
+          description={t("settings:behavior.showInTray.description")}
           htmlFor="show-in-tray"
         >
           <Switch
@@ -86,8 +118,8 @@ export function AppSettingsTab({
         </SettingRow>
 
         <SettingRow
-          label="Launch at Login"
-          description="Automatically start when you log in"
+          label={t("settings:behavior.launchAtLogin.label")}
+          description={t("settings:behavior.launchAtLogin.description")}
           htmlFor="launch-at-login"
         >
           <Switch
@@ -101,12 +133,12 @@ export function AppSettingsTab({
 
       {/* Notifications Section */}
       <SettingsSection
-        title="Notifications"
-        description="Configure notification preferences"
+        title={t("settings:notifications.title")}
+        description={t("settings:notifications.description")}
       >
         <SettingRow
-          label="Enable Notifications"
-          description="Allow the app to send you notifications"
+          label={t("settings:notifications.enable.label")}
+          description={t("settings:notifications.enable.description")}
           htmlFor="enable-notifications"
         >
           <Switch
@@ -120,12 +152,12 @@ export function AppSettingsTab({
 
       {/* Developer Section */}
       <SettingsSection
-        title="Developer"
-        description="Advanced settings for debugging and development"
+        title={t("settings:developer.title")}
+        description={t("settings:developer.description")}
       >
         <SettingRow
-          label="Enable Logging"
-          description="Enable detailed application logging"
+          label={t("settings:developer.enableLogging.label")}
+          description={t("settings:developer.enableLogging.description")}
           htmlFor="enable-logging"
         >
           <Switch
@@ -139,8 +171,8 @@ export function AppSettingsTab({
         </SettingRow>
 
         <SettingRow
-          label="Log Level"
-          description="Set the minimum log level to record"
+          label={t("settings:developer.logLevel.label")}
+          description={t("settings:developer.logLevel.description")}
         >
           <Select<LogLevel>
             value={settings.logLevel}

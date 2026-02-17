@@ -13,3 +13,8 @@ export const LOG_LEVEL_OPTIONS: Array<{ value: LogLevel; label: string }> = [
   { value: "debug", label: "Debug" },
   { value: "trace", label: "Trace" },
 ];
+
+export const LANGUAGE_OPTIONS = [
+  { value: "en", label: "English" },
+  // Future languages will be added here
+] as const;
