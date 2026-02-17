@@ -946,6 +946,22 @@ jobs:
 
 ---
 
+## Cross-Cutting i18n Tests
+
+Aligned with:
+- `docs/plans/2026-02-16-i18n-design.md`
+- `docs/plans/2026-02-16-i18n-implementation.md`
+
+| Test ID | Test Name | Description | Pass Criteria |
+| ------- | --------- | ----------- | ------------- |
+| I18N-1 | Locale detection on first launch | Fresh run with OS locale set to non-English | App selects matching locale fallback chain and renders localized strings |
+| I18N-2 | Settings override persistence | Change language in Settings, restart app | Selected locale persists and loads before first route paint |
+| I18N-3 | Key coverage guard | Scan locale JSON files for missing required keys | No missing keys for enabled locales; CI fails on missing keys |
+| I18N-4 | ICU/plural formatting correctness | Validate count/date/number formatting across sample locales | Rendered strings match locale rules and placeholders resolve |
+| I18N-5 | Regression guard for default locale | Run app in `en` and compare key UI workflows | Existing behavior/text semantics remain stable for English users |
+
+---
+
 ## Test Count Summary
 
 | Phase     | Unit Tests | Task Tests | Wave Tests | Manual Tests | Total   |

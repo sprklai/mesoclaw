@@ -990,5 +990,25 @@ Before proceeding to Phase 1, verify:
 
 ---
 
+## Cross-Cutting Track: i18n (Frontend Localization)
+
+This track runs alongside the phase roadmap and is defined in:
+- `docs/plans/2026-02-16-i18n-design.md`
+- `docs/plans/2026-02-16-i18n-implementation.md`
+
+Implementation requirements:
+- Initialize i18n before React mount.
+- Add namespace-based locale files under `src/locales/`.
+- Provide Settings-based language override with persistence.
+- Ensure route-level UI strings are translation-backed (no hardcoded UI copy in user-facing surfaces).
+
+Acceptance criteria:
+- i18n plan tasks are completed and verified.
+- Existing UI behavior remains unchanged when locale is `en`.
+- Non-English locale switch applies without app restart.
+- i18n tests in `docs/test-plan.md` pass.
+
+---
+
 _Document created: February 2026_
 _References: docs/claw-ecosystem-analysis.md, docs/mesoclaw-gap-analysis.md_

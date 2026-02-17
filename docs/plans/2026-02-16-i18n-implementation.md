@@ -1166,7 +1166,7 @@ This index organizes all documentation for the MesoClaw project, providing a str
 ### Ecosystem Analysis
 - [Claw Ecosystem Analysis](./claw-ecosystem-analysis.md) - Analysis of Claw family products
 - [Moltis/MicroClaw Analysis](./moltis-microclaw-analysis.md) - Comparison with related products
-- [TauriClaw Gap Analysis](./tauriclaw-gap-analysis.md) - Feature gap analysis
+- [MesoClaw Gap Analysis](./mesoclaw-gap-analysis.md) - Feature gap analysis
 
 ## Implementation Plans
 

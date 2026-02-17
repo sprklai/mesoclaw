@@ -34,49 +34,35 @@ Design  Bite-sized  TDD     Unit/    Git    Code
 
 ### Implementation Sequence
 
-**Phase-Based Development** (see [Implementation Plan](./implementation-plan.md)):
+**Master sequence is defined in the [Implementation Plan](./implementation-plan.md):**
 
-1. **Phase 0: Foundation** ✅ Complete
-   - Project setup, dependencies, tooling
+1. **Phase 0:** Slim Down + Responsive
+2. **Phase 1:** Foundation
+3. **Phase 2:** Core Infrastructure
+4. **Phase 3:** Agent Intelligence
+5. **Phase 4:** Proactive Behavior
+6. **Phase 5:** Config & DX
+7. **Phase 6:** Extensions & UI
+8. **Phase 7:** Channels & Mobile
+9. **Phase 8:** CI/CD & Community
 
-2. **Phase 1: Backend Infrastructure** ✅ Complete
-   - Database providers, models, services
-
-3. **Phase 2: AI Integration** ✅ Complete
-   - LLM providers, skills system, agents
-
-4. **Phase 3: Frontend UI** ✅ Complete
-   - React components, routing, state management
-
-5. **Phase 4: IPC Commands** 🔄 In Progress
-   - Tauri command layer, frontend-backend integration
-
-6. **Future Phases**
-   - i18n (planned - see [i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md))
-   - Mobile support
-   - Additional database providers
+**Cross-cutting track:** i18n
+- Plan: [i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md)
+- Design: [i18n Design](./plans/2026-02-16-i18n-design.md)
 
 ### Testing Sequence
 
-**For each feature, follow this test sequence:**
+**Execution order comes from [Test Plan](./test-plan.md):**
 
-1. **Unit Tests** - Test individual functions/components
-   - Location: `src/__tests__/` (frontend), `src-tauri/src/*/tests/` (backend)
-   - Run: `bun run test` (frontend), `cargo test --lib` (backend)
+1. Unit tests (module/function level)
+2. Task tests (per implementation task)
+3. Phase/Wave integration tests
+4. Manual tests (workflow validation)
+5. E2E scenarios (release-level confidence)
 
-2. **Integration Tests** - Test feature integration
-   - Location: `src-tauri/tests/` (backend integration)
-   - Run: `cargo test`
-
-3. **E2E Tests** - Test user workflows
-   - Based on: [User Journey](./user-journey.md)
-   - Manual testing + automated (future)
-
-4. **Accessibility Tests** - Keyboard navigation, screen readers
-   - Guide: [Accessibility Improvements](./features/accessibility/ACCESSIBILITY_IMPROVEMENTS.md)
-
-5. **Security Tests** - Credential storage, API key handling
-   - Guide: [Secure Storage](./security/SECURE_STORAGE.md)
+**Specialized test guidance:**
+- Accessibility: [Accessibility Improvements](./features/accessibility/ACCESSIBILITY_IMPROVEMENTS.md)
+- Security: [Secure Storage](./security/SECURE_STORAGE.md)
 
 **Test Plan Reference:** [Test Plan](./test-plan.md)
 
@@ -93,7 +79,7 @@ Design  Bite-sized  TDD     Unit/    Git    Code
 ### Ecosystem Analysis
 - **[Claw Ecosystem Analysis](./claw-ecosystem-analysis.md)** - Analysis of Claw family products (ZeroClaw, MicroClaw, etc.)
 - **[Moltis/MicroClaw Analysis](./moltis-microclaw-analysis.md)** - Comparison with related products
-- **[TauriClaw Gap Analysis](./tauriclaw-gap-analysis.md)** - Feature gap analysis and roadmap
+- **[Mesoclaw Gap Analysis](./mesoclaw-gap-analysis.md)** - Feature gap analysis and roadmap
 
 ---
 
@@ -235,21 +221,13 @@ pending → in_progress → completed
 
 ## 📊 Current Project Status
 
-**Completed:**
-- ✅ Phase 0-3: Foundation, Backend, AI, Frontend
-- ✅ SSH Tunnel Support (~95%)
-- ✅ MongoDB Integration (~95%)
-- ✅ AI Skill System (8 built-in skills)
-- ✅ Secure credential storage
+Status is tracked in the master plans, not duplicated here:
 
-**In Progress:**
-- 🔄 Phase 4: IPC Commands (Phase 4.6-4.7 remaining)
-- 🔄 i18n Implementation (plan ready)
+- Roadmap source of truth: [Implementation Plan](./implementation-plan.md)
+- Validation source of truth: [Test Plan](./test-plan.md)
+- Cross-cutting active track: [i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md)
 
-**Planned:**
-- ⏳ Supabase database integration
-- ⏳ Mobile UI support
-- ⏳ Additional language translations
+Use phase checkpoints in `docs/implementation-plan.md` and wave/manual test sections in `docs/test-plan.md` for current progress.
 
 ---
 
@@ -274,7 +252,7 @@ pending → in_progress → completed
 ### For Product Managers
 1. Requirements: [Product Requirements](./product-requirements.md)
 2. Roadmap: [Implementation Plan](./implementation-plan.md)
-3. Status: This document's [Current Project Status](#current-project-status)
+3. Status: Phase checkpoints in [Implementation Plan](./implementation-plan.md)
 
 ---
 
@@ -305,7 +283,7 @@ pending → in_progress → completed
 
 ---
 
-**Last Updated:** 2026-02-16
+**Last Updated:** 2026-02-17
 **Maintained By:** MesoClaw Development Team
 
 **Need help?** Start with [README](../README.md) → [CLAUDE.md](../CLAUDE.md) → This index

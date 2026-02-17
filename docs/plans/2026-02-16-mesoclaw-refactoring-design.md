@@ -121,7 +121,7 @@ This refactoring transforms MesoClaw from its legacy "database comprehension des
 3. `docs/implementation-plan.md` (implementation tasks)
 4. `docs/product-requirements.md` (FR-18 Sidecar Module System)
 5. `docs/test-plan.md` (sidecar testing section)
-6. `docs/tauriclaw-gap-analysis.md` (sidecar recommendations)
+6. `docs/mesoclaw-gap-analysis.md` (sidecar recommendations)
 7. `docs/user-journey.md` (Stage 10)
 8. `docs/generated-diagrams.md` (sidecar diagrams)
 9. `docs/architecture/tauri-plugin-baseline.md` (plugin vs sidecar)
@@ -246,7 +246,7 @@ Navigation guide for the MesoClaw documentation directory.
 
 - **[Product Requirements](product-requirements.md)** - Complete feature specifications with 18 functional requirement categories
 - **[Implementation Plan](implementation-plan.md)** - 8 phases, 49 tasks, version mapping, acceptance criteria
-- **[Gap Analysis](tauriclaw-gap-analysis.md)** - Feature parity analysis vs. claw ecosystem projects
+- **[Gap Analysis](mesoclaw-gap-analysis.md)** - Feature parity analysis vs. claw ecosystem projects
 
 ### 🏗️ Architecture
 
@@ -282,7 +282,7 @@ graph TD
     ARCH --> SIDECAR[architecture/sidecar-system.md]
     ARCH --> TEST[test-plan.md]
     IMPL --> TEST
-    GAP[tauriclaw-gap-analysis.md] --> IMPL
+    GAP[mesoclaw-gap-analysis.md] --> IMPL
     IMPL --> UJ[user-journey.md]
 ```
 
