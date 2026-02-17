@@ -46,12 +46,10 @@ pub async fn discover_ollama_models_command(
         .optional()
         .map_err(|e| format!("Failed to query provider: {}", e))?;
 
-    if provider.is_none() {
+    let Some(provider) = provider else {
         println!("[Ollama Discovery] Ollama provider not found or inactive");
         return Err("Ollama provider not found. Please ensure the provider is active.".to_string());
-    }
-
-    let provider = provider.unwrap();
+    };
     let base_url = &provider.base_url;
     println!("[Ollama Discovery] Using base_url: {}", base_url);
 
@@ -118,7 +116,7 @@ pub async fn discover_ollama_models_command(
         let model_id = &ollama_model.name;
 
         // Create a safe ID by replacing both slashes and colons (common in Ollama model names)
-        let safe_id = model_id.replace('/', "-").replace(':', "-");
+        let safe_id = model_id.replace(['/', ':'], "-");
         let db_id = format!("ollama_{}", safe_id);
 
         // Check if model already exists using the unique constraint (provider_id, model_id)
@@ -191,6 +189,7 @@ pub async fn discover_ollama_models_command(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

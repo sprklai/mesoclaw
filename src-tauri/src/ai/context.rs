@@ -17,7 +17,7 @@ impl ContextManager {
     pub fn estimate_tokens(&self, text: &str) -> usize {
         // Simple heuristic: divide character count by 4
         // This is a rough approximation and should be replaced with a proper tokenizer
-        (text.len() + 3) / 4
+        text.len().div_ceil(4)
     }
 
     /// Estimate total tokens for a list of messages

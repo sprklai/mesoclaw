@@ -275,13 +275,10 @@ impl VercelAIGatewayProvider {
             "anthropic" => {
                 if model_name.contains("claude-3-5-sonnet")
                     || model_name.contains("claude-sonnet-4.5")
-                {
-                    200_000
-                } else if model_name.contains("claude-3-5-haiku")
+                    || model_name.contains("claude-3-5-haiku")
                     || model_name.contains("claude-haiku-4.5")
+                    || model_name.contains("claude-opus")
                 {
-                    200_000
-                } else if model_name.contains("claude-opus") {
                     200_000
                 } else {
                     100_000 // Claude 2 and earlier
@@ -429,6 +426,7 @@ impl LLMProvider for VercelAIGatewayProvider {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

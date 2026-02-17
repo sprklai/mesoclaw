@@ -19,8 +19,12 @@ pub fn setup(app: &App, pool: &DbPool) -> Result<(), Box<dyn std::error::Error>>
     let menu = Menu::with_items(app, &[&show_i, &hide_i, &quit_i])?;
 
     // Build the tray icon
+    let window_icon = app
+        .default_window_icon()
+        .ok_or("No default window icon configured")?
+        .clone();
     let tray = TrayIconBuilder::new()
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(window_icon)
         .menu(&menu)
         .show_menu_on_left_click(false)
         .tooltip(TRAY_TOOLTIP)

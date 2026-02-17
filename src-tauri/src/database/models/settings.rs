@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -22,8 +24,12 @@ impl Theme {
             Theme::System => "system",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Result<Self, DbError> {
+impl FromStr for Theme {
+    type Err = DbError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "light" => Ok(Theme::Light),
             "dark" => Ok(Theme::Dark),
@@ -54,8 +60,12 @@ impl LogLevel {
             LogLevel::Trace => "trace",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Result<Self, DbError> {
+impl FromStr for LogLevel {
+    type Err = DbError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "error" => Ok(LogLevel::Error),
             "warn" => Ok(LogLevel::Warn),

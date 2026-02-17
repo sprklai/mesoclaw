@@ -267,7 +267,11 @@ pub async fn suggest_skills_command(
 
     // Sort by relevance score descending
     let mut sorted = suggestions;
-    sorted.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap());
+    sorted.sort_by(|a, b| {
+        b.relevance_score
+            .partial_cmp(&a.relevance_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     Ok(sorted)
 }

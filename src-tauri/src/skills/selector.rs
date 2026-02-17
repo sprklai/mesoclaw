@@ -261,7 +261,14 @@ Rules:
         }
 
         // If only one candidate or no LLM provided, use pre-filter result
-        if candidates.len() == 1 || llm_provider.is_none() {
+        let Some(provider) = llm_provider else {
+            return Ok(SelectionResult {
+                selected_skills: candidates.iter().map(|s| s.id.clone()).collect(),
+                reasoning: Some("Selected by pre-filter.".to_string()),
+            });
+        };
+
+        if candidates.len() == 1 {
             return Ok(SelectionResult {
                 selected_skills: candidates.iter().map(|s| s.id.clone()).collect(),
                 reasoning: Some("Selected by pre-filter.".to_string()),
@@ -269,7 +276,7 @@ Rules:
         }
 
         // Stage 2: LLM selection
-        self.llm_select(candidates, ctx, llm_provider.unwrap()).await
+        self.llm_select(candidates, ctx, provider).await
     }
 
     /// Get skills by ID from the registry.
@@ -281,6 +288,7 @@ Rules:
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

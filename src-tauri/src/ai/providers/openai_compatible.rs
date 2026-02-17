@@ -345,7 +345,7 @@ impl OpenAICompatibleProvider {
     /// Execute HTTP request with retry logic
     async fn execute_with_retry(
         &self,
-        request_fn: impl Fn() -> reqwest::RequestBuilder,
+        request_fn: impl Fn() -> Result<reqwest::RequestBuilder>,
     ) -> Result<Response> {
         let mut last_error = None;
 
@@ -356,7 +356,8 @@ impl OpenAICompatibleProvider {
                 tokio::time::sleep(delay).await;
             }
 
-            match request_fn().send().await {
+            let builder = request_fn()?;
+            match builder.send().await {
                 Ok(response) => {
                     let status = response.status();
 
@@ -414,7 +415,12 @@ impl LLMProvider for OpenAICompatibleProvider {
         }
 
         let response = self
-            .execute_with_retry(|| request_builder.try_clone().unwrap().json(&api_request))
+            .execute_with_retry(|| {
+                request_builder
+                    .try_clone()
+                    .ok_or_else(|| "Failed to clone request builder".to_string())
+                    .map(|b| b.json(&api_request))
+            })
             .await?;
 
         let api_response: ChatCompletionResponse = response
@@ -470,7 +476,12 @@ impl LLMProvider for OpenAICompatibleProvider {
         }
 
         let response = self
-            .execute_with_retry(|| request_builder.try_clone().unwrap().json(&api_request))
+            .execute_with_retry(|| {
+                request_builder
+                    .try_clone()
+                    .ok_or_else(|| "Failed to clone request builder".to_string())
+                    .map(|b| b.json(&api_request))
+            })
             .await
             .map_err(|e| {
                 log::error!("[LLM Stream] Request failed for {}: {}", url, e);
@@ -539,6 +550,7 @@ impl LLMProvider for OpenAICompatibleProvider {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

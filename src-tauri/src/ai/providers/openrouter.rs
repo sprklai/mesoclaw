@@ -279,11 +279,9 @@ impl OpenRouterProvider {
                 if model_name.contains("claude-3.5")
                     || model_name.contains("claude-sonnet-4")
                     || model_name.contains("claude-opus-4")
+                    || model_name.contains("claude-3")
+                    || model_name.contains("claude-opus")
                 {
-                    200_000
-                } else if model_name.contains("claude-3") {
-                    200_000
-                } else if model_name.contains("claude-opus") {
                     200_000
                 } else {
                     100_000 // Claude 2 and earlier
@@ -442,6 +440,7 @@ impl LLMProvider for OpenRouterProvider {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

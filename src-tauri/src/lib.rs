@@ -24,11 +24,11 @@ pub fn run() {
             let app_local_data_dir = app
                 .path()
                 .app_local_data_dir()
-                .expect("could not resolve app local data path");
+                .map_err(|e| format!("could not resolve app local data path: {e}"))?;
 
             // Ensure directory exists
             std::fs::create_dir_all(&app_local_data_dir)
-                .expect("failed to create app local data directory");
+                .map_err(|e| format!("failed to create app local data directory: {e}"))?;
 
             // Define salt path
             let salt_path = app_local_data_dir.join("salt.txt");
@@ -122,5 +122,5 @@ pub fn run() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .unwrap_or_else(|e| panic!("error while running tauri application: {e}"));
 }

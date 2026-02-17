@@ -321,18 +321,19 @@ fn build_user_prompt_static(
 ) -> String {
     let mut prompt = user_request.to_string();
 
-    if let Some(overrides) = context_overrides {
-        if let Ok(formatted) = serde_json::to_string_pretty(overrides) {
-            prompt.push_str("\n\nAdditional context:\n```json\n");
-            prompt.push_str(&formatted);
-            prompt.push_str("\n```");
-        }
+    if let Some(overrides) = context_overrides
+        && let Ok(formatted) = serde_json::to_string_pretty(overrides)
+    {
+        prompt.push_str("\n\nAdditional context:\n```json\n");
+        prompt.push_str(&formatted);
+        prompt.push_str("\n```");
     }
 
     prompt
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::adapters::{AdapterError, ContextType, ToolCall, ToolDefinition, ToolResult};

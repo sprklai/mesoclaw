@@ -58,7 +58,7 @@ pub async fn get_or_init_registry() -> Arc<SkillRegistry> {
             // Initialize with defaults (embedded skills only)
             initialize_skill_registry(None, None)
                 .await
-                .expect("Failed to initialize skill registry")
+                .unwrap_or_else(|e| panic!("Failed to initialize skill registry: {e}"))
         }
     }
 }
