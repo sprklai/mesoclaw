@@ -10,6 +10,27 @@ afterEach(() => {
 // Extend Vitest's expect with jest-dom matchers
 expect.extend({});
 
+// Mock @lobehub/icons to avoid ESM directory import issues with @lobehub/fluent-emoji
+vi.mock("@lobehub/icons", () => {
+  const MockIcon = () => null;
+  return {
+    Anthropic: MockIcon,
+    Claude: MockIcon,
+    DeepSeek: MockIcon,
+    Gemini: MockIcon,
+    Google: MockIcon,
+    Groq: MockIcon,
+    Mistral: MockIcon,
+    Ollama: MockIcon,
+    OpenAI: MockIcon,
+    OpenRouter: MockIcon,
+    Together: MockIcon,
+    VertexAI: MockIcon,
+    Vercel: MockIcon,
+    XAI: MockIcon,
+  };
+});
+
 // Mock react-i18next for component tests
 // i18n tests that need real i18next should import from '@/lib/i18n' directly
 vi.mock("react-i18next", () => ({
