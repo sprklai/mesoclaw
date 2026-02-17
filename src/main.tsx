@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 
 import { routeTree } from "./routeTree.gen";
 import "./styles/globals.css";
+import "./lib/i18n"; // Initialize i18n before React mounts
 
 // Attach console to forward Rust logs to browser devtools
 attachConsole();
