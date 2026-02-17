@@ -21,6 +21,55 @@ expect_used = "warn"
 name = "local_ts_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# ---------------------------------------------------------------------------
+# Binaries
+# ---------------------------------------------------------------------------
+
+[[bin]]
+# Headless CLI interface to the AI agent runtime.
+# Build with: cargo build --bin mesoclaw
+name = "mesoclaw"
+path = "src/bin/cli.rs"
+required-features = ["cli"]
+
+[[bin]]
+# Tauri desktop GUI binary.
+# Build with: cargo build --bin mesoclaw-desktop
+name = "mesoclaw-desktop"
+path = "src/bin/desktop.rs"
+required-features = ["desktop"]
+
+# ---------------------------------------------------------------------------
+# Feature flags
+# ---------------------------------------------------------------------------
+# CI matrix — test these combinations:
+#   cargo build --features core,cli          (minimal: no desktop, no gateway)
+#   cargo build                              (default features)
+#   cargo build --all-features               (full build)
+
+[features]
+default = ["core", "cli", "desktop"]
+# Core library modules — always compiled when the library is used
+core = []
+# Headless CLI binary
+cli = []
+# Tauri desktop GUI binary
+desktop = []
+# Gateway server (inter-process communication hub) — Phase 2
+gateway = []
+# Sidecar process management — required by containers and mcp-client
+sidecars = []
+# Container runtime integration (requires sidecar management)
+containers = ["sidecars"]
+# MCP (Model Context Protocol) client integration (requires sidecar management)
+mcp-client = ["sidecars"]
+# Telegram channel integration
+channels-telegram = []
+# Task/trigger scheduler
+scheduler = []
+# Vector-based memory store (embedding similarity search)
+memory-vector = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -57,6 +106,9 @@ dirs = "5.0"
 urlencoding = "2"
 serde_yaml = "0.9"
 tracing = "0.1"
+
+# CLI dependencies
+clap = { version = "4", features = ["derive"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-autostart = "2.5.1"
