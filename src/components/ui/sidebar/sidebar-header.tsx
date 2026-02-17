@@ -37,7 +37,7 @@ export function SidebarHeader({ expanded, onToggle }: SidebarHeaderProps) {
           size="icon"
           onClick={onToggle}
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-          className="hidden h-9 w-9 shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:inline-flex"
+          className="hidden min-h-[44px] min-w-[44px] shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:inline-flex"
         >
           {expanded ? (
             <PanelLeftClose className="size-5" />

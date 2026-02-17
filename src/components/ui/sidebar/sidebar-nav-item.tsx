@@ -32,9 +32,10 @@ export function SidebarNavItem({
         "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         "w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        // Minimum 44x44px touch target per WCAG 2.5.8 / Apple HIG
         expanded
-          ? "h-10 justify-start gap-3 px-3"
-          : "h-10 w-10 justify-center px-0",
+          ? "min-h-[44px] justify-start gap-3 px-3"
+          : "min-h-[44px] min-w-[44px] justify-center px-0",
         isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
       )}
     >

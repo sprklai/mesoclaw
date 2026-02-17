@@ -88,16 +88,30 @@ export function DialogContent({
         onClick={() => onOpenChange(false)}
         aria-hidden="true"
       />
-      {/* Content */}
+
+      {/*
+       * Responsive dialog content:
+       *
+       * Mobile (< sm): Bottom sheet pattern — slides up from the bottom edge.
+       *   - Full width, rounded top corners only
+       *   - Max height 90vh with overflow scroll
+       *   - Safe area bottom padding for notched devices
+       *
+       * Desktop (>= sm): Centered modal — classic overlay pattern.
+       *   - Centered in viewport with padding
+       *   - All corners rounded
+       */}
+
+      {/* Desktop: centered modal container */}
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+        className="fixed inset-0 z-50 hidden items-center justify-center p-4 overflow-y-auto sm:flex"
         style={{ zIndex }}
       >
         <div
           className={cn(
-            "grid w-full max-w-lg gap-4 border bg-popover shadow-xl sm:rounded-lg relative overflow-hidden p-6",
+            "grid w-full max-w-lg gap-4 border bg-popover shadow-xl rounded-lg relative overflow-hidden p-6",
             "will-change-transform",
-            className
+            className,
           )}
           style={{ color: "var(--popover-foreground)" }}
           role="dialog"
@@ -107,45 +121,95 @@ export function DialogContent({
           onClick={(e) => e.stopPropagation()}
           {...props}
         >
-          {React.Children.map(children, (child) => {
-            if (React.isValidElement(child)) {
-              if (child.type === DialogTitle) {
-                return React.cloneElement(child, {
-                  id: (child.props as { id?: string }).id || titleId,
-                } as React.HTMLAttributes<HTMLElement>);
-              }
-              if (child.type === DialogDescription) {
-                return React.cloneElement(child, {
-                  id: (child.props as { id?: string }).id || descriptionId,
-                } as React.HTMLAttributes<HTMLElement>);
-              }
-            }
-            return child;
-          })}
-          <button
-            className="absolute right-6 top-6 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            onClick={() => onOpenChange(false)}
-            aria-label="Close dialog"
-          >
-            <span className="sr-only">Close</span>
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                d="M6 18L18 6M6 6l12 12"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-              />
-            </svg>
-          </button>
+          {renderChildren(children, titleId, descriptionId)}
+          <CloseButton onClick={() => onOpenChange(false)} />
+        </div>
+      </div>
+
+      {/* Mobile: bottom sheet container */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-50 flex sm:hidden"
+        style={{ zIndex }}
+      >
+        <div
+          className={cn(
+            "grid w-full gap-4 border-t bg-popover shadow-xl",
+            "rounded-t-2xl relative overflow-hidden p-6",
+            // Safe area bottom padding for iPhone home indicator
+            "pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+            // Max height prevents the sheet from covering the full screen
+            "max-h-[90dvh] overflow-y-auto",
+            "will-change-transform",
+            className,
+          )}
+          style={{ color: "var(--popover-foreground)" }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          onClick={(e) => e.stopPropagation()}
+          {...props}
+        >
+          {/* Bottom sheet drag handle indicator */}
+          <div className="absolute left-1/2 top-3 h-1 w-8 -translate-x-1/2 rounded-full bg-muted-foreground/30" />
+
+          {renderChildren(children, titleId, descriptionId)}
+          <CloseButton onClick={() => onOpenChange(false)} />
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Clones children to inject accessibility IDs onto DialogTitle and
+ * DialogDescription elements.
+ */
+function renderChildren(
+  children: ReactNode,
+  titleId: string,
+  descriptionId: string,
+): ReactNode {
+  return React.Children.map(children, (child) => {
+    if (React.isValidElement(child)) {
+      if (child.type === DialogTitle) {
+        return React.cloneElement(child, {
+          id: (child.props as { id?: string }).id || titleId,
+        } as React.HTMLAttributes<HTMLElement>);
+      }
+      if (child.type === DialogDescription) {
+        return React.cloneElement(child, {
+          id: (child.props as { id?: string }).id || descriptionId,
+        } as React.HTMLAttributes<HTMLElement>);
+      }
+    }
+    return child;
+  });
+}
+
+function CloseButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      className="absolute right-6 top-6 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+      onClick={onClick}
+      aria-label="Close dialog"
+    >
+      <span className="sr-only">Close</span>
+      <svg
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          d="M6 18L18 6M6 6l12 12"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+        />
+      </svg>
+    </button>
   );
 }
 
@@ -154,7 +218,7 @@ export function DialogHeader({ className, ...props }: ComponentProps<"div">) {
     <div
       className={cn(
         "flex flex-col space-y-1.5 text-center sm:text-left",
-        className
+        className,
       )}
       {...props}
     />
@@ -166,7 +230,7 @@ export function DialogFooter({ className, ...props }: ComponentProps<"div">) {
     <div
       className={cn(
         "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
-        className
+        className,
       )}
       {...props}
     />
@@ -178,7 +242,7 @@ export function DialogTitle({ className, ...props }: ComponentProps<"h2">) {
     <h2
       className={cn(
         "text-lg font-semibold leading-none tracking-tight",
-        className
+        className,
       )}
       {...props}
     />

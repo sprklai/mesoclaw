@@ -522,6 +522,36 @@
 }
 
 /* ============================================
+   SAFE AREA INSET UTILITIES
+   For Tauri Mobile (iOS/Android) — notch & home indicator support.
+   Uses env(safe-area-inset-*) from viewport-fit=cover.
+   ============================================ */
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left);
+}
+
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right);
+}
+
+@utility mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+@utility mt-safe {
+  margin-top: env(safe-area-inset-top);
+}
+
+/* ============================================
    RESPONSIVE TYPOGRAPHY SCALE
    Fluid typography for better scaling
    ============================================ */

@@ -59,7 +59,8 @@ function MobileMenuButton({ onClick }: MobileMenuButtonProps) {
       variant="ghost"
       size="icon"
       onClick={onClick}
-      className="fixed left-3 top-3 z-40 md:hidden"
+      // min-h/min-w ensures >= 44px touch target per WCAG 2.5.8 / Apple HIG
+      className="fixed left-3 top-3 z-40 min-h-[44px] min-w-[44px] md:hidden"
       aria-label="Open menu"
     >
       <Menu className="size-5" />
@@ -102,7 +103,8 @@ function MobileSidebarPanel({
         variant="ghost"
         size="icon"
         onClick={onClose}
-        className="absolute right-2 top-2 z-50"
+        // min-h/min-w ensures >= 44px touch target per WCAG 2.5.8 / Apple HIG
+        className="absolute right-2 top-2 z-50 min-h-[44px] min-w-[44px]"
         aria-label="Close menu"
       >
         <X className="size-5" />

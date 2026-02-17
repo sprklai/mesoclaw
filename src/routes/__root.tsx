@@ -1,5 +1,6 @@
 import { Outlet, createRootRoute } from "@tanstack/react-router";
 
+import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/ui/sidebar";
 import { APP_IDENTITY } from "@/config/app-identity";
 
@@ -9,9 +10,31 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   return (
-    <div className="flex h-screen overflow-hidden">
+    /*
+     * Responsive root layout — adapts across all breakpoints:
+     *
+     *   xs / sm (< 768px)  → Single column, MobileNav fixed at bottom
+     *   md      (768-1279)  → 2-column: [256px sidebar | 1fr main]
+     *   xl      (>= 1280px) → 3-column: [256px sidebar | 1fr main | 320px panel]
+     *
+     * The third column (xl) is reserved for future contextual panels (e.g. AI
+     * assistant, schema detail view). It renders as an empty slot until content
+     * is passed via a route-level outlet or context.
+     */
+    <div className="flex h-screen flex-col overflow-hidden md:flex-row">
+      {/*
+       * Sidebar: hidden on xs/sm (< md), shown as persistent sidebar on md+.
+       * On mobile the Sidebar component renders a floating drawer instead.
+       */}
       <Sidebar />
-      <main className="flex flex-1 flex-col overflow-hidden">
+
+      {/*
+       * Main content area
+       * - Takes all remaining horizontal space on md/lg
+       * - On xl, leaves room for the right panel via the parent grid approach
+       */}
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* ── Topbar / title bar ────────────────────────────────── */}
         <div
           data-tauri-drag-region
           className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4"
@@ -26,10 +49,32 @@ function RootLayout() {
             <span className="text-xl font-bold">{APP_IDENTITY.productName}</span>
           </div>
         </div>
-        <div className="flex-1 overflow-auto p-4 pt-6 md:p-6">
+
+        {/*
+         * Scrollable page content.
+         * pb-16 on mobile to avoid content being obscured by the MobileNav bar.
+         * md:pb-0 removes that padding on desktop where MobileNav is hidden.
+         */}
+        <div className="flex-1 overflow-auto p-4 pb-20 pt-6 md:p-6 md:pb-6">
           <Outlet />
         </div>
       </main>
+
+      {/*
+       * Right contextual panel — xl breakpoint only (>= 1280px).
+       * Currently renders empty; route-level components can populate this
+       * via a future named outlet or portal mechanism.
+       * Width: 320px fixed (xl:w-80)
+       */}
+      <aside className="hidden border-l border-border xl:flex xl:w-80 xl:flex-col">
+        {/* Future: contextual panel content (schema details, AI assistant, etc.) */}
+      </aside>
+
+      {/*
+       * Mobile bottom navigation bar.
+       * Visible only on xs/sm (< md). Fixed to bottom of viewport.
+       */}
+      <MobileNav />
     </div>
   );
 }
