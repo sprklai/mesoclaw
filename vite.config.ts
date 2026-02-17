@@ -43,6 +43,7 @@ export default defineConfig(async () => ({
     globals: true,
     environment: "happy-dom",
     setupFiles: ["./vitest.setup.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.worktrees/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
