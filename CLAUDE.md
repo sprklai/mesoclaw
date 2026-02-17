@@ -199,6 +199,159 @@ See `src-tauri/CLAUDE.md` for detailed Rust standards.
 
 See `src/CLAUDE.md` for detailed React/TypeScript standards.
 
+## Development Best Practices
+
+### Incomplete Features & Technical Debt Tracking
+
+When implementing features that are not yet complete or using mock/placeholder implementations:
+
+1. **Add inline comments** with appropriate markers:
+   - `## TODO` - Feature not yet implemented
+   - `## MOCK` - Temporary mock/placeholder implementation
+   - `## FIXME` - Known bug or issue that needs fixing
+   - `## HACK` - Temporary workaround that should be refactored
+   - `## PERF` - Performance optimization needed
+   - `## SECURITY` - Security consideration or vulnerability
+   - `## REFACTOR` - Code that works but needs refactoring
+
+2. **Track in `todo.md`** at project root:
+   - Add entry with file path, line number, and description
+   - Group by category (TODO, MOCK, FIXME, etc.)
+   - Update status when addressed
+
+Example:
+```typescript
+// ## TODO: Implement actual authentication
+// See todo.md line 42
+export const login = () => {
+  return Promise.resolve({ token: "mock-token" });
+};
+```
+
+### Reusable Pattern Extraction
+
+When you notice a pattern used multiple times across files:
+
+1. **Extract to shared utilities** in appropriate location:
+   - **Frontend UI patterns**: `src/components/ui/` or `src/lib/utils/`
+   - **Frontend logic**: `src/lib/` or `src/hooks/`
+   - **Backend utilities**: `src-tauri/src/utils/`
+
+2. **Define clear interfaces** with TypeScript types or Rust traits
+
+3. **Common patterns to centralize**:
+   - **Toast notifications**: Use `sonner` toast with consistent styling
+   - **Alert dialogs**: Standardized confirmation/alert components
+   - **Form validation**: Shared validation schemas (Zod/Valibot)
+   - **Error handling**: Consistent error display components
+   - **Loading states**: Unified loading indicators/skeletons
+   - **API calls**: Wrapper functions with error handling
+   - **Date formatting**: Shared date/time utilities
+
+Example - Toast utility:
+```typescript
+// src/lib/toast.ts
+import { toast } from "sonner";
+
+export const showSuccess = (message: string) => {
+  toast.success(message, { duration: 3000 });
+};
+
+export const showError = (message: string, error?: Error) => {
+  toast.error(message, {
+    description: error?.message,
+    duration: 5000
+  });
+};
+```
+
+### Code Organization Best Practices
+
+1. **Single Responsibility**: Each function/component should do one thing well
+2. **DRY Principle**: If you write the same code twice, extract it
+3. **Fail Fast**: Validate inputs early and return errors immediately
+4. **Explicit over Implicit**: Prefer clear, verbose code over clever shortcuts
+5. **Delete Dead Code**: Remove unused code instead of commenting it out
+6. **Consistent Naming**:
+   - React components: PascalCase (`UserProfile.tsx`)
+   - Hooks: camelCase with `use` prefix (`useAuth.ts`)
+   - Utilities: camelCase (`formatDate.ts`)
+   - Types: PascalCase (`UserProfile` type)
+   - Constants: UPPER_SNAKE_CASE (`MAX_RETRIES`)
+
+### Error Handling Patterns
+
+1. **Frontend**: Use try-catch with user-friendly error messages
+   ```typescript
+   try {
+     await invoke("command_name");
+     showSuccess("Operation completed");
+   } catch (error) {
+     showError("Failed to complete operation", error);
+   }
+   ```
+
+2. **Backend**: Return `Result<T, String>` from commands
+   ```rust
+   #[tauri::command]
+   pub fn my_command() -> Result<String, String> {
+     operation().map_err(|e| e.to_string())
+   }
+   ```
+
+3. **Logging**: Use appropriate log levels
+   - `error!()` - Errors that need immediate attention
+   - `warn!()` - Potential issues or degraded functionality
+   - `info!()` - Important state changes or milestones
+   - `debug!()` - Detailed diagnostic information
+   - `trace!()` - Very verbose debugging information
+
+### Testing Best Practices
+
+1. **Test naming**: Descriptive test names that explain what is being tested
+   ```typescript
+   it("should validate email format correctly", () => {});
+   it("should handle empty input gracefully", () => {});
+   ```
+
+2. **Arrange-Act-Assert**: Structure tests clearly
+   ```typescript
+   it("should add two numbers", () => {
+     // Arrange
+     const a = 1;
+     const b = 2;
+
+     // Act
+     const result = add(a, b);
+
+     // Assert
+     expect(result).toBe(3);
+   });
+   ```
+
+3. **Test isolation**: Each test should be independent
+4. **Mock external dependencies**: Don't call real APIs in tests
+5. **Edge cases**: Test boundary conditions and error cases
+
+### Performance Considerations
+
+1. **React optimization**:
+   - Use `useMemo` for expensive calculations
+   - Use `useCallback` for functions passed to child components
+   - Lazy load routes and heavy components
+   - Debounce/throttle user input handlers
+
+2. **Backend optimization**:
+   - Use connection pooling for databases
+   - Implement caching for expensive operations
+   - Use async/await for I/O operations
+   - Batch database queries when possible
+
+3. **Bundle size**:
+   - Import only what you need from libraries
+   - Use code splitting for large features
+   - Regularly audit bundle size with `bunx vite-bundle-visualizer`
+
 ## Key Files and Directories
 
 ```
