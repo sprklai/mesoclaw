@@ -1,0 +1,61 @@
+{
+  "title": "Settings",
+  "tabs": {
+    "app": "App Settings",
+    "ai": "AI Settings",
+    "skills": "Skills",
+    "advanced": "Advanced",
+    "privacy": "Privacy"
+  },
+  "appearance": {
+    "title": "Appearance",
+    "description": "Customize how the application looks",
+    "theme": {
+      "label": "Theme",
+      "description": "Select your preferred color scheme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "language": {
+      "label": "Language",
+      "description": "Choose your preferred language"
+    },
+    "sidebarExpanded": {
+      "label": "Sidebar Expanded",
+      "description": "Keep the sidebar expanded by default"
+    }
+  },
+  "behavior": {
+    "title": "Behavior",
+    "description": "Control how the application behaves",
+    "showInTray": {
+      "label": "Show in System Tray",
+      "description": "Show the application icon in the system tray"
+    },
+    "launchAtLogin": {
+      "label": "Launch at Login",
+      "description": "Automatically start when you log in"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "description": "Configure notification preferences",
+    "enable": {
+      "label": "Enable Notifications",
+      "description": "Allow the app to send you notifications"
+    }
+  },
+  "developer": {
+    "title": "Developer",
+    "description": "Advanced settings for debugging and development",
+    "enableLogging": {
+      "label": "Enable Logging",
+      "description": "Enable detailed application logging"
+    },
+    "logLevel": {
+      "label": "Log Level",
+      "description": "Set the minimum log level to record"
+    }
+  }
+}

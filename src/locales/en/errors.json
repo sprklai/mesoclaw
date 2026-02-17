@@ -1,0 +1,24 @@
+{
+  "connection": {
+    "failed": "Connection failed",
+    "timeout": "Connection timeout",
+    "refused": "Connection refused"
+  },
+  "validation": {
+    "required": "This field is required",
+    "invalid": "Invalid value",
+    "tooShort": "Value is too short",
+    "tooLong": "Value is too long"
+  },
+  "api": {
+    "generalError": "An error occurred while communicating with the server",
+    "unauthorized": "Unauthorized access",
+    "forbidden": "Access forbidden",
+    "notFound": "Resource not found"
+  },
+  "file": {
+    "notFound": "File not found",
+    "readError": "Error reading file",
+    "writeError": "Error writing file"
+  }
+}

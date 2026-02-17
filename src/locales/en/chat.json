@@ -1,0 +1,18 @@
+{
+  "placeholder": "Ask anything about your database...",
+  "emptyState": {
+    "title": "Start a conversation",
+    "description": "Ask questions about your database schema, relationships, or queries"
+  },
+  "actions": {
+    "send": "Send",
+    "clear": "Clear conversation",
+    "copy": "Copy message",
+    "regenerate": "Regenerate response"
+  },
+  "status": {
+    "thinking": "Thinking...",
+    "streaming": "Generating response...",
+    "error": "Failed to get response"
+  }
+}

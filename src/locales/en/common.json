@@ -1,0 +1,30 @@
+{
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "copy": "Copy",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Finish",
+    "confirm": "Confirm"
+  },
+  "navigation": {
+    "home": "Home",
+    "settings": "Settings",
+    "chat": "Chat"
+  },
+  "status": {
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "noResults": "No results found",
+    "error": "An error occurred"
+  },
+  "tableCount_one": "{{count}} table",
+  "tableCount_other": "{{count}} tables",
+  "itemCount_one": "{{count}} item",
+  "itemCount_other": "{{count}} items"
+}

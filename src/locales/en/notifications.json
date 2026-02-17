@@ -1,0 +1,19 @@
+{
+  "workspace": {
+    "created": "Workspace '{{name}}' created successfully",
+    "updated": "Workspace updated successfully",
+    "deleted": "Workspace deleted successfully"
+  },
+  "settings": {
+    "saved": "Settings saved successfully",
+    "error": "Failed to save settings"
+  },
+  "ai": {
+    "providerSet": "AI provider set to {{provider}}",
+    "keyUpdated": "API key updated successfully"
+  },
+  "general": {
+    "success": "Operation completed successfully",
+    "error": "Operation failed"
+  }
+}

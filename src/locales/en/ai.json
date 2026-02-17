@@ -1,0 +1,22 @@
+{
+  "providers": {
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    "google": "Google AI",
+    "groq": "Groq",
+    "vercel": "Vercel AI Gateway",
+    "ollama": "Ollama (Local)"
+  },
+  "skills": {
+    "title": "Skills",
+    "description": "Custom AI capabilities",
+    "create": "Create Skill",
+    "edit": "Edit Skill",
+    "delete": "Delete Skill",
+    "execute": "Execute Skill"
+  },
+  "models": {
+    "select": "Select Model",
+    "custom": "Custom Model"
+  }
+}
