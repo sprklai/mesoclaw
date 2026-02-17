@@ -1,0 +1,311 @@
+# MesoClaw Documentation Index
+
+This index organizes all documentation for the MesoClaw project, providing a structured guide to architecture, planning, features, and implementation.
+
+## 🚀 Quick Start (New Contributors)
+
+**Start here if you're new to the project:**
+
+1. **[README](../README.md)** - Project overview, features, quick start commands
+2. **[CLAUDE.md](../CLAUDE.md)** - High-level orientation and common development tasks
+3. **[.claude/CLAUDE.md](../.claude/CLAUDE.md)** - Comprehensive project standards and code conventions
+
+## 📋 Where to Start & Track Work
+
+### For Implementation Work
+
+**Finding Active Work:**
+1. Check **[Implementation Plan](./implementation-plan.md)** - Master roadmap with phase status
+2. Review **[Active Plans](#active-implementation-plans)** below - Current bite-sized task lists
+3. Look at **Task Management** - Use `TaskList`, `TaskCreate`, `TaskUpdate` tools in Claude Code
+
+**Workflow:**
+```
+Design → Plan → Implement → Test → Commit → Review
+   ↓       ↓        ↓         ↓       ↓        ↓
+Design  Bite-sized  TDD     Unit/    Git    Code
+ Doc     Tasks    Approach  E2E           Review
+```
+
+**Task Tracking:**
+- **In Claude Code Session**: Use Task tools (`/tasks` to list)
+- **In Plans**: Each implementation plan has numbered tasks with checkboxes
+- **In Git**: Commits reference task/plan numbers
+
+### Implementation Sequence
+
+**Phase-Based Development** (see [Implementation Plan](./implementation-plan.md)):
+
+1. **Phase 0: Foundation** ✅ Complete
+   - Project setup, dependencies, tooling
+
+2. **Phase 1: Backend Infrastructure** ✅ Complete
+   - Database providers, models, services
+
+3. **Phase 2: AI Integration** ✅ Complete
+   - LLM providers, skills system, agents
+
+4. **Phase 3: Frontend UI** ✅ Complete
+   - React components, routing, state management
+
+5. **Phase 4: IPC Commands** 🔄 In Progress
+   - Tauri command layer, frontend-backend integration
+
+6. **Future Phases**
+   - i18n (planned - see [i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md))
+   - Mobile support
+   - Additional database providers
+
+### Testing Sequence
+
+**For each feature, follow this test sequence:**
+
+1. **Unit Tests** - Test individual functions/components
+   - Location: `src/__tests__/` (frontend), `src-tauri/src/*/tests/` (backend)
+   - Run: `bun run test` (frontend), `cargo test --lib` (backend)
+
+2. **Integration Tests** - Test feature integration
+   - Location: `src-tauri/tests/` (backend integration)
+   - Run: `cargo test`
+
+3. **E2E Tests** - Test user workflows
+   - Based on: [User Journey](./user-journey.md)
+   - Manual testing + automated (future)
+
+4. **Accessibility Tests** - Keyboard navigation, screen readers
+   - Guide: [Accessibility Improvements](./features/accessibility/ACCESSIBILITY_IMPROVEMENTS.md)
+
+5. **Security Tests** - Credential storage, API key handling
+   - Guide: [Secure Storage](./security/SECURE_STORAGE.md)
+
+**Test Plan Reference:** [Test Plan](./test-plan.md)
+
+---
+
+## 📚 Architecture Documentation
+
+### Core Architecture
+- **[Architecture Diagram](./architecture-diagram.md)** - Complete system architecture overview with diagrams
+- **[Frontend Database-Agnostic Design](./architecture/frontend-database-agnostic-design.md)** - Frontend abstraction layer
+- **[AI Multi-Provider Design](./architecture/AI_MULTI_PROVIDER_DESIGN.md)** - AI provider integration architecture
+- **[Tauri Plugin Baseline](./architecture/tauri-plugin-baseline.md)** - Tauri plugin architecture and patterns
+
+### Ecosystem Analysis
+- **[Claw Ecosystem Analysis](./claw-ecosystem-analysis.md)** - Analysis of Claw family products (ZeroClaw, MicroClaw, etc.)
+- **[Moltis/MicroClaw Analysis](./moltis-microclaw-analysis.md)** - Comparison with related products
+- **[TauriClaw Gap Analysis](./tauriclaw-gap-analysis.md)** - Feature gap analysis and roadmap
+
+---
+
+## 🎯 Implementation Plans
+
+### Active Implementation Plans
+
+**Current Focus:**
+
+- **[i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md)** 🔥 **START HERE**
+  - Frontend internationalization with react-i18next
+  - 12 bite-sized tasks (2-5 min each)
+  - Estimated: 3-4 hours
+  - Status: Ready to implement
+  - Design: [i18n Design](./plans/2026-02-16-i18n-design.md)
+
+**Recent Plans:**
+
+- [MesoClaw Refactoring Plan](./plans/2026-02-16-mesoclaw-refactoring-plan.md) - Bite-sized refactoring tasks
+- [MesoClaw Refactoring Design](./plans/2026-02-16-mesoclaw-refactoring-design.md) - Documentation and code cleanup
+- [CLI + Gateway + Agents Design](./plans/2026-02-16-cli-gateway-agents-design.md) - CLI-first architecture
+- [Sidecar Modularity Design](./plans/2026-02-16-sidecar-modularity-design.md) - Sidecar architecture for modularity
+- [Doc Reconciliation Draft](./plans/2026-02-16-doc-reconciliation-draft.md) - Documentation cleanup
+
+### Master Roadmap
+
+- **[Implementation Plan](./implementation-plan.md)** - Phase-based master roadmap
+- **[Test Plan](./test-plan.md)** - Comprehensive testing strategy
+
+---
+
+## 📖 Product & Requirements
+
+- **[Product Requirements](./product-requirements.md)** - Complete PRD with functional requirements
+- **[User Journey](./user-journey.md)** - User experience flows and scenarios
+- **[Generated Diagrams](./generated-diagrams.md)** - Auto-generated architecture diagrams
+
+---
+
+## ⚡ Features
+
+### AI & Chat
+- **[Chat Functionality](./features/CHAT_FUNCTIONALITY.md)** - Chat interface implementation guide
+- **[Skill System](./features/SKILL_SYSTEM.md)** - AI skill system architecture and usage
+
+### Accessibility
+- **[Accessibility Improvements](./features/accessibility/ACCESSIBILITY_IMPROVEMENTS.md)** - Accessibility enhancements
+- **[Keyboard Navigation](./features/accessibility/KEYBOARD_NAVIGATION.md)** - Keyboard shortcuts and navigation patterns
+
+---
+
+## 🔒 Security
+
+- **[Secure Storage](./security/SECURE_STORAGE.md)** - Secure credential storage design
+- **[Secure Storage Quickstart](./security/SECURE_STORAGE_QUICKSTART.md)** - Quick reference guide
+- **[Keychain Migration](./security/KEYCHAIN_MIGRATION.md)** - Migration guide for keychain storage
+
+---
+
+## 🎨 UI/UX
+
+- **[UI/UX Improvements](./ux/UI_UX_IMPROVEMENTS.md)** - Interface improvements and enhancements
+- **[Splash Screen Fix](./ui-fixes/SPLASH_SCREEN_FIX.md)** - Splash screen implementation
+- **[Splash Screen Position Fix](./ui-fixes/SPLASH_SCREEN_POSITION_FIX.md)** - Splash screen positioning
+
+---
+
+## 🛠️ Build & Optimization
+
+- **[Build Optimizations](./BUILD_OPTIMIZATIONS.md)** - Build performance improvements and optimization strategies
+
+---
+
+## 🔄 Workflow Guide
+
+### Starting a New Feature
+
+```
+1. Design Phase
+   ├─ Read: Product Requirements → User Journey
+   ├─ Read: Related Architecture Docs
+   ├─ Create: Design document (docs/plans/YYYY-MM-DD-{feature}-design.md)
+   └─ Get: Design approval
+
+2. Planning Phase
+   ├─ Create: Implementation plan (docs/plans/YYYY-MM-DD-{feature}-implementation.md)
+   ├─ Break down: Into bite-sized tasks (2-5 min each)
+   └─ Define: Success criteria
+
+3. Implementation Phase (TDD Approach)
+   ├─ For each task:
+   │  ├─ Write: Failing test
+   │  ├─ Run: Verify test fails
+   │  ├─ Implement: Minimal code to pass
+   │  ├─ Run: Verify test passes
+   │  └─ Commit: With descriptive message
+   └─ Review: Code quality, security, accessibility
+
+4. Testing Phase
+   ├─ Unit tests: Individual components
+   ├─ Integration tests: Feature integration
+   ├─ E2E tests: User workflows
+   ├─ Accessibility: Keyboard + screen reader
+   └─ Security: Credential handling
+
+5. Documentation Phase
+   ├─ Update: Feature documentation
+   ├─ Update: API documentation
+   ├─ Update: This index (if needed)
+   └─ Update: CHANGELOG
+```
+
+### Task Management in Claude Code
+
+**Creating tasks:**
+```
+Use TaskCreate tool with:
+- subject: Brief task title
+- description: Detailed requirements
+- activeForm: Present continuous (e.g., "Implementing feature")
+```
+
+**Tracking tasks:**
+```
+TaskList - View all tasks with status
+TaskGet - Get task details
+TaskUpdate - Update status (pending → in_progress → completed)
+```
+
+**Task workflow:**
+```
+pending → in_progress → completed
+   ↓          ↓             ↓
+ Created   Working on    Verified
+           the task      & Done
+```
+
+---
+
+## 📊 Current Project Status
+
+**Completed:**
+- ✅ Phase 0-3: Foundation, Backend, AI, Frontend
+- ✅ SSH Tunnel Support (~95%)
+- ✅ MongoDB Integration (~95%)
+- ✅ AI Skill System (8 built-in skills)
+- ✅ Secure credential storage
+
+**In Progress:**
+- 🔄 Phase 4: IPC Commands (Phase 4.6-4.7 remaining)
+- 🔄 i18n Implementation (plan ready)
+
+**Planned:**
+- ⏳ Supabase database integration
+- ⏳ Mobile UI support
+- ⏳ Additional language translations
+
+---
+
+## 🎯 Quick Links by Role
+
+### For Developers
+1. Start: [CLAUDE.md](../CLAUDE.md)
+2. Architecture: [Architecture Diagram](./architecture-diagram.md)
+3. Active Work: [i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md)
+4. Testing: [Test Plan](./test-plan.md)
+5. Standards: [.claude/CLAUDE.md](../.claude/CLAUDE.md)
+
+### For Designers
+1. User Flows: [User Journey](./user-journey.md)
+2. UI/UX: [UI/UX Improvements](./ux/UI_UX_IMPROVEMENTS.md)
+3. Accessibility: [Accessibility Improvements](./features/accessibility/ACCESSIBILITY_IMPROVEMENTS.md)
+
+### For Security Reviewers
+1. Credentials: [Secure Storage](./security/SECURE_STORAGE.md)
+2. Architecture: [AI Multi-Provider Design](./architecture/AI_MULTI_PROVIDER_DESIGN.md)
+
+### For Product Managers
+1. Requirements: [Product Requirements](./product-requirements.md)
+2. Roadmap: [Implementation Plan](./implementation-plan.md)
+3. Status: This document's [Current Project Status](#current-project-status)
+
+---
+
+## 📝 Documentation Standards
+
+**Creating new documentation:**
+
+1. **Architecture Docs** → `docs/architecture/`
+   - High-level design, diagrams, trade-offs
+   - Format: Markdown with Mermaid diagrams
+
+2. **Implementation Plans** → `docs/plans/YYYY-MM-DD-{feature}-implementation.md`
+   - Bite-sized tasks (2-5 min each)
+   - Exact file paths, complete code snippets
+   - TDD approach: test → fail → implement → pass → commit
+
+3. **Design Docs** → `docs/plans/YYYY-MM-DD-{feature}-design.md`
+   - Requirements, approaches, decision rationale
+   - Architecture overview, file structure
+
+4. **Feature Docs** → `docs/features/`
+   - User-facing functionality, usage examples
+   - API references, code examples
+
+5. **Security Docs** → `docs/security/`
+   - Threat models, mitigation strategies
+   - Secure coding guidelines
+
+---
+
+**Last Updated:** 2026-02-16
+**Maintained By:** MesoClaw Development Team
+
+**Need help?** Start with [README](../README.md) → [CLAUDE.md](../CLAUDE.md) → This index
