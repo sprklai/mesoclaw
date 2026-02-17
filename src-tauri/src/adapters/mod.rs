@@ -5,7 +5,7 @@
 
 mod traits;
 
-// Database-specific adapter module removed - was aiboilerplate-specific code that's not needed in boilerplate
+// Database-specific adapter module removed - legacy project-specific code no longer needed.
 // Re-implement if you need database-specific AI skills integration
 pub use traits::{
     AdapterError, ApplicationAdapter, ContextBag, ContextType, ToolCall, ToolDefinition, ToolResult,

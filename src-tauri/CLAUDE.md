@@ -1,6 +1,6 @@
 # Backend Code Standards (src-tauri/)
 
-This directory contains the Rust backend for aiboilerplate, built with Tauri 2, Diesel ORM, and async patterns.
+This directory contains the Rust backend for the application, built with Tauri 2, Diesel ORM, and async patterns.
 
 ## Tech Stack
 

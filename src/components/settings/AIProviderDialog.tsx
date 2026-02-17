@@ -28,6 +28,7 @@ import {
   XCircle,
 } from "@/lib/icons";
 import { showError, showSuccess } from "@/lib/toast";
+import { APP_IDENTITY } from "@/config/app-identity";
 import { useLLMStore } from "@/stores/llm";
 
 interface AIProviderDialogProps {
@@ -169,7 +170,7 @@ export function AIProviderDialog({
       // Save API key to keychain
       if (apiKey.trim()) {
         await invoke("keychain_set", {
-          service: "com.sprklai.aiboilerplate",
+          service: APP_IDENTITY.keychainService,
           key: `api_key:${providerId}`,
           value: apiKey,
         });
@@ -184,13 +185,13 @@ export function AIProviderDialog({
       // Save gateway URLs
       if (selectedProvider === "vercel_gateway") {
         await invoke("keychain_set", {
-          service: "com.sprklai.aiboilerplate",
+          service: APP_IDENTITY.keychainService,
           key: "gateway-url-vercel-ai-gateway",
           value: vercelGatewayUrl,
         });
       } else if (selectedProvider === "openrouter") {
         await invoke("keychain_set", {
-          service: "com.sprklai.aiboilerplate",
+          service: APP_IDENTITY.keychainService,
           key: "gateway-url-openrouter",
           value: openrouterGatewayUrl,
         });

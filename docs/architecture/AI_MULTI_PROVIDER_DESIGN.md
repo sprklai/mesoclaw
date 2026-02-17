@@ -3,15 +3,17 @@
 > The multi-provider architecture below is being simplified. Three near-identical provider
 > implementations (OpenAI-compatible: 678 lines, OpenRouter: 566 lines, Vercel: 554 lines)
 > will be consolidated into a single `GenericProvider` using the `async-openai` crate (~200 lines).
-> See `docs/tauriclaw-gap-analysis.md` item S2 for details.
+> See `docs/mesoclaw-gap-analysis.md` item S2 for details.
 >
 > **What changes**:
+>
 > - All OpenAI-compatible providers merge into one `GenericProvider` struct
 > - Provider differences reduced to `base_url` + optional `api_key` + optional headers
 > - `async-openai` handles streaming, retries, and protocol compliance
 > - Anthropic remains separate (different API format) but uses a thin adapter
 >
 > **What stays the same**:
+>
 > - The `LLMProvider` trait interface
 > - Frontend provider selection UI
 > - OS keyring storage for API keys
@@ -627,7 +629,7 @@ interface LLMState {
   checkApiKeyStatus: () => Promise<Record<string, boolean>>;
   testProviderConnection: (
     providerId: string,
-    modelId: string
+    modelId: string,
   ) => Promise<TestResult>;
 }
 ```

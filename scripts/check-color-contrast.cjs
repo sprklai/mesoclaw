@@ -3,7 +3,7 @@
 /**
  * Color Contrast Verification Script
  *
- * This script validates that all color tokens used in aiboilerplate
+ * This script validates that all color tokens used in the app
  * meet WCAG AA contrast requirements.
  *
  * WCAG AA Requirements:

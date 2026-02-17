@@ -1,14 +1,14 @@
-# TauriClaw Architecture Diagram
+# Mesoclaw Architecture Diagram
 
-> Complete system architecture for TauriClaw — a desktop AI agent built on Tauri 2.
-> Reference: `docs/claw-ecosystem-analysis.md`, `docs/tauriclaw-gap-analysis.md`
+> Complete system architecture for Mesoclaw — a desktop AI agent built on Tauri 2.
+> Reference: `docs/claw-ecosystem-analysis.md`, `docs/mesoclaw-gap-analysis.md`
 
 ---
 
 ### System Overview (CLI-First)
 
 ```
-                              tauriclaw-core (lib.rs)
+                              mesoclaw-core (lib.rs)
                     ┌──────────────────────────────────────┐
                     │           Daemon + Gateway            │
                     │     (axum HTTP + WebSocket on         │
@@ -55,23 +55,23 @@
 │  │  └────────────────────────┬───────────────────────────────┘  │  │
 │  │                           │                                  │  │
 │  │  ┌────────────────────────▼───────────────────────────────┐  │  │
-│  │  │         Typed IPC Layer (invoke + listen)              │  │  │
-│  │  │  invoke<T>("command", args) → Promise<T>               │  │  │
-│  │  │  listen("event-name", handler) → unlisten              │  │  │
+│  │  │      Gateway Client Layer (HTTP + WebSocket)           │  │  │
+│  │  │  fetch("/api/v1/*") + ws://127.0.0.1:18790/api/v1/ws  │  │  │
+│  │  │  Tauri IPC only for window/tray/native notifications   │  │  │
 │  │  └────────────────────────┬───────────────────────────────┘  │  │
 │  └───────────────────────────┼───────────────────────────────────┘  │
 │                              │                                      │
 │  ════════════════════════════╪══════════════════════════════════════ │
-│              Tauri IPC Bridge (WebView ↔ Rust)                      │
+│         Local Gateway Transport (WebView ↔ 127.0.0.1 API)           │
 │  ════════════════════════════╪══════════════════════════════════════ │
 │                              │                                      │
 │  ┌───────────────────────────▼───────────────────────────────────┐  │
 │  │                  BACKEND (Rust / Tauri 2)                     │  │
 │  │                                                               │  │
 │  │  ┌───────────────────────────────────────────────────────┐   │  │
-│  │  │              Commands Layer (IPC Handlers)             │   │  │
-│  │  │  agent_cmds · provider_cmds · memory_cmds             │   │  │
-│  │  │  scheduler_cmds · identity_cmds · security_cmds       │   │  │
+│  │  │          Gateway API Layer (REST + WebSocket)         │   │  │
+│  │  │  agent · providers · memory · scheduler · identity    │   │  │
+│  │  │  modules · channels · system                           │   │  │
 │  │  └───────────────────────┬───────────────────────────────┘   │  │
 │  │                          │                                    │  │
 │  │  ┌───────────────────────▼───────────────────────────────┐   │  │
@@ -120,17 +120,16 @@
 ```
 src-tauri/src/
 │
-├── main.rs                          # Binary entry point
-├── lib.rs                           # Module tree + Tauri setup + prelude
+├── lib.rs                           # Module tree + daemon/gateway setup + prelude
+├── bin/
+│   ├── cli.rs                       # CLI entry point
+│   └── desktop.rs                   # Tauri desktop entry point
 │
-├── commands/                        # ── Tauri IPC Command Handlers ──
-│   ├── agent_commands.rs            #   Start/stop agent sessions, send messages
-│   ├── provider_commands.rs         #   List/set/test LLM providers
-│   ├── memory_commands.rs           #   Store/recall/forget/search memory
-│   ├── scheduler_commands.rs        #   CRUD for scheduled jobs
-│   ├── identity_commands.rs         #   Read/update identity files
-│   ├── security_commands.rs         #   Approval responses, policy config
-│   └── streaming_chat.rs            #   (existing) Single-turn streaming
+├── gateway/                         # ── Primary Control Plane ──
+│   ├── routes.rs                    #   REST endpoints
+│   ├── ws.rs                        #   WebSocket event stream + commands
+│   ├── auth.rs                      #   Bearer token auth middleware
+│   └── daemon.rs                    #   lifecycle (port, pid, token)
 │
 ├── agent/                           # ── Agent Loop (P0.3) ──
 │   ├── mod.rs                       #   Public API
@@ -249,26 +248,26 @@ src-tauri/src/
 User types message
        │
        ▼
-┌──────────────┐     invoke("stream_chat")     ┌────────────────┐
-│   Frontend   │ ──────────────────────────────▶│  Commands      │
-│  PromptInput │                                │  Layer         │
-└──────────────┘                                └───────┬────────┘
-                                                        │
-       ┌────────────────────────────────────────────────▼─────────┐
-       │                  LLM Provider                             │
-       │  ReliableProvider → GenericProvider → Remote API          │
-       │  (retry 3x)        (async-openai)    (OpenAI/Anthropic)  │
-       └────────────────────────────┬─────────────────────────────┘
-                                    │ SSE stream
-       ┌────────────────────────────▼─────────────────────────────┐
-       │                  Tauri Event Emit                         │
-       │  app_handle.emit("chat-token", { token, done })          │
-       └────────────────────────────┬─────────────────────────────┘
-                                    │
-       ┌────────────────────────────▼──────┐
-       │  Frontend: Conversation component │
-       │  Renders tokens incrementally     │
-       └───────────────────────────────────┘
+┌──────────────┐   POST /api/v1/agent/sessions/{id}/messages  ┌───────────────┐
+│   Frontend   │ ──────────────────────────────────────────────▶│ Gateway API   │
+│  PromptInput │                                                │ (REST)        │
+└──────────────┘                                                └──────┬────────┘
+                                                                        │
+       ┌────────────────────────────────────────────────────────────────▼───────┐
+       │                            Agent + Provider                             │
+       │  ReliableProvider → GenericProvider → Remote API                        │
+       │  (retry 3x)        (async-openai)    (OpenAI/Anthropic/Ollama)          │
+       └───────────────────────────────────────────┬──────────────────────────────┘
+                                                   │ token/tool events
+       ┌───────────────────────────────────────────▼──────────────────────────────┐
+       │                   WebSocket Stream /api/v1/ws                             │
+       │  agent.token · agent.tool_start · agent.tool_result · agent.complete     │
+       └───────────────────────────────────────────┬──────────────────────────────┘
+                                                   │
+       ┌───────────────────────────────────────────▼──────┐
+       │  Frontend: Conversation component                 │
+       │  Renders tokens and tool states incrementally     │
+       └───────────────────────────────────────────────────┘
 ```
 
 ### Multi-Turn Agent Loop (New — P0.3)
@@ -455,7 +454,7 @@ Adapted from ZeroClaw's 6-layer model for desktop context:
 ## Storage Architecture
 
 ```
-~/.tauriclaw/                          # Application data directory
+~/.mesoclaw/                          # Application data directory
 ├── config.toml                        # User configuration (TOML + env overrides)
 ├── app.db                             # SQLite database
 │   ├── chat_sessions                  #   Session metadata
@@ -621,28 +620,28 @@ Mobile (<768px)
 
 ### Breakpoint System
 
-| Breakpoint | Name | Layout | Columns | Navigation |
-|-----------|------|--------|---------|------------|
-| >1280px | `xl` | Full 3-panel | Sidebar + Chat + Detail | Persistent sidebar |
-| 1024-1280px | `lg` | 2-panel + overlay | Sidebar + Chat | Persistent sidebar, detail as overlay |
-| 768-1024px | `md` | 2-panel collapsible | Toggle sidebar + Chat | Hamburger menu |
-| 640-768px | `sm` | Single + drawer | Chat only | Bottom nav + drawer |
-| <640px | `xs` | Single compact | Chat only | Bottom nav + drawer |
+| Breakpoint  | Name | Layout              | Columns                 | Navigation                            |
+| ----------- | ---- | ------------------- | ----------------------- | ------------------------------------- |
+| >1280px     | `xl` | Full 3-panel        | Sidebar + Chat + Detail | Persistent sidebar                    |
+| 1024-1280px | `lg` | 2-panel + overlay   | Sidebar + Chat          | Persistent sidebar, detail as overlay |
+| 768-1024px  | `md` | 2-panel collapsible | Toggle sidebar + Chat   | Hamburger menu                        |
+| 640-768px   | `sm` | Single + drawer     | Chat only               | Bottom nav + drawer                   |
+| <640px      | `xs` | Single compact      | Chat only               | Bottom nav + drawer                   |
 
 ### Component Responsive Behavior
 
-| Component | Desktop | Tablet | Mobile |
-|-----------|---------|--------|--------|
-| **Sidebar** | Always visible, 256px wide | Collapsible (hamburger), overlay | Hidden, drawer from left |
-| **Chat messages** | Full width with max-width 800px | Full width | Full width, compact spacing |
-| **PromptInput** | Bottom of chat area | Bottom of chat area | Fixed bottom with safe area inset |
-| **Settings** | Tabbed panel in sidebar or route | Full-screen route | Full-screen route |
-| **Tool execution** | Inline in chat + detail panel | Inline in chat | Inline in chat, expandable |
-| **Approval overlay** | Centered modal | Centered modal | Bottom sheet |
-| **Memory search** | Detail panel (right) | Overlay panel | Full-screen route |
-| **Scheduler** | Settings tab | Full-screen route | Full-screen route |
-| **System tray** | Native OS tray | N/A (mobile) | N/A (mobile) |
-| **Notifications** | Desktop native toast | Mobile native push (APNs/FCM) | Mobile native push |
+| Component            | Desktop                          | Tablet                           | Mobile                            |
+| -------------------- | -------------------------------- | -------------------------------- | --------------------------------- |
+| **Sidebar**          | Always visible, 256px wide       | Collapsible (hamburger), overlay | Hidden, drawer from left          |
+| **Chat messages**    | Full width with max-width 800px  | Full width                       | Full width, compact spacing       |
+| **PromptInput**      | Bottom of chat area              | Bottom of chat area              | Fixed bottom with safe area inset |
+| **Settings**         | Tabbed panel in sidebar or route | Full-screen route                | Full-screen route                 |
+| **Tool execution**   | Inline in chat + detail panel    | Inline in chat                   | Inline in chat, expandable        |
+| **Approval overlay** | Centered modal                   | Centered modal                   | Bottom sheet                      |
+| **Memory search**    | Detail panel (right)             | Overlay panel                    | Full-screen route                 |
+| **Scheduler**        | Settings tab                     | Full-screen route                | Full-screen route                 |
+| **System tray**      | Native OS tray                   | N/A (mobile)                     | N/A (mobile)                      |
+| **Notifications**    | Desktop native toast             | Mobile native push (APNs/FCM)    | Mobile native push                |
 
 ### Tailwind CSS 4 Responsive Patterns
 
@@ -671,16 +670,16 @@ Mobile (<768px)
 
 ### Mobile-Specific Considerations
 
-| Concern | Solution |
-|---------|----------|
+| Concern                                | Solution                                                      |
+| -------------------------------------- | ------------------------------------------------------------- |
 | **Safe areas** (notch, home indicator) | `env(safe-area-inset-*)` via Tailwind `safe-area-*` utilities |
-| **Virtual keyboard** | `visualViewport` API to resize chat on keyboard open |
-| **Touch targets** | Minimum 44x44px for all interactive elements |
-| **Swipe gestures** | Swipe right → open sidebar. Swipe left → close sidebar |
-| **Pull to refresh** | Pull down in chat → load older messages |
-| **Haptic feedback** | Tauri mobile APIs for button press feedback |
-| **Dark mode** | `prefers-color-scheme` + manual toggle (already exists) |
-| **Offline mode** | Queue messages locally, send when back online |
+| **Virtual keyboard**                   | `visualViewport` API to resize chat on keyboard open          |
+| **Touch targets**                      | Minimum 44x44px for all interactive elements                  |
+| **Swipe gestures**                     | Swipe right → open sidebar. Swipe left → close sidebar        |
+| **Pull to refresh**                    | Pull down in chat → load older messages                       |
+| **Haptic feedback**                    | Tauri mobile APIs for button press feedback                   |
+| **Dark mode**                          | `prefers-color-scheme` + manual toggle (already exists)       |
+| **Offline mode**                       | Queue messages locally, send when back online                 |
 
 ---
 
@@ -733,20 +732,20 @@ Mobile (<768px)
 
 ### Platform Support Matrix
 
-| Platform | Architecture | Target Triple | Bundle | Signing |
-|----------|-------------|---------------|--------|---------|
-| macOS | Apple Silicon | `aarch64-apple-darwin` | DMG, APP | Apple notarization |
-| macOS | Intel | `x86_64-apple-darwin` | DMG, APP | Apple notarization |
-| macOS | Universal | `lipo` of both | DMG, APP | Apple notarization |
-| Windows | x64 | `x86_64-pc-windows-msvc` | MSI, NSIS | Azure Trusted Signing |
-| Windows | ARM64 | `aarch64-pc-windows-msvc` | MSI, NSIS | Azure Trusted Signing |
-| Linux | x64 (22.04) | `x86_64-unknown-linux-gnu` | DEB | — |
-| Linux | x64 (24.04) | `x86_64-unknown-linux-gnu` | AppImage, RPM | — |
-| Linux | ARM64 | `aarch64-unknown-linux-gnu` | DEB, AppImage | — |
-| iOS | arm64 | `aarch64-apple-ios` | IPA | Apple distribution |
-| Android | arm64-v8a | `aarch64-linux-android` | AAB, APK | Keystore |
-| Android | armeabi-v7a | `armv7-linux-androideabi` | AAB, APK | Keystore |
-| Android | x86_64 | `x86_64-linux-android` | APK (emulator) | Debug |
+| Platform | Architecture  | Target Triple               | Bundle         | Signing               |
+| -------- | ------------- | --------------------------- | -------------- | --------------------- |
+| macOS    | Apple Silicon | `aarch64-apple-darwin`      | DMG, APP       | Apple notarization    |
+| macOS    | Intel         | `x86_64-apple-darwin`       | DMG, APP       | Apple notarization    |
+| macOS    | Universal     | `lipo` of both              | DMG, APP       | Apple notarization    |
+| Windows  | x64           | `x86_64-pc-windows-msvc`    | MSI, NSIS      | Azure Trusted Signing |
+| Windows  | ARM64         | `aarch64-pc-windows-msvc`   | MSI, NSIS      | Azure Trusted Signing |
+| Linux    | x64 (22.04)   | `x86_64-unknown-linux-gnu`  | DEB            | —                     |
+| Linux    | x64 (24.04)   | `x86_64-unknown-linux-gnu`  | AppImage, RPM  | —                     |
+| Linux    | ARM64         | `aarch64-unknown-linux-gnu` | DEB, AppImage  | —                     |
+| iOS      | arm64         | `aarch64-apple-ios`         | IPA            | Apple distribution    |
+| Android  | arm64-v8a     | `aarch64-linux-android`     | AAB, APK       | Keystore              |
+| Android  | armeabi-v7a   | `armv7-linux-androideabi`   | AAB, APK       | Keystore              |
+| Android  | x86_64        | `x86_64-linux-android`      | APK (emulator) | Debug                 |
 
 **Not supported**: 32-bit x86 on any platform. All modern OSes are 64-bit.
 
@@ -876,7 +875,7 @@ JSON          JSON (inside container)
 ### Module Manifest & Discovery
 
 ```
-~/.tauriclaw/
+~/.mesoclaw/
 ├── modules/                          ← User-installed modules
 │   ├── python-analyst/
 │   │   ├── manifest.toml            ← [module] name, type, desc
@@ -917,7 +916,7 @@ JSON          JSON (inside container)
 ### Composio.dev Integration via MCP
 
 ```
-TauriClaw                      Composio MCP Server
+Mesoclaw                      Composio MCP Server
 ┌──────────────┐              ┌──────────────────┐
 │ MCP Client   │──initialize──▶│ composio-core    │
 │ (mcp_client  │              │ mcp-server        │
@@ -978,42 +977,42 @@ src/
 │       └── NotificationConfig.tsx
 │
 └── lib/
-    ├── invoke.ts                     #   Typed Tauri IPC wrappers
-    └── events.ts                     #   Tauri event listener helpers
+    ├── gateway-client.ts             #   Typed REST + WebSocket client
+    └── ws-events.ts                  #   WebSocket event subscription helpers
 ```
 
 ---
 
 ## Technology Stack Summary
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Desktop Shell** | Tauri 2 | Native window, IPC bridge, system tray, notifications |
-| **Frontend Framework** | React 19 | UI rendering |
-| **Build Tool** | Vite | Frontend bundling, HMR |
-| **Routing** | TanStack Router | File-based routing |
-| **State** | Zustand | Lightweight stores |
-| **Styling** | Tailwind CSS 4 | Utility-first CSS |
-| **Backend Language** | Rust 2024 | Performance, safety |
-| **Async Runtime** | Tokio | Async I/O, background tasks, scheduling |
-| **LLM Client** | async-openai | OpenAI-compatible API calls |
-| **Database** | SQLite (rusqlite) | App data, vector storage, FTS5 |
-| **Secrets** | OS Keyring + zeroize | Secure credential storage |
-| **Templates** | Tera | Prompt template rendering |
-| **Serialization** | serde + serde_json + toml | Data serialization |
-| **Error Handling** | thiserror + anyhow | Typed + ad-hoc errors |
-| **Logging** | tracing | Structured logging |
-| **HTTP** | reqwest (rustls) | Embedding API calls |
-| **HTTP Server** | axum (optional) | Webhook listener |
-| **Sidecar Protocol** | Stdin/Stdout JSON + MCP (JSON-RPC) | Module communication |
-| **Container Runtime** | bollard (Docker/Podman API) | Container-based module isolation |
-| **Manifest Format** | TOML | Module definition and configuration |
-| **CI/CD** | GitHub Actions | Multi-platform builds, testing, releases |
-| **Package Manager** | Bun | Frontend dependency management |
-| **Code Signing** | Apple Notarization + Azure Trusted Signing | macOS + Windows binary signing |
-| **Mobile Build** | Tauri Mobile (iOS/Android) | Same codebase compiles to mobile |
+| Layer                  | Technology                                 | Purpose                                               |
+| ---------------------- | ------------------------------------------ | ----------------------------------------------------- |
+| **Desktop Shell**      | Tauri 2                                    | Native window, IPC bridge, system tray, notifications |
+| **Frontend Framework** | React 19                                   | UI rendering                                          |
+| **Build Tool**         | Vite                                       | Frontend bundling, HMR                                |
+| **Routing**            | TanStack Router                            | File-based routing                                    |
+| **State**              | Zustand                                    | Lightweight stores                                    |
+| **Styling**            | Tailwind CSS 4                             | Utility-first CSS                                     |
+| **Backend Language**   | Rust 2024                                  | Performance, safety                                   |
+| **Async Runtime**      | Tokio                                      | Async I/O, background tasks, scheduling               |
+| **LLM Client**         | async-openai                               | OpenAI-compatible API calls                           |
+| **Database**           | SQLite (rusqlite)                          | App data, vector storage, FTS5                        |
+| **Secrets**            | OS Keyring + zeroize                       | Secure credential storage                             |
+| **Templates**          | Tera                                       | Prompt template rendering                             |
+| **Serialization**      | serde + serde_json + toml                  | Data serialization                                    |
+| **Error Handling**     | thiserror + anyhow                         | Typed + ad-hoc errors                                 |
+| **Logging**            | tracing                                    | Structured logging                                    |
+| **HTTP**               | reqwest (rustls)                           | Embedding API calls                                   |
+| **HTTP Server**        | axum                                       | Gateway/control plane + webhook listener              |
+| **Sidecar Protocol**   | Stdin/Stdout JSON + MCP (JSON-RPC)         | Module communication                                  |
+| **Container Runtime**  | bollard (Docker/Podman API)                | Container-based module isolation                      |
+| **Manifest Format**    | TOML                                       | Module definition and configuration                   |
+| **CI/CD**              | GitHub Actions                             | Multi-platform builds, testing, releases              |
+| **Package Manager**    | Bun                                        | Frontend dependency management                        |
+| **Code Signing**       | Apple Notarization + Azure Trusted Signing | macOS + Windows binary signing                        |
+| **Mobile Build**       | Tauri Mobile (iOS/Android)                 | Same codebase compiles to mobile                      |
 
 ---
 
-*Document created: February 2026*
-*References: docs/claw-ecosystem-analysis.md, docs/tauriclaw-gap-analysis.md*
+_Document created: February 2026_
+_References: docs/claw-ecosystem-analysis.md, docs/mesoclaw-gap-analysis.md_

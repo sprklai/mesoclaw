@@ -10,6 +10,7 @@ use crate::ai::types::{
     CompletionRequest, CompletionResponse, Message as AppMessage, MessageRole, StreamChunk,
     TokenUsage,
 };
+use crate::config::app_identity::{OPENROUTER_HTTP_REFERER, OPENROUTER_TITLE};
 
 /// Default base URL for OpenRouter
 const DEFAULT_BASE_URL: &str = "https://openrouter.ai/api/v1";
@@ -334,8 +335,8 @@ impl LLMProvider for OpenRouterProvider {
                 self.client
                     .post(format!("{}/chat/completions", self.config.base_url))
                     .header("Authorization", format!("Bearer {}", self.config.api_key))
-                    .header("HTTP-Referer", "https://aiboilerplate.app")
-                    .header("X-Title", "aiboilerplate")
+                    .header("HTTP-Referer", OPENROUTER_HTTP_REFERER)
+                    .header("X-Title", OPENROUTER_TITLE)
                     .header("Content-Type", "application/json")
                     .json(&api_request)
             })
@@ -374,8 +375,8 @@ impl LLMProvider for OpenRouterProvider {
                 self.client
                     .post(format!("{}/chat/completions", self.config.base_url))
                     .header("Authorization", format!("Bearer {}", self.config.api_key))
-                    .header("HTTP-Referer", "https://aiboilerplate.app")
-                    .header("X-Title", "aiboilerplate")
+                    .header("HTTP-Referer", OPENROUTER_HTTP_REFERER)
+                    .header("X-Title", OPENROUTER_TITLE)
                     .header("Content-Type", "application/json")
                     .json(&api_request)
             })

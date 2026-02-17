@@ -7,17 +7,17 @@
 
 ## Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Sidecar role | Both Tools + Services | Lightweight sidecars as on-demand Tools, heavy sidecars as long-lived Services |
-| Primary protocol | Stdin/Stdout JSON | Simple, no networking needed, works with any language |
-| Standard protocol | MCP (JSON-RPC over stdin/stdout) | Industry standard for AI tool servers; enables Composio.dev integration for free |
-| Service protocol | HTTP REST | Long-lived services expose REST endpoints on localhost |
-| Container scope | Container as Tool runtime | Isolated execution environment, not full orchestration |
-| Container preference | Podman > Docker > Native | Auto-detect, prefer rootless Podman, fallback chain |
-| Module discovery | Manifest-based (TOML) | Filesystem convention + typed manifests in `~/.tauriclaw/modules/` |
-| Architecture modularity | Cargo feature flags | Compile-time module selection, minimal to full builds |
-| Trait design | Extends existing Tool trait | SidecarModule extends Tool, registers in ToolRegistry — no agent loop changes |
+| Decision                | Choice                           | Rationale                                                                        |
+| ----------------------- | -------------------------------- | -------------------------------------------------------------------------------- |
+| Sidecar role            | Both Tools + Services            | Lightweight sidecars as on-demand Tools, heavy sidecars as long-lived Services   |
+| Primary protocol        | Stdin/Stdout JSON                | Simple, no networking needed, works with any language                            |
+| Standard protocol       | MCP (JSON-RPC over stdin/stdout) | Industry standard for AI tool servers; enables Composio.dev integration for free |
+| Service protocol        | HTTP REST                        | Long-lived services expose REST endpoints on localhost                           |
+| Container scope         | Container as Tool runtime        | Isolated execution environment, not full orchestration                           |
+| Container preference    | Podman > Docker > Native         | Auto-detect, prefer rootless Podman, fallback chain                              |
+| Module discovery        | Manifest-based (TOML)            | Filesystem convention + typed manifests in `~/.mesoclaw/modules/`                |
+| Architecture modularity | Cargo feature flags              | Compile-time module selection, minimal to full builds                            |
+| Trait design            | Extends existing Tool trait      | SidecarModule extends Tool, registers in ToolRegistry — no agent loop changes    |
 
 ---
 
@@ -42,11 +42,11 @@ Three module types, all unified under the existing Tool system:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-| Module Type | Lifecycle | Protocol | Use Case |
-|-------------|-----------|----------|----------|
-| `SidecarTool` | On-demand (spawn per call) | Stdin/Stdout JSON | Python script, Node.js script, CLI tool |
-| `SidecarService` | Long-lived (start once) | HTTP REST | Python API server, Node.js service |
-| `McpServer` | Long-lived (start once) | MCP (JSON-RPC over stdin/stdout) | Composio tools, any MCP server |
+| Module Type      | Lifecycle                  | Protocol                         | Use Case                                |
+| ---------------- | -------------------------- | -------------------------------- | --------------------------------------- |
+| `SidecarTool`    | On-demand (spawn per call) | Stdin/Stdout JSON                | Python script, Node.js script, CLI tool |
+| `SidecarService` | Long-lived (start once)    | HTTP REST                        | Python API server, Node.js service      |
+| `McpServer`      | Long-lived (start once)    | MCP (JSON-RPC over stdin/stdout) | Composio tools, any MCP server          |
 
 ---
 
@@ -135,7 +135,7 @@ pub struct ContainerConfig {
 External modules defined via filesystem convention with typed manifests:
 
 ```
-~/.tauriclaw/modules/
+~/.mesoclaw/modules/
 ├── python-analyst/
 │   ├── manifest.toml       ← Module definition
 │   ├── main.py             ← Entry point
@@ -286,10 +286,10 @@ timeout_seconds = 300
 Simple request/response over process stdin/stdout:
 
 ```
-TauriClaw → Sidecar (stdin):
+Mesoclaw → Sidecar (stdin):
 {"id": "req-1", "method": "execute", "params": {"data_path": "sales.csv", "query": "top 5 products"}}
 
-Sidecar → TauriClaw (stdout):
+Sidecar → Mesoclaw (stdout):
 {"id": "req-1", "result": {"summary": "Top 5 products by revenue: ...", "chart_data": [...]}}
 
 Error response:
@@ -318,7 +318,7 @@ for line in sys.stdin:
 
 ### MCP (JSON-RPC over stdin/stdout)
 
-Standard Model Context Protocol. TauriClaw acts as MCP client:
+Standard Model Context Protocol. Mesoclaw acts as MCP client:
 
 1. `initialize` → negotiate capabilities
 2. `tools/list` → discover available tools
@@ -413,7 +413,7 @@ preferred_runtime = "podman"   # "podman" | "docker" | "native"
 ### Startup Sequence
 
 ```
-1. Scan ~/.tauriclaw/modules/ for directories with manifest.toml
+1. Scan ~/.mesoclaw/modules/ for directories with manifest.toml
 2. Parse and validate each manifest (reject malformed)
 3. Classify by type:
    a. SidecarTool → register in ToolRegistry (lazy, not started)
@@ -440,7 +440,8 @@ preferred_runtime = "podman"   # "podman" | "docker" | "native"
 
 ### Hot Reload (v2)
 
-Watch `~/.tauriclaw/modules/` for changes:
+Watch `~/.mesoclaw/modules/` for changes:
+
 - New module directory → register
 - Manifest change → restart module
 - Directory removed → deregister and stop
@@ -449,7 +450,7 @@ Watch `~/.tauriclaw/modules/` for changes:
 
 ## 7. Architecture Modularity (Feature Flags)
 
-The entire TauriClaw system is modular via Cargo feature flags:
+The entire Mesoclaw system is modular via Cargo feature flags:
 
 ```toml
 [features]
@@ -479,12 +480,12 @@ memory-vector = []                     # Vector search (qdrant)
 
 ### Build Profiles
 
-| Profile | Features | Use Case |
-|---------|----------|----------|
-| Minimal CLI | `core, cli, gateway` | Lightweight CLI agent |
-| Full Desktop | `default, sidecars, containers, mcp-client, scheduler` | Full-featured desktop app |
-| Headless Server | `core, gateway, sidecars, mcp-client, scheduler, channels-telegram` | Server deployment |
-| Developer | `default, sidecars, mcp-client` | Development with MCP tools |
+| Profile         | Features                                                            | Use Case                   |
+| --------------- | ------------------------------------------------------------------- | -------------------------- |
+| Minimal CLI     | `core, cli, gateway`                                                | Lightweight CLI agent      |
+| Full Desktop    | `default, sidecars, containers, mcp-client, scheduler`              | Full-featured desktop app  |
+| Headless Server | `core, gateway, sidecars, mcp-client, scheduler, channels-telegram` | Server deployment          |
+| Developer       | `default, sidecars, mcp-client`                                     | Development with MCP tools |
 
 ### Module Dependency Tree
 
@@ -530,7 +531,7 @@ src-tauri/src/
 ### User-Facing Directory
 
 ```
-~/.tauriclaw/
+~/.mesoclaw/
 ├── modules/                         ← User-installed sidecar modules
 │   ├── python-analyst/
 │   │   ├── manifest.toml
@@ -545,15 +546,15 @@ src-tauri/src/
 
 ## 9. Security Model
 
-| Boundary | Enforcement | Mechanism |
-|----------|-------------|-----------|
-| Filesystem | `allowed_paths` in manifest | Path validation before process spawn; container volume mounts |
-| Network | `network = false` by default | Container: `--network=none`; Native: advisory warning |
-| Timeout | Hard kill after `timeout_seconds` | `tokio::time::timeout` wrapping process/container |
-| Memory | `max_memory_mb` limit | Container: `--memory` flag; Native: advisory via `ulimit` |
-| Execution | SecurityPolicy gates module access | Per-identity `tools.toml` controls which modules agents can invoke |
-| Audit | All invocations logged | EventBus `ModuleToolStart`/`ModuleToolResult` events → `audit.jsonl` |
-| Input validation | Schema enforcement | Manifest `input_schema` validated before forwarding to sidecar |
+| Boundary         | Enforcement                        | Mechanism                                                            |
+| ---------------- | ---------------------------------- | -------------------------------------------------------------------- |
+| Filesystem       | `allowed_paths` in manifest        | Path validation before process spawn; container volume mounts        |
+| Network          | `network = false` by default       | Container: `--network=none`; Native: advisory warning                |
+| Timeout          | Hard kill after `timeout_seconds`  | `tokio::time::timeout` wrapping process/container                    |
+| Memory           | `max_memory_mb` limit              | Container: `--memory` flag; Native: advisory via `ulimit`            |
+| Execution        | SecurityPolicy gates module access | Per-identity `tools.toml` controls which modules agents can invoke   |
+| Audit            | All invocations logged             | EventBus `ModuleToolStart`/`ModuleToolResult` events → `audit.jsonl` |
+| Input validation | Schema enforcement                 | Manifest `input_schema` validated before forwarding to sidecar       |
 
 ### Principle of Least Privilege
 
@@ -592,26 +593,26 @@ New WebSocket events:
 ### CLI Commands
 
 ```bash
-tauriclaw module list                      # List all modules + status
-tauriclaw module install <path-or-url>     # Copy module to ~/.tauriclaw/modules/
-tauriclaw module remove <name>             # Remove module
-tauriclaw module start <name>              # Start service/MCP module
-tauriclaw module stop <name>               # Stop module
-tauriclaw module health <name>             # Check health
-tauriclaw module reload                    # Re-scan modules directory
-tauriclaw module create <name> --type tool --runtime python  # Scaffold new module
+mesoclaw module list                      # List all modules + status
+mesoclaw module install <path-or-url>     # Copy module to ~/.mesoclaw/modules/
+mesoclaw module remove <name>             # Remove module
+mesoclaw module start <name>              # Start service/MCP module
+mesoclaw module stop <name>               # Stop module
+mesoclaw module health <name>             # Check health
+mesoclaw module reload                    # Re-scan modules directory
+mesoclaw module create <name> --type tool --runtime python  # Scaffold new module
 ```
 
 ---
 
 ## 11. Composio.dev Integration Path
 
-Composio exposes tools via MCP servers. TauriClaw's MCP client support enables Composio integration with zero custom code:
+Composio exposes tools via MCP servers. Mesoclaw's MCP client support enables Composio integration with zero custom code:
 
 ```
 1. User installs Composio CLI: npm install -g composio-core
-2. Creates manifest in ~/.tauriclaw/modules/composio/manifest.toml
-3. TauriClaw starts MCP server, discovers tools via tools/list
+2. Creates manifest in ~/.mesoclaw/modules/composio/manifest.toml
+3. Mesoclaw starts MCP server, discovers tools via tools/list
 4. Agent can now call gmail_send, github_create_issue, slack_post, etc.
 5. Composio handles OAuth, token management, API calls
 ```
@@ -624,33 +625,43 @@ Any MCP-compatible tool server works the same way — the protocol is standardiz
 
 ### New Phase/Tasks Required
 
-| Item | Phase | Description |
-|------|-------|-------------|
-| Module system core | Phase 2 (after Tool registry) | ModuleRegistry, manifest parsing, SidecarTool |
-| Container runtime | Phase 2 | ContainerRuntime trait + Docker/Podman |
-| MCP client | Phase 2 | MCP protocol client, tool discovery |
-| SidecarService | Phase 4 | Long-lived service management |
-| Module CLI commands | Phase 5 | `tauriclaw module` subcommands |
-| Module management UI | Phase 6 | Frontend UI for module status/management |
-| Cargo feature flags | Phase 0 | Restructure crate into feature-gated modules |
+| Item                 | Phase                         | Description                                   |
+| -------------------- | ----------------------------- | --------------------------------------------- |
+| Module system core   | Phase 2 (after Tool registry) | ModuleRegistry, manifest parsing, SidecarTool |
+| Container runtime    | Phase 2                       | ContainerRuntime trait + Docker/Podman        |
+| MCP client           | Phase 2                       | MCP protocol client, tool discovery           |
+| SidecarService       | Phase 4                       | Long-lived service management                 |
+| Module CLI commands  | Phase 5                       | `mesoclaw module` subcommands                 |
+| Module management UI | Phase 6                       | Frontend UI for module status/management      |
+| Cargo feature flags  | Phase 0                       | Restructure crate into feature-gated modules  |
 
 ### Modified Existing Items
 
-| Existing Item | Change |
-|---------------|--------|
-| Tool trait + registry (Phase 2.2) | Extended with SidecarModule trait |
-| SecurityPolicy (Phase 2.3) | Adds module-level access control |
-| EventBus (Phase 2.1) | New module lifecycle events |
-| Gateway API | New `/api/v1/modules/*` endpoints |
-| CLI commands | New `tauriclaw module` subcommand group |
-| Cargo.toml | Feature flags for modular compilation |
-| `~/.tauriclaw/` | New `modules/` and `module-cache/` directories |
+| Existing Item                     | Change                                         |
+| --------------------------------- | ---------------------------------------------- |
+| Tool trait + registry (Phase 2.2) | Extended with SidecarModule trait              |
+| SecurityPolicy (Phase 2.3)        | Adds module-level access control               |
+| EventBus (Phase 2.1)              | New module lifecycle events                    |
+| Gateway API                       | New `/api/v1/modules/*` endpoints              |
+| CLI commands                      | New `mesoclaw module` subcommand group         |
+| Cargo.toml                        | Feature flags for modular compilation          |
+| `~/.mesoclaw/`                    | New `modules/` and `module-cache/` directories |
+
+### Tauri v2 Sidecar Compliance Notes
+
+For bundled trusted sidecars shipped with the app, follow Tauri's sidecar model:
+
+1. Declare binaries in `bundle.externalBin` in `src-tauri/tauri.conf.json`.
+2. Enable and initialize `tauri-plugin-shell`.
+3. Restrict shell capability permissions to explicit sidecar commands/scopes.
+
+User-installed modules in `~/.mesoclaw/modules/` remain backend-managed via process/container runtimes and should not require broad shell capability grants.
 
 ### New Dependencies
 
 ```toml
 # Module system
-toml = "0.8"                    # Manifest parsing (may already exist)
+toml = "1"                      # Manifest parsing (may already exist)
 jsonschema = "0.28"             # Input schema validation
 
 # Container runtime
@@ -664,5 +675,5 @@ bollard = "0.18"                # Docker API client (optional, feature-gated)
 
 ---
 
-*Design approved: February 16, 2026*
-*References: docs/plans/2026-02-16-cli-gateway-agents-design.md, docs/claw-ecosystem-analysis.md*
+_Design approved: February 16, 2026_
+_References: docs/plans/2026-02-16-cli-gateway-agents-design.md, docs/claw-ecosystem-analysis.md_

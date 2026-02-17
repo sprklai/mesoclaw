@@ -1,6 +1,7 @@
 pub mod adapters;
 pub mod ai;
 mod commands;
+pub mod config;
 pub mod database;
 mod plugins;
 pub mod services;

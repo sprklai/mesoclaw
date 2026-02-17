@@ -2,7 +2,7 @@
 >
 > The skills system documented below (2,631 lines across parser, composer, selector, executor)
 > is being replaced with simple prompt templates using `tera` or `handlebars` (~150 lines).
-> See `docs/tauriclaw-gap-analysis.md` item S1 for details.
+> See `docs/mesoclaw-gap-analysis.md` item S1 for details.
 >
 > **What replaces it**: Markdown files with `{{variable}}` placeholders, loaded by a single
 > `PromptTemplate` struct. No custom parser, no composer, no selector, no executor.
@@ -98,12 +98,12 @@ src-tauri/src/skills_embedded/
 
 ### 2. Local Skills (User-Created)
 
-**Location:** `~/.config/aiboilerplate/skills/` (Linux/macOS) or `%APPDATA%\aiboilerplate\skills\` (Windows)
+**Location:** `~/.config/<skillsConfigDirName>/skills/` (Linux/macOS) or `%APPDATA%\<skillsConfigDirName>\skills\` (Windows)
 
 Create custom skills by adding markdown files to this directory:
 
 ```
-~/.config/aiboilerplate/skills/
+~/.config/<skillsConfigDirName>/skills/
 ├── my-custom-skill.md          # Your custom skill
 ├── team-conventions.md         # Team-specific conventions
 └── domain-specific/            # Subdirectories are supported
@@ -121,13 +121,13 @@ Community skills that can be downloaded from a central registry.
 
 ```bash
 # Linux/macOS
-ls ~/.config/aiboilerplate/skills/
+ls ~/.config/<skillsConfigDirName>/skills/
 
 # Windows (PowerShell)
-dir $env:APPDATA\aiboilerplate\skills\
+dir $env:APPDATA\<skillsConfigDirName>\skills\
 
 # Create the directory if it doesn't exist
-mkdir -p ~/.config/aiboilerplate/skills/  # Linux/macOS
+mkdir -p ~/.config/<skillsConfigDirName>/skills/  # Linux/macOS
 ```
 
 ---
@@ -716,10 +716,10 @@ Create a new `.md` file in your local skills directory:
 
 ```bash
 # Create directory if needed
-mkdir -p ~/.config/aiboilerplate/skills/
+mkdir -p ~/.config/<skillsConfigDirName>/skills/
 
 # Create your skill file
-touch ~/.config/aiboilerplate/skills/my-custom-skill.md
+touch ~/.config/<skillsConfigDirName>/skills/my-custom-skill.md
 ```
 
 ### Step 2: Add YAML Frontmatter
@@ -842,10 +842,10 @@ Local skills can be modified directly:
 
    ```bash
    # Linux/macOS
-   cd ~/.config/aiboilerplate/skills/
+   cd ~/.config/<skillsConfigDirName>/skills/
 
    # Windows
-   cd %APPDATA%\aiboilerplate\skills\
+   cd %APPDATA%\<skillsConfigDirName>\skills\
    ```
 
 2. **Edit the skill file**
@@ -921,7 +921,7 @@ To customize an embedded skill without modifying source code:
 1. **Create a local skill with the same ID**
 
    ```bash
-   touch ~/.config/aiboilerplate/skills/schema-explainer.md
+   touch ~/.config/<skillsConfigDirName>/skills/schema-explainer.md
    ```
 
 2. **Copy and modify the content**
@@ -947,7 +947,7 @@ To customize an embedded skill without modifying source code:
 
    ```bash
    # Create a skills repo
-   cd ~/.config/aiboilerplate/skills/
+   cd ~/.config/<skillsConfigDirName>/skills/
    git init
    git add .
    git commit -m "Initial skills"
@@ -1519,7 +1519,7 @@ if (!mySkill) {
 
 ```bash
 # Use a YAML linter
-yamllint ~/.config/aiboilerplate/skills/my-skill.md
+yamllint ~/.config/<skillsConfigDirName>/skills/my-skill.md
 
 # Or check in Python
 python -c "import yaml; yaml.safe_load(open('my-skill.md').read().split('---')[1])"
@@ -1532,7 +1532,7 @@ python -c "import yaml; yaml.safe_load(open('my-skill.md').read().split('---')[1
 const suggestions = await suggestSkills(
   workspaceId,
   "check data quality", // Should match your trigger words
-  "postgresql"
+  "postgresql",
 );
 console.log(suggestions);
 ```
@@ -1606,7 +1606,7 @@ compose:
 Group related skills in subdirectories:
 
 ```
-~/.config/aiboilerplate/skills/
+~/.config/<skillsConfigDirName>/skills/
 ├── healthcare/
 │   ├── hipaa-compliance.md
 │   └── phi-detector.md
@@ -1712,7 +1712,7 @@ const result = await executeWithSkills(
   "Explain the users table",
   providerId,
   apiKey,
-  { entityType: "table", taskHint: "explain" }
+  { entityType: "table", taskHint: "explain" },
 );
 
 // Execute a specific skill
@@ -1721,7 +1721,7 @@ const result = await executeSkill(
   "query-optimizer",
   "SELECT * FROM users WHERE status = 'active'",
   providerId,
-  apiKey
+  apiKey,
 );
 ```
 
@@ -1734,7 +1734,7 @@ import { suggestSkills } from "@/lib/tauri/skills";
 const suggestions = await suggestSkills(
   workspaceId,
   "How can I optimize this query?",
-  "postgresql"
+  "postgresql",
 );
 
 // suggestions = [
@@ -2073,7 +2073,7 @@ try {
     "my-skill",
     "Test input for my skill",
     providerId,
-    apiKey
+    apiKey,
   );
 
   console.log("✓ Skill executed successfully");
@@ -2107,7 +2107,7 @@ const result = await executeWithSkills(
   "Explain and check quality of users table", // Triggers multiple skills
   providerId,
   apiKey,
-  { entityType: "table" }
+  { entityType: "table" },
 );
 ```
 
@@ -2148,7 +2148,7 @@ async function testSkill(skillId: string) {
     databaseType: "postgresql",
   });
   console.log(
-    `  Suggestion rank: ${suggestions.findIndex((s) => s.skillId === skillId) + 1}`
+    `  Suggestion rank: ${suggestions.findIndex((s) => s.skillId === skillId) + 1}`,
   );
 
   console.log("\n=== Test Complete ===\n");
@@ -2164,13 +2164,13 @@ testSkill("my-custom-skill");
 
 ```bash
 # Check file exists
-ls -la ~/.config/aiboilerplate/skills/my-skill.md
+ls -la ~/.config/<skillsConfigDirName>/skills/my-skill.md
 
 # Check permissions
-stat ~/.config/aiboilerplate/skills/my-skill.md
+stat ~/.config/<skillsConfigDirName>/skills/my-skill.md
 
 # Check file encoding (should be UTF-8)
-file ~/.config/aiboilerplate/skills/my-skill.md
+file ~/.config/<skillsConfigDirName>/skills/my-skill.md
 ```
 
 #### YAML Parse Errors
@@ -2249,7 +2249,7 @@ Add skill tests to your CI pipeline:
 
    ```bash
    # Check the correct path
-   ls ~/.config/aiboilerplate/skills/
+   ls ~/.config/<skillsConfigDirName>/skills/
    ```
 
 2. **Invalid YAML syntax**

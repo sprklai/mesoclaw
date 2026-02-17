@@ -34,6 +34,7 @@ import {
   Trash2,
 } from "@/lib/icons";
 import { showError, showSuccess } from "@/lib/toast";
+import { APP_IDENTITY } from "@/config/app-identity";
 import { useLLMStore } from "@/stores/llm";
 
 interface DeleteModelDialogProps {
@@ -242,7 +243,7 @@ export function AIProviderManagement() {
   const handleDeleteApiKey = async (providerId: string) => {
     try {
       await invoke("keychain_delete", {
-        service: "com.sprklai.aiboilerplate",
+        service: APP_IDENTITY.keychainService,
         key: `api_key:${providerId}`,
       });
       await useLLMStore.getState().loadProvidersWithKeyStatus();

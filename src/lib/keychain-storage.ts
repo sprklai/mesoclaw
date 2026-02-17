@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { APP_IDENTITY } from "@/config/app-identity";
 
 /**
  * Fast, OS-native secure storage using system keychain
@@ -9,7 +10,7 @@ import { invoke } from "@tauri-apps/api/core";
  * Access time: <10ms (vs 40 seconds with Stronghold)
  */
 
-const SERVICE_NAME = "com.sprklai.aiboilerplate";
+const SERVICE_NAME = APP_IDENTITY.keychainService;
 
 export class KeychainStorage {
   /**

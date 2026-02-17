@@ -1,6 +1,6 @@
 # Frontend Code Standards (src/)
 
-This directory contains the React frontend for aiboilerplate, built with TypeScript, Vite, TanStack Router, and Tailwind CSS 4.
+This directory contains the React frontend for the application, built with TypeScript, Vite, TanStack Router, and Tailwind CSS 4.
 
 ## Tech Stack
 

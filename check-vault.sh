@@ -5,7 +5,7 @@ echo "=== Checking Stronghold Vault Location ==="
 echo ""
 
 # Linux vault location
-LINUX_VAULT_DIR="$HOME/.local/share/com.aiboilerplate.credentials"
+LINUX_VAULT_DIR="$HOME/.local/share/com.mesoclaw.credentials"
 echo "Linux vault directory: $LINUX_VAULT_DIR"
 
 if [ -d "$LINUX_VAULT_DIR" ]; then

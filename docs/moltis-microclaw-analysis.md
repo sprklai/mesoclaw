@@ -1,4 +1,4 @@
-# Moltis & MicroClaw Analysis: Relevance to TauriClaw
+# Moltis & MicroClaw Analysis: Relevance to Mesoclaw
 
 > Critical assessment of two additional "claw" ecosystem repositories.
 > Conducted: February 2026
@@ -29,18 +29,18 @@
 3. **Test coverage** — Codecov badge exists but percentage hidden. No public coverage report.
 4. **"One binary, no runtime"** — Requires Docker/Podman for core sandbox features
 
-### Relevance to TauriClaw
+### Relevance to Mesoclaw
 
-| TauriClaw Gap | Moltis Status | Verdict |
-|---|---|---|
-| Event Bus | Missing — uses WebSocket broadcast | Need to build our own |
-| Heartbeat/Cron | Has it — `crates/cron/` with heartbeat prompts | Study pattern |
-| Identity Files | Has it — YAML frontmatter in .md files | Copy pattern |
-| Memory | Excellent — hybrid vector + FTS, chunking, SQLite | Strong inspiration |
-| Agent Loop | Has it — 25-iteration limit, tool calling, streaming | Study implementation |
-| Tools | Robust — 17 built-in, MCP bridge, hooks, sandbox | Learn from this |
-| Security | Strong — sandboxing, auth, SSRF protection, secret redaction | Adopt patterns |
-| Channels | Extensible — Telegram done, trait-based abstraction | Copy architecture |
+| Mesoclaw Gap   | Moltis Status                                                | Verdict               |
+| -------------- | ------------------------------------------------------------ | --------------------- |
+| Event Bus      | Missing — uses WebSocket broadcast                           | Need to build our own |
+| Heartbeat/Cron | Has it — `crates/cron/` with heartbeat prompts               | Study pattern         |
+| Identity Files | Has it — YAML frontmatter in .md files                       | Copy pattern          |
+| Memory         | Excellent — hybrid vector + FTS, chunking, SQLite            | Strong inspiration    |
+| Agent Loop     | Has it — 25-iteration limit, tool calling, streaming         | Study implementation  |
+| Tools          | Robust — 17 built-in, MCP bridge, hooks, sandbox             | Learn from this       |
+| Security       | Strong — sandboxing, auth, SSRF protection, secret redaction | Adopt patterns        |
+| Channels       | Extensible — Telegram done, trait-based abstraction          | Copy architecture     |
 
 **Bottom line**: Goldmine for patterns, not a library to import. Can't `cargo add moltis` — it's an application, not a crate. Study the memory system, agent loop, and security patterns. Avoid the 27-crate complexity and web-first architecture.
 
@@ -54,16 +54,16 @@
 
 ### Honest Assessment
 
-**Creator's own words**: *"This is still a toy / experimental project. There's no sandboxing, permission model, or security hardening — the agent has full access to bash and the filesystem."*
+**Creator's own words**: _"This is still a toy / experimental project. There's no sandboxing, permission model, or security hardening — the agent has full access to bash and the filesystem."_
 
-| Category | Score | Notes |
-|---|---|---|
-| Code quality | 6/10 | Compiles, has CI, but zero tests |
-| Documentation | 5/10 | README exists, no API docs |
-| Maturity | 2/10 | 9 days old |
-| Security | 1/10 | Creator admits no sandboxing |
-| Relevance to Tauri | 0/10 | Not Tauri-related at all |
-| Production readiness | 2/10 | Experimental |
+| Category             | Score | Notes                            |
+| -------------------- | ----- | -------------------------------- |
+| Code quality         | 6/10  | Compiles, has CI, but zero tests |
+| Documentation        | 5/10  | README exists, no API docs       |
+| Maturity             | 2/10  | 9 days old                       |
+| Security             | 1/10  | Creator admits no sandboxing     |
+| Relevance to Tauri   | 0/10  | Not Tauri-related at all         |
+| Production readiness | 2/10  | Experimental                     |
 
 ### What's Interesting
 
@@ -80,7 +80,7 @@
 - No documented public API
 - Weekend hack pace (entire repo is 9 days old)
 
-**Bottom line**: Not relevant for TauriClaw. Too immature, no Tauri integration, no tests, no security. Glance at channel adapter patterns if curious, nothing more.
+**Bottom line**: Not relevant for Mesoclaw. Too immature, no Tauri integration, no tests, no security. Glance at channel adapter patterns if curious, nothing more.
 
 ---
 
@@ -89,6 +89,7 @@
 Both Moltis and MicroClaw are **applications**, not libraries. You cannot `cargo add` either one.
 
 **What we CAN do**:
+
 - Study Moltis patterns for memory, agent loop, hooks, and identity files
 - Use Moltis's strict linting config (`deny(unsafe_code, unwrap_used, expect_used)`)
 - Adopt Moltis's agent loop architecture (iteration limits, tool result sanitization, concurrent execution)
@@ -96,40 +97,40 @@ Both Moltis and MicroClaw are **applications**, not libraries. You cannot `cargo
 
 ---
 
-## Codebase Audit: TauriClaw Needs Slimming
+## Codebase Audit: Mesoclaw Needs Slimming
 
-Analysis of the existing TauriClaw backend revealed significant over-engineering:
+Analysis of the existing Mesoclaw backend revealed significant over-engineering:
 
 ### By the Numbers
 
-| Module | Lines | % of Backend | Issue |
-|---|---|---|---|
-| skills/ | 2,631 | 29% | Over-engineered — custom parser, composer, selector, executor for prompt templates |
-| ai/providers/ | 1,798 | 20% | 3 near-identical implementations (OpenAI-compatible: 678, OpenRouter: 566, Vercel: 554) |
-| commands/ | 1,826 | 20% | Reasonable — mostly IPC boilerplate |
-| database/ | 955 | 10% | Diesel ORM overkill for single-user SQLite desktop app |
-| services/ | 624 | 7% | Reasonable |
-| adapters/ | 236 | 3% | Reasonable |
-| **Total** | **9,152** | **100%** | **~62% reduction possible** |
+| Module        | Lines     | % of Backend | Issue                                                                                   |
+| ------------- | --------- | ------------ | --------------------------------------------------------------------------------------- |
+| skills/       | 2,631     | 29%          | Over-engineered — custom parser, composer, selector, executor for prompt templates      |
+| ai/providers/ | 1,798     | 20%          | 3 near-identical implementations (OpenAI-compatible: 678, OpenRouter: 566, Vercel: 554) |
+| commands/     | 1,826     | 20%          | Reasonable — mostly IPC boilerplate                                                     |
+| database/     | 955       | 10%          | Diesel ORM overkill for single-user SQLite desktop app                                  |
+| services/     | 624       | 7%           | Reasonable                                                                              |
+| adapters/     | 236       | 3%           | Reasonable                                                                              |
+| **Total**     | **9,152** | **100%**     | **~62% reduction possible**                                                             |
 
 ### Top Savings Opportunities
 
-| Change | Lines Saved | Impact |
-|---|---|---|
-| Replace skills/ with simple prompt templates | ~2,600 | Remove 29% of codebase |
-| Consolidate 3 AI providers using `async-openai` | ~1,500 | Remove 20% of codebase |
-| Replace Diesel with `rusqlite` | ~400 | Smaller binary, faster compile |
-| Remove duplicate logging (log + tracing) | ~50 | Cleaner dependency tree |
-| **Total** | **~4,550** | **50% reduction** |
+| Change                                          | Lines Saved | Impact                         |
+| ----------------------------------------------- | ----------- | ------------------------------ |
+| Replace skills/ with simple prompt templates    | ~2,600      | Remove 29% of codebase         |
+| Consolidate 3 AI providers using `async-openai` | ~1,500      | Remove 20% of codebase         |
+| Replace Diesel with `rusqlite`                  | ~400        | Smaller binary, faster compile |
+| Remove duplicate logging (log + tracing)        | ~50         | Cleaner dependency tree        |
+| **Total**                                       | **~4,550**  | **50% reduction**              |
 
 ### Projected After Slimming
 
-| Metric | Before | After |
-|---|---|---|
-| Lines of Rust | 9,152 | ~4,600 |
-| Direct dependencies | 48 | ~25 |
-| Binary size | 10-20 MB (est.) | 5-10 MB (est.) |
-| Compile time | Full | ~40-60% faster |
+| Metric              | Before          | After          |
+| ------------------- | --------------- | -------------- |
+| Lines of Rust       | 9,152           | ~4,600         |
+| Direct dependencies | 48              | ~25            |
+| Binary size         | 10-20 MB (est.) | 5-10 MB (est.) |
+| Compile time        | Full            | ~40-60% faster |
 
 ### Recommendation
 

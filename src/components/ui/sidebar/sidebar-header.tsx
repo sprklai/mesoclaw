@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { APP_IDENTITY } from "@/config/app-identity";
 import { APP_TITLE } from "@/constants";
 import { PanelLeft, PanelLeftClose } from "@/lib/icons";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,7 @@ export function SidebarHeader({ expanded, onToggle }: SidebarHeaderProps) {
     >
       <div className="flex items-center gap-2">
         <img
-          src="/aiboilerplate-icon.png"
+          src={APP_IDENTITY.iconAssetPath}
           alt=""
           className="size-7 shrink-0"
           draggable={false}

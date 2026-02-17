@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the responsive design system implemented for the aiboilerplate database comprehension tool. The implementation follows mobile-first principles and provides a comprehensive set of utility classes for building responsive interfaces.
+This document describes the responsive design system implemented for the application. The implementation follows mobile-first principles and provides a comprehensive set of utility classes for building responsive interfaces.
 
 ## Files Added/Modified
 

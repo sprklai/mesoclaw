@@ -11,9 +11,7 @@ use crate::database::models::ai_provider::{
 use crate::database::schema::settings;
 use crate::database::DbPool;
 use crate::database::schema::{ai_models, ai_providers};
-
-/// Service name for keychain storage (consistent across the app)
-const KEYCHAIN_SERVICE: &str = "com.sprklai.aiboilerplate";
+use crate::config::app_identity::KEYCHAIN_SERVICE;
 
 /// Provider with API key status response
 #[derive(Debug, Serialize, Deserialize)]

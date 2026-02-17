@@ -1,5 +1,6 @@
 import { appDataDir } from "@tauri-apps/api/path";
 import { Client, Stronghold } from "@tauri-apps/plugin-stronghold";
+import { APP_IDENTITY } from "@/config/app-identity";
 
 import type {
   SecretResponse,
@@ -38,7 +39,7 @@ async function initStronghold(): Promise<{
       );
 
       const vaultPath = `${appData}/secrets.hold`;
-      const vaultPassword = "aiboilerplate-secure-vault";
+      const vaultPassword = APP_IDENTITY.strongholdVaultPassword;
 
       console.log("[SecureStorage] Initializing Stronghold at:", vaultPath);
 
@@ -48,7 +49,7 @@ async function initStronghold(): Promise<{
         `[SecureStorage] Stronghold.load() took ${(performance.now() - loadStart).toFixed(2)}ms`
       );
 
-      const clientName = "aiboilerplate-secrets";
+      const clientName = APP_IDENTITY.strongholdClientName;
       try {
         const loadClientStart = performance.now();
         clientInstance = await strongholdInstance.loadClient(clientName);

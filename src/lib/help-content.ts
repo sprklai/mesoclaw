@@ -10,6 +10,7 @@ import {
   type Terminology,
   getTerminology,
 } from "./terminology";
+import { APP_IDENTITY } from "../config/app-identity";
 
 /**
  * Help content structure for a specific section.
@@ -73,7 +74,7 @@ export function getHelpContent(paradigm?: DatabaseParadigm): HelpContent {
     },
     onboarding: {
       welcome: {
-        title: "Welcome to aiboilerplate!",
+        title: `Welcome to ${APP_IDENTITY.productName}!`,
         content: generateWelcomeHelp(t),
       },
       schemaExplorer: {
@@ -236,9 +237,9 @@ This explanation is generated using AI to help you understand:
 
 function generateWelcomeHelp(t: Terminology): string {
   return `
-# Welcome to aiboilerplate!
+# Welcome to ${APP_IDENTITY.productName}!
 
-**aiboilerplate** is your intelligent database exploration companion.
+**${APP_IDENTITY.productName}** is your intelligent database exploration companion.
 
 ## Getting Started
 
@@ -399,9 +400,9 @@ This explanation is generated using AI to help you understand:
 
   onboarding: {
     welcome: `
-# Welcome to aiboilerplate! 👋
+# Welcome to ${APP_IDENTITY.productName}! 👋
 
-**aiboilerplate** is your intelligent database exploration companion.
+**${APP_IDENTITY.productName}** is your intelligent database exploration companion.
 
 ## Getting Started
 

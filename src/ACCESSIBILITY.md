@@ -1,6 +1,6 @@
 # Accessibility Standards
 
-This document outlines the accessibility standards and guidelines for the aiboilerplate Database Comprehension Tool. All components and features must adhere to these standards to ensure the application is usable by everyone, including users with disabilities.
+This document outlines the accessibility standards and guidelines for the application. All components and features must adhere to these standards to ensure the application is usable by everyone, including users with disabilities.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ This document outlines the accessibility standards and guidelines for the aiboil
 
 ## Core Principles
 
-aiboilerplate follows the **WCAG 2.1 AA** standard with a goal of reaching AAA where feasible. Our four core principles are:
+The application follows the **WCAG 2.1 AA** standard with a goal of reaching AAA where feasible. Our four core principles are:
 
 1. **Perceivable** - Information must be presentable in ways users can perceive
 2. **Operable** - Interface components must be operable by all users

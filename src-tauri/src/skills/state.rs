@@ -6,9 +6,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::OnceCell;
 
+use crate::config::app_identity::SKILLS_CONFIG_DIR_NAME;
 use crate::skills::loader::SkillLoader;
-use crate::skills::registry::SkillRegistry;
 use crate::skills::error::SkillResult;
+use crate::skills::registry::SkillRegistry;
 
 /// Global skill registry instance.
 static SKILL_REGISTRY: OnceCell<Arc<SkillRegistry>> = OnceCell::const_new();
@@ -64,9 +65,9 @@ pub async fn get_or_init_registry() -> Arc<SkillRegistry> {
 
 /// Get the default local skills directory path.
 ///
-/// Returns ~/.config/aiboilerplate/skills/ on Linux/macOS or %APPDATA%/aiboilerplate/skills/ on Windows.
+/// Returns ~/.config/<slug>/skills/ on Linux/macOS or %APPDATA%/<slug>/skills/ on Windows.
 pub fn get_default_skills_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|p| p.join("aiboilerplate").join("skills"))
+    dirs::config_dir().map(|p| p.join(SKILLS_CONFIG_DIR_NAME).join("skills"))
 }
 
 /// Reload the skill registry.

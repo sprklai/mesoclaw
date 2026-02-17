@@ -36,6 +36,7 @@ import {
   ModelSelectorName,
   ModelSelectorTrigger,
 } from "@/components/ai-elements/model-selector";
+import { APP_IDENTITY } from "@/config/app-identity";
 import { useSettings } from "@/stores/settings";
 
 export const Route = createFileRoute("/chat")({
@@ -176,7 +177,7 @@ function ChatPage() {
     async function loadApiKey() {
       try {
         const key = await invoke<string>("keychain_get", {
-          service: "com.sprklai.aiboilerplate",
+          service: APP_IDENTITY.keychainService,
           key: `api_key:${selectedModel.providerId}`,
         });
         setApiKey(key || "");

@@ -2,9 +2,7 @@ use keyring::{Entry, Error as KeyringError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zeroize::Zeroize;
-
-/// Service name for keychain entries
-const SERVICE_NAME: &str = "com.aiboilerplate.credentials";
+use crate::config::app_identity::CREDENTIALS_SERVICE;
 
 /// Credential types supported by the store
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -25,11 +23,17 @@ impl CredentialType {
     /// Convert credential type to service identifier
     fn to_service_id(&self) -> String {
         match self {
-            CredentialType::VercelAIGateway => format!("{}.vercel-ai-gateway", SERVICE_NAME),
-            CredentialType::DatabasePassword => format!("{}.database-password", SERVICE_NAME),
-            CredentialType::ApiKey => format!("{}.api-key", SERVICE_NAME),
-            CredentialType::SshPassword => format!("{}.ssh-password", SERVICE_NAME),
-            CredentialType::SshPassphrase => format!("{}.ssh-passphrase", SERVICE_NAME),
+            CredentialType::VercelAIGateway => {
+                format!("{}.vercel-ai-gateway", CREDENTIALS_SERVICE)
+            }
+            CredentialType::DatabasePassword => {
+                format!("{}.database-password", CREDENTIALS_SERVICE)
+            }
+            CredentialType::ApiKey => format!("{}.api-key", CREDENTIALS_SERVICE),
+            CredentialType::SshPassword => format!("{}.ssh-password", CREDENTIALS_SERVICE),
+            CredentialType::SshPassphrase => {
+                format!("{}.ssh-passphrase", CREDENTIALS_SERVICE)
+            }
         }
     }
 }

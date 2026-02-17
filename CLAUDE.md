@@ -105,7 +105,7 @@ This project follows a **clean architecture** pattern with clear separation betw
 
 ### Adding a New AI Skill
 
-Skills are markdown files with YAML frontmatter in `~/.tauri-ai-boilerplate/skills/`:
+Skills are markdown files with YAML frontmatter in `~/.config/<skillsConfigDirName>/skills/`:
 
 ```yaml
 ---
@@ -170,7 +170,7 @@ diesel migration revert   # Rollback last migration
 diesel migration refresh  # Rebuild DB (destructive)
 ```
 
-App database location: `~/.tauri-ai-boilerplate/app.db`
+App database location: Tauri app-local data directory (`app_local_data_dir`), typically under your OS application data path.
 
 ## Important Conventions
 

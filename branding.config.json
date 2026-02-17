@@ -1,0 +1,22 @@
+{
+  "productName": "MesoClaw",
+  "slug": "mesoclaw",
+  "reverseDomain": "com.sprklai",
+  "npmPackageName": "tauri-ai-boilerplate",
+  "tauriNpmPackageName": "mesoclaw-tauri",
+  "cargoPackageName": "tauri-ai-boilerplate",
+  "cargoLibName": "local_ts_lib",
+  "mainWindowTitle": "MesoClaw",
+  "htmlTitle": "MesoClaw",
+  "splashTitle": "MesoClaw",
+  "splashSubtitle": "MesoClaw",
+  "iconAssetPath": "/mesoclaw-icon.png",
+  "keychainService": "com.sprklai.mesoclaw",
+  "credentialsService": "com.mesoclaw.credentials",
+  "strongholdClientName": "mesoclaw-secrets",
+  "strongholdVaultPassword": "mesoclaw-secure-vault",
+  "openRouterHttpReferer": "https://mesoclaw.app",
+  "openRouterTitle": "mesoclaw",
+  "trayTooltip": "mesoclaw",
+  "skillsConfigDirName": "mesoclaw"
+}
