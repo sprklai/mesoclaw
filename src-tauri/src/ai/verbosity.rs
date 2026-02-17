@@ -2,18 +2,13 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Verbosity level for AI-generated explanations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Verbosity {
     Concise,
+    #[default]
     Balanced,
     Detailed,
-}
-
-impl Default for Verbosity {
-    fn default() -> Self {
-        Verbosity::Balanced
-    }
 }
 
 impl FromStr for Verbosity {

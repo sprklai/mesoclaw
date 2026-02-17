@@ -5,6 +5,13 @@ description = "Clean Tauri 2 boilerplate with integrated AI capabilities."
 authors = ["NSR Technologies Inc."]
 edition = "2024"
 
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]

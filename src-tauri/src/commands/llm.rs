@@ -145,6 +145,7 @@ pub async fn test_llm_provider_command(config: LLMProviderConfig) -> Result<Test
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

@@ -1,4 +1,4 @@
-/// AI utility functions for extracting structured data from LLM responses.
+//! AI utility functions for extracting structured data from LLM responses.
 
 /// Extract confidence score from LLM response.
 ///

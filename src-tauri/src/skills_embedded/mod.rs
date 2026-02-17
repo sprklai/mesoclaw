@@ -19,13 +19,13 @@ use std::collections::HashMap;
 /// 2. Using `include_str!("filename.md")` to embed it at compile time
 /// 3. Inserting it into the HashMap with a unique skill ID
 pub fn get_embedded_skills() -> HashMap<String, &'static str> {
-    let skills = HashMap::new();
-
     // Example of how to add an embedded skill:
+    // let mut skills = HashMap::new();
     // skills.insert(
     //     "my-custom-skill".to_string(),
     //     include_str!("my_custom_skill.md"),
     // );
+    // skills
 
-    skills
+    HashMap::new()
 }

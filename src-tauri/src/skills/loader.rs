@@ -93,7 +93,7 @@ impl SkillLoader {
         let mut all_skills = Vec::new();
 
         // 1. Load embedded skills (sync, no async needed)
-        for (_id, skill) in &self.embedded_skills {
+        for skill in self.embedded_skills.values() {
             all_skills.push(skill.clone());
         }
 
@@ -218,10 +218,10 @@ impl SkillLoader {
     /// Load a specific skill by ID.
     pub async fn load_skill(&self, id: &str) -> SkillResult<SkillDefinition> {
         // Check cache first (sync lock, no await while holding)
-        if let Ok(cache) = self.cache.lock() {
-            if let Some((skill, _)) = cache.get(id) {
-                return Ok(skill.clone());
-            }
+        if let Ok(cache) = self.cache.lock()
+            && let Some((skill, _)) = cache.get(id)
+        {
+            return Ok(skill.clone());
         }
 
         // Check embedded skills
@@ -387,6 +387,7 @@ impl SkillLoader {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
