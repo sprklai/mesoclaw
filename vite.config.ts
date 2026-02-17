@@ -40,6 +40,7 @@ export default defineConfig(async () => ({
 
   // Config for testing
   test: {
+    environment: "happy-dom",
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
