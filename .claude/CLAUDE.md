@@ -158,7 +158,7 @@ Most formatting and common issues are automatically fixed by Biome. Run `bunx ul
 
 **Skills System:**
 - Reusable AI prompts with parameters
-- JSON-based skill definitions in `~/.tauri-ai-boilerplate/skills/`
+- JSON-based skill definitions in `~/.config/<skillsConfigDirName>/skills/`
 - Dynamic skill discovery and loading
 - Type-safe invocation from frontend
 
@@ -241,7 +241,7 @@ All AI providers implement the `LLMProvider` trait defined in `src-tauri/src/ai/
 
 ### Skills System
 
-Skills are JSON files in `~/.tauri-ai-boilerplate/skills/` with the following structure:
+Skills are JSON files in `~/.config/<skillsConfigDirName>/skills/` with the following structure:
 
 ```json
 {
@@ -307,7 +307,7 @@ Frontend routes are defined in `src/routes/` using TanStack Router file-based co
 
 Skills can be added via:
 - UI in Settings → Skills tab
-- Manually creating JSON files in `~/.tauri-ai-boilerplate/skills/`
+- Manually creating JSON files in `~/.config/<skillsConfigDirName>/skills/`
 - Programmatically via `create_skill_command`
 
 ## Key Documentation

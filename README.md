@@ -4,7 +4,7 @@ Desktop-first AI agent built with Tauri 2 (Rust backend + React frontend), with 
 
 ## Status
 
-This repository is actively transitioning from legacy `tauri-ai-boilerplate` internals to the Mesoclaw architecture documented under `docs/`.
+This repository is actively transitioning from earlier boilerplate internals to the Mesoclaw architecture documented under `docs/`.
 
 Use the docs below as the source of truth for architecture and roadmap.
 

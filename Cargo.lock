@@ -3097,6 +3097,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "mesoclaw"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "diesel",
+ "diesel_migrations",
+ "dirs 5.0.1",
+ "eventsource-stream",
+ "futures",
+ "hex",
+ "keyring",
+ "libsqlite3-sys",
+ "log",
+ "lru",
+ "regex",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-log",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tauri-plugin-store",
+ "tauri-plugin-stronghold",
+ "tauri-plugin-window-state",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "urlencoding",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "migrations_internals"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5553,47 +5594,6 @@ dependencies = [
  "webview2-com",
  "window-vibrancy",
  "windows 0.61.3",
-]
-
-[[package]]
-name = "tauri-ai-boilerplate"
-version = "0.0.1"
-dependencies = [
- "async-trait",
- "bytes",
- "chrono",
- "diesel",
- "diesel_migrations",
- "dirs 5.0.1",
- "eventsource-stream",
- "futures",
- "hex",
- "keyring",
- "libsqlite3-sys",
- "log",
- "lru",
- "regex",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-log",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tauri-plugin-store",
- "tauri-plugin-stronghold",
- "tauri-plugin-window-state",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "urlencoding",
- "uuid",
- "zeroize",
 ]
 
 [[package]]

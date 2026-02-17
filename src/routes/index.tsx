@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { Sparkles, Zap } from "lucide-react";
+import { APP_IDENTITY } from "@/config/app-identity";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -10,7 +11,9 @@ function HomePage() {
   return (
     <div className="flex h-full items-center justify-center">
       <div className="max-w-3xl text-center">
-        <h1 className="text-4xl font-bold">Welcome to Tauri AI Boilerplate</h1>
+        <h1 className="text-4xl font-bold">
+          Welcome to {APP_IDENTITY.productName}
+        </h1>
         <p className="mt-4 text-lg text-muted-foreground">
           A production-ready foundation for building AI-powered desktop
           applications with Tauri 2, React, and TypeScript.

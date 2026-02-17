@@ -97,7 +97,7 @@ Slim Down    →  Foundation  →  Core Infra     →  Agent Intel    →  Proac
 | 0.4.6 | Delete `schema.rs`                          | Remove Diesel-generated schema file                                                                                       |
 | 0.4.7 | Remove Diesel from `Cargo.toml`             | Remove `diesel`, `diesel_migrations`, `libsqlite3-sys`                                                                    |
 | 0.4.8 | Run all 120 existing tests                  | Ensure zero regressions                                                                                                   |
-| 0.4.9 | Test data migration with real user database | Use a copy of the existing `~/.tauri-ai-boilerplate/app.db`                                                               |
+| 0.4.9 | Test data migration with real user database | Use a copy of the existing app database under the OS app data directory (for example `~/.local/share/<bundle-id>/app.db` on Linux)                                                               |
 
 ---
 

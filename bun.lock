@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "tauri-ai-boilerplate",
+      "name": "mesoclaw",
       "dependencies": {
         "@ai-sdk/react": "^3.0.51",
         "@base-ui/react": "^1.1.0",
