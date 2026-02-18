@@ -20,7 +20,7 @@ use crate::{
 
 use super::{
     manifest::{ModuleManifest, ModuleType, RuntimeConfig, RuntimeType},
-    protocol::stdio_json::{send_request, read_response, StdioRequest},
+    protocol::stdio_json::{StdioRequest, read_response, send_request},
 };
 
 // ─── SidecarTool ──────────────────────────────────────────────────────────────
@@ -43,7 +43,12 @@ impl SidecarTool {
         policy: Arc<SecurityPolicy>,
         bus: Option<Arc<dyn EventBus>>,
     ) -> Self {
-        Self { manifest, module_dir, policy, bus }
+        Self {
+            manifest,
+            module_dir,
+            policy,
+            bus,
+        }
     }
 
     pub fn module_type(&self) -> &ModuleType {
@@ -126,13 +131,13 @@ impl Tool for SidecarTool {
                 return Err(format!(
                     "sidecar '{}' denied by security policy: {reason}",
                     self.manifest.module.id
-                ))
+                ));
             }
             ValidationResult::NeedsApproval => {
                 return Err(format!(
                     "sidecar '{}' requires manual approval (autonomy level too low)",
                     self.manifest.module.id
-                ))
+                ));
             }
             ValidationResult::Allowed => {}
         }
@@ -146,15 +151,10 @@ impl Tool for SidecarTool {
             .and_then(|v| v.as_str())
             .unwrap_or("execute")
             .to_string();
-        let params = args
-            .get("params")
-            .cloned()
-            .unwrap_or_else(|| args.clone());
+        let params = args.get("params").cloned().unwrap_or_else(|| args.clone());
 
         // ── 4. Spawn process (native or container) ───────────────────────────
-        let timeout = Duration::from_secs(
-            self.manifest.runtime.timeout_secs.unwrap_or(30),
-        );
+        let timeout = Duration::from_secs(self.manifest.runtime.timeout_secs.unwrap_or(30));
 
         let mut child = self.spawn_child().await?;
 
@@ -182,8 +182,8 @@ impl Tool for SidecarTool {
         let tool_result = match io_result {
             Ok(Ok(response)) => match response.into_result() {
                 Ok(value) => {
-                    let output = serde_json::to_string_pretty(&value)
-                        .unwrap_or_else(|_| value.to_string());
+                    let output =
+                        serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string());
                     ToolResult::ok(output)
                 }
                 Err(e) => ToolResult::err(e),
@@ -249,7 +249,7 @@ impl SidecarTool {
     /// - `manifest.runtime.args[1..]` are arguments to that command.
     #[cfg(feature = "containers")]
     async fn spawn_container_child(&self) -> Result<tokio::process::Child, String> {
-        use super::container::{detect_runtime, ContainerConfig};
+        use super::container::{ContainerConfig, detect_runtime};
 
         let runtime = detect_runtime().ok_or_else(|| {
             format!(
@@ -261,14 +261,14 @@ impl SidecarTool {
 
         let config = ContainerConfig {
             image: self.manifest.runtime.command.clone(),
-            command: self.manifest.runtime.args.first().cloned().unwrap_or_default(),
-            args: self
+            command: self
                 .manifest
                 .runtime
                 .args
-                .get(1..)
-                .unwrap_or(&[])
-                .to_vec(),
+                .first()
+                .cloned()
+                .unwrap_or_default(),
+            args: self.manifest.runtime.args.get(1..).unwrap_or(&[]).to_vec(),
             env: self.manifest.runtime.env.clone(),
             memory_limit_mb: Some(self.manifest.security.max_memory_mb),
             network_disabled: !self.manifest.security.allow_network,
@@ -286,8 +286,7 @@ impl SidecarTool {
 mod tests {
     use super::*;
     use crate::modules::manifest::{
-        ModuleInfo, ModuleType, ParametersConfig, RuntimeConfig, RuntimeType,
-        SecurityConfig,
+        ModuleInfo, ModuleType, ParametersConfig, RuntimeConfig, RuntimeType, SecurityConfig,
     };
     use crate::security::SecurityPolicy;
     use std::collections::HashMap;

@@ -31,7 +31,10 @@ impl Default for TokioBroadcastBus {
 impl EventBus for TokioBroadcastBus {
     fn publish(&self, event: AppEvent) -> Result<(), String> {
         // `send` returns the number of active receivers (may be 0 — that is fine).
-        self.sender.send(event).map(|_| ()).map_err(|e| e.to_string())
+        self.sender
+            .send(event)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 
     fn subscribe(&self) -> broadcast::Receiver<AppEvent> {

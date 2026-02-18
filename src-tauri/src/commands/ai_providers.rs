@@ -5,13 +5,13 @@ use tauri::State;
 use crate::ai::provider::LLMProvider;
 use crate::ai::providers::openai_compatible::{OpenAICompatibleConfig, OpenAICompatibleProvider};
 use crate::ai::types::{CompletionRequest, Message};
+use crate::config::app_identity::KEYCHAIN_SERVICE;
+use crate::database::DbPool;
 use crate::database::models::ai_provider::{
     AIModel, AIModelData, AIProvider, AIProviderData, NewAIModel, NewAIProvider, ProviderWithModels,
 };
 use crate::database::schema::settings;
-use crate::database::DbPool;
 use crate::database::schema::{ai_models, ai_providers};
-use crate::config::app_identity::KEYCHAIN_SERVICE;
 
 /// Provider with API key status response
 #[derive(Debug, Serialize, Deserialize)]
@@ -173,11 +173,8 @@ pub async fn test_provider_connection_command(
     // Create the provider instance specifically for testing with the test model
     // We don't use create_provider_from_db here because that loads the default model from settings
     // Instead, we create the provider directly with the test model we want to use
-    let config = OpenAICompatibleConfig::with_model(
-        effective_api_key,
-        &provider.base_url,
-        &model.model_id,
-    );
+    let config =
+        OpenAICompatibleConfig::with_model(effective_api_key, &provider.base_url, &model.model_id);
 
     let provider_instance = OpenAICompatibleProvider::new(config, &provider.id)
         .map_err(|e| format!("Failed to create provider: {}", e))?;
@@ -203,14 +200,12 @@ pub async fn test_provider_connection_command(
                 model: Some(response.model),
             })
         }
-        Err(msg) if msg.contains("401") || msg.contains("403") => {
-            Ok(ProviderTestResult {
-                success: false,
-                latency_ms: None,
-                message: "Invalid API key. Please check your credentials.".to_string(),
-                model: None,
-            })
-        }
+        Err(msg) if msg.contains("401") || msg.contains("403") => Ok(ProviderTestResult {
+            success: false,
+            latency_ms: None,
+            message: "Invalid API key. Please check your credentials.".to_string(),
+            model: None,
+        }),
         Err(msg) if msg.contains("404") => Ok(ProviderTestResult {
             success: false,
             latency_ms: None,
@@ -260,7 +255,10 @@ pub fn add_custom_model_command(
         .map_err(|e| format!("Failed to check existing model: {}", e))?;
 
     if existing.is_some() {
-        return Err(format!("Model already exists for this provider: {}", model_id));
+        return Err(format!(
+            "Model already exists for this provider: {}",
+            model_id
+        ));
     }
 
     // Generate a unique ID for the custom model
@@ -287,10 +285,7 @@ pub fn add_custom_model_command(
 /// Only custom models (is_custom=1) can be deleted.
 /// Built-in models cannot be deleted.
 #[tauri::command]
-pub fn delete_model_command(
-    pool: State<'_, DbPool>,
-    model_id: String,
-) -> Result<(), String> {
+pub fn delete_model_command(pool: State<'_, DbPool>, model_id: String) -> Result<(), String> {
     let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
 
     // Find the model
@@ -327,9 +322,7 @@ pub fn reactivate_provider_command(
     pool: State<'_, DbPool>,
     provider_id: String,
 ) -> Result<String, String> {
-    let mut conn = pool
-        .get()
-        .map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
 
     // Reactivate the provider
     let updated = diesel::update(ai_providers::table.filter(ai_providers::id.eq(&provider_id)))
@@ -342,10 +335,11 @@ pub fn reactivate_provider_command(
     }
 
     // Reactivate all models for this provider
-    let model_count = diesel::update(ai_models::table.filter(ai_models::provider_id.eq(&provider_id)))
-        .set(ai_models::is_active.eq(1))
-        .execute(&mut conn)
-        .map_err(|e| format!("Failed to reactivate models: {}", e))?;
+    let model_count =
+        diesel::update(ai_models::table.filter(ai_models::provider_id.eq(&provider_id)))
+            .set(ai_models::is_active.eq(1))
+            .execute(&mut conn)
+            .map_err(|e| format!("Failed to reactivate models: {}", e))?;
 
     Ok(format!(
         "Reactivated provider '{}' and {} model(s)",
@@ -363,9 +357,7 @@ pub fn update_provider_command(
     provider_id: String,
     base_url: String,
 ) -> Result<(), String> {
-    let mut conn = pool
-        .get()
-        .map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
 
     // Update the provider
     let updated = diesel::update(ai_providers::table.filter(ai_providers::id.eq(&provider_id)))
@@ -432,7 +424,10 @@ pub fn add_user_provider_command(
     let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
 
     // Validate provider ID format (lowercase, alphanumeric with hyphens)
-    if !id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+    if !id
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
         return Err("Provider ID must be lowercase alphanumeric with hyphens only".to_string());
     }
     if id.len() < 3 || id.len() > 50 {
@@ -465,7 +460,9 @@ pub fn add_user_provider_command(
 
     // Add initial models
     for model_spec in initial_models {
-        let display_name = model_spec.display_name.unwrap_or_else(|| model_spec.model_id.clone());
+        let display_name = model_spec
+            .display_name
+            .unwrap_or_else(|| model_spec.model_id.clone());
         let model_db_id = format!("{}-{}", id, model_spec.model_id.replace('/', "-"));
 
         let new_model = NewAIModel::custom(&model_db_id, &id, &model_spec.model_id, &display_name);
@@ -499,7 +496,10 @@ pub async fn delete_user_provider_command(
         .ok_or_else(|| format!("Provider not found: {}", provider_id))?;
 
     if provider.is_user_defined == 0 {
-        return Err("Cannot delete built-in providers. Only user-defined providers can be deleted.".to_string());
+        return Err(
+            "Cannot delete built-in providers. Only user-defined providers can be deleted."
+                .to_string(),
+        );
     }
 
     // Delete all models for this provider
@@ -578,7 +578,10 @@ pub fn set_global_default_model_command(
         .is_some();
 
     if !model_exists {
-        return Err(format!("Model '{}' not found for provider '{}'", model_id, provider_id));
+        return Err(format!(
+            "Model '{}' not found for provider '{}'",
+            model_id, provider_id
+        ));
     }
 
     // Update settings

@@ -49,10 +49,7 @@ pub fn create_provider(
             OpenAICompatibleConfig::vercel_gateway(api_key),
             "vercel-ai-gateway",
         ),
-        ProviderType::OpenRouter => (
-            OpenAICompatibleConfig::openrouter(api_key),
-            "openrouter",
-        ),
+        ProviderType::OpenRouter => (OpenAICompatibleConfig::openrouter(api_key), "openrouter"),
     };
 
     if let Some(url) = base_url {

@@ -61,15 +61,13 @@ impl Tool for FileReadTool {
             }
         }
 
-        self.policy.log_action(
-            self.name(),
-            args.clone(),
-            RiskLevel::Low,
-            "allowed",
-            None,
-        );
+        self.policy
+            .log_action(self.name(), args.clone(), RiskLevel::Low, "allowed", None);
 
-        let max_lines = args.get("max_lines").and_then(Value::as_u64).map(|n| n as usize);
+        let max_lines = args
+            .get("max_lines")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize);
 
         let contents = fs::read_to_string(&path)
             .map_err(|e| format!("failed to read '{}': {e}", path.display()))?;
@@ -79,8 +77,7 @@ impl Tool for FileReadTool {
             None => contents,
         };
 
-        Ok(ToolResult::ok(output)
-            .with_metadata(json!({ "path": path.display().to_string() })))
+        Ok(ToolResult::ok(output).with_metadata(json!({ "path": path.display().to_string() })))
     }
 }
 
@@ -144,20 +141,17 @@ impl Tool for FileWriteTool {
         );
 
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("failed to create parent dirs: {e}"))?;
+            fs::create_dir_all(parent).map_err(|e| format!("failed to create parent dirs: {e}"))?;
         }
 
         let bytes = content.len();
         fs::write(&path, &content)
             .map_err(|e| format!("failed to write '{}': {e}", path.display()))?;
 
-        Ok(ToolResult::ok(format!(
-            "wrote {} bytes to '{}'",
-            bytes,
-            path.display()
-        ))
-        .with_metadata(json!({ "path": path.display().to_string(), "bytes": bytes })))
+        Ok(
+            ToolResult::ok(format!("wrote {} bytes to '{}'", bytes, path.display()))
+                .with_metadata(json!({ "path": path.display().to_string(), "bytes": bytes })),
+        )
     }
 }
 
@@ -214,19 +208,13 @@ impl Tool for FileListTool {
             }
         }
 
-        self.policy.log_action(
-            self.name(),
-            args.clone(),
-            RiskLevel::Low,
-            "allowed",
-            None,
-        );
+        self.policy
+            .log_action(self.name(), args.clone(), RiskLevel::Low, "allowed", None);
 
         let entries = collect_entries(&path, recursive)
             .map_err(|e| format!("failed to list '{}': {e}", path.display()))?;
 
-        Ok(ToolResult::ok(entries.join("\n"))
-            .with_metadata(json!({ "count": entries.len() })))
+        Ok(ToolResult::ok(entries.join("\n")).with_metadata(json!({ "count": entries.len() })))
     }
 }
 
@@ -282,7 +270,10 @@ mod tests {
         fs::write(&file, "hello world").unwrap();
 
         let tool = FileReadTool::new(full_policy());
-        let r = tool.execute(json!({"path": file.display().to_string()})).await.unwrap();
+        let r = tool
+            .execute(json!({"path": file.display().to_string()}))
+            .await
+            .unwrap();
         assert!(r.success);
         assert_eq!(r.output.trim(), "hello world");
     }
@@ -304,7 +295,9 @@ mod tests {
     #[tokio::test]
     async fn read_missing_file_errors() {
         let tool = FileReadTool::new(full_policy());
-        let r = tool.execute(json!({"path": "/tmp/__nonexistent_file_xyz__"})).await;
+        let r = tool
+            .execute(json!({"path": "/tmp/__nonexistent_file_xyz__"}))
+            .await;
         assert!(r.is_err());
     }
 
@@ -330,7 +323,9 @@ mod tests {
         fs::write(&file, "secret").unwrap();
 
         let tool = FileReadTool::new(policy);
-        let r = tool.execute(json!({"path": file.display().to_string()})).await;
+        let r = tool
+            .execute(json!({"path": file.display().to_string()}))
+            .await;
         assert!(r.is_err());
     }
 

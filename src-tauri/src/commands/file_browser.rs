@@ -60,9 +60,7 @@ pub async fn list_directory(
         let path_str = entry.path().to_string_lossy().to_string();
 
         // Filter files by extension if specified
-        if !is_directory
-            && let Some(ref exts) = extensions
-        {
+        if !is_directory && let Some(ref exts) = extensions {
             let has_matching_ext = exts.iter().any(|ext| {
                 name.to_lowercase()
                     .ends_with(&format!(".{}", ext.to_lowercase()))

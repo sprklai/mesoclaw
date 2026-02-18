@@ -5,8 +5,8 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::scheduler::{
-    traits::{JobPayload, Scheduler as _, ScheduledJob, Schedule, SessionTarget},
     TokioScheduler,
+    traits::{JobPayload, Schedule, ScheduledJob, Scheduler as _, SessionTarget},
 };
 
 /// List all registered scheduled jobs.
@@ -29,10 +29,10 @@ pub async fn create_job_command(
     enabled: Option<bool>,
     scheduler: State<'_, Arc<TokioScheduler>>,
 ) -> Result<String, String> {
-    let schedule: Schedule = serde_json::from_value(schedule_json)
-        .map_err(|e| format!("Invalid schedule: {e}"))?;
-    let payload: JobPayload = serde_json::from_value(payload_json)
-        .map_err(|e| format!("Invalid payload: {e}"))?;
+    let schedule: Schedule =
+        serde_json::from_value(schedule_json).map_err(|e| format!("Invalid schedule: {e}"))?;
+    let payload: JobPayload =
+        serde_json::from_value(payload_json).map_err(|e| format!("Invalid payload: {e}"))?;
 
     let job = ScheduledJob {
         id: String::new(), // assigned by scheduler

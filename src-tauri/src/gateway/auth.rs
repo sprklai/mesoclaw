@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    path::PathBuf,
-};
+use std::{fs, path::PathBuf};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -40,8 +37,7 @@ pub fn load_or_create_token() -> Result<String, String> {
     let token = Uuid::new_v4().to_string().replace('-', "");
 
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("failed to create .mesoclaw dir: {e}"))?;
+        fs::create_dir_all(parent).map_err(|e| format!("failed to create .mesoclaw dir: {e}"))?;
     }
 
     fs::write(&path, &token).map_err(|e| format!("failed to write token: {e}"))?;

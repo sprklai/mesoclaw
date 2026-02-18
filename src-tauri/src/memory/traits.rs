@@ -61,12 +61,8 @@ pub struct MemoryEntry {
 #[async_trait]
 pub trait Memory: Send + Sync {
     /// Store or overwrite a memory entry identified by `key`.
-    async fn store(
-        &self,
-        key: &str,
-        content: &str,
-        category: MemoryCategory,
-    ) -> Result<(), String>;
+    async fn store(&self, key: &str, content: &str, category: MemoryCategory)
+    -> Result<(), String>;
 
     /// Search for entries that match `query`.
     ///

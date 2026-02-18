@@ -88,11 +88,7 @@ impl TemplateRegistry {
     }
 
     /// Render a template with the provided variables using Tera.
-    pub async fn render(
-        &self,
-        id: &str,
-        vars: &HashMap<String, String>,
-    ) -> Result<String, String> {
+    pub async fn render(&self, id: &str, vars: &HashMap<String, String>) -> Result<String, String> {
         let template = self
             .get(id)
             .await

@@ -21,7 +21,7 @@ use crate::{
     channels::ChannelManager,
     config::loader::load_default_config,
     event_bus::{AppEvent, EventBus},
-    identity::loader::{default_identity_dir, IdentityLoader},
+    identity::loader::{IdentityLoader, default_identity_dir},
     memory::daily::DailyMemory,
     scheduler::{Scheduler, TokioScheduler},
 };
@@ -61,7 +61,12 @@ impl BootSequence {
         let base_dir = dirs::home_dir()
             .ok_or("could not determine home directory")?
             .join(".mesoclaw");
-        Ok(Self { bus, channels, base_dir, channel_buffer: 64 })
+        Ok(Self {
+            bus,
+            channels,
+            base_dir,
+            channel_buffer: 64,
+        })
     }
 
     /// Create a `BootSequence` with a custom base directory (useful for tests).
@@ -70,7 +75,12 @@ impl BootSequence {
         channels: Arc<ChannelManager>,
         base_dir: PathBuf,
     ) -> Self {
-        Self { bus, channels, base_dir, channel_buffer: 64 }
+        Self {
+            bus,
+            channels,
+            base_dir,
+            channel_buffer: 64,
+        }
     }
 
     /// Execute all boot steps in order.  Returns [`BootContext`] on success.
@@ -97,7 +107,9 @@ impl BootSequence {
             Ok((today, yesterday)) => {
                 let today_len = today.as_deref().unwrap_or("").len();
                 let yest_len = yesterday.as_deref().unwrap_or("").len();
-                log::info!("[boot] daily memory loaded (today={today_len}B, yesterday={yest_len}B)");
+                log::info!(
+                    "[boot] daily memory loaded (today={today_len}B, yesterday={yest_len}B)"
+                );
             }
             Err(e) => log::warn!("[boot] daily memory read failed (non-fatal): {e}"),
         }
@@ -114,12 +126,8 @@ impl BootSequence {
 
         // ── Step 7: Start channels ─────────────────────────────────────────────
         log::info!("[boot] starting channels");
-        let (message_rx, channel_handles) =
-            self.channels.start_all(self.channel_buffer).await;
-        log::info!(
-            "[boot] {} channel(s) started",
-            channel_handles.len()
-        );
+        let (message_rx, channel_handles) = self.channels.start_all(self.channel_buffer).await;
+        log::info!("[boot] {} channel(s) started", channel_handles.len());
 
         // ── Step 8: Execute BOOT.md checklist ────────────────────────────────
         log::info!("[boot] checking for BOOT.md checklist");
@@ -177,7 +185,10 @@ impl BootSequence {
                 if items.is_empty() {
                     log::debug!("[boot] BOOT.md has no unchecked items");
                 } else {
-                    log::info!("[boot] BOOT.md has {} unchecked item(s) (manual review needed)", items.len());
+                    log::info!(
+                        "[boot] BOOT.md has {} unchecked item(s) (manual review needed)",
+                        items.len()
+                    );
                     for item in items {
                         log::info!("[boot]   {}", item.trim());
                     }

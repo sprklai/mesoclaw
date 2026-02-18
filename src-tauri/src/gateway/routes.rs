@@ -1,9 +1,4 @@
-use axum::{
-    Json,
-    extract::State,
-    response::IntoResponse,
-    http::StatusCode,
-};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
@@ -68,10 +63,10 @@ pub async fn create_session(
     }
 }
 
-pub async fn list_sessions(
-    State(state): State<GatewayState>,
-) -> impl IntoResponse {
-    let keys: Vec<String> = state.sessions.list_keys()
+pub async fn list_sessions(State(state): State<GatewayState>) -> impl IntoResponse {
+    let keys: Vec<String> = state
+        .sessions
+        .list_keys()
         .iter()
         .map(|k| k.to_string())
         .collect();
@@ -80,9 +75,7 @@ pub async fn list_sessions(
 
 // ─── Provider status ──────────────────────────────────────────────────────────
 
-pub async fn provider_status(
-    State(_state): State<GatewayState>,
-) -> impl IntoResponse {
+pub async fn provider_status(State(_state): State<GatewayState>) -> impl IntoResponse {
     // Provider health is surfaced via ProviderHealthChange events on the
     // EventBus.  For now return a minimal status acknowledging the service.
     // Full DB-backed health query is deferred until the gateway has access
@@ -99,10 +92,10 @@ pub struct ModuleSummary {
 }
 
 /// List all registered sidecar modules.
-pub async fn list_modules(
-    State(state): State<GatewayState>,
-) -> impl IntoResponse {
-    let modules: Vec<serde_json::Value> = state.modules.ids()
+pub async fn list_modules(State(state): State<GatewayState>) -> impl IntoResponse {
+    let modules: Vec<serde_json::Value> = state
+        .modules
+        .ids()
         .iter()
         .map(|id| json!({ "id": id }))
         .collect();
@@ -125,7 +118,8 @@ pub async fn module_health(
         None => (
             StatusCode::NOT_FOUND,
             Json(json!({ "id": params.id, "healthy": false, "error": "module not found" })),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -145,7 +139,9 @@ pub async fn start_module(
     }
     (
         StatusCode::NOT_IMPLEMENTED,
-        Json(json!({ "id": params.id, "error": "module lifecycle (start/stop) requires SidecarService wiring" })),
+        Json(
+            json!({ "id": params.id, "error": "module lifecycle (start/stop) requires SidecarService wiring" }),
+        ),
     )
 }
 
@@ -162,7 +158,9 @@ pub async fn stop_module(
     }
     (
         StatusCode::NOT_IMPLEMENTED,
-        Json(json!({ "id": params.id, "error": "module lifecycle (start/stop) requires SidecarService wiring" })),
+        Json(
+            json!({ "id": params.id, "error": "module lifecycle (start/stop) requires SidecarService wiring" }),
+        ),
     )
 }
 
@@ -171,11 +169,11 @@ pub async fn stop_module(
 /// ModuleRegistry::discover() requires a mutable ToolRegistry and rebuilds
 /// the map from scratch; a live reload while tools are executing is unsafe
 /// without quiescing.  Returns 501 until a safe reload protocol is designed.
-pub async fn reload_modules(
-    State(_state): State<GatewayState>,
-) -> impl IntoResponse {
+pub async fn reload_modules(State(_state): State<GatewayState>) -> impl IntoResponse {
     (
         StatusCode::NOT_IMPLEMENTED,
-        Json(json!({ "error": "hot module reload not yet safe; restart the daemon to re-discover modules" })),
+        Json(
+            json!({ "error": "hot module reload not yet safe; restart the daemon to re-discover modules" }),
+        ),
     )
 }

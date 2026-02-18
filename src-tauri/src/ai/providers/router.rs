@@ -78,7 +78,11 @@ pub struct ModelTarget {
 }
 
 impl ModelTarget {
-    pub fn new(provider_id: impl Into<String>, model: impl Into<String>, cost_tier: CostTier) -> Self {
+    pub fn new(
+        provider_id: impl Into<String>,
+        model: impl Into<String>,
+        cost_tier: CostTier,
+    ) -> Self {
         Self {
             provider_id: provider_id.into(),
             model: model.into(),
@@ -131,15 +135,27 @@ impl RouterConfig {
         // Anthropic aliases
         aliases.insert(
             "claude".to_string(),
-            ModelTarget::new("vercel-ai-gateway", "anthropic/claude-sonnet-4-5", CostTier::Medium),
+            ModelTarget::new(
+                "vercel-ai-gateway",
+                "anthropic/claude-sonnet-4-5",
+                CostTier::Medium,
+            ),
         );
         aliases.insert(
             "claude-opus".to_string(),
-            ModelTarget::new("vercel-ai-gateway", "anthropic/claude-opus-4-5", CostTier::High),
+            ModelTarget::new(
+                "vercel-ai-gateway",
+                "anthropic/claude-opus-4-5",
+                CostTier::High,
+            ),
         );
         aliases.insert(
             "claude-haiku".to_string(),
-            ModelTarget::new("vercel-ai-gateway", "anthropic/claude-haiku-4-5-20251001", CostTier::Low),
+            ModelTarget::new(
+                "vercel-ai-gateway",
+                "anthropic/claude-haiku-4-5-20251001",
+                CostTier::Low,
+            ),
         );
         // OpenAI aliases
         aliases.insert(
@@ -153,7 +169,11 @@ impl RouterConfig {
         // Google aliases
         aliases.insert(
             "gemini".to_string(),
-            ModelTarget::new("vercel-ai-gateway", "google/gemini-2.0-flash", CostTier::Low),
+            ModelTarget::new(
+                "vercel-ai-gateway",
+                "google/gemini-2.0-flash",
+                CostTier::Low,
+            ),
         );
 
         let mut task_routes = HashMap::new();
@@ -162,7 +182,11 @@ impl RouterConfig {
         task_routes.insert(
             "code".to_string(),
             TaskRoute::new(vec![
-                ModelTarget::new("vercel-ai-gateway", "anthropic/claude-sonnet-4-5", CostTier::Medium),
+                ModelTarget::new(
+                    "vercel-ai-gateway",
+                    "anthropic/claude-sonnet-4-5",
+                    CostTier::Medium,
+                ),
                 ModelTarget::new("vercel-ai-gateway", "openai/gpt-4o", CostTier::Medium),
                 ModelTarget::new("vercel-ai-gateway", "openai/gpt-4o-mini", CostTier::Low),
             ]),
@@ -173,7 +197,11 @@ impl RouterConfig {
             "general".to_string(),
             TaskRoute::new(vec![
                 ModelTarget::new("vercel-ai-gateway", "openai/gpt-4o-mini", CostTier::Low),
-                ModelTarget::new("vercel-ai-gateway", "google/gemini-2.0-flash", CostTier::Low),
+                ModelTarget::new(
+                    "vercel-ai-gateway",
+                    "google/gemini-2.0-flash",
+                    CostTier::Low,
+                ),
             ]),
         );
 
@@ -181,7 +209,11 @@ impl RouterConfig {
         task_routes.insert(
             "fast".to_string(),
             TaskRoute::new(vec![
-                ModelTarget::new("vercel-ai-gateway", "google/gemini-2.0-flash", CostTier::Low),
+                ModelTarget::new(
+                    "vercel-ai-gateway",
+                    "google/gemini-2.0-flash",
+                    CostTier::Low,
+                ),
                 ModelTarget::new("vercel-ai-gateway", "openai/gpt-4o-mini", CostTier::Low),
             ]),
         );
@@ -190,7 +222,11 @@ impl RouterConfig {
         task_routes.insert(
             "creative".to_string(),
             TaskRoute::new(vec![
-                ModelTarget::new("vercel-ai-gateway", "anthropic/claude-sonnet-4-5", CostTier::Medium),
+                ModelTarget::new(
+                    "vercel-ai-gateway",
+                    "anthropic/claude-sonnet-4-5",
+                    CostTier::Medium,
+                ),
                 ModelTarget::new("vercel-ai-gateway", "openai/gpt-4o", CostTier::Medium),
             ]),
         );
@@ -199,8 +235,16 @@ impl RouterConfig {
         task_routes.insert(
             "analysis".to_string(),
             TaskRoute::new(vec![
-                ModelTarget::new("vercel-ai-gateway", "anthropic/claude-opus-4-5", CostTier::High),
-                ModelTarget::new("vercel-ai-gateway", "anthropic/claude-sonnet-4-5", CostTier::Medium),
+                ModelTarget::new(
+                    "vercel-ai-gateway",
+                    "anthropic/claude-opus-4-5",
+                    CostTier::High,
+                ),
+                ModelTarget::new(
+                    "vercel-ai-gateway",
+                    "anthropic/claude-sonnet-4-5",
+                    CostTier::Medium,
+                ),
                 ModelTarget::new("vercel-ai-gateway", "openai/gpt-4o", CostTier::Medium),
             ]),
         );
@@ -208,11 +252,7 @@ impl RouterConfig {
         Self {
             aliases,
             task_routes,
-            fallback: ModelTarget::new(
-                "vercel-ai-gateway",
-                "openai/gpt-4o-mini",
-                CostTier::Low,
-            ),
+            fallback: ModelTarget::new("vercel-ai-gateway", "openai/gpt-4o-mini", CostTier::Low),
         }
     }
 

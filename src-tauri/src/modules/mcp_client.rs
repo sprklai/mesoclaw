@@ -181,19 +181,18 @@ impl McpClient {
         let mut proc_guard = self.process.lock().await;
 
         // Spawn the server process.
-        let mut child =
-            tokio::process::Command::new(&self.manifest.runtime.command)
-                .args(&self.manifest.runtime.args)
-                .stdin(std::process::Stdio::piped())
-                .stdout(std::process::Stdio::piped())
-                .stderr(std::process::Stdio::null())
-                .spawn()
-                .map_err(|e| {
-                    format!(
-                        "failed to start MCP server '{}': {e}",
-                        self.manifest.runtime.command
-                    )
-                })?;
+        let mut child = tokio::process::Command::new(&self.manifest.runtime.command)
+            .args(&self.manifest.runtime.args)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| {
+                format!(
+                    "failed to start MCP server '{}': {e}",
+                    self.manifest.runtime.command
+                )
+            })?;
 
         let stdin = child.stdin.take().ok_or("MCP child has no stdin")?;
         let stdout_raw = child.stdout.take().ok_or("MCP child has no stdout")?;
@@ -351,8 +350,8 @@ impl Tool for McpToolProxy {
     async fn execute(&self, args: Value) -> Result<ToolResult, String> {
         match self.client.call_tool(&self.tool_name, args).await {
             Ok(value) => {
-                let output = serde_json::to_string_pretty(&value)
-                    .unwrap_or_else(|_| value.to_string());
+                let output =
+                    serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string());
                 Ok(ToolResult::ok(output))
             }
             Err(e) => Ok(ToolResult::err(e)),
@@ -435,7 +434,8 @@ mod tests {
 
     #[test]
     fn mcp_tool_deserializes() {
-        let json = r#"{"name":"my-tool","description":"Does stuff","inputSchema":{"type":"object"}}"#;
+        let json =
+            r#"{"name":"my-tool","description":"Does stuff","inputSchema":{"type":"object"}}"#;
         let tool: McpTool = serde_json::from_str(json).unwrap();
         assert_eq!(tool.name, "my-tool");
         assert_eq!(tool.description, "Does stuff");

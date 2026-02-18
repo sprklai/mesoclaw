@@ -159,9 +159,7 @@ fn read_pid_and_port() -> Option<(u32, u16)> {
 }
 
 fn read_token() -> Option<String> {
-    let path = dirs::home_dir()?
-        .join(".mesoclaw")
-        .join("daemon.token");
+    let path = dirs::home_dir()?.join(".mesoclaw").join("daemon.token");
     fs::read_to_string(path).ok().map(|s| s.trim().to_string())
 }
 
@@ -310,7 +308,10 @@ async fn require_gateway() -> Option<GatewayClient> {
 
 fn print_value(value: &Value, raw: bool, json_mode: bool) {
     if json_mode {
-        println!("{}", serde_json::to_string_pretty(value).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(value).unwrap_or_default()
+        );
     } else if raw {
         if let Some(s) = value.as_str() {
             println!("{s}");
@@ -319,7 +320,10 @@ fn print_value(value: &Value, raw: bool, json_mode: bool) {
         }
     } else {
         // Human-friendly default.
-        println!("{}", serde_json::to_string_pretty(value).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(value).unwrap_or_default()
+        );
     }
 }
 
@@ -355,19 +359,17 @@ async fn dispatch(command: &Commands, raw: bool, json_mode: bool) {
 
 async fn handle_daemon(args: &DaemonArgs) {
     match args.action.as_str() {
-        "status" => {
-            match is_daemon_running() {
-                Some(port) => {
-                    if let Some(client) = require_gateway().await {
-                        match client.health().await {
-                            Ok(v) => println!("daemon: running on port {port} — {v}"),
-                            Err(e) => println!("daemon: port {port} (health check failed: {e})"),
-                        }
+        "status" => match is_daemon_running() {
+            Some(port) => {
+                if let Some(client) = require_gateway().await {
+                    match client.health().await {
+                        Ok(v) => println!("daemon: running on port {port} — {v}"),
+                        Err(e) => println!("daemon: port {port} (health check failed: {e})"),
                     }
                 }
-                None => println!("daemon: not running"),
             }
-        }
+            None => println!("daemon: not running"),
+        },
         "start" => {
             if let Some(port) = is_daemon_running() {
                 println!("daemon: already running on port {port}");
@@ -378,8 +380,7 @@ async fn handle_daemon(args: &DaemonArgs) {
                 if !args.foreground {
                     // Self-spawn with --foreground so `daemon start` returns to
                     // the shell immediately instead of blocking.
-                    let exe = std::env::current_exe()
-                        .unwrap_or_else(|_| PathBuf::from("mesoclaw"));
+                    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("mesoclaw"));
                     match std::process::Command::new(&exe)
                         .arg("daemon")
                         .arg("start")
@@ -394,8 +395,8 @@ async fn handle_daemon(args: &DaemonArgs) {
                     }
                     return;
                 }
-                use std::sync::Arc;
                 use local_ts_lib::{event_bus::TokioBroadcastBus, gateway::start_gateway};
+                use std::sync::Arc;
                 let bus = Arc::new(TokioBroadcastBus::new());
                 log::info!("daemon: running in foreground");
                 if let Err(e) = start_gateway(bus).await {
@@ -457,7 +458,9 @@ async fn handle_identity(args: &IdentityArgs, _raw: bool, _json_mode: bool) {
 async fn handle_module(args: &ModuleArgs, raw: bool, json_mode: bool) {
     match args.action.as_str() {
         "list" => {
-            let Some(client) = require_gateway().await else { return; };
+            let Some(client) = require_gateway().await else {
+                return;
+            };
             match client.list_modules().await {
                 Ok(v) => print_value(&v, raw, json_mode),
                 Err(e) => print_err(&format!("module list: {e}")),
@@ -468,7 +471,9 @@ async fn handle_module(args: &ModuleArgs, raw: bool, json_mode: bool) {
                 print_err("module health requires a module name");
                 return;
             };
-            let Some(client) = require_gateway().await else { return; };
+            let Some(client) = require_gateway().await else {
+                return;
+            };
             match client.module_health(name).await {
                 Ok(v) => print_value(&v, raw, json_mode),
                 Err(e) => print_err(&format!("module health: {e}")),
@@ -479,14 +484,18 @@ async fn handle_module(args: &ModuleArgs, raw: bool, json_mode: bool) {
                 print_err(&format!("module {} requires a module name", args.action));
                 return;
             };
-            let Some(client) = require_gateway().await else { return; };
+            let Some(client) = require_gateway().await else {
+                return;
+            };
             match client.module_action(name, &args.action).await {
                 Ok(v) => print_value(&v, raw, json_mode),
                 Err(e) => print_err(&format!("module {}: {e}", args.action)),
             }
         }
         "reload" => {
-            let Some(client) = require_gateway().await else { return; };
+            let Some(client) = require_gateway().await else {
+                return;
+            };
             match client.reload_modules().await {
                 Ok(v) => print_value(&v, raw, json_mode),
                 Err(e) => print_err(&format!("module reload: {e}")),
@@ -520,7 +529,9 @@ fn create_module_scaffold(name: &str, module_type: &str, runtime: &str) {
         .join(name);
 
     if modules_dir.exists() {
-        print_err(&format!("module '{name}' already exists at {modules_dir:?}"));
+        print_err(&format!(
+            "module '{name}' already exists at {modules_dir:?}"
+        ));
         return;
     }
 
@@ -635,7 +646,10 @@ async fn run_repl(raw: bool, json_mode: bool) {
         let stdin = io::stdin();
         for line in stdin.lock().lines() {
             match line {
-                Ok(l) => { input.push_str(&l); input.push('\n'); }
+                Ok(l) => {
+                    input.push_str(&l);
+                    input.push('\n');
+                }
                 Err(_) => break,
             }
         }
@@ -663,14 +677,22 @@ async fn run_repl(raw: bool, json_mode: bool) {
         match stdin.lock().read_line(&mut line) {
             Ok(0) => break,
             Ok(_) => {}
-            Err(e) => { eprintln!("read error: {e}"); break; }
+            Err(e) => {
+                eprintln!("read error: {e}");
+                break;
+            }
         }
 
         let trimmed = line.trim();
-        if trimmed.is_empty() { continue; }
+        if trimmed.is_empty() {
+            continue;
+        }
 
         match trimmed {
-            "exit" | "quit" | "q" => { println!("Goodbye."); break; }
+            "exit" | "quit" | "q" => {
+                println!("Goodbye.");
+                break;
+            }
             "help" | "?" => print_help(),
             _ => {
                 // Try to parse as a subcommand first.

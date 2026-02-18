@@ -17,7 +17,10 @@ pub async fn approve_action_command(
     event_bus: State<'_, Arc<dyn EventBus>>,
 ) -> Result<(), String> {
     event_bus
-        .publish(AppEvent::ApprovalResponse { action_id, approved })
+        .publish(AppEvent::ApprovalResponse {
+            action_id,
+            approved,
+        })
         .map_err(|e| format!("failed to publish approval: {e}"))
 }
 

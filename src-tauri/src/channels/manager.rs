@@ -8,7 +8,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 
 use super::traits::{Channel, ChannelMessage};
 
@@ -91,7 +91,10 @@ impl ChannelManager {
     pub async fn start_all(
         &self,
         buffer: usize,
-    ) -> (mpsc::Receiver<ChannelMessage>, Vec<tokio::task::JoinHandle<()>>) {
+    ) -> (
+        mpsc::Receiver<ChannelMessage>,
+        Vec<tokio::task::JoinHandle<()>>,
+    ) {
         let (tx, rx) = mpsc::channel::<ChannelMessage>(buffer);
         let channels = self.channels.read().await;
 

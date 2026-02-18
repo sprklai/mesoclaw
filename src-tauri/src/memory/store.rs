@@ -90,10 +90,7 @@ impl Memory for InMemoryStore {
             }
         };
 
-        entries.insert(
-            key.to_owned(),
-            InternalEntry { entry, embedding },
-        );
+        entries.insert(key.to_owned(), InternalEntry { entry, embedding });
         Ok(())
     }
 
@@ -103,10 +100,7 @@ impl Memory for InMemoryStore {
         }
 
         let query_embedding = self.embedding_provider.embed(query).await?;
-        let query_words: Vec<String> = query
-            .split_whitespace()
-            .map(|w| w.to_lowercase())
-            .collect();
+        let query_words: Vec<String> = query.split_whitespace().map(|w| w.to_lowercase()).collect();
 
         let entries = self.entries.read().map_err(|e| e.to_string())?;
 
@@ -122,7 +116,11 @@ impl Memory for InMemoryStore {
             })
             .collect();
 
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         scored.truncate(limit);
         Ok(scored)
     }
@@ -218,7 +216,10 @@ mod tests {
         // Key is gone.
         let results = store.recall("v", 1).await.unwrap();
         let keys: Vec<&str> = results.iter().map(|e| e.key.as_str()).collect();
-        assert!(!keys.contains(&"k"), "forgotten key should not appear in recall");
+        assert!(
+            !keys.contains(&"k"),
+            "forgotten key should not appear in recall"
+        );
     }
 
     #[tokio::test]
@@ -231,7 +232,10 @@ mod tests {
     #[tokio::test]
     async fn store_daily_and_recall_daily_round_trip() {
         let store = make_store();
-        store.store_daily("Today I worked on the memory system.").await.unwrap();
+        store
+            .store_daily("Today I worked on the memory system.")
+            .await
+            .unwrap();
 
         let date = Utc::now().format("%Y-%m-%d").to_string();
         let content = store.recall_daily(&date).await.unwrap();
@@ -251,7 +255,11 @@ mod tests {
         let store = make_store();
         for i in 0..10 {
             store
-                .store(&format!("key:{i}"), &format!("content number {i}"), MemoryCategory::Core)
+                .store(
+                    &format!("key:{i}"),
+                    &format!("content number {i}"),
+                    MemoryCategory::Core,
+                )
                 .await
                 .unwrap();
         }
@@ -276,7 +284,11 @@ mod tests {
             .unwrap();
         let results = store.recall("some query", 5).await.unwrap();
         for entry in &results {
-            assert!(entry.score >= 0.0, "score should be non-negative, got {}", entry.score);
+            assert!(
+                entry.score >= 0.0,
+                "score should be non-negative, got {}",
+                entry.score
+            );
         }
     }
 
@@ -322,15 +334,27 @@ mod tests {
 
         let date = Utc::now().format("%Y-%m-%d").to_string();
         let content = store.recall_daily(&date).await.unwrap().unwrap();
-        assert!(content.contains("First entry."), "daily content should contain first entry");
-        assert!(content.contains("Second entry."), "daily content should contain second entry");
+        assert!(
+            content.contains("First entry."),
+            "daily content should contain first entry"
+        );
+        assert!(
+            content.contains("Second entry."),
+            "daily content should contain second entry"
+        );
     }
 
     #[tokio::test]
     async fn store_creates_unique_ids() {
         let store = make_store();
-        store.store("a", "alpha", MemoryCategory::Core).await.unwrap();
-        store.store("b", "beta", MemoryCategory::Core).await.unwrap();
+        store
+            .store("a", "alpha", MemoryCategory::Core)
+            .await
+            .unwrap();
+        store
+            .store("b", "beta", MemoryCategory::Core)
+            .await
+            .unwrap();
 
         let ra = store.recall("alpha", 5).await.unwrap();
         let rb = store.recall("beta", 5).await.unwrap();

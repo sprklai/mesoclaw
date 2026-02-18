@@ -1,8 +1,8 @@
+use crate::config::app_identity::CREDENTIALS_SERVICE;
 use keyring::{Entry, Error as KeyringError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zeroize::Zeroize;
-use crate::config::app_identity::CREDENTIALS_SERVICE;
 
 /// Credential types supported by the store
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

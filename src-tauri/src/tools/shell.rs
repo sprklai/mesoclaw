@@ -68,13 +68,8 @@ impl Tool for ShellTool {
             ValidationResult::NeedsApproval => "needs_approval",
             ValidationResult::Denied(_) => "denied",
         };
-        self.policy.log_action(
-            self.name(),
-            args.clone(),
-            risk,
-            decision_str,
-            None,
-        );
+        self.policy
+            .log_action(self.name(), args.clone(), risk, decision_str, None);
 
         match decision {
             ValidationResult::Allowed => {}
@@ -93,7 +88,8 @@ impl Tool for ShellTool {
             if let Some(dir) = &working_dir {
                 cmd.current_dir(dir);
             }
-            cmd.output().map_err(|e| format!("failed to spawn process: {e}"))
+            cmd.output()
+                .map_err(|e| format!("failed to spawn process: {e}"))
         })
         .await
         .map_err(|e| format!("blocking task panicked: {e}"))??;
@@ -147,7 +143,10 @@ mod tests {
     #[tokio::test]
     async fn echo_succeeds() {
         let tool = ShellTool::new(full_policy());
-        let r = tool.execute(json!({"command": "echo hello"})).await.unwrap();
+        let r = tool
+            .execute(json!({"command": "echo hello"}))
+            .await
+            .unwrap();
         assert!(r.success);
         assert!(r.output.contains("hello"));
     }
@@ -163,7 +162,9 @@ mod tests {
     async fn blocked_by_readonly() {
         let tool = ShellTool::new(readonly_policy());
         // mkdir is Medium risk — blocked in ReadOnly mode.
-        let r = tool.execute(json!({"command": "mkdir /tmp/test_readonly_blocked"})).await;
+        let r = tool
+            .execute(json!({"command": "mkdir /tmp/test_readonly_blocked"}))
+            .await;
         assert!(r.is_err());
     }
 

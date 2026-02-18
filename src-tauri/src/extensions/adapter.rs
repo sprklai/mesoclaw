@@ -195,7 +195,10 @@ mod tests {
     async fn binary_i32_adapter_executes_correctly() {
         let module = compile_add();
         let adapter = WasmToolAdapter::binary_i32("wasm_add", "Add two numbers", module, "add");
-        let result = adapter.execute(json!({"a": 3, "b": 4})).await.expect("execute");
+        let result = adapter
+            .execute(json!({"a": 3, "b": 4}))
+            .await
+            .expect("execute");
         assert!(result.success);
         assert_eq!(result.output, "7");
     }
@@ -213,7 +216,10 @@ mod tests {
     async fn binary_i32_adapter_handles_negative_numbers() {
         let module = compile_add();
         let adapter = WasmToolAdapter::binary_i32("wasm_add", "Add", module, "add");
-        let result = adapter.execute(json!({"a": -10, "b": 4})).await.expect("execute");
+        let result = adapter
+            .execute(json!({"a": -10, "b": 4}))
+            .await
+            .expect("execute");
         assert_eq!(result.output, "-6");
     }
 
@@ -234,7 +240,10 @@ mod tests {
         let adapter = WasmToolAdapter::binary_i32("wasm_add", "Add", module, "add");
         // Each call uses a fresh Store, so calls are independent.
         for i in 0..5_i64 {
-            let result = adapter.execute(json!({"a": i, "b": 1})).await.expect("execute");
+            let result = adapter
+                .execute(json!({"a": i, "b": 1}))
+                .await
+                .expect("execute");
             assert_eq!(result.output, (i + 1).to_string());
         }
     }
@@ -251,8 +260,7 @@ mod tests {
     #[tokio::test]
     async fn missing_export_returns_error() {
         let module = compile_add();
-        let adapter =
-            WasmToolAdapter::binary_i32("wasm_add", "Add", module, "nonexistent_fn");
+        let adapter = WasmToolAdapter::binary_i32("wasm_add", "Add", module, "nonexistent_fn");
         let result = adapter.execute(json!({"a": 1, "b": 2})).await;
         assert!(result.is_err(), "missing export should return Err");
     }

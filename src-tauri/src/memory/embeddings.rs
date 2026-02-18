@@ -137,7 +137,10 @@ mod tests {
     fn cosine_similarity_identical() {
         let v = vec![0.6f32, 0.8, 0.0];
         let score = cosine_similarity(&v, &v);
-        assert!((score - 1.0).abs() < 1e-5, "identical vectors → 1.0, got {score}");
+        assert!(
+            (score - 1.0).abs() < 1e-5,
+            "identical vectors → 1.0, got {score}"
+        );
     }
 
     #[test]
@@ -145,7 +148,10 @@ mod tests {
         let a = vec![1.0f32, 0.0, 0.0];
         let b = vec![0.0f32, 1.0, 0.0];
         let score = cosine_similarity(&a, &b);
-        assert!((score - 0.0).abs() < 1e-5, "orthogonal vectors → 0.0, got {score}");
+        assert!(
+            (score - 0.0).abs() < 1e-5,
+            "orthogonal vectors → 0.0, got {score}"
+        );
     }
 
     #[test]
@@ -185,7 +191,10 @@ mod tests {
         let provider = MockEmbeddingProvider::new();
         let e = provider.embed("normalise me").await.unwrap();
         let mag: f32 = e.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!((mag - 1.0).abs() < 1e-5, "embedding should be unit-length, got {mag}");
+        assert!(
+            (mag - 1.0).abs() < 1e-5,
+            "embedding should be unit-length, got {mag}"
+        );
     }
 
     #[tokio::test]

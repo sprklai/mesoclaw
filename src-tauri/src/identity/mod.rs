@@ -7,4 +7,4 @@ pub use commands::{
     update_identity_file_command,
 };
 pub use loader::{IdentityLoader, default_identity_dir};
-pub use types::{Identity, IdentityFileInfo, IdentityMeta, IDENTITY_FILES};
+pub use types::{IDENTITY_FILES, Identity, IdentityFileInfo, IdentityMeta};

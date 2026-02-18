@@ -77,8 +77,7 @@ impl ContainerRuntime for DockerRuntime {
 
     fn is_available(&self) -> bool {
         // The binary resolves to a real file or is findable via PATH.
-        std::path::Path::new(&self.binary).is_file()
-            || which::which(&self.binary).is_ok()
+        std::path::Path::new(&self.binary).is_file() || which::which(&self.binary).is_ok()
     }
 
     async fn pull_image(&self, image: &str) -> Result<(), String> {

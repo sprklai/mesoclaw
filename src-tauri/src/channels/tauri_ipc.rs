@@ -50,11 +50,11 @@ impl Channel for TauriIpcChannel {
             match rx.recv().await {
                 Ok(event) => {
                     // Convert relevant events into ChannelMessages.
-                    if let Some(msg) = event_to_channel_message(event) {
-                        if tx.send(msg).await.is_err() {
-                            // Receiver dropped — stop listening.
-                            break;
-                        }
+                    if let Some(msg) = event_to_channel_message(event)
+                        && tx.send(msg).await.is_err()
+                    {
+                        // Receiver dropped — stop listening.
+                        break;
                     }
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Closed) => break,

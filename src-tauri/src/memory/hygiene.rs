@@ -147,10 +147,11 @@ impl MemoryHygiene {
     fn archive_old_files(&self, report: &mut HygieneReport) {
         let today = Local::now().naive_local().date();
         // threshold = today - archive_days.  Files with date < threshold are archived.
-        let threshold = match today.checked_sub_signed(Duration::days(self.config.archive_days as i64)) {
-            Some(t) => t,
-            None => return,
-        };
+        let threshold =
+            match today.checked_sub_signed(Duration::days(self.config.archive_days as i64)) {
+                Some(t) => t,
+                None => return,
+            };
 
         let entries = match fs::read_dir(&self.memory_dir) {
             Ok(e) => e,
@@ -183,19 +184,16 @@ impl MemoryHygiene {
                 continue;
             }
 
-            let dest = self.archive_dir().join(
-                path.file_name()
-                    .unwrap_or_default(),
-            );
+            let dest = self
+                .archive_dir()
+                .join(path.file_name().unwrap_or_default());
             match fs::rename(&path, &dest) {
                 Ok(()) => {
                     report.archived.push(file_date.to_string());
                     log::debug!("hygiene: archived {:?} → {:?}", path, dest);
                 }
                 Err(e) => {
-                    report.push_error(format!(
-                        "failed to archive '{file_date}': {e}"
-                    ));
+                    report.push_error(format!("failed to archive '{file_date}': {e}"));
                 }
             }
         }
@@ -204,10 +202,11 @@ impl MemoryHygiene {
     /// Delete archived files older than `config.purge_days`.
     fn purge_old_archives(&self, report: &mut HygieneReport) {
         let today = Local::now().naive_local().date();
-        let threshold = match today.checked_sub_signed(Duration::days(self.config.purge_days as i64)) {
-            Some(t) => t,
-            None => return,
-        };
+        let threshold =
+            match today.checked_sub_signed(Duration::days(self.config.purge_days as i64)) {
+                Some(t) => t,
+                None => return,
+            };
 
         let entries = match fs::read_dir(self.archive_dir()) {
             Ok(e) => e,
@@ -244,9 +243,7 @@ impl MemoryHygiene {
                     log::debug!("hygiene: purged {:?}", path);
                 }
                 Err(e) => {
-                    report.push_error(format!(
-                        "failed to purge archive '{file_date}': {e}"
-                    ));
+                    report.push_error(format!("failed to purge archive '{file_date}': {e}"));
                 }
             }
         }
@@ -285,7 +282,10 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         write_diary(tmp.path(), &days_ago(10));
 
-        let config = HygieneConfig { enabled: false, ..HygieneConfig::default() };
+        let config = HygieneConfig {
+            enabled: false,
+            ..HygieneConfig::default()
+        };
         let report = hygiene(&tmp, config).run();
 
         assert!(report.archived.is_empty());
@@ -303,7 +303,10 @@ mod tests {
         write_diary(tmp.path(), &days_ago(3)); // 3 days ago
 
         let report = hygiene(&tmp, HygieneConfig::default()).run();
-        assert!(report.archived.is_empty(), "files within 7-day window should stay");
+        assert!(
+            report.archived.is_empty(),
+            "files within 7-day window should stay"
+        );
     }
 
     #[test]
@@ -320,7 +323,12 @@ mod tests {
         // Original file removed from main dir.
         assert!(!tmp.path().join(format!("{old}.md")).exists());
         // File present in archive.
-        assert!(tmp.path().join("archive").join(format!("{old}.md")).exists());
+        assert!(
+            tmp.path()
+                .join("archive")
+                .join(format!("{old}.md"))
+                .exists()
+        );
     }
 
     #[test]
@@ -332,7 +340,10 @@ mod tests {
         write_diary(tmp.path(), &boundary);
 
         let report = hygiene(&tmp, HygieneConfig::default()).run();
-        assert!(report.archived.is_empty(), "boundary file should not be archived");
+        assert!(
+            report.archived.is_empty(),
+            "boundary file should not be archived"
+        );
     }
 
     #[test]
@@ -343,7 +354,10 @@ mod tests {
 
         let report = hygiene(&tmp, HygieneConfig::default()).run();
 
-        assert!(tmp.path().join("MEMORY.md").exists(), "MEMORY.md must not be archived");
+        assert!(
+            tmp.path().join("MEMORY.md").exists(),
+            "MEMORY.md must not be archived"
+        );
         assert_eq!(report.archived.len(), 1, "only the diary file is archived");
     }
 
@@ -353,7 +367,10 @@ mod tests {
         write_diary(tmp.path(), &days_ago(3)); // 3 days old
 
         // With archive_days = 2, a 3-day-old file should be archived.
-        let config = HygieneConfig { archive_days: 2, ..HygieneConfig::default() };
+        let config = HygieneConfig {
+            archive_days: 2,
+            ..HygieneConfig::default()
+        };
         let report = hygiene(&tmp, config).run();
 
         assert_eq!(report.archived.len(), 1);
@@ -420,7 +437,10 @@ mod tests {
         fs::write(archive_dir.join(format!("{old}.md")), "old content").unwrap();
 
         // With purge_days = 7, a 10-day-old archive file should be purged.
-        let config = HygieneConfig { purge_days: 7, ..HygieneConfig::default() };
+        let config = HygieneConfig {
+            purge_days: 7,
+            ..HygieneConfig::default()
+        };
         let report = hygiene(&tmp, config).run();
 
         assert_eq!(report.purged.len(), 1);

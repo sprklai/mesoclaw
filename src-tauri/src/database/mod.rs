@@ -4,7 +4,7 @@ pub mod utils;
 
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::sqlite::SqliteConnection;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
@@ -61,7 +61,9 @@ pub fn init(app: &AppHandle) -> Result<DbPool, DbError> {
         .map_err(|e| DbError::Init(format!("Failed to create connection pool: {}", e)))?;
 
     // Run migrations
-    let mut conn = pool.get().map_err(|e| DbError::Init(format!("Failed to get database connection: {}", e)))?;
+    let mut conn = pool
+        .get()
+        .map_err(|e| DbError::Init(format!("Failed to get database connection: {}", e)))?;
     conn.run_pending_migrations(MIGRATIONS)
         .map_err(|e| DbError::Migration(e.to_string()))?;
 

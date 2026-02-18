@@ -41,10 +41,10 @@ pub use commands::{
     forget_memory_command, get_daily_memory_command, search_memory_command, store_memory_command,
 };
 pub use daily::DailyMemory;
-pub use hygiene::{HygieneConfig, HygieneReport, MemoryHygiene};
 pub use embeddings::{
     EmbeddingProvider, LruEmbeddingCache, MockEmbeddingProvider, cosine_similarity,
 };
+pub use hygiene::{HygieneConfig, HygieneReport, MemoryHygiene};
 pub use store::InMemoryStore;
 pub use tools::{MemoryForgetTool, MemoryRecallTool, MemoryStoreTool};
 pub use traits::{Memory, MemoryCategory, MemoryEntry};

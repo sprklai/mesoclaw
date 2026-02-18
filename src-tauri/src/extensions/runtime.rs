@@ -83,12 +83,7 @@ impl WasmModule {
     ///
     /// Used by the demo add-tool and any WASM module exporting a simple
     /// binary integer operation.
-    pub fn call_binary_i32(
-        &self,
-        fn_name: &str,
-        a: i32,
-        b: i32,
-    ) -> Result<i32, String> {
+    pub fn call_binary_i32(&self, fn_name: &str, a: i32, b: i32) -> Result<i32, String> {
         let mut store = Store::new(&self.engine, ());
         let func = self.instantiate::<(i32, i32), i32>(&mut store, fn_name)?;
         func.call(&mut store, (a, b))

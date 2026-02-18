@@ -10,8 +10,7 @@
 //! writes corrupting the config file.
 
 use std::{
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
 };
 
@@ -47,9 +46,7 @@ pub fn load_default_config() -> AppConfig {
     // Check for custom config path via env.
     let path = env::var("MESOCLAW_CONFIG")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            default_config_path().unwrap_or_else(|_| PathBuf::from("config.toml"))
-        });
+        .unwrap_or_else(|_| default_config_path().unwrap_or_else(|_| PathBuf::from("config.toml")));
 
     load_config(&path).unwrap_or_default()
 }
@@ -77,10 +74,10 @@ fn apply_env_overrides(config: &mut AppConfig) {
     if let Ok(v) = env::var("MESOCLAW_SECURITY_LEVEL") {
         config.security.autonomy_level = v;
     }
-    if let Ok(v) = env::var("MESOCLAW_HEARTBEAT_INTERVAL") {
-        if let Ok(secs) = v.parse::<u64>() {
-            config.scheduler.heartbeat_interval_secs = secs;
-        }
+    if let Ok(v) = env::var("MESOCLAW_HEARTBEAT_INTERVAL")
+        && let Ok(secs) = v.parse::<u64>()
+    {
+        config.scheduler.heartbeat_interval_secs = secs;
     }
     if let Ok(v) = env::var("MESOCLAW_HEARTBEAT_ENABLED") {
         config.scheduler.heartbeat_enabled = v == "1" || v.eq_ignore_ascii_case("true");
@@ -103,31 +100,27 @@ fn apply_env_overrides(config: &mut AppConfig) {
 /// Writes to `<path>.tmp`, syncs to disk, creates a backup of the existing
 /// file as `<path>.bak`, then renames the temp file to `<path>`.
 pub fn save_config(path: &Path, config: &AppConfig) -> Result<(), String> {
-    let content = toml::to_string_pretty(config)
-        .map_err(|e| format!("failed to serialise config: {e}"))?;
+    let content =
+        toml::to_string_pretty(config).map_err(|e| format!("failed to serialise config: {e}"))?;
 
     // Ensure parent directory exists.
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("failed to create config dir: {e}"))?;
+        fs::create_dir_all(parent).map_err(|e| format!("failed to create config dir: {e}"))?;
     }
 
     let tmp_path = path.with_extension("toml.tmp");
 
     // Write to temp file.
-    fs::write(&tmp_path, &content)
-        .map_err(|e| format!("failed to write temp config: {e}"))?;
+    fs::write(&tmp_path, &content).map_err(|e| format!("failed to write temp config: {e}"))?;
 
     // Backup existing config if it exists.
     if path.exists() {
         let bak_path = path.with_extension("toml.bak");
-        fs::copy(path, &bak_path)
-            .map_err(|e| format!("failed to backup config: {e}"))?;
+        fs::copy(path, &bak_path).map_err(|e| format!("failed to backup config: {e}"))?;
     }
 
     // Atomic rename.
-    fs::rename(&tmp_path, path)
-        .map_err(|e| format!("failed to replace config file: {e}"))?;
+    fs::rename(&tmp_path, path).map_err(|e| format!("failed to replace config file: {e}"))?;
 
     Ok(())
 }
@@ -157,10 +150,13 @@ mod tests {
     #[test]
     fn load_partial_config_fills_defaults() {
         let dir = TempDir::new().unwrap();
-        let path = write_config(&dir, r#"
+        let path = write_config(
+            &dir,
+            r#"
 [provider]
 default_id = "anthropic"
-"#);
+"#,
+        );
         let config = load_config(&path).unwrap();
         assert_eq!(config.provider.default_id, "anthropic");
         // Other fields should use defaults.
@@ -171,7 +167,9 @@ default_id = "anthropic"
     #[test]
     fn load_full_config() {
         let dir = TempDir::new().unwrap();
-        let path = write_config(&dir, r#"
+        let path = write_config(
+            &dir,
+            r#"
 [provider]
 default_id = "openai"
 default_model = "gpt-4o"
@@ -193,7 +191,8 @@ embedding_cache_size = 5000
 [notifications]
 enabled = true
 do_not_disturb = true
-"#);
+"#,
+        );
         let config = load_config(&path).unwrap();
         assert_eq!(config.provider.default_model, "gpt-4o");
         assert_eq!(config.provider.max_retries, 5);
@@ -215,7 +214,10 @@ do_not_disturb = true
 
         save_config(&path, &original).unwrap();
         let loaded = load_config(&path).unwrap();
-        assert_eq!(loaded, original, "config should round-trip through save/load");
+        assert_eq!(
+            loaded, original,
+            "config should round-trip through save/load"
+        );
     }
 
     #[test]
@@ -236,7 +238,10 @@ do_not_disturb = true
         let dir = TempDir::new().unwrap();
         let nested_path = dir.path().join("a").join("b").join("config.toml");
         save_config(&nested_path, &AppConfig::default()).unwrap();
-        assert!(nested_path.exists(), "config should be created in nested dirs");
+        assert!(
+            nested_path.exists(),
+            "config should be created in nested dirs"
+        );
     }
 
     #[test]
@@ -245,10 +250,14 @@ do_not_disturb = true
         // in parallel runs, but we use unique var names to reduce risk.
         let key = "MESOCLAW_PROVIDER_ID";
         // SAFETY: single-threaded test context; no other threads read this var.
-        unsafe { env::set_var(key, "groq"); }
+        unsafe {
+            env::set_var(key, "groq");
+        }
         let config = load_default_config();
         // SAFETY: same as set_var above.
-        unsafe { env::remove_var(key); }
+        unsafe {
+            env::remove_var(key);
+        }
         assert_eq!(config.provider.default_id, "groq");
     }
 
@@ -256,10 +265,14 @@ do_not_disturb = true
     fn env_override_security_level() {
         let key = "MESOCLAW_SECURITY_LEVEL";
         // SAFETY: single-threaded test context; no other threads read this var.
-        unsafe { env::set_var(key, "readonly"); }
+        unsafe {
+            env::set_var(key, "readonly");
+        }
         let config = load_default_config();
         // SAFETY: same as set_var above.
-        unsafe { env::remove_var(key); }
+        unsafe {
+            env::remove_var(key);
+        }
         assert_eq!(config.security.autonomy_level, "readonly");
     }
 
@@ -267,10 +280,14 @@ do_not_disturb = true
     fn env_override_heartbeat_enabled_false() {
         let key = "MESOCLAW_HEARTBEAT_ENABLED";
         // SAFETY: single-threaded test context; no other threads read this var.
-        unsafe { env::set_var(key, "0"); }
+        unsafe {
+            env::set_var(key, "0");
+        }
         let config = load_default_config();
         // SAFETY: same as set_var above.
-        unsafe { env::remove_var(key); }
+        unsafe {
+            env::remove_var(key);
+        }
         assert!(!config.scheduler.heartbeat_enabled);
     }
 

@@ -196,21 +196,13 @@ impl OpenAICompatibleConfig {
 
     /// Create configuration for OpenAI
     pub fn openai(api_key: impl Into<String>) -> Self {
-        Self::with_model(
-            api_key,
-            "https://api.openai.com/v1",
-            "gpt-4.1",
-        )
+        Self::with_model(api_key, "https://api.openai.com/v1", "gpt-4.1")
     }
 
     /// Create configuration for Anthropic
     pub fn anthropic(api_key: impl Into<String>) -> Self {
-        Self::with_model(
-            api_key,
-            "https://api.anthropic.com/v1",
-            "claude-sonnet-4.5",
-        )
-        .with_header("anthropic-version", "2023-06-01")
+        Self::with_model(api_key, "https://api.anthropic.com/v1", "claude-sonnet-4.5")
+            .with_header("anthropic-version", "2023-06-01")
     }
 
     /// Create configuration for Google Gemini
@@ -383,10 +375,7 @@ impl OpenAICompatibleProvider {
                     }
 
                     // Retry server errors and rate limits
-                    last_error = Some(format!(
-                        "API request failed with status {}",
-                        status
-                    ));
+                    last_error = Some(format!("API request failed with status {}", status));
                 }
                 Err(e) => {
                     last_error = Some(format!("HTTP request failed: {}", e));
@@ -524,10 +513,7 @@ impl LLMProvider for OpenAICompatibleProvider {
                                 None
                             }
                         }
-                        Err(e) => Some(Err(format!(
-                            "Failed to parse stream chunk: {}",
-                            e
-                        ))),
+                        Err(e) => Some(Err(format!("Failed to parse stream chunk: {}", e))),
                     }
                 }
                 Err(e) => Some(Err(format!("Stream error: {}", e))),
@@ -629,7 +615,10 @@ mod tests {
         assert_eq!(config.default_model, "test-model");
         assert_eq!(config.timeout, Duration::from_secs(60));
         assert_eq!(config.max_retries, 5);
-        assert_eq!(config.extra_headers.get("X-Custom-Header"), Some(&"value".to_string()));
+        assert_eq!(
+            config.extra_headers.get("X-Custom-Header"),
+            Some(&"value".to_string())
+        );
     }
 
     #[test]

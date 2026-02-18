@@ -71,9 +71,4 @@ diesel::table! {
 
 diesel::joinable!(ai_models -> ai_providers (provider_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    ai_models,
-    ai_providers,
-    scheduled_jobs,
-    settings,
-);
+diesel::allow_tables_to_appear_in_same_query!(ai_models, ai_providers, scheduled_jobs, settings,);

@@ -68,9 +68,15 @@ mod tests {
 
     #[async_trait]
     impl Tool for DummyTool {
-        fn name(&self) -> &str { "dummy" }
-        fn description(&self) -> &str { "A test tool" }
-        fn parameters_schema(&self) -> Value { json!({"type": "object"}) }
+        fn name(&self) -> &str {
+            "dummy"
+        }
+        fn description(&self) -> &str {
+            "A test tool"
+        }
+        fn parameters_schema(&self) -> Value {
+            json!({"type": "object"})
+        }
         async fn execute(&self, _args: Value) -> Result<ToolResult, String> {
             Ok(ToolResult::ok("done"))
         }

@@ -17,10 +17,7 @@
 //!
 //! ```
 
-use std::{
-    fs,
-    path::PathBuf,
-};
+use std::{fs, path::PathBuf};
 
 use chrono::{Local, NaiveDate};
 
@@ -146,10 +143,10 @@ impl DailyMemory {
     pub fn build_daily_context(&self) -> String {
         let mut sections: Vec<String> = Vec::new();
 
-        if let Ok(Some(mem)) = self.read_memory_md() {
-            if !mem.trim().is_empty() {
-                sections.push(format!("## Long-term Memory\n\n{mem}"));
-            }
+        if let Ok(Some(mem)) = self.read_memory_md()
+            && !mem.trim().is_empty()
+        {
+            sections.push(format!("## Long-term Memory\n\n{mem}"));
         }
 
         let today = Local::now().format("%Y-%m-%d").to_string();
@@ -157,15 +154,15 @@ impl DailyMemory {
             .format("%Y-%m-%d")
             .to_string();
 
-        if let Ok(Some(content)) = self.recall_daily(&today) {
-            if !content.trim().is_empty() {
-                sections.push(format!("## Today's Diary ({today})\n\n{content}"));
-            }
+        if let Ok(Some(content)) = self.recall_daily(&today)
+            && !content.trim().is_empty()
+        {
+            sections.push(format!("## Today's Diary ({today})\n\n{content}"));
         }
-        if let Ok(Some(content)) = self.recall_daily(&yesterday) {
-            if !content.trim().is_empty() {
-                sections.push(format!("## Yesterday's Diary ({yesterday})\n\n{content}"));
-            }
+        if let Ok(Some(content)) = self.recall_daily(&yesterday)
+            && !content.trim().is_empty()
+        {
+            sections.push(format!("## Yesterday's Diary ({yesterday})\n\n{content}"));
         }
 
         sections.join("\n\n---\n\n")
@@ -176,8 +173,8 @@ impl DailyMemory {
     /// List all daily diary dates (as `YYYY-MM-DD` strings) in descending order.
     pub fn list_dates(&self) -> Result<Vec<String>, String> {
         match fs::read_dir(&self.dir) {
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(e) => return Err(format!("failed to read memory dir: {e}")),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+            Err(e) => Err(format!("failed to read memory dir: {e}")),
             Ok(rd) => {
                 let mut dates: Vec<String> = rd
                     .filter_map(|entry| entry.ok())
@@ -219,7 +216,10 @@ mod tests {
         daily.store_daily("Worked on memory system.").unwrap();
 
         let today = Local::now().format("%Y-%m-%d").to_string();
-        assert!(tmp.path().join(format!("{today}.md")).exists(), "daily file should exist");
+        assert!(
+            tmp.path().join(format!("{today}.md")).exists(),
+            "daily file should exist"
+        );
     }
 
     #[test]
@@ -252,7 +252,10 @@ mod tests {
         let today = Local::now().format("%Y-%m-%d").to_string();
         let content = daily.recall_daily(&today).unwrap().unwrap();
         assert!(content.contains("First."), "first entry should be present");
-        assert!(content.contains("Second."), "second entry should be present");
+        assert!(
+            content.contains("Second."),
+            "second entry should be present"
+        );
     }
 
     #[test]
@@ -290,8 +293,13 @@ mod tests {
     fn append_memory_md_creates_file() {
         let tmp = TempDir::new().unwrap();
         let daily = make_daily(&tmp);
-        daily.append_memory_md("# Long-term facts\n\nUser prefers concise answers.").unwrap();
-        assert!(daily.memory_md_path().exists(), "MEMORY.md should exist after append");
+        daily
+            .append_memory_md("# Long-term facts\n\nUser prefers concise answers.")
+            .unwrap();
+        assert!(
+            daily.memory_md_path().exists(),
+            "MEMORY.md should exist after append"
+        );
     }
 
     #[test]
@@ -300,7 +308,10 @@ mod tests {
         let daily = make_daily(&tmp);
         daily.append_memory_md("User name: Alice.").unwrap();
         let content = daily.read_memory_md().unwrap().unwrap();
-        assert!(content.contains("Alice"), "MEMORY.md should contain appended content");
+        assert!(
+            content.contains("Alice"),
+            "MEMORY.md should contain appended content"
+        );
     }
 
     #[test]
@@ -311,7 +322,10 @@ mod tests {
         daily.append_memory_md("Fact.").unwrap();
 
         let dates = daily.list_dates().unwrap();
-        assert!(!dates.contains(&"MEMORY".to_string()), "MEMORY.md should not appear in dates");
+        assert!(
+            !dates.contains(&"MEMORY".to_string()),
+            "MEMORY.md should not appear in dates"
+        );
     }
 
     #[test]
@@ -322,7 +336,10 @@ mod tests {
 
         let dates = daily.list_dates().unwrap();
         let today = Local::now().format("%Y-%m-%d").to_string();
-        assert!(dates.contains(&today), "today's date should appear in list_dates");
+        assert!(
+            dates.contains(&today),
+            "today's date should appear in list_dates"
+        );
     }
 
     #[test]
@@ -340,6 +357,9 @@ mod tests {
         daily.store_daily("Context content.").unwrap();
 
         let context = daily.build_daily_context();
-        assert!(context.contains("Context content."), "context should include today's diary");
+        assert!(
+            context.contains("Context content."),
+            "context should include today's diary"
+        );
     }
 }

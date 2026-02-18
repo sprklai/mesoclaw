@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::ai::providers::{create_provider, ProviderType};
+use crate::ai::providers::{ProviderType, create_provider};
 use crate::ai::types::{CompletionRequest, Message};
-use crate::database::models::settings::SettingsUpdate;
 use crate::database::DbPool;
+use crate::database::models::settings::SettingsUpdate;
 use crate::services::settings::update_settings;
 
 /// LLM provider configuration (for testing only - API keys are stored in Stronghold)
@@ -103,13 +103,11 @@ pub async fn test_llm_provider_command(config: LLMProviderConfig) -> Result<Test
             message: format!("Connection successful! Model: {}", response.model),
             model: Some(response.model),
         }),
-        Err(msg) if msg.contains("401") || msg.contains("403") => {
-            Ok(TestResult {
-                success: false,
-                message: "Invalid API key. Please check your credentials.".to_string(),
-                model: None,
-            })
-        }
+        Err(msg) if msg.contains("401") || msg.contains("403") => Ok(TestResult {
+            success: false,
+            message: "Invalid API key. Please check your credentials.".to_string(),
+            model: None,
+        }),
         Err(msg) if msg.contains("404") => Ok(TestResult {
             success: false,
             message: format!("Model '{}' not found or not accessible.", config.model_id),

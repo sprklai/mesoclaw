@@ -1,30 +1,19 @@
-use std::{
-    fs,
-    net::SocketAddr,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{fs, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use axum::{
-    Router,
-    middleware,
+    Router, middleware,
     routing::{get, post},
 };
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
-use crate::{
-    agent::session_router::SessionRouter,
-    event_bus::EventBus,
-    modules::ModuleRegistry,
-};
+use crate::{agent::session_router::SessionRouter, event_bus::EventBus, modules::ModuleRegistry};
 
 use super::{
     auth::{auth_middleware, load_or_create_token},
     routes::{
-        GatewayState,
-        create_session, health, list_sessions, provider_status,
-        list_modules, module_health, start_module, stop_module, reload_modules,
+        GatewayState, create_session, health, list_modules, list_sessions, module_health,
+        provider_status, reload_modules, start_module, stop_module,
     },
     ws::ws_handler,
 };
@@ -53,7 +42,11 @@ pub async fn start_gateway(
     // Ensure the token exists before accepting connections.
     load_or_create_token()?;
 
-    let state = GatewayState { bus, sessions, modules };
+    let state = GatewayState {
+        bus,
+        sessions,
+        modules,
+    };
 
     // Build the router.
     let protected = Router::new()
@@ -108,10 +101,8 @@ async fn bind_with_fallback(start_port: u16) -> Result<TcpListener, String> {
 fn write_pid_file(port: u16) -> Result<(), String> {
     let path = pid_path();
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("failed to create .mesoclaw dir: {e}"))?;
+        fs::create_dir_all(parent).map_err(|e| format!("failed to create .mesoclaw dir: {e}"))?;
     }
     let content = format!("{}\n{}\n", std::process::id(), port);
-    fs::write(&path, content)
-        .map_err(|e| format!("failed to write PID file: {e}"))
+    fs::write(&path, content).map_err(|e| format!("failed to write PID file: {e}"))
 }

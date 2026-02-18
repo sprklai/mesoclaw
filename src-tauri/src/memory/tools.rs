@@ -132,10 +132,7 @@ impl Tool for MemoryRecallTool {
             .get("query")
             .and_then(|v| v.as_str())
             .ok_or("missing required parameter 'query'")?;
-        let limit = args
-            .get("limit")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(5) as usize;
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
 
         let entries = self.memory.recall(query, limit).await?;
         if entries.is_empty() {
@@ -199,7 +196,9 @@ impl Tool for MemoryForgetTool {
         if found {
             Ok(ToolResult::ok(format!("Removed memory: {key}")))
         } else {
-            Ok(ToolResult::ok(format!("No memory entry found for key: {key}")))
+            Ok(ToolResult::ok(format!(
+                "No memory entry found for key: {key}"
+            )))
         }
     }
 }

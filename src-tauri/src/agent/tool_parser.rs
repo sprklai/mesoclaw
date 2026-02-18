@@ -58,10 +58,10 @@ pub struct ParsedToolCall {
 /// parse to fail, so a single bad call never silently discards valid ones.
 pub fn parse_tool_calls(content: &str) -> Vec<ParsedToolCall> {
     // Prefer the JSON format (explicit contract).
-    if let Some(calls) = try_parse_json(content) {
-        if !calls.is_empty() {
-            return calls;
-        }
+    if let Some(calls) = try_parse_json(content)
+        && !calls.is_empty()
+    {
+        return calls;
     }
     // Fall back to XML scanning.
     parse_xml(content)
@@ -92,8 +92,12 @@ fn try_parse_json(content: &str) -> Option<Vec<ParsedToolCall>> {
         // OpenAI format: { "id": "...", "type": "function", "function": { "name": "...", "arguments": "..." } }
         // Use `let Some(...) else { continue }` so that one malformed entry
         // never silently discards all subsequent valid entries.
-        let Some(func) = entry.get("function") else { continue };
-        let Some(name_str) = func.get("name").and_then(|v| v.as_str()) else { continue };
+        let Some(func) = entry.get("function") else {
+            continue;
+        };
+        let Some(name_str) = func.get("name").and_then(|v| v.as_str()) else {
+            continue;
+        };
         let name = name_str.to_string();
         let call_id = entry.get("id").and_then(|v| v.as_str()).map(str::to_string);
 
@@ -106,7 +110,11 @@ fn try_parse_json(content: &str) -> Option<Vec<ParsedToolCall>> {
             None => Value::Object(Default::default()),
         };
 
-        result.push(ParsedToolCall { name, arguments, call_id });
+        result.push(ParsedToolCall {
+            name,
+            arguments,
+            call_id,
+        });
     }
     Some(result)
 }
@@ -149,7 +157,11 @@ fn parse_xml_body(body: &str) -> Option<ParsedToolCall> {
         .get("arguments")
         .cloned()
         .unwrap_or(Value::Object(Default::default()));
-    Some(ParsedToolCall { name, arguments, call_id: None })
+    Some(ParsedToolCall {
+        name,
+        arguments,
+        call_id: None,
+    })
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -317,8 +329,7 @@ I found something."#;
 
     #[test]
     fn xml_unicode_in_arguments() {
-        let content =
-            "<tool_call>{\"name\": \"translate\", \"arguments\": {\"text\": \"こんにちは世界\"}}</tool_call>";
+        let content = "<tool_call>{\"name\": \"translate\", \"arguments\": {\"text\": \"こんにちは世界\"}}</tool_call>";
         let calls = parse_tool_calls(content);
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].arguments["text"], "こんにちは世界");
@@ -337,7 +348,8 @@ I found something."#;
     fn xml_arguments_contain_angle_brackets() {
         // Arguments with HTML-like strings should not confuse the parser since
         // we search for the exact `</tool_call>` close sequence.
-        let content = r#"<tool_call>{"name": "echo", "arguments": {"msg": "<b>bold</b>"}}</tool_call>"#;
+        let content =
+            r#"<tool_call>{"name": "echo", "arguments": {"msg": "<b>bold</b>"}}</tool_call>"#;
         let calls = parse_tool_calls(content);
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].arguments["msg"], "<b>bold</b>");
@@ -388,8 +400,7 @@ I found something."#;
     fn xml_nested_open_tag_in_arguments() {
         // A literal `<tool_call>` string inside an argument value must not
         // confuse the nesting — we match CLOSE strictly.
-        let content =
-            r#"<tool_call>{"name": "doc", "arguments": {"snippet": "<tool_call> text"}}</tool_call>"#;
+        let content = r#"<tool_call>{"name": "doc", "arguments": {"snippet": "<tool_call> text"}}</tool_call>"#;
         let calls = parse_tool_calls(content);
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].arguments["snippet"], "<tool_call> text");

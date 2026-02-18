@@ -63,9 +63,7 @@ pub async fn send_request(stdin: &mut ChildStdin, request: &StdioRequest) -> Res
 }
 
 /// Read a single newline-terminated JSON line from the child stdout.
-pub async fn read_response(
-    reader: &mut BufReader<ChildStdout>,
-) -> Result<StdioResponse, String> {
+pub async fn read_response(reader: &mut BufReader<ChildStdout>) -> Result<StdioResponse, String> {
     let mut line = String::new();
     reader
         .read_line(&mut line)

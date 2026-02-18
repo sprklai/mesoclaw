@@ -31,6 +31,10 @@ pub use commands::{
     create_job_command, delete_job_command, job_history_command, list_jobs_command,
     toggle_job_command,
 };
-pub use heartbeat::{DEFAULT_HEARTBEAT_INTERVAL_SECS, ERROR_BACKOFF_SECS, backoff_secs, parse_heartbeat_items};
+pub use heartbeat::{
+    DEFAULT_HEARTBEAT_INTERVAL_SECS, ERROR_BACKOFF_SECS, backoff_secs, parse_heartbeat_items,
+};
 pub use tokio_scheduler::TokioScheduler;
-pub use traits::{JobExecution, JobId, JobPayload, JobStatus, Schedule, ScheduledJob, Scheduler, SessionTarget};
+pub use traits::{
+    JobExecution, JobId, JobPayload, JobStatus, Schedule, ScheduledJob, Scheduler, SessionTarget,
+};

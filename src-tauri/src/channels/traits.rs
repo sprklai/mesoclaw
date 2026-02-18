@@ -73,7 +73,10 @@ pub enum ChannelEvent {
     /// A message was received.
     MessageReceived(ChannelMessage),
     /// A message was sent successfully.
-    MessageSent { channel: String, recipient: Option<String> },
+    MessageSent {
+        channel: String,
+        recipient: Option<String>,
+    },
     /// An error occurred (non-fatal).
     Error { channel: String, error: String },
 }

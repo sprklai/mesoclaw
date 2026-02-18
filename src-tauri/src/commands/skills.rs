@@ -12,8 +12,8 @@
 use std::collections::HashMap;
 
 use crate::prompts::{
-    get_or_init_registry, SkillDefinition, SkillInfo, SkillSettings, SkillSuggestion,
-    SkillUserConfig,
+    SkillDefinition, SkillInfo, SkillSettings, SkillSuggestion, SkillUserConfig,
+    get_or_init_registry,
 };
 
 /// List all available prompt templates as `SkillInfo` objects.
@@ -62,11 +62,11 @@ pub async fn get_skill_settings_command() -> Result<SkillSettings, String> {
 /// always available. Returns an explicit error so the caller can gate its UI
 /// rather than silently discarding the write.
 #[tauri::command]
-pub async fn set_skill_enabled_command(
-    _skill_id: String,
-    _enabled: bool,
-) -> Result<(), String> {
-    Err("not supported: template system does not persist per-skill enable/disable state".to_string())
+pub async fn set_skill_enabled_command(_skill_id: String, _enabled: bool) -> Result<(), String> {
+    Err(
+        "not supported: template system does not persist per-skill enable/disable state"
+            .to_string(),
+    )
 }
 
 /// Update skill configuration.
@@ -102,8 +102,7 @@ pub async fn reload_skills_command() -> Result<(), String> {
 
 /// List templates grouped by category.
 #[tauri::command]
-pub async fn list_skills_by_category_command(
-) -> Result<HashMap<String, Vec<SkillInfo>>, String> {
+pub async fn list_skills_by_category_command() -> Result<HashMap<String, Vec<SkillInfo>>, String> {
     let registry = get_or_init_registry().await;
     Ok(registry.by_category().await)
 }
@@ -123,9 +122,7 @@ pub async fn set_skill_auto_select_command(_auto_select: bool) -> Result<(), Str
 /// name, description, or category. Templates with no matching words are
 /// excluded. Results are ordered by descending relevance score.
 #[tauri::command]
-pub async fn suggest_skills_command(
-    request: String,
-) -> Result<Vec<SkillSuggestion>, String> {
+pub async fn suggest_skills_command(request: String) -> Result<Vec<SkillSuggestion>, String> {
     let registry = get_or_init_registry().await;
     let infos = registry.skill_infos().await;
 

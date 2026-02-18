@@ -6,7 +6,7 @@ use std::{
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
-use super::types::{Identity, IdentityMeta, IDENTITY_FILES};
+use super::types::{IDENTITY_FILES, Identity, IdentityMeta};
 use crate::event_bus::{AppEvent, EventBus};
 
 // ─── Embedded defaults ────────────────────────────────────────────────────────
@@ -51,10 +51,7 @@ impl IdentityLoader {
     /// When a file in the identity directory is modified, the loader reloads
     /// its contents and publishes a [`AppEvent::SystemReady`]-adjacent signal
     /// via the event bus.
-    pub fn new_with_watcher(
-        dir: PathBuf,
-        bus: Arc<dyn EventBus>,
-    ) -> Result<Arc<Self>, String> {
+    pub fn new_with_watcher(dir: PathBuf, bus: Arc<dyn EventBus>) -> Result<Arc<Self>, String> {
         ensure_defaults(&dir)?;
         let identity = load_from_dir(&dir)?;
 
@@ -67,10 +64,11 @@ impl IdentityLoader {
         let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
             if let Ok(event) = res
                 && matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_))
-                    && let Ok(updated) = load_from_dir(&dir_clone) {
-                        *cache_clone.lock().unwrap_or_else(|e| e.into_inner()) = updated;
-                        let _ = bus.publish(AppEvent::SystemReady);
-                    }
+                && let Ok(updated) = load_from_dir(&dir_clone)
+            {
+                *cache_clone.lock().unwrap_or_else(|e| e.into_inner()) = updated;
+                let _ = bus.publish(AppEvent::SystemReady);
+            }
         })
         .map_err(|e| format!("failed to create file watcher: {e}"))?;
 
@@ -87,7 +85,10 @@ impl IdentityLoader {
 
     /// Return a snapshot of the current identity.
     pub fn get(&self) -> Identity {
-        self.identity.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.identity
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     /// Reload a single file from disk (or fall back to default) and update the cache.
@@ -123,8 +124,7 @@ impl IdentityLoader {
     pub fn update_file(&self, file_name: &str, content: &str) -> Result<(), String> {
         validate_file_name(file_name)?;
         let path = self.dir.join(file_name);
-        fs::write(&path, content)
-            .map_err(|e| format!("failed to write '{file_name}': {e}"))?;
+        fs::write(&path, content).map_err(|e| format!("failed to write '{file_name}': {e}"))?;
         self.reload()
     }
 
@@ -152,9 +152,10 @@ impl IdentityLoader {
         .collect();
 
         if let Some(ctx) = daily_context
-            && !ctx.trim().is_empty() {
-                parts.push(format!("# Memory\n\n{ctx}"));
-            }
+            && !ctx.trim().is_empty()
+        {
+            parts.push(format!("# Memory\n\n{ctx}"));
+        }
 
         parts.join("\n\n---\n\n")
     }
@@ -171,8 +172,7 @@ pub fn default_identity_dir() -> Result<PathBuf, String> {
 
 /// Write the embedded defaults to `dir` for any file that does not exist yet.
 fn ensure_defaults(dir: &Path) -> Result<(), String> {
-    fs::create_dir_all(dir)
-        .map_err(|e| format!("failed to create identity dir: {e}"))?;
+    fs::create_dir_all(dir).map_err(|e| format!("failed to create identity dir: {e}"))?;
 
     let defaults: &[(&str, &str)] = &[
         ("SOUL.md", DEFAULT_SOUL),

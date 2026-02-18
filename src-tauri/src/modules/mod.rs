@@ -33,8 +33,8 @@ pub mod container;
 pub mod mcp_client;
 
 pub use manifest::{
-    load_manifest, parse_manifest, ModuleManifest, ModuleType, ParametersConfig,
-    RuntimeConfig, RuntimeType, SecurityConfig,
+    ModuleManifest, ModuleType, ParametersConfig, RuntimeConfig, RuntimeType, SecurityConfig,
+    load_manifest, parse_manifest,
 };
 pub use sidecar_tool::SidecarTool;
 
@@ -136,10 +136,7 @@ impl ModuleRegistry {
         let entries = match std::fs::read_dir(modules_dir) {
             Ok(e) => e,
             Err(e) => {
-                log::warn!(
-                    "ModuleRegistry: failed to scan {:?}: {e}",
-                    modules_dir
-                );
+                log::warn!("ModuleRegistry: failed to scan {:?}: {e}", modules_dir);
                 return Self { modules };
             }
         };
@@ -168,17 +165,13 @@ impl ModuleRegistry {
                     ));
 
                     // Register as a generic Tool in the shared registry.
-                    tool_registry
-                        .register(Arc::clone(&tool) as Arc<dyn Tool>);
+                    tool_registry.register(Arc::clone(&tool) as Arc<dyn Tool>);
 
                     log::info!("ModuleRegistry: registered module '{id}'");
                     modules.insert(id, tool);
                 }
                 Err(e) => {
-                    log::warn!(
-                        "ModuleRegistry: skipping {:?}: {e}",
-                        manifest_path
-                    );
+                    log::warn!("ModuleRegistry: skipping {:?}: {e}", manifest_path);
                 }
             }
         }
@@ -189,7 +182,9 @@ impl ModuleRegistry {
     /// Create a registry with no modules registered (useful for contexts where
     /// module discovery hasn't run yet, e.g. the gateway daemon on startup).
     pub fn empty() -> Self {
-        Self { modules: std::collections::HashMap::new() }
+        Self {
+            modules: std::collections::HashMap::new(),
+        }
     }
 
     pub fn len(&self) -> usize {

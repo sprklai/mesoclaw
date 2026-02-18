@@ -159,8 +159,8 @@ impl TelegramChannel {
     /// `=`, `|`, `{`, `}`, `.`, `!`
     pub fn escape_markdown_v2(text: &str) -> String {
         const RESERVED: &[char] = &[
-            '_', '*', '[', ']', '(', ')', '~', '`', '>',
-            '#', '+', '-', '=', '|', '{', '}', '.', '!',
+            '_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.',
+            '!',
         ];
         let mut out = String::with_capacity(text.len() + 16);
         for ch in text.chars() {
@@ -409,7 +409,10 @@ impl TelegramChannel {
         if msg.photo().is_some() {
             "[photo]".to_string()
         } else if let Some(doc) = msg.document() {
-            format!("[document: {}]", doc.file_name.as_deref().unwrap_or("unknown"))
+            format!(
+                "[document: {}]",
+                doc.file_name.as_deref().unwrap_or("unknown")
+            )
         } else if msg.voice().is_some() {
             "[voice message]".to_string()
         } else if msg.audio().is_some() {
@@ -456,18 +459,12 @@ mod tests {
 
     #[test]
     fn escape_parentheses() {
-        assert_eq!(
-            TelegramChannel::escape_markdown_v2("(value)"),
-            r"\(value\)"
-        );
+        assert_eq!(TelegramChannel::escape_markdown_v2("(value)"), r"\(value\)");
     }
 
     #[test]
     fn escape_underscores_and_asterisks() {
-        assert_eq!(
-            TelegramChannel::escape_markdown_v2("_bold_"),
-            r"\_bold\_"
-        );
+        assert_eq!(TelegramChannel::escape_markdown_v2("_bold_"), r"\_bold\_");
     }
 
     #[test]
@@ -661,22 +658,34 @@ mod tests {
 
     #[test]
     fn backoff_attempt_0_is_1s() {
-        assert_eq!(TelegramChannel::reconnect_backoff(0), Duration::from_secs(1));
+        assert_eq!(
+            TelegramChannel::reconnect_backoff(0),
+            Duration::from_secs(1)
+        );
     }
 
     #[test]
     fn backoff_attempt_1_is_2s() {
-        assert_eq!(TelegramChannel::reconnect_backoff(1), Duration::from_secs(2));
+        assert_eq!(
+            TelegramChannel::reconnect_backoff(1),
+            Duration::from_secs(2)
+        );
     }
 
     #[test]
     fn backoff_attempt_5_is_32s() {
-        assert_eq!(TelegramChannel::reconnect_backoff(5), Duration::from_secs(32));
+        assert_eq!(
+            TelegramChannel::reconnect_backoff(5),
+            Duration::from_secs(32)
+        );
     }
 
     #[test]
     fn backoff_is_capped_at_60s() {
-        assert_eq!(TelegramChannel::reconnect_backoff(7), Duration::from_secs(60));
+        assert_eq!(
+            TelegramChannel::reconnect_backoff(7),
+            Duration::from_secs(60)
+        );
     }
 
     #[test]

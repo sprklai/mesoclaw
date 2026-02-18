@@ -29,14 +29,16 @@ use uuid::Uuid;
 use crate::{
     agent::loop_::{AgentConfig, AgentLoop},
     ai::provider::LLMProvider,
-    database::{schema::scheduled_jobs, DbPool},
+    database::{DbPool, schema::scheduled_jobs},
     event_bus::{AppEvent, EventBus},
     identity::loader::IdentityLoader,
     security::SecurityPolicy,
     tools::ToolRegistry,
 };
 
-use super::traits::{JobExecution, JobId, JobPayload, JobStatus, Schedule, ScheduledJob, Scheduler};
+use super::traits::{
+    JobExecution, JobId, JobPayload, JobStatus, Schedule, ScheduledJob, Scheduler,
+};
 
 // ─── AgentComponents ─────────────────────────────────────────────────────────
 
@@ -194,7 +196,9 @@ impl TokioScheduler {
                 return;
             }
         };
-        let Ok(mut map) = self.jobs.write() else { return };
+        let Ok(mut map) = self.jobs.write() else {
+            return;
+        };
         for row in rows {
             if let Some(job) = row.into_job() {
                 map.insert(job.id.clone(), job);
@@ -207,7 +211,9 @@ impl TokioScheduler {
     fn persist_job(&self, job: &ScheduledJob) {
         let Some(ref pool) = self.pool else { return };
         let Ok(mut conn) = pool.get() else { return };
-        let Some(row) = ScheduledJobRow::from_job(job) else { return };
+        let Some(row) = ScheduledJobRow::from_job(job) else {
+            return;
+        };
         if let Err(e) = diesel::replace_into(scheduled_jobs::table)
             .values(&row)
             .execute(&mut conn)
@@ -244,7 +250,10 @@ impl TokioScheduler {
                 } else {
                     expr.clone()
                 };
-                cron::Schedule::from_str(&full_expr).ok()?.upcoming(Utc).next()
+                cron::Schedule::from_str(&full_expr)
+                    .ok()?
+                    .upcoming(Utc)
+                    .next()
             }
         }
     }
@@ -282,7 +291,7 @@ impl Scheduler for TokioScheduler {
                                 .values()
                                 .filter(|j| j.enabled)
                                 .filter(|j| {
-                                    j.next_run.map_or(false, |t| t <= Utc::now())
+                                    j.next_run.is_some_and(|t| t <= Utc::now())
                                 })
                                 .cloned()
                                 .collect()
@@ -345,8 +354,8 @@ impl Scheduler for TokioScheduler {
                                 Self::record_history(&history_clone, exec);
 
                                 // Reschedule and update error_count.
-                                if let Ok(mut map) = jobs_clone.write() {
-                                    if let Some(j) = map.get_mut(&job_clone.id) {
+                                if let Ok(mut map) = jobs_clone.write()
+                                    && let Some(j) = map.get_mut(&job_clone.id) {
                                         if job_status == JobStatus::Success {
                                             j.error_count = 0;
                                         } else {
@@ -354,7 +363,6 @@ impl Scheduler for TokioScheduler {
                                         }
                                         j.next_run = Self::compute_next_run(&j.schedule);
                                     }
-                                }
                             });
                         }
                     }
@@ -434,7 +442,10 @@ async fn execute_job(
     match &job.payload {
         JobPayload::Heartbeat => {
             let Some(agent) = agent else {
-                return (JobStatus::Success, "Heartbeat tick recorded (no agent wired).".to_string());
+                return (
+                    JobStatus::Success,
+                    "Heartbeat tick recorded (no agent wired).".to_string(),
+                );
             };
             let system_prompt = agent.identity_loader.build_system_prompt();
             let prompt = "Run your heartbeat checklist. Review any pending tasks, check system status, and report anything that needs attention.";
@@ -562,7 +573,10 @@ mod tests {
     fn compute_next_run_interval() {
         let before = Utc::now();
         let next = TokioScheduler::compute_next_run(&Schedule::Interval { secs: 300 });
-        assert!(next.is_some(), "interval schedule should produce a next_run");
+        assert!(
+            next.is_some(),
+            "interval schedule should produce a next_run"
+        );
         assert!(next.unwrap() > before, "next_run should be in the future");
     }
 
@@ -572,7 +586,10 @@ mod tests {
         let next = TokioScheduler::compute_next_run(&Schedule::Cron {
             expr: "* * * * *".to_string(),
         });
-        assert!(next.is_some(), "valid cron expression should produce a next_run");
+        assert!(
+            next.is_some(),
+            "valid cron expression should produce a next_run"
+        );
     }
 
     #[test]
@@ -601,6 +618,10 @@ mod tests {
 
         let jobs = scheduler.list_jobs().await;
         let names: Vec<&str> = jobs.iter().map(|j| j.name.as_str()).collect();
-        assert_eq!(names, vec!["alpha", "mango", "zebra"], "jobs should be sorted by name");
+        assert_eq!(
+            names,
+            vec!["alpha", "mango", "zebra"],
+            "jobs should be sorted by name"
+        );
     }
 }

@@ -70,7 +70,10 @@ impl SidecarService {
 
     /// Return the current service status.
     pub fn status(&self) -> ServiceStatus {
-        self.status.lock().map(|s| s.clone()).unwrap_or(ServiceStatus::Stopped)
+        self.status
+            .lock()
+            .map(|s| s.clone())
+            .unwrap_or(ServiceStatus::Stopped)
     }
 
     /// Spawn the service process and poll until healthy or timeout.
@@ -99,7 +102,10 @@ impl SidecarService {
         // Poll health endpoint.
         let svc = &self.manifest.service;
         let healthy = match svc.health_url("127.0.0.1") {
-            Some(url) => self.wait_for_health(&url, svc.startup_timeout_secs, svc.health_poll_secs).await,
+            Some(url) => {
+                self.wait_for_health(&url, svc.startup_timeout_secs, svc.health_poll_secs)
+                    .await
+            }
             None => {
                 // No HTTP port configured — assume healthy immediately.
                 true
@@ -112,10 +118,11 @@ impl SidecarService {
         } else {
             let reason = format!(
                 "service '{}' did not become healthy within {}s",
-                self.manifest.module.id,
-                svc.startup_timeout_secs
+                self.manifest.module.id, svc.startup_timeout_secs
             );
-            self.set_status(ServiceStatus::Unhealthy { reason: reason.clone() });
+            self.set_status(ServiceStatus::Unhealthy {
+                reason: reason.clone(),
+            });
             Err(reason)
         }
     }
@@ -210,8 +217,8 @@ impl SidecarService {
 mod tests {
     use super::*;
     use crate::modules::manifest::{
-        ModuleInfo, ModuleType, ModuleManifest, ParametersConfig, RuntimeConfig,
-        RuntimeType, SecurityConfig, ServiceConfig,
+        ModuleInfo, ModuleManifest, ModuleType, ParametersConfig, RuntimeConfig, RuntimeType,
+        SecurityConfig, ServiceConfig,
     };
 
     fn service_manifest(port: Option<u16>) -> Arc<ModuleManifest> {
@@ -334,7 +341,10 @@ mod tests {
     async fn stop_on_stopped_service_is_safe() {
         let svc = SidecarService::new(service_manifest(None)).unwrap();
         let result = svc.stop().await;
-        assert!(result.is_ok(), "stopping an already-stopped service should be safe");
+        assert!(
+            result.is_ok(),
+            "stopping an already-stopped service should be safe"
+        );
     }
 
     #[tokio::test]

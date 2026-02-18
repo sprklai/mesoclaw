@@ -6,9 +6,9 @@ use tauri::{AppHandle, Emitter, State};
 use crate::ai::provider::LLMProvider;
 use crate::ai::providers::{OpenAICompatibleConfig, OpenAICompatibleProvider};
 use crate::ai::types::{CompletionRequest, Message};
+use crate::database::DbPool;
 use crate::database::models::ai_provider::AIProvider;
 use crate::database::schema::ai_providers;
-use crate::database::DbPool;
 
 /// Chat message request
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,11 +57,8 @@ pub async fn stream_chat_command(
     };
 
     // Create OpenAI-compatible provider instance with provider's base URL
-    let config = OpenAICompatibleConfig::with_model(
-        api_key,
-        &provider_record.base_url,
-        &request.model_id,
-    );
+    let config =
+        OpenAICompatibleConfig::with_model(api_key, &provider_record.base_url, &request.model_id);
 
     let provider = std::sync::Arc::new(
         OpenAICompatibleProvider::new(config, &request.provider_id)

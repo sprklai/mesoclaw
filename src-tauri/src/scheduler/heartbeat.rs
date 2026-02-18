@@ -20,10 +20,10 @@ pub fn parse_heartbeat_items(content: &str) -> Vec<String> {
                 Some(rest.trim().to_owned())
             } else if let Some(rest) = trimmed.strip_prefix("- [x]") {
                 Some(rest.trim().to_owned())
-            } else if let Some(rest) = trimmed.strip_prefix("- [X]") {
-                Some(rest.trim().to_owned())
             } else {
-                None
+                trimmed
+                    .strip_prefix("- [X]")
+                    .map(|rest| rest.trim().to_owned())
             }
         })
         .filter(|s| !s.is_empty())

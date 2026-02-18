@@ -192,9 +192,8 @@ impl ModuleManifest {
     /// passthrough schema.
     pub fn parameters_schema(&self) -> Value {
         if let Some(schema_str) = &self.parameters.schema {
-            serde_json::from_str(schema_str).unwrap_or_else(|_| {
-                serde_json::json!({"type": "object"})
-            })
+            serde_json::from_str(schema_str)
+                .unwrap_or_else(|_| serde_json::json!({"type": "object"}))
         } else {
             serde_json::json!({
                 "type": "object",
@@ -217,14 +216,13 @@ impl ModuleManifest {
 
 /// Parse a `ModuleManifest` from a TOML string.
 pub fn parse_manifest(toml_str: &str) -> Result<ModuleManifest, String> {
-    toml::from_str::<ModuleManifest>(toml_str)
-        .map_err(|e| format!("manifest parse error: {e}"))
+    toml::from_str::<ModuleManifest>(toml_str).map_err(|e| format!("manifest parse error: {e}"))
 }
 
 /// Load and parse a `manifest.toml` file from disk.
 pub fn load_manifest(path: &Path) -> Result<ModuleManifest, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("cannot read {:?}: {e}", path))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("cannot read {:?}: {e}", path))?;
     parse_manifest(&content)
 }
 

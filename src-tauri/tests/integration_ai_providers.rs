@@ -16,8 +16,8 @@ impl OpenAICompatibleConfigExt for OpenAICompatibleConfig {
 
 #[cfg(test)]
 mod tests {
-    use local_ts_lib::ai::provider::LLMProvider;
     use super::{OpenAICompatibleConfig, OpenAICompatibleConfigExt};
+    use local_ts_lib::ai::provider::LLMProvider;
     use local_ts_lib::ai::providers::OpenAICompatibleProvider;
     use local_ts_lib::ai::types::{CompletionRequest, Message as AppMessage};
     use std::time::Duration;
@@ -119,12 +119,17 @@ mod tests {
         headers.insert("X-Header-1".to_string(), "value-1".to_string());
         headers.insert("X-Header-2".to_string(), "value-2".to_string());
 
-        let config =
-            OpenAICompatibleConfig::new("key", "https://api.com").with_headers(headers);
+        let config = OpenAICompatibleConfig::new("key", "https://api.com").with_headers(headers);
 
         assert_eq!(config.extra_headers.len(), 2);
-        assert_eq!(config.extra_headers.get("X-Header-1"), Some(&"value-1".to_string()));
-        assert_eq!(config.extra_headers.get("X-Header-2"), Some(&"value-2".to_string()));
+        assert_eq!(
+            config.extra_headers.get("X-Header-1"),
+            Some(&"value-1".to_string())
+        );
+        assert_eq!(
+            config.extra_headers.get("X-Header-2"),
+            Some(&"value-2".to_string())
+        );
     }
 
     // =========================================================================
@@ -233,8 +238,7 @@ mod tests {
 
     #[test]
     fn test_retry_configuration() {
-        let config =
-            OpenAICompatibleConfig::openai("test-key").max_retries(10);
+        let config = OpenAICompatibleConfig::openai("test-key").max_retries(10);
         assert_eq!(config.max_retries, 10);
     }
 
@@ -342,8 +346,14 @@ mod tests {
             .with_header("X-Custom-2", "value-2");
 
         assert_eq!(config.extra_headers.len(), 3); // 2 custom + anthropic-version
-        assert_eq!(config.extra_headers.get("X-Custom-1"), Some(&"value-1".to_string()));
-        assert_eq!(config.extra_headers.get("X-Custom-2"), Some(&"value-2".to_string()));
+        assert_eq!(
+            config.extra_headers.get("X-Custom-1"),
+            Some(&"value-1".to_string())
+        );
+        assert_eq!(
+            config.extra_headers.get("X-Custom-2"),
+            Some(&"value-2".to_string())
+        );
     }
 
     // =========================================================================
@@ -352,14 +362,14 @@ mod tests {
 
     #[test]
     fn test_completion_request_basic() {
-        let request = CompletionRequest::new(
-            "gpt-4.1",
-            vec![AppMessage::user("Explain Rust")],
-        );
+        let request = CompletionRequest::new("gpt-4.1", vec![AppMessage::user("Explain Rust")]);
 
         assert_eq!(request.model, "gpt-4.1");
         assert_eq!(request.messages.len(), 1);
-        assert_eq!(request.messages[0].role, local_ts_lib::ai::types::MessageRole::User);
+        assert_eq!(
+            request.messages[0].role,
+            local_ts_lib::ai::types::MessageRole::User
+        );
         assert_eq!(request.messages[0].content, "Explain Rust");
         assert_eq!(request.temperature, None);
         assert_eq!(request.max_tokens, None);
@@ -390,11 +400,8 @@ mod tests {
 
     #[test]
     fn test_completion_request_with_stream() {
-        let request = CompletionRequest::new(
-            "gpt-4.1",
-            vec![AppMessage::user("Hello")],
-        )
-        .with_stream(true);
+        let request =
+            CompletionRequest::new("gpt-4.1", vec![AppMessage::user("Hello")]).with_stream(true);
 
         assert_eq!(request.stream, Some(true));
     }
@@ -411,21 +418,27 @@ mod tests {
         );
 
         assert_eq!(request.messages.len(), 3);
-        assert_eq!(request.messages[0].role, local_ts_lib::ai::types::MessageRole::User);
-        assert_eq!(request.messages[1].role, local_ts_lib::ai::types::MessageRole::Assistant);
-        assert_eq!(request.messages[2].role, local_ts_lib::ai::types::MessageRole::User);
+        assert_eq!(
+            request.messages[0].role,
+            local_ts_lib::ai::types::MessageRole::User
+        );
+        assert_eq!(
+            request.messages[1].role,
+            local_ts_lib::ai::types::MessageRole::Assistant
+        );
+        assert_eq!(
+            request.messages[2].role,
+            local_ts_lib::ai::types::MessageRole::User
+        );
     }
 
     #[test]
     fn test_completion_request_with_all_parameters() {
-        let request = CompletionRequest::new(
-            "gpt-4.1",
-            vec![AppMessage::user("Test")],
-        )
-        .with_temperature(0.5)
-        .with_max_tokens(2000)
-        .with_top_p(0.8)
-        .with_stream(false);
+        let request = CompletionRequest::new("gpt-4.1", vec![AppMessage::user("Test")])
+            .with_temperature(0.5)
+            .with_max_tokens(2000)
+            .with_top_p(0.8)
+            .with_stream(false);
 
         assert_eq!(request.temperature, Some(0.5));
         assert_eq!(request.max_tokens, Some(2000));
@@ -446,7 +459,10 @@ mod tests {
     #[test]
     fn test_message_constructors() {
         let system_msg = AppMessage::system("You are helpful");
-        assert_eq!(system_msg.role, local_ts_lib::ai::types::MessageRole::System);
+        assert_eq!(
+            system_msg.role,
+            local_ts_lib::ai::types::MessageRole::System
+        );
         assert_eq!(system_msg.content, "You are helpful");
 
         let user_msg = AppMessage::user("Hello");
@@ -454,7 +470,10 @@ mod tests {
         assert_eq!(user_msg.content, "Hello");
 
         let assistant_msg = AppMessage::assistant("Hi there!");
-        assert_eq!(assistant_msg.role, local_ts_lib::ai::types::MessageRole::Assistant);
+        assert_eq!(
+            assistant_msg.role,
+            local_ts_lib::ai::types::MessageRole::Assistant
+        );
         assert_eq!(assistant_msg.content, "Hi there!");
     }
 

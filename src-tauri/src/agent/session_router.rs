@@ -18,10 +18,7 @@
 //! [`SessionRouter::compact`] keeps the last `max_messages` messages and
 //! prepends a one-line summary of dropped messages to prevent unbounded growth.
 
-use std::{
-    collections::HashMap,
-    sync::RwLock,
-};
+use std::{collections::HashMap, sync::RwLock};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -62,7 +59,10 @@ impl SessionKey {
 
     /// Return the canonical string representation.
     pub fn as_str(&self) -> String {
-        format!("{}:{}:{}:{}", self.agent, self.scope, self.channel, self.peer)
+        format!(
+            "{}:{}:{}:{}",
+            self.agent, self.scope, self.channel, self.peer
+        )
     }
 
     /// Return `true` if this session is isolated (agent field is `"isolated"`).
@@ -223,11 +223,7 @@ impl SessionRouter {
 
     /// Get a clone of the session identified by `key`, or `None`.
     pub fn get_session(&self, key: &SessionKey) -> Option<Session> {
-        self.sessions
-            .read()
-            .ok()?
-            .get(key)
-            .cloned()
+        self.sessions.read().ok()?.get(key).cloned()
     }
 
     /// Ensure a session exists for `key`, creating it if necessary.
@@ -254,7 +250,9 @@ impl SessionRouter {
         content: impl Into<String>,
     ) -> Result<(), String> {
         let mut map = self.sessions.write().map_err(|e| e.to_string())?;
-        let session = map.entry(key.clone()).or_insert_with(|| Session::new(key.clone()));
+        let session = map
+            .entry(key.clone())
+            .or_insert_with(|| Session::new(key.clone()));
         session.push(role, content);
         Ok(())
     }
@@ -326,7 +324,10 @@ mod tests {
 
     #[test]
     fn parse_invalid_session_key_errors() {
-        assert!(SessionKey::parse("main:dm").is_err(), "too few parts → error");
+        assert!(
+            SessionKey::parse("main:dm").is_err(),
+            "too few parts → error"
+        );
     }
 
     #[test]
@@ -339,7 +340,10 @@ mod tests {
     #[test]
     fn main_user_key_not_isolated() {
         let key = SessionKey::main_user();
-        assert!(!key.is_isolated(), "main user session should not be isolated");
+        assert!(
+            !key.is_isolated(),
+            "main user session should not be isolated"
+        );
     }
 
     #[test]
@@ -401,7 +405,8 @@ mod tests {
         let isolated_key = SessionKey::isolated_task("task1");
 
         r.push_message(&main_key, "user", "Main chat").unwrap();
-        r.push_message(&isolated_key, "user", "Isolated task").unwrap();
+        r.push_message(&isolated_key, "user", "Isolated task")
+            .unwrap();
 
         assert_eq!(r.session_count(), 2, "should have 2 sessions");
         let main = r.get_session(&main_key).unwrap();
@@ -421,8 +426,15 @@ mod tests {
         assert!(compacted, "compaction should have occurred");
 
         let session = r.get_session(&key).unwrap();
-        assert_eq!(session.len(), 5, "should have only 5 messages after compaction");
-        assert!(session.compaction_summary.is_some(), "should have compaction summary");
+        assert_eq!(
+            session.len(),
+            5,
+            "should have only 5 messages after compaction"
+        );
+        assert!(
+            session.compaction_summary.is_some(),
+            "should have compaction summary"
+        );
     }
 
     #[test]

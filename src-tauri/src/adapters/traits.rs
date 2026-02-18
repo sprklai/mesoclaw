@@ -49,7 +49,11 @@ pub struct ContextType {
 
 impl ContextType {
     /// Create a new context type.
-    pub fn new(key: impl Into<String>, description: impl Into<String>, value_type: impl Into<String>) -> Self {
+    pub fn new(
+        key: impl Into<String>,
+        description: impl Into<String>,
+        value_type: impl Into<String>,
+    ) -> Self {
         Self {
             key: key.into(),
             description: description.into(),
@@ -113,14 +117,20 @@ impl ContextBag {
     }
 
     /// Insert a value into the context bag.
-    pub fn insert(&mut self, key: impl Into<String>, value: impl Serialize) -> Result<(), serde_json::Error> {
+    pub fn insert(
+        &mut self,
+        key: impl Into<String>,
+        value: impl Serialize,
+    ) -> Result<(), serde_json::Error> {
         self.values.insert(key.into(), serde_json::to_value(value)?);
         Ok(())
     }
 
     /// Get a value from the context bag.
     pub fn get<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Option<T> {
-        self.values.get(key).and_then(|v| serde_json::from_value(v.clone()).ok())
+        self.values
+            .get(key)
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 
     /// Get a raw JSON value from the context bag.

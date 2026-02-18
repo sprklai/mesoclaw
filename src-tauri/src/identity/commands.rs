@@ -4,7 +4,7 @@ use tauri::State;
 
 use super::{
     loader::IdentityLoader,
-    types::{IdentityFileInfo, IDENTITY_FILES},
+    types::{IDENTITY_FILES, IdentityFileInfo},
 };
 
 /// Return the raw content of one identity file (e.g. `"SOUL.md"`).
@@ -37,9 +37,7 @@ pub async fn list_identity_files_command(
     Ok(IDENTITY_FILES
         .iter()
         .map(|(file_name, description)| IdentityFileInfo {
-            name: file_name
-                .trim_end_matches(".md")
-                .to_string(),
+            name: file_name.trim_end_matches(".md").to_string(),
             file_name: file_name.to_string(),
             description: description.to_string(),
         })

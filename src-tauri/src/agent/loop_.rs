@@ -34,7 +34,7 @@ use crate::{
     tools::ToolRegistry,
 };
 
-use super::tool_parser::{parse_tool_calls, ParsedToolCall};
+use super::tool_parser::{ParsedToolCall, parse_tool_calls};
 
 // ─── AgentConfig ──────────────────────────────────────────────────────────────
 
@@ -70,10 +70,17 @@ impl Default for AgentConfig {
 /// A message in the agent's conversation history.
 #[derive(Debug, Clone)]
 pub enum AgentMessage {
-    System { content: String },
-    User { content: String },
+    System {
+        content: String,
+    },
+    User {
+        content: String,
+    },
     /// An assistant turn, which may include pending tool calls.
-    Assistant { content: String, tool_calls: Vec<ParsedToolCall> },
+    Assistant {
+        content: String,
+        tool_calls: Vec<ParsedToolCall>,
+    },
     /// Result of a tool execution — serialised as a User message for providers
     /// that do not have a native Tool role.
     ToolResult {
@@ -103,7 +110,12 @@ impl AgentMessage {
                 role: MessageRole::Assistant,
                 content: content.clone(),
             },
-            AgentMessage::ToolResult { tool_name, result, success, .. } => {
+            AgentMessage::ToolResult {
+                tool_name,
+                result,
+                success,
+                ..
+            } => {
                 let prefix = if *success { "✓" } else { "✗" };
                 Message {
                     role: MessageRole::User,
@@ -137,7 +149,13 @@ impl AgentLoop {
         bus: Option<Arc<dyn EventBus>>,
         config: AgentConfig,
     ) -> Self {
-        Self { provider, tool_registry, security_policy, bus, config }
+        Self {
+            provider,
+            tool_registry,
+            security_policy,
+            bus,
+            config,
+        }
     }
 
     // ── Public entry points ───────────────────────────────────────────────────
@@ -145,14 +163,14 @@ impl AgentLoop {
     /// Run a single-message agent turn with no prior history.
     ///
     /// Returns the final text response.
-    pub async fn run(
-        &self,
-        system_prompt: &str,
-        user_message: &str,
-    ) -> Result<String, String> {
+    pub async fn run(&self, system_prompt: &str, user_message: &str) -> Result<String, String> {
         let mut history = vec![
-            AgentMessage::System { content: system_prompt.to_string() },
-            AgentMessage::User { content: user_message.to_string() },
+            AgentMessage::System {
+                content: system_prompt.to_string(),
+            },
+            AgentMessage::User {
+                content: user_message.to_string(),
+            },
         ];
         self.run_with_history(&mut history).await
     }
@@ -252,9 +270,8 @@ impl AgentLoop {
                     });
 
                     let mut rx = bus.subscribe();
-                    let approved = tokio::time::timeout(
-                        std::time::Duration::from_secs(30),
-                        async {
+                    let approved =
+                        tokio::time::timeout(std::time::Duration::from_secs(30), async {
                             loop {
                                 match rx.recv().await {
                                     Ok(AppEvent::ApprovalResponse {
@@ -265,10 +282,9 @@ impl AgentLoop {
                                     Err(_) => break false,
                                 }
                             }
-                        },
-                    )
-                    .await
-                    .unwrap_or(false); // timeout → deny
+                        })
+                        .await
+                        .unwrap_or(false); // timeout → deny
 
                     if !approved {
                         let msg =
@@ -368,16 +384,13 @@ impl AgentLoop {
 mod tests {
     use super::*;
     use crate::{
-        ai::{
-            provider::StreamResponse,
-            types::CompletionResponse,
-        },
+        ai::{provider::StreamResponse, types::CompletionResponse},
         event_bus::EventBus,
         security::{AutonomyLevel, SecurityPolicy},
         tools::{Tool, ToolRegistry, ToolResult},
     };
-    use serde_json::Value;
     use async_trait::async_trait;
+    use serde_json::Value;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     // ── Mock LLM provider ─────────────────────────────────────────────────────
@@ -398,7 +411,10 @@ mod tests {
 
     #[async_trait]
     impl LLMProvider for MockProvider {
-        async fn complete(&self, _request: CompletionRequest) -> crate::ai::provider::Result<CompletionResponse> {
+        async fn complete(
+            &self,
+            _request: CompletionRequest,
+        ) -> crate::ai::provider::Result<CompletionResponse> {
             let i = self.index.fetch_add(1, Ordering::SeqCst);
             let content = self
                 .responses
@@ -413,13 +429,22 @@ mod tests {
             })
         }
 
-        async fn stream(&self, _r: CompletionRequest) -> crate::ai::provider::Result<StreamResponse> {
+        async fn stream(
+            &self,
+            _r: CompletionRequest,
+        ) -> crate::ai::provider::Result<StreamResponse> {
             unimplemented!("stream not used in AgentLoop tests")
         }
 
-        fn context_limit(&self) -> usize { 128_000 }
-        fn supports_tools(&self) -> bool { false }
-        fn provider_name(&self) -> &str { "mock" }
+        fn context_limit(&self) -> usize {
+            128_000
+        }
+        fn supports_tools(&self) -> bool {
+            false
+        }
+        fn provider_name(&self) -> &str {
+            "mock"
+        }
     }
 
     // ── Mock tool ─────────────────────────────────────────────────────────────
@@ -428,12 +453,19 @@ mod tests {
 
     #[async_trait]
     impl Tool for EchoTool {
-        fn name(&self) -> &str { "echo" }
-        fn description(&self) -> &str { "echoes its input" }
-        fn parameters_schema(&self) -> Value { serde_json::json!({"type": "object"}) }
+        fn name(&self) -> &str {
+            "echo"
+        }
+        fn description(&self) -> &str {
+            "echoes its input"
+        }
+        fn parameters_schema(&self) -> Value {
+            serde_json::json!({"type": "object"})
+        }
 
         async fn execute(&self, args: Value) -> Result<ToolResult, String> {
-            let msg = args.get("message")
+            let msg = args
+                .get("message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("(empty)")
                 .to_string();
@@ -485,8 +517,16 @@ mod tests {
     #[tokio::test]
     async fn single_turn_no_tool_calls() {
         let provider = MockProvider::new(vec!["Hello, I can help with that."]);
-        let loop_ = make_loop(provider, registry_with_echo(), supervised_policy(), Default::default());
-        let result = loop_.run("You are a helper.", "What is 2+2?").await.unwrap();
+        let loop_ = make_loop(
+            provider,
+            registry_with_echo(),
+            supervised_policy(),
+            Default::default(),
+        );
+        let result = loop_
+            .run("You are a helper.", "What is 2+2?")
+            .await
+            .unwrap();
         assert_eq!(result, "Hello, I can help with that.");
     }
 
@@ -498,8 +538,16 @@ mod tests {
             // Second: after tool result, LLM gives final answer
             "The echo said: ping. That's the result.",
         ]);
-        let loop_ = make_loop(provider, registry_with_echo(), supervised_policy(), Default::default());
-        let result = loop_.run("You are an agent.", "Test the echo tool.").await.unwrap();
+        let loop_ = make_loop(
+            provider,
+            registry_with_echo(),
+            supervised_policy(),
+            Default::default(),
+        );
+        let result = loop_
+            .run("You are an agent.", "Test the echo tool.")
+            .await
+            .unwrap();
         assert_eq!(result, "The echo said: ping. That's the result.");
     }
 
@@ -509,7 +557,12 @@ mod tests {
             r#"<tool_call>{"name": "nonexistent_tool", "arguments": {}}</tool_call>"#,
             "I couldn't find that tool, sorry.",
         ]);
-        let loop_ = make_loop(provider, registry_with_echo(), supervised_policy(), Default::default());
+        let loop_ = make_loop(
+            provider,
+            registry_with_echo(),
+            supervised_policy(),
+            Default::default(),
+        );
         let result = loop_.run("system", "user").await.unwrap();
         assert_eq!(result, "I couldn't find that tool, sorry.");
     }
@@ -539,7 +592,12 @@ mod tests {
             "The tool was denied, I'll work another way.",
         ]);
         // Use echo tool registry but with readonly policy
-        let loop_ = make_loop(provider, registry_with_echo(), readonly_policy(), Default::default());
+        let loop_ = make_loop(
+            provider,
+            registry_with_echo(),
+            readonly_policy(),
+            Default::default(),
+        );
         let result = loop_.run("system", "delete a file").await.unwrap();
         // Should continue after denial and return the second response
         assert_eq!(result, "The tool was denied, I'll work another way.");
@@ -552,12 +610,17 @@ mod tests {
             Arc::new(ToolRegistry::new()),
             supervised_policy(),
             None,
-            AgentConfig { max_history: 5, ..Default::default() },
+            AgentConfig {
+                max_history: 5,
+                ..Default::default()
+            },
         );
 
         // Build a history of 8 messages (more than max_history=5).
         let mut history: Vec<AgentMessage> = (0..8)
-            .map(|i| AgentMessage::User { content: format!("msg {i}") })
+            .map(|i| AgentMessage::User {
+                content: format!("msg {i}"),
+            })
             .collect();
 
         loop_.trim_history(&mut history);
@@ -580,11 +643,16 @@ mod tests {
             Arc::new(ToolRegistry::new()),
             supervised_policy(),
             None,
-            AgentConfig { max_history: 50, ..Default::default() },
+            AgentConfig {
+                max_history: 50,
+                ..Default::default()
+            },
         );
 
         let mut history: Vec<AgentMessage> = (0..10)
-            .map(|i| AgentMessage::User { content: format!("msg {i}") })
+            .map(|i| AgentMessage::User {
+                content: format!("msg {i}"),
+            })
             .collect();
 
         loop_.trim_history(&mut history);
@@ -593,7 +661,9 @@ mod tests {
 
     #[test]
     fn agent_message_to_llm_system() {
-        let msg = AgentMessage::System { content: "Be helpful.".to_string() };
+        let msg = AgentMessage::System {
+            content: "Be helpful.".to_string(),
+        };
         let llm = msg.to_llm_message();
         assert_eq!(llm.role, MessageRole::System);
         assert_eq!(llm.content, "Be helpful.");

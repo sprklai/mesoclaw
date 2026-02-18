@@ -124,7 +124,11 @@ mod tests {
             overlap: 2,
         };
         let chunks = split_into_chunks(&text, &config);
-        assert!(chunks.len() >= 2, "long text → multiple chunks, got {}", chunks.len());
+        assert!(
+            chunks.len() >= 2,
+            "long text → multiple chunks, got {}",
+            chunks.len()
+        );
     }
 
     #[test]
@@ -140,7 +144,8 @@ mod tests {
         let chunks = split_into_chunks(&text, &config);
         assert!(chunks.len() >= 2, "need at least 2 chunks for overlap test");
 
-        let last_words_of_first: Vec<&str> = chunks[0].text.split_whitespace().rev().take(2).collect();
+        let last_words_of_first: Vec<&str> =
+            chunks[0].text.split_whitespace().rev().take(2).collect();
         let first_words_of_second: Vec<&str> = chunks[1].text.split_whitespace().take(2).collect();
 
         // The last 2 of chunk 0 reversed should equal the first 2 of chunk 1.

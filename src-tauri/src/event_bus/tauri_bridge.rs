@@ -32,10 +32,10 @@ impl TauriBridge {
             loop {
                 match receiver.recv().await {
                     Ok(event) => {
-                        if is_ui_relevant(&event) {
-                            if let Err(e) = app_handle.emit("app-event", &event) {
-                                log::warn!("TauriBridge: failed to emit event: {e}");
-                            }
+                        if is_ui_relevant(&event)
+                            && let Err(e) = app_handle.emit("app-event", &event)
+                        {
+                            log::warn!("TauriBridge: failed to emit event: {e}");
                         }
                     }
                     Err(RecvError::Lagged(n)) => {

@@ -26,17 +26,13 @@ struct OllamaModelsResponse {
 /// This makes a GET request to http://localhost:11434/api/tags
 /// to discover what models the user has installed locally.
 #[tauri::command]
-pub async fn discover_ollama_models_command(
-    pool: State<'_, DbPool>,
-) -> Result<usize, String> {
+pub async fn discover_ollama_models_command(pool: State<'_, DbPool>) -> Result<usize, String> {
     println!("[Ollama Discovery] Starting model discovery...");
 
-    let mut conn = pool
-        .get()
-        .map_err(|e| {
-            println!("[Ollama Discovery] Database connection failed: {}", e);
-            format!("Database error: {}", e)
-        })?;
+    let mut conn = pool.get().map_err(|e| {
+        println!("[Ollama Discovery] Database connection failed: {}", e);
+        format!("Database error: {}", e)
+    })?;
 
     // Check if Ollama provider exists
     let provider = ai_providers::table
@@ -72,14 +68,13 @@ pub async fn discover_ollama_models_command(
     let url = format!("{}/api/tags", api_base);
     println!("[Ollama Discovery] Requesting URL: {}", url);
 
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| {
-            println!("[Ollama Discovery] HTTP request failed: {}", e);
-            format!("Failed to connect to Ollama: {}. Make sure Ollama is running at {}", e, api_base)
-        })?;
+    let response = client.get(&url).send().await.map_err(|e| {
+        println!("[Ollama Discovery] HTTP request failed: {}", e);
+        format!(
+            "Failed to connect to Ollama: {}. Make sure Ollama is running at {}",
+            e, api_base
+        )
+    })?;
 
     let status = response.status();
     println!("[Ollama Discovery] Response status: {}", status);
@@ -87,20 +82,19 @@ pub async fn discover_ollama_models_command(
     if !status.is_success() {
         return Err(format!(
             "Ollama returned error: {}. Make sure Ollama is running at {}",
-            status,
-            api_base
+            status, api_base
         ));
     }
 
-    let ollama_response: OllamaModelsResponse = response
-        .json()
-        .await
-        .map_err(|e| {
-            println!("[Ollama Discovery] Failed to parse JSON: {}", e);
-            format!("Failed to parse Ollama response: {}", e)
-        })?;
+    let ollama_response: OllamaModelsResponse = response.json().await.map_err(|e| {
+        println!("[Ollama Discovery] Failed to parse JSON: {}", e);
+        format!("Failed to parse Ollama response: {}", e)
+    })?;
 
-    println!("[Ollama Discovery] Found {} model(s)", ollama_response.models.len());
+    println!(
+        "[Ollama Discovery] Found {} model(s)",
+        ollama_response.models.len()
+    );
     for (i, model) in ollama_response.models.iter().enumerate() {
         println!("  - Model {}: {}", i + 1, model.name);
     }
@@ -110,7 +104,10 @@ pub async fn discover_ollama_models_command(
     let mut skipped_count = 0;
     let total_models = ollama_response.models.len();
 
-    println!("[Ollama Discovery] Syncing {} model(s) to database...", total_models);
+    println!(
+        "[Ollama Discovery] Syncing {} model(s) to database...",
+        total_models
+    );
 
     for ollama_model in ollama_response.models {
         let model_id = &ollama_model.name;
@@ -127,12 +124,18 @@ pub async fn discover_ollama_models_command(
             .first::<String>(&mut conn)
             .optional()
             .map_err(|e| {
-                println!("[Ollama Discovery] Database query failed for model {}: {}", model_id, e);
+                println!(
+                    "[Ollama Discovery] Database query failed for model {}: {}",
+                    model_id, e
+                );
                 format!("Failed to check existing model: {}", e)
             })?;
 
         if existing.is_some() {
-            println!("[Ollama Discovery] Model {} already exists (provider_id=ollama, model_id={}), skipping", db_id, model_id);
+            println!(
+                "[Ollama Discovery] Model {} already exists (provider_id=ollama, model_id={}), skipping",
+                db_id, model_id
+            );
             skipped_count += 1;
             continue; // Skip if already exists
         }
@@ -177,7 +180,10 @@ pub async fn discover_ollama_models_command(
     }
 
     if added_count == 0 && skipped_count > 0 {
-        println!("[Ollama Discovery] All {} model(s) already exist in database", skipped_count);
+        println!(
+            "[Ollama Discovery] All {} model(s) already exist in database",
+            skipped_count
+        );
         println!("[Ollama Discovery] Discovery complete - no new models");
         // Return 0 - frontend will show appropriate message
         return Ok(0);

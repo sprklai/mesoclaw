@@ -1,23 +1,23 @@
 pub mod adapters;
 pub mod agent;
-#[cfg(feature = "wasm-ext")]
-pub mod extensions;
 pub mod ai;
 pub mod channels;
 mod commands;
 pub mod config;
 pub mod database;
 pub mod event_bus;
+#[cfg(feature = "wasm-ext")]
+pub mod extensions;
 pub mod gateway;
 pub mod identity;
 pub mod memory;
 pub mod modules;
-pub mod scheduler;
 mod plugins;
+pub mod prompts;
+pub mod scheduler;
 pub mod security;
 pub mod services;
 pub mod tools;
-pub mod prompts;
 
 /// Convenience re-exports for the most commonly used traits and types across
 /// the MesoClaw codebase.
@@ -44,7 +44,7 @@ pub mod prelude {
     pub use crate::event_bus::{AppEvent, EventBus, TokioBroadcastBus};
 
     // Scheduler
-    pub use crate::scheduler::{JobPayload, Scheduler, Schedule};
+    pub use crate::scheduler::{JobPayload, Schedule, Scheduler};
 
     // Configuration
     pub use crate::config::{AppConfig, load_default_config};

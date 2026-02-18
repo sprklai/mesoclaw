@@ -4,8 +4,8 @@
 //! runs a single agent turn, and returns the final response.  Cancellation
 //! is tracked via a shared `SessionCancelMap`.
 
-use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use diesel::prelude::*;
 use tauri::State;
@@ -20,8 +20,8 @@ use crate::{
     config::app_identity::KEYCHAIN_SERVICE,
     database::{
         DbPool,
-        schema::{ai_models, ai_providers},
         models::ai_provider::{AIModel, AIProvider},
+        schema::{ai_models, ai_providers},
     },
     event_bus::{AppEvent, EventBus},
     identity::IdentityLoader,
@@ -33,8 +33,7 @@ use crate::{
 
 /// Shared map from `session_id → cancellation flag`, managed in Tauri state.
 /// A `true` value tells the session to abort at the next safe boundary.
-pub type SessionCancelMap =
-    Arc<Mutex<HashMap<String, Arc<std::sync::atomic::AtomicBool>>>>;
+pub type SessionCancelMap = Arc<Mutex<HashMap<String, Arc<std::sync::atomic::AtomicBool>>>>;
 
 // ─── Provider resolution ──────────────────────────────────────────────────────
 
@@ -88,10 +87,12 @@ pub fn resolve_active_provider(pool: &DbPool) -> Result<Arc<dyn LLMProvider>, St
         keyring::Entry::new(KEYCHAIN_SERVICE, &key_name)
             .map_err(|e| format!("Keyring entry error: {e}"))?
             .get_password()
-            .map_err(|_| format!(
-                "No API key stored for '{}'. Open Settings → Providers and save your key.",
-                provider.id
-            ))?
+            .map_err(|_| {
+                format!(
+                    "No API key stored for '{}'. Open Settings → Providers and save your key.",
+                    provider.id
+                )
+            })?
     };
 
     // 5. Build the provider instance.
@@ -143,7 +144,13 @@ pub async fn start_agent_session_command(
     let system_prompt = identity_loader.build_system_prompt();
 
     // Construct and run the agent loop.
-    let agent = AgentLoop::new(provider, registry, policy, Some(bus.clone()), AgentConfig::default());
+    let agent = AgentLoop::new(
+        provider,
+        registry,
+        policy,
+        Some(bus.clone()),
+        AgentConfig::default(),
+    );
     let result = agent.run(&system_prompt, &message).await;
 
     // Remove the cancellation entry when done.
@@ -178,6 +185,9 @@ pub async fn cancel_agent_session_command(
             flag.store(true, std::sync::atomic::Ordering::SeqCst);
             Ok(())
         }
-        None => Err(format!("Session '{}' not found or already complete.", session_id)),
+        None => Err(format!(
+            "Session '{}' not found or already complete.",
+            session_id
+        )),
     }
 }

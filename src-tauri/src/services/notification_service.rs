@@ -51,21 +51,12 @@ pub struct NotificationSpec {
 // ─── NotificationConfig ──────────────────────────────────────────────────────
 
 /// Per-category preferences and global Do Not Disturb flag.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NotificationConfig {
     /// When `true`, all notifications are suppressed regardless of category.
     pub do_not_disturb: bool,
     /// Per-category enable flag.  Missing keys default to `true` (enabled).
     pub categories: std::collections::HashMap<String, bool>,
-}
-
-impl Default for NotificationConfig {
-    fn default() -> Self {
-        Self {
-            do_not_disturb: false,
-            categories: std::collections::HashMap::new(),
-        }
-    }
 }
 
 impl NotificationConfig {
@@ -103,7 +94,10 @@ pub fn event_to_notification(event: &AppEvent) -> Option<NotificationSpec> {
             category: NotificationCategory::Cron,
             session_id: Some(job_id.clone()),
         }),
-        AppEvent::AgentComplete { session_id, message } => Some(NotificationSpec {
+        AppEvent::AgentComplete {
+            session_id,
+            message,
+        } => Some(NotificationSpec {
             title: "Agent Task Complete".to_string(),
             body: message.chars().take(120).collect(),
             category: NotificationCategory::Agent,
@@ -197,11 +191,7 @@ impl NotificationService {
 
                         if enabled {
                             // ## TODO: call tauri_plugin_notification to show OS notification.
-                            log::info!(
-                                "[notification] {} — {}",
-                                spec.title,
-                                spec.body
-                            );
+                            log::info!("[notification] {} — {}", spec.title, spec.body);
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
@@ -234,7 +224,10 @@ mod tests {
             timestamp: "2026-02-18T12:00:00Z".to_string(),
         };
         let spec = event_to_notification(&event);
-        assert!(spec.is_some(), "HeartbeatTick should produce a notification");
+        assert!(
+            spec.is_some(),
+            "HeartbeatTick should produce a notification"
+        );
         assert_eq!(spec.unwrap().category, NotificationCategory::Heartbeat);
     }
 
@@ -270,7 +263,10 @@ mod tests {
         };
         let spec = event_to_notification(&event).unwrap();
         assert_eq!(spec.category, NotificationCategory::Approval);
-        assert!(spec.title.contains("shell"), "title should include tool name");
+        assert!(
+            spec.title.contains("shell"),
+            "title should include tool name"
+        );
     }
 
     #[test]
@@ -285,7 +281,10 @@ mod tests {
     #[test]
     fn system_ready_does_not_trigger_notification() {
         let spec = event_to_notification(&AppEvent::SystemReady);
-        assert!(spec.is_none(), "SystemReady should not produce a notification");
+        assert!(
+            spec.is_none(),
+            "SystemReady should not produce a notification"
+        );
     }
 
     #[test]
@@ -375,7 +374,10 @@ mod tests {
         let event = AppEvent::SystemError {
             message: "err".to_string(),
         };
-        assert!(!service.should_notify(&event), "DND should suppress after update_config");
+        assert!(
+            !service.should_notify(&event),
+            "DND should suppress after update_config"
+        );
     }
 
     #[test]
@@ -386,6 +388,9 @@ mod tests {
             message: long_msg,
         };
         let spec = event_to_notification(&event).unwrap();
-        assert!(spec.body.len() <= 120, "body should be truncated to 120 chars");
+        assert!(
+            spec.body.len() <= 120,
+            "body should be truncated to 120 chars"
+        );
     }
 }

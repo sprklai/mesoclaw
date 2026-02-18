@@ -159,9 +159,7 @@ impl SecurityPolicy {
         // 2. Check for blocked executables.
         let executable = extract_executable(command);
         if BLOCKED_EXECUTABLES.contains(&executable.as_str()) {
-            return ValidationResult::Denied(format!(
-                "executable '{executable}' is not permitted"
-            ));
+            return ValidationResult::Denied(format!("executable '{executable}' is not permitted"));
         }
 
         let risk = classify_executable_risk(&executable);
@@ -193,7 +191,9 @@ impl SecurityPolicy {
 
         // 4. Blocked directories.
         for blocked in &self.blocked_dirs {
-            if canonical.starts_with(blocked) || canonical_str.starts_with(&*blocked.to_string_lossy()) {
+            if canonical.starts_with(blocked)
+                || canonical_str.starts_with(&*blocked.to_string_lossy())
+            {
                 return ValidationResult::Denied(format!(
                     "access to '{}' is blocked",
                     blocked.display()
@@ -203,12 +203,13 @@ impl SecurityPolicy {
 
         // 5. Workspace confinement.
         if let Some(ref root) = self.workspace_root
-            && !canonical.starts_with(root) {
-                return ValidationResult::Denied(format!(
-                    "path is outside the workspace root '{}'",
-                    root.display()
-                ));
-            }
+            && !canonical.starts_with(root)
+        {
+            return ValidationResult::Denied(format!(
+                "path is outside the workspace root '{}'",
+                root.display()
+            ));
+        }
 
         ValidationResult::Allowed
     }
@@ -285,14 +286,12 @@ fn extract_executable(command: &str) -> String {
 /// Classify the risk level of an executable by name.
 fn classify_executable_risk(executable: &str) -> RiskLevel {
     const LOW: &[&str] = &[
-        "ls", "cat", "grep", "git", "echo", "pwd", "which", "file", "head",
-        "tail", "wc", "sort", "uniq", "diff", "find", "stat", "type", "env",
-        "printenv", "date", "uptime",
+        "ls", "cat", "grep", "git", "echo", "pwd", "which", "file", "head", "tail", "wc", "sort",
+        "uniq", "diff", "find", "stat", "type", "env", "printenv", "date", "uptime",
     ];
     const MEDIUM: &[&str] = &[
-        "touch", "mkdir", "cp", "mv", "npm", "yarn", "pnpm", "bun", "pip",
-        "pip3", "cargo", "make", "cmake", "gcc", "clang", "rustc", "python",
-        "python3", "node", "tee", "ln",
+        "touch", "mkdir", "cp", "mv", "npm", "yarn", "pnpm", "bun", "pip", "pip3", "cargo", "make",
+        "cmake", "gcc", "clang", "rustc", "python", "python3", "node", "tee", "ln",
     ];
 
     if LOW.contains(&executable) {
@@ -306,8 +305,8 @@ fn classify_executable_risk(executable: &str) -> RiskLevel {
 
 /// Executables that are never allowed regardless of autonomy level.
 const BLOCKED_EXECUTABLES: &[&str] = &[
-    "rm", "sudo", "su", "shutdown", "reboot", "halt", "poweroff", "dd",
-    "mkfs", "fdisk", "parted", "format", "del", "rmdir",
+    "rm", "sudo", "su", "shutdown", "reboot", "halt", "poweroff", "dd", "mkfs", "fdisk", "parted",
+    "format", "del", "rmdir",
 ];
 
 /// Detect shell injection patterns; returns a reason string if found.
@@ -401,7 +400,10 @@ mod tests {
 
     #[test]
     fn low_risk_echo() {
-        assert_eq!(supervised().classify_command_risk("echo hello"), RiskLevel::Low);
+        assert_eq!(
+            supervised().classify_command_risk("echo hello"),
+            RiskLevel::Low
+        );
     }
 
     #[test]
@@ -411,72 +413,114 @@ mod tests {
 
     #[test]
     fn low_risk_which() {
-        assert_eq!(supervised().classify_command_risk("which cargo"), RiskLevel::Low);
+        assert_eq!(
+            supervised().classify_command_risk("which cargo"),
+            RiskLevel::Low
+        );
     }
 
     #[test]
     fn low_risk_file() {
-        assert_eq!(supervised().classify_command_risk("file /usr/bin/ls"), RiskLevel::Low);
+        assert_eq!(
+            supervised().classify_command_risk("file /usr/bin/ls"),
+            RiskLevel::Low
+        );
     }
 
     #[test]
     fn medium_risk_mkdir() {
-        assert_eq!(supervised().classify_command_risk("mkdir -p foo/bar"), RiskLevel::Medium);
+        assert_eq!(
+            supervised().classify_command_risk("mkdir -p foo/bar"),
+            RiskLevel::Medium
+        );
     }
 
     #[test]
     fn medium_risk_cp() {
-        assert_eq!(supervised().classify_command_risk("cp src dst"), RiskLevel::Medium);
+        assert_eq!(
+            supervised().classify_command_risk("cp src dst"),
+            RiskLevel::Medium
+        );
     }
 
     #[test]
     fn medium_risk_mv() {
-        assert_eq!(supervised().classify_command_risk("mv a b"), RiskLevel::Medium);
+        assert_eq!(
+            supervised().classify_command_risk("mv a b"),
+            RiskLevel::Medium
+        );
     }
 
     #[test]
     fn medium_risk_npm_install() {
-        assert_eq!(supervised().classify_command_risk("npm install"), RiskLevel::Medium);
+        assert_eq!(
+            supervised().classify_command_risk("npm install"),
+            RiskLevel::Medium
+        );
     }
 
     #[test]
     fn medium_risk_cargo_build() {
-        assert_eq!(supervised().classify_command_risk("cargo build"), RiskLevel::Medium);
+        assert_eq!(
+            supervised().classify_command_risk("cargo build"),
+            RiskLevel::Medium
+        );
     }
 
     #[test]
     fn medium_risk_touch() {
-        assert_eq!(supervised().classify_command_risk("touch newfile.txt"), RiskLevel::Medium);
+        assert_eq!(
+            supervised().classify_command_risk("touch newfile.txt"),
+            RiskLevel::Medium
+        );
     }
 
     #[test]
     fn high_risk_unknown() {
-        assert_eq!(supervised().classify_command_risk("xyzunknown"), RiskLevel::High);
+        assert_eq!(
+            supervised().classify_command_risk("xyzunknown"),
+            RiskLevel::High
+        );
     }
 
     #[test]
     fn high_risk_curl() {
-        assert_eq!(supervised().classify_command_risk("curl https://example.com"), RiskLevel::High);
+        assert_eq!(
+            supervised().classify_command_risk("curl https://example.com"),
+            RiskLevel::High
+        );
     }
 
     #[test]
     fn high_risk_wget() {
-        assert_eq!(supervised().classify_command_risk("wget http://x.com"), RiskLevel::High);
+        assert_eq!(
+            supervised().classify_command_risk("wget http://x.com"),
+            RiskLevel::High
+        );
     }
 
     #[test]
     fn high_risk_chmod() {
-        assert_eq!(supervised().classify_command_risk("chmod +x script.sh"), RiskLevel::High);
+        assert_eq!(
+            supervised().classify_command_risk("chmod +x script.sh"),
+            RiskLevel::High
+        );
     }
 
     #[test]
     fn high_risk_chown() {
-        assert_eq!(supervised().classify_command_risk("chown user:group file"), RiskLevel::High);
+        assert_eq!(
+            supervised().classify_command_risk("chown user:group file"),
+            RiskLevel::High
+        );
     }
 
     #[test]
     fn high_risk_kill() {
-        assert_eq!(supervised().classify_command_risk("kill -9 1234"), RiskLevel::High);
+        assert_eq!(
+            supervised().classify_command_risk("kill -9 1234"),
+            RiskLevel::High
+        );
     }
 
     // ── env-prefix bypass ───────────────────────────────────────────────
@@ -681,13 +725,7 @@ mod tests {
     fn path_blocked_dir_denied() {
         let tmp = TempDir::new().unwrap();
         let blocked = tmp.path().to_path_buf();
-        let policy = SecurityPolicy::new(
-            AutonomyLevel::Full,
-            None,
-            vec![blocked.clone()],
-            60,
-            100,
-        );
+        let policy = SecurityPolicy::new(AutonomyLevel::Full, None, vec![blocked.clone()], 60, 100);
         let target = blocked.join("file.txt");
         fs::write(&target, "x").unwrap();
         assert!(matches!(
