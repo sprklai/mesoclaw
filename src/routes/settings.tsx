@@ -5,6 +5,7 @@ import { AdvancedSettingsTab } from "@/components/settings/AdvancedSettingsTab";
 import { AISettingsTab } from "@/components/settings/AISettingsTab";
 import { AppSettingsTab } from "@/components/settings/AppSettingsTab";
 import { ChannelList } from "@/components/settings/ChannelList";
+import { MobileSettings } from "@/components/settings/MobileSettings";
 import { IdentityEditor } from "@/components/settings/IdentityEditor";
 import { JobList } from "@/components/settings/JobList";
 import { ModuleList } from "@/components/settings/ModuleList";
@@ -88,6 +89,9 @@ function SettingsPage() {
           <TabsTrigger value="channels" className="flex-1 font-bold">
             Channels
           </TabsTrigger>
+          <TabsTrigger value="mobile" className="flex-1 font-bold">
+            Mobile
+          </TabsTrigger>
           <TabsTrigger value="advanced" className="flex-1 font-bold">
             Advanced
           </TabsTrigger>
@@ -125,6 +129,9 @@ function SettingsPage() {
         </TabsContent>
         <TabsContent value="channels" className="mt-6">
           <ChannelList />
+        </TabsContent>
+        <TabsContent value="mobile" className="mt-6">
+          <MobileSettings />
         </TabsContent>
         <TabsContent value="advanced" className="mt-6">
           <AdvancedSettingsTab />

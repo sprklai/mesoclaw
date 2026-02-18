@@ -40,6 +40,8 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | ⏳ | `src/lib/tauri/identity/index.ts` | 4 | Migrate identity CRUD to gateway REST API (Phase 3) | Medium |
 | ⏳ | `src/lib/gateway-client.ts` | 61 | Add dedicated `get_daemon_config_command` (Phase 2.7) | Low |
 | ⏳ | `src/lib/gateway-client.ts` | 198 | Add dedicated approval endpoint to gateway REST API | Medium |
+| ⏳ | `src-tauri/` | — | Phase 7.4.1–7.4.6, 7.4.8: `tauri ios init` + `tauri android init`, code signing, TestFlight / Google Play distribution — requires macOS + Xcode + Android SDK | High |
+| ⏳ | `src/components/settings/MobileSettings.tsx` | — | Wire push notifications to `tauri-plugin-notification` once APNs/FCM signing is configured (Phase 7.4.4) | Medium |
 
 ---
 
@@ -131,3 +133,14 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | 2026-02-18 | Bugfix | `src-tauri/src/gateway/routes.rs` | Stub endpoints `create_session`, `start_module`, `stop_module` now return 501 NOT_IMPLEMENTED instead of 201/202 |
 | 2026-02-18 | Bugfix | `src-tauri/src/bin/cli.rs` | `daemon start` self-spawns with `--foreground` flag and returns to shell; no longer blocks |
 | 2026-02-18 | Bugfix | `src-tauri/src/channels/tauri_ipc.rs` | `event_to_channel_message` returns `None` for `AgentComplete` — removes output→input feedback loop |
+| 2026-02-18 | Feature | `src-tauri/src/channels/telegram.rs` | TelegramChannel: MarkdownV2 escaping, 4096-char split, exponential back-off, allow-list, 33 tests (Phase 7.1) |
+| 2026-02-18 | Feature | `src/stores/channelStore.ts` | Zustand channel store; `ChannelList.tsx` + `TelegramConfig.tsx` settings UI (Phase 7.2) |
+| 2026-02-18 | Feature | `src/hooks/useMobileSwipe.ts` | Swipe gesture hook; edge-right opens sidebar, swipe-left closes (Phase 7.3.1) |
+| 2026-02-18 | Feature | `src/hooks/usePullToRefresh.ts` | Pull-to-refresh hook with `isPulling`/`isRefreshing` state (Phase 7.3.2) |
+| 2026-02-18 | Feature | `src/hooks/useVirtualKeyboard.ts` | VisualViewport keyboard height tracker; sets `--keyboard-height` CSS var (Phase 7.3.3) |
+| 2026-02-18 | Feature | `src/hooks/useHaptic.ts` | Haptic feedback via `navigator.vibrate()` with light/medium/heavy styles (Phase 7.3.4) |
+| 2026-02-18 | Feature | `src/stores/offlineQueueStore.ts` | Persisted offline message queue with auto-flush on `window.online` (Phase 7.3.5) |
+| 2026-02-18 | Feature | `src/stores/sidebarStore.ts` | Zustand store for mobile drawer open/close; wired to swipe gesture (Phase 7.3) |
+| 2026-02-18 | Feature | `src/stores/mobileSettingsStore.ts` | localStorage-persisted mobile prefs: haptic toggle, push notifications, battery, background refresh (Phase 7.4.7) |
+| 2026-02-18 | Feature | `src/components/settings/MobileSettings.tsx` | Mobile Settings tab: haptic toggle, push notification opt-in, Android/iOS guidance (Phase 7.4.7) |
+| 2026-02-18 | Bugfix | `src-tauri/src/event_bus/tauri_bridge.rs` | Use `tauri::async_runtime::spawn` instead of `tokio::spawn` for Tauri runtime consistency |
