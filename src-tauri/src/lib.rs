@@ -1,5 +1,7 @@
 pub mod adapters;
 pub mod agent;
+#[cfg(feature = "wasm-ext")]
+pub mod extensions;
 pub mod ai;
 pub mod channels;
 mod commands;
@@ -63,7 +65,6 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(plugins::logging::build().build())
         .setup(|app| {
             plugins::logging::init(app);
