@@ -66,6 +66,8 @@ enum Commands {
     Schedule(ScheduleArgs),
     /// Manage communication channels (e.g., Telegram).
     Channel(ChannelArgs),
+    /// Manage sidecar extension modules (list, install, remove, start, stop, health, reload, create).
+    Module(ModuleArgs),
     /// Launch the MesoClaw desktop GUI.
     Gui,
 }
@@ -120,6 +122,21 @@ struct ChannelArgs {
     #[arg(default_value = "list")]
     action: String,
     channel_type: Option<String>,
+}
+
+#[derive(Parser, Debug)]
+struct ModuleArgs {
+    /// Module action: list | install | remove | start | stop | health | reload | create
+    #[arg(default_value = "list")]
+    action: String,
+    /// Module name or ID (required for install, remove, start, stop, health, create).
+    name: Option<String>,
+    /// Module type for `create` (tool | service | mcp).
+    #[arg(long, default_value = "tool")]
+    module_type: String,
+    /// Runtime for `create` (native | docker | podman).
+    #[arg(long, default_value = "native")]
+    runtime: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -226,6 +243,46 @@ impl GatewayClient {
             .replace("https://", "wss://")
             + "/api/v1/ws"
     }
+
+    async fn list_modules(&self) -> reqwest::Result<Value> {
+        self.client
+            .get(format!("{}/api/v1/modules", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn module_action(&self, id: &str, action: &str) -> reqwest::Result<Value> {
+        self.client
+            .post(format!("{}/api/v1/modules/{id}/{action}", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn module_health(&self, id: &str) -> reqwest::Result<Value> {
+        self.client
+            .get(format!("{}/api/v1/modules/{id}/health", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn reload_modules(&self) -> reqwest::Result<Value> {
+        self.client
+            .post(format!("{}/api/v1/modules", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
 }
 
 /// Resolve or start the gateway, returning a ready client.
@@ -284,6 +341,7 @@ async fn dispatch(command: &Commands, raw: bool, json_mode: bool) {
         Commands::Channel(args) => {
             println!("channel {}: not yet implemented (Phase 7)", args.action);
         }
+        Commands::Module(args) => handle_module(args, raw, json_mode).await,
         Commands::Gui => {
             println!("gui: not yet implemented — launch mesoclaw-desktop directly");
         }
@@ -370,6 +428,147 @@ async fn handle_memory(args: &MemoryArgs, _raw: bool, _json_mode: bool) {
 async fn handle_identity(args: &IdentityArgs, _raw: bool, _json_mode: bool) {
     // ## TODO: wire to identity REST endpoint (Phase 2.6 completion)
     println!("identity {}: not yet implemented (Phase 3)", args.action);
+}
+
+async fn handle_module(args: &ModuleArgs, raw: bool, json_mode: bool) {
+    match args.action.as_str() {
+        "list" => {
+            let Some(client) = require_gateway().await else { return; };
+            match client.list_modules().await {
+                Ok(v) => print_value(&v, raw, json_mode),
+                Err(e) => print_err(&format!("module list: {e}")),
+            }
+        }
+        "health" => {
+            let Some(name) = &args.name else {
+                print_err("module health requires a module name");
+                return;
+            };
+            let Some(client) = require_gateway().await else { return; };
+            match client.module_health(name).await {
+                Ok(v) => print_value(&v, raw, json_mode),
+                Err(e) => print_err(&format!("module health: {e}")),
+            }
+        }
+        "start" | "stop" => {
+            let Some(name) = &args.name else {
+                print_err(&format!("module {} requires a module name", args.action));
+                return;
+            };
+            let Some(client) = require_gateway().await else { return; };
+            match client.module_action(name, &args.action).await {
+                Ok(v) => print_value(&v, raw, json_mode),
+                Err(e) => print_err(&format!("module {}: {e}", args.action)),
+            }
+        }
+        "reload" => {
+            let Some(client) = require_gateway().await else { return; };
+            match client.reload_modules().await {
+                Ok(v) => print_value(&v, raw, json_mode),
+                Err(e) => print_err(&format!("module reload: {e}")),
+            }
+        }
+        "create" => {
+            let Some(name) = &args.name else {
+                print_err("module create requires a module name: mesoclaw module create <name>");
+                return;
+            };
+            create_module_scaffold(name, &args.module_type, &args.runtime);
+        }
+        "install" | "remove" => {
+            // ## TODO: implement package-registry install/remove (Phase 6+)
+            println!("module {}: not yet implemented (Phase 6)", args.action);
+        }
+        other => {
+            print_err(&format!(
+                "unknown module action '{other}'. Use: list | install | remove | start | stop | health | reload | create"
+            ));
+        }
+    }
+}
+
+/// Generate a module scaffold at `~/.mesoclaw/modules/<name>/`.
+fn create_module_scaffold(name: &str, module_type: &str, runtime: &str) {
+    let modules_dir = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+        .join(".mesoclaw")
+        .join("modules")
+        .join(name);
+
+    if modules_dir.exists() {
+        print_err(&format!("module '{name}' already exists at {modules_dir:?}"));
+        return;
+    }
+
+    if let Err(e) = std::fs::create_dir_all(&modules_dir) {
+        print_err(&format!("failed to create module directory: {e}"));
+        return;
+    }
+
+    let manifest = format!(
+        r#"[module]
+id = "{name}"
+name = "{name}"
+version = "0.1.0"
+description = "A MesoClaw extension module"
+type = "{module_type}"
+
+[runtime]
+runtime_type = "{runtime}"
+command = "./{name}"
+args = []
+timeout_secs = 30
+
+[security]
+allow_network = false
+max_memory_mb = 128
+"#
+    );
+
+    let manifest_path = modules_dir.join("manifest.toml");
+    if let Err(e) = std::fs::write(&manifest_path, &manifest) {
+        print_err(&format!("failed to write manifest: {e}"));
+        return;
+    }
+
+    // Generate a template script (shell for native runtime).
+    if runtime == "native" {
+        let script = format!(
+            r#"#!/usr/bin/env bash
+# MesoClaw module: {name}
+# Reads a JSON request from stdin, writes a JSON response to stdout.
+# See https://docs.mesoclaw.dev/modules for protocol details.
+
+set -euo pipefail
+
+# Read the request
+request=$(cat)
+echo "$request" >&2  # debug — remove in production
+
+# Write the response
+echo '{{"result": "ok", "output": "hello from {name}"}}'
+"#
+        );
+        let script_path = modules_dir.join(name);
+        if let Err(e) = std::fs::write(&script_path, &script) {
+            print_err(&format!("failed to write script: {e}"));
+            return;
+        }
+        // Make executable on Unix.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = std::fs::metadata(&script_path) {
+                let mut perms = meta.permissions();
+                perms.set_mode(0o755);
+                let _ = std::fs::set_permissions(&script_path, perms);
+            }
+        }
+    }
+
+    println!("Created module '{name}' at {modules_dir:?}");
+    println!("  manifest: {manifest_path:?}");
+    println!("  Edit manifest.toml to configure your module.");
 }
 
 // ---------------------------------------------------------------------------
@@ -472,7 +671,7 @@ async fn run_repl(raw: bool, json_mode: bool) {
 
 fn print_help() {
     println!(
-        "Commands: daemon | agent | memory | identity | config | schedule | channel | gui | exit"
+        "Commands: daemon | agent | memory | identity | config | schedule | channel | module | gui | exit"
     );
 }
 

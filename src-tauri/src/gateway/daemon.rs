@@ -17,7 +17,11 @@ use crate::event_bus::EventBus;
 
 use super::{
     auth::{auth_middleware, load_or_create_token},
-    routes::{GatewayState, create_session, health, list_sessions, provider_status},
+    routes::{
+        GatewayState,
+        create_session, health, list_sessions, provider_status,
+        list_modules, module_health, start_module, stop_module, reload_modules,
+    },
     ws::ws_handler,
 };
 
@@ -48,6 +52,11 @@ pub async fn start_gateway(bus: Arc<dyn EventBus>) -> Result<(), String> {
         .route("/api/v1/sessions", post(create_session).get(list_sessions))
         .route("/api/v1/providers", get(provider_status))
         .route("/api/v1/ws", get(ws_handler))
+        // Module management endpoints (Phase 5.5)
+        .route("/api/v1/modules", get(list_modules).post(reload_modules))
+        .route("/api/v1/modules/{id}/health", get(module_health))
+        .route("/api/v1/modules/{id}/start", post(start_module))
+        .route("/api/v1/modules/{id}/stop", post(stop_module))
         .layer(middleware::from_fn(auth_middleware))
         .with_state(state.clone());
 
