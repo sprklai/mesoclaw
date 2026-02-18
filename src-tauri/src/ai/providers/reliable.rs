@@ -94,12 +94,21 @@ impl LLMProvider for ReliableProvider {
         Err(format!("All providers failed. Last error: {last_err}"))
     }
 
+    /// Returns the minimum context limit across the primary provider and all
+    /// fallbacks so that callers never submit requests that would exceed a
+    /// fallback provider's capacity.
     fn context_limit(&self) -> usize {
-        self.primary.context_limit()
+        self.fallbacks
+            .iter()
+            .map(|f| f.context_limit())
+            .fold(self.primary.context_limit(), |min, limit| min.min(limit))
     }
 
+    /// Returns `true` only when every provider in the chain (primary and all
+    /// fallbacks) supports tool use, ensuring that tool-based requests remain
+    /// valid after a fallback switch.
     fn supports_tools(&self) -> bool {
-        self.primary.supports_tools()
+        self.primary.supports_tools() && self.fallbacks.iter().all(|f| f.supports_tools())
     }
 
     fn provider_name(&self) -> &str {

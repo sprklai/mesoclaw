@@ -4,8 +4,10 @@
 //! prompt templates. All IPC command names are kept stable so the frontend
 //! requires no changes.
 //!
-//! Commands that previously required workspace context (settings, enable/disable,
-//! auto-select) are now no-ops — all templates are always available.
+//! In the template system every template is always available and enabled.
+//! Write commands that previously modified per-skill settings (enable/disable,
+//! auto-select, priority) are not supported and return an explicit error so
+//! callers can gate their UX accordingly instead of receiving a silent no-op.
 
 use std::collections::HashMap;
 
@@ -54,29 +56,40 @@ pub async fn get_skill_settings_command() -> Result<SkillSettings, String> {
     })
 }
 
-/// Enable or disable a skill (no-op in the template system).
+/// Enable or disable a skill.
+///
+/// Not supported in the filesystem-based template system — all templates are
+/// always available. Returns an explicit error so the caller can gate its UI
+/// rather than silently discarding the write.
 #[tauri::command]
 pub async fn set_skill_enabled_command(
     _skill_id: String,
     _enabled: bool,
 ) -> Result<(), String> {
-    Ok(())
+    Err("not supported: template system does not persist per-skill enable/disable state".to_string())
 }
 
-/// Update skill configuration (no-op in the template system).
+/// Update skill configuration.
+///
+/// Not supported in the filesystem-based template system. Returns an explicit
+/// error so the caller can gate its UI rather than silently discarding the write.
 #[tauri::command]
 pub async fn update_skill_config_command(
     _skill_id: String,
     _enabled: bool,
     _priority_override: Option<i32>,
 ) -> Result<(), String> {
-    Ok(())
+    Err("not supported: template system does not persist per-skill configuration".to_string())
 }
 
-/// Initialise default skill settings (no-op in the template system).
+/// Initialise default skill settings.
+///
+/// Not supported in the filesystem-based template system — defaults are derived
+/// from the template files themselves. Returns an explicit error so the caller
+/// can gate its UI rather than silently discarding the operation.
 #[tauri::command]
 pub async fn initialize_skill_defaults_command() -> Result<(), String> {
-    Ok(())
+    Err("not supported: template system does not use persisted skill defaults".to_string())
 }
 
 /// Reload templates from the filesystem.
@@ -95,19 +108,68 @@ pub async fn list_skills_by_category_command(
     Ok(registry.by_category().await)
 }
 
-/// Toggle auto-select mode (no-op in the template system).
+/// Toggle auto-select mode.
+///
+/// Not supported in the filesystem-based template system. Returns an explicit
+/// error so the caller can gate its UI rather than silently discarding the write.
 #[tauri::command]
 pub async fn set_skill_auto_select_command(_auto_select: bool) -> Result<(), String> {
-    Ok(())
+    Err("not supported: template system does not persist auto-select state".to_string())
 }
 
-/// Suggest skills for a given request.
+/// Suggest skills relevant to a given request using keyword matching.
 ///
-/// The template system does not perform AI-based selection, so this always
-/// returns an empty list.
+/// Scores each template by the fraction of request words that appear in its
+/// name, description, or category. Templates with no matching words are
+/// excluded. Results are ordered by descending relevance score.
 #[tauri::command]
 pub async fn suggest_skills_command(
-    _request: String,
+    request: String,
 ) -> Result<Vec<SkillSuggestion>, String> {
-    Ok(vec![])
+    let registry = get_or_init_registry().await;
+    let infos = registry.skill_infos().await;
+
+    let request_lower = request.to_lowercase();
+    let words: Vec<&str> = request_lower.split_whitespace().collect();
+    if words.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let mut suggestions: Vec<SkillSuggestion> = infos
+        .into_iter()
+        .filter_map(|info| {
+            let haystack = format!(
+                "{} {} {}",
+                info.name.to_lowercase(),
+                info.description.to_lowercase(),
+                info.category.to_lowercase()
+            );
+            let matched_triggers: Vec<String> = words
+                .iter()
+                .filter(|&&w| haystack.contains(w))
+                .map(|w| (*w).to_string())
+                .collect();
+
+            if matched_triggers.is_empty() {
+                return None;
+            }
+
+            let relevance_score = matched_triggers.len() as f32 / words.len() as f32;
+            Some(SkillSuggestion {
+                skill_id: info.id,
+                skill_name: info.name,
+                description: info.description,
+                relevance_score,
+                matched_triggers,
+            })
+        })
+        .collect();
+
+    suggestions.sort_by(|a, b| {
+        b.relevance_score
+            .partial_cmp(&a.relevance_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    Ok(suggestions)
 }

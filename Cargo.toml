@@ -8,3 +8,28 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+
+# Optimized compilation settings for development
+[profile.dev]
+# Split debuginfo for faster compilation on all platforms
+split-debuginfo = "unpacked"
+# Enable incremental compilation
+incremental = true
+
+# Faster development builds
+[profile.dev.package."*"]
+# Optimize dependencies for better performance without slowing compilation
+opt-level = 2
+
+# Production optimizations
+[profile.release]
+# Full link-time optimization for maximum dead-code elimination
+lto = true
+# Optimize for binary size over speed
+opt-level = "z"
+# Strip debug symbols for smaller binary size
+strip = true
+# Use fewer codegen units for better optimization at cost of compile time
+codegen-units = 1
+# Remove panic unwinding code for smaller binary size (~100KB savings)
+panic = "abort"
