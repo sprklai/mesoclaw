@@ -49,12 +49,12 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 
 | Status | File | Line | Description | Replace With | Priority |
 |--------|------|------|-------------|--------------|----------|
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 66 | `provider_status` returns hardcoded `{"status":"ok"}` | Real provider health probe | Medium |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 88 | `list_modules` returns empty `[]` until `ModuleRegistry` is wired | `ModuleRegistry::list()` | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 103 | `module_health` returns stubbed `{"healthy":true}` | `SidecarModule::health_check()` | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 112 | `start_module` returns `{"started":true}` stub | `ModuleRegistry::start(id)` | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 124 | `stop_module` returns `{"stopped":true}` stub | `ModuleRegistry::stop(id)` | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 135 | `reload_modules` returns `{"reloaded":true}` stub | `ModuleRegistry::discover()` | Medium |
+| ⏳ | `src-tauri/src/gateway/routes.rs` | 66 | `provider_status` returns minimal stub — needs `DbPool` in `GatewayState` for real DB query | Real provider health probe | Medium |
+| ✅ | `src-tauri/src/gateway/routes.rs` | 88 | `list_modules` now returns `ModuleRegistry::ids()` with count | `ModuleRegistry::list()` | High |
+| ✅ | `src-tauri/src/gateway/routes.rs` | 103 | `module_health` now returns 200 if registered, 404 if not found | `SidecarModule::health_check()` | High |
+| ⏳ | `src-tauri/src/gateway/routes.rs` | 112 | `start_module` returns 501 with reason (SidecarService lifecycle not wired) | `SidecarService::start(id)` | High |
+| ⏳ | `src-tauri/src/gateway/routes.rs` | 124 | `stop_module` returns 501 with reason (SidecarService lifecycle not wired) | `SidecarService::stop(id)` | High |
+| ⏳ | `src-tauri/src/gateway/routes.rs` | 135 | `reload_modules` returns 501 — hot reload requires quiescing running tools | `ModuleRegistry::discover()` safe reload | Medium |
 
 ---
 
@@ -98,7 +98,7 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 
 | Status | File | Line | Description | Reason | Priority |
 |--------|------|------|-------------|--------|----------|
-| ⏳ | `src-tauri/src/agent/agent_commands.rs` | 12 | Full agent session wiring (Phase 3 follow-up) — commands are stubs | Phase 3 agent loop integration | High |
+| ✅ | `src-tauri/src/agent/agent_commands.rs` | 12 | Agent session commands fully wired: provider from DB+keyring, AgentLoop from state, system prompt from IdentityLoader, AgentComplete event, SessionCancelMap | Phase 3 agent loop integration | High |
 
 ---
 
@@ -158,3 +158,13 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | 2026-02-18 | Docs | `SECURITY.md` | Security policy: GitHub Advisories reporting, 48h/1w/2w SLA, architecture summary (Phase 8.5) |
 | 2026-02-18 | Docs | `.github/CODEOWNERS` | Auto-review routing for security/agent/CI paths (Phase 8.5) |
 | 2026-02-18 | Docs | `CODE_OF_CONDUCT.md` | Contributor Covenant v2.1 — community standards and enforcement (Phase 8.5) |
+| 2026-02-18 | Feature | `src-tauri/src/agent/agent_commands.rs` | Agent session fully wired: DB provider resolution, AgentLoop from state, IdentityLoader system prompt, SessionCancelMap cancellation |
+| 2026-02-18 | Feature | `src-tauri/src/agent/loop_.rs` | Real approval flow: emit ApprovalNeeded → subscribe ApprovalResponse → 30s timeout → execute or deny |
+| 2026-02-18 | Feature | `src-tauri/src/gateway/routes.rs` | GatewayState expanded; session create/list wired to SessionRouter; module list/health wired to ModuleRegistry |
+| 2026-02-18 | Feature | `src-tauri/src/gateway/daemon.rs` | start_gateway() accepts Arc<SessionRouter> + Arc<ModuleRegistry> |
+| 2026-02-18 | Feature | `src-tauri/src/scheduler/commands.rs` | All 5 scheduler IPC commands wired to managed Arc<TokioScheduler> |
+| 2026-02-18 | Feature | `src-tauri/src/memory/commands.rs` | All 4 memory IPC commands wired to managed Arc<InMemoryStore> |
+| 2026-02-18 | Feature | `src-tauri/src/scheduler/tokio_scheduler.rs` | SQLite persistence: scheduled_jobs migration, add_job upserts, remove_job deletes, load on startup |
+| 2026-02-18 | Feature | `src-tauri/src/scheduler/tokio_scheduler.rs` | AgentLoop integration: Heartbeat/AgentTurn payloads executed through real AgentLoop when AgentComponents present |
+| 2026-02-18 | Feature | `src-tauri/src/commands/approval.rs` | get_daemon_config_command: reads daemon.pid (port) + daemon.token from ~/.mesoclaw/ |
+| 2026-02-18 | Feature | `src/lib/gateway-client.ts` | resolveDaemonConfig() wired to get_daemon_config_command IPC |
