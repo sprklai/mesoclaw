@@ -6,6 +6,7 @@ pub mod database;
 pub mod event_bus;
 pub mod gateway;
 pub mod identity;
+pub mod modules;
 mod plugins;
 pub mod security;
 pub mod services;
