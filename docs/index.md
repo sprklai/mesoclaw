@@ -38,13 +38,13 @@ Design  Bite-sized  TDD     Unit/    Git    Code
 
 1. **Phase 0:** Slim Down + Responsive ✅ **COMPLETE** (2026-02-18) — −3,355 lines, 2 binaries, feature flags, clippy clean
 2. **Phase 1:** Foundation ✅ **COMPLETE** (2026-02-17) — release profile optimized, ReliableProvider with retry/fallback
-3. **Phase 2:** Core Infrastructure ← **ACTIVE**
+3. **Phase 2:** Core Infrastructure ← **ACTIVE** (Event Bus, Tools, Security, Identity)
 4. **Phase 3:** Agent Intelligence
 5. **Phase 4:** Proactive Behavior
-6. **Phase 5:** Config & DX
-7. **Phase 6:** Extensions & UI
-8. **Phase 7:** Channels & Mobile
-9. **Phase 8:** CI/CD & Community
+6. **Phase 5:** Config & DX ✅ **COMPLETE** (2026-02-18) — config loader, model router, prelude, tool parser, module CLI, plugin baseline
+7. **Phase 6:** Extensions & UI ✅ **COMPLETE** (2026-02-18) — channels, boot sequence, memory hygiene, WASM spike, module/identity/scheduler UI
+8. **Phase 7:** Channels & Mobile ✅ **COMPLETE** (2026-02-18) — Telegram channel, channel UI, mobile polish, mobile settings
+9. **Phase 8:** CI/CD & Community ✅ **COMPLETE** (2026-02-18) — 6 GitHub Actions workflows, community health files, contribution infrastructure
 
 **Cross-cutting track:** i18n ✅ **COMPLETE** (2026-02-17)
 - Plan: [i18n Implementation Plan](./plans/2026-02-16-i18n-implementation.md) — all 12 tasks done

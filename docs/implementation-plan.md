@@ -960,17 +960,22 @@ Before proceeding to Phase 1, verify:
 
 ---
 
-### Phase 8 Checkpoint
+### Phase 8 Checkpoint ✅ COMPLETE (2026-02-18)
 
-- [ ] CI pipeline: push to main triggers test suite on all 3 platforms
-- [ ] PR pipeline: lint + test + format checks pass before merge
-- [ ] Release: manual trigger produces signed binaries for all 8 desktop configurations
-- [ ] Mobile: iOS IPA uploads to TestFlight, Android AAB uploads to Play Console
-- [ ] Dependabot: weekly PRs for dependency updates
-- [ ] Auto-labeling: PRs labeled correctly by changed files
-- [ ] Issue templates: bug report and feature request forms work
-- [ ] PR template: all sections render correctly
-- [ ] CONTRIBUTING.md: complete with setup, conventions, and extensibility examples
+- [x] CI pipeline (ci.yml): push to main + PRs trigger test suite on all 3 platforms ✅
+- [x] PR pipeline: `cargo fmt --check` + `clippy -D warnings` + `cargo test --lib` + `bun run test` + `bunx ultracite check` ✅
+- [x] Release pipeline (release.yml): manual trigger, signed binaries for 8 desktop configurations ✅
+- [x] Unsigned test build workflow (build-test.yml): manual trigger, 30-day artifact retention ✅
+- [x] Mobile pipeline (mobile.yml): iOS (TestFlight via altool) + Android (Play Internal via AAB) ✅
+- [x] Dependabot (dependabot.yml): weekly Cargo + npm/Bun + Actions PRs ✅
+- [x] Auto-labeling (labeler.yml + workflows/labeler.yml): 11 label categories by file path ✅
+- [x] Stale management (stale.yml): 60-day stale + 14-day close, exempt bug/security labels ✅
+- [x] Issue templates: bug_report.yml + feature_request.yml + config.yml (blank issues disabled) ✅
+- [x] PR template (pull_request_template.md): summary, change type, validation evidence, security impact ✅
+- [x] CONTRIBUTING.md: setup, A/B/C collaboration tracks, commit convention, extensibility examples ✅
+- [x] SECURITY.md: GitHub Advisories, 48h/1w/2w SLA, architecture summary ✅
+- [x] CODEOWNERS: auto-review routing for security/agent/CI paths ✅
+- [x] CODE_OF_CONDUCT.md: community standards and enforcement (Contributor Covenant v2.1) ✅
 
 ---
 
