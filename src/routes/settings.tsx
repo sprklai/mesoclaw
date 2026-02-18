@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AdvancedSettingsTab } from "@/components/settings/AdvancedSettingsTab";
 import { AISettingsTab } from "@/components/settings/AISettingsTab";
 import { AppSettingsTab } from "@/components/settings/AppSettingsTab";
+import { ChannelList } from "@/components/settings/ChannelList";
 import { IdentityEditor } from "@/components/settings/IdentityEditor";
 import { JobList } from "@/components/settings/JobList";
 import { ModuleList } from "@/components/settings/ModuleList";
@@ -84,6 +85,9 @@ function SettingsPage() {
           <TabsTrigger value="modules" className="flex-1 font-bold">
             Modules
           </TabsTrigger>
+          <TabsTrigger value="channels" className="flex-1 font-bold">
+            Channels
+          </TabsTrigger>
           <TabsTrigger value="advanced" className="flex-1 font-bold">
             Advanced
           </TabsTrigger>
@@ -118,6 +122,9 @@ function SettingsPage() {
         </TabsContent>
         <TabsContent value="modules" className="mt-6">
           <ModuleList />
+        </TabsContent>
+        <TabsContent value="channels" className="mt-6">
+          <ChannelList />
         </TabsContent>
         <TabsContent value="advanced" className="mt-6">
           <AdvancedSettingsTab />
