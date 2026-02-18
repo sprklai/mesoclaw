@@ -36,8 +36,8 @@ Design  Bite-sized  TDD     Unit/    Git    Code
 
 **Master sequence is defined in the [Implementation Plan](./implementation-plan.md):**
 
-1. **Phase 0:** Slim Down + Responsive
-2. **Phase 1:** Foundation
+1. **Phase 0:** Slim Down + Responsive ✅ **COMPLETE** (2026-02-18) — −3,355 lines, 2 binaries, feature flags, clippy clean
+2. **Phase 1:** Foundation ← **ACTIVE**
 3. **Phase 2:** Core Infrastructure
 4. **Phase 3:** Agent Intelligence
 5. **Phase 4:** Proactive Behavior
