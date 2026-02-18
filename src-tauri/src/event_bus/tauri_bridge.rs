@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, async_runtime};
 use tokio::sync::broadcast::error::RecvError;
 
 use super::traits::{AppEvent, EventBus};
@@ -28,7 +28,7 @@ impl TauriBridge {
         let mut receiver = self.event_bus.subscribe();
         let app_handle = self.app_handle;
 
-        tokio::spawn(async move {
+        async_runtime::spawn(async move {
             loop {
                 match receiver.recv().await {
                     Ok(event) => {

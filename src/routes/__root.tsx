@@ -4,12 +4,28 @@ import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/ui/sidebar";
 import { APP_IDENTITY } from "@/config/app-identity";
 import { GatewayStatus } from "@/components/ui/gateway-status";
+import { useMobileSwipe } from "@/hooks/useMobileSwipe";
+import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
+import { useSidebarStore } from "@/stores/sidebarStore";
 
 export const Route = createRootRoute({
   component: RootLayout,
 });
 
 function RootLayout() {
+  const openMobile = useSidebarStore((state) => state.openMobile);
+  const closeMobile = useSidebarStore((state) => state.closeMobile);
+
+  // Swipe right from the left edge → open sidebar; swipe left → close it.
+  const { onTouchStart, onTouchEnd } = useMobileSwipe({
+    onSwipeRight: openMobile,
+    onSwipeLeft: closeMobile,
+  });
+
+  // Track the software keyboard height so the CSS variable `--keyboard-height`
+  // is always up-to-date for layout compensation (e.g. chat input area).
+  useVirtualKeyboard();
+
   return (
     /*
      * Responsive root layout — adapts across all breakpoints:
@@ -22,7 +38,12 @@ function RootLayout() {
      * assistant, schema detail view). It renders as an empty slot until content
      * is passed via a route-level outlet or context.
      */
-    <div className="flex h-screen flex-col overflow-hidden md:flex-row">
+    // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: touch handlers on root layout div are for gesture detection, not interactive semantics
+    <div
+      className="flex h-screen flex-col overflow-hidden md:flex-row"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
       {/*
        * Sidebar: hidden on xs/sm (< md), shown as persistent sidebar on md+.
        * On mobile the Sidebar component renders a floating drawer instead.

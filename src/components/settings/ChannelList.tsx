@@ -13,7 +13,7 @@
  * Phase 7.2 implementation.
  */
 
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,7 +75,7 @@ interface ChannelCardProps {
   onSelect: () => void;
 }
 
-function ChannelCard({ entry, isSelected, onSelect }: ChannelCardProps) {
+const ChannelCard = memo(function ChannelCard({ entry, isSelected, onSelect }: ChannelCardProps) {
   const { connectChannel, disconnectChannel } = useChannelStore();
   const isConnected = entry.status === "connected";
   const isWorking = entry.status === "reconnecting";
@@ -163,7 +163,7 @@ function ChannelCard({ entry, isSelected, onSelect }: ChannelCardProps) {
       )}
     </div>
   );
-}
+});
 
 // ─── ChannelList ──────────────────────────────────────────────────────────────
 

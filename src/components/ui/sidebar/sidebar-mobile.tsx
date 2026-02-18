@@ -1,11 +1,10 @@
-import { useCallback, useState } from "react";
-
 import type { SidebarItem } from "@/components/ui/sidebar/sidebar-nav-item";
 
 import { Button } from "@/components/ui/button";
 import { SidebarHeader } from "@/components/ui/sidebar/sidebar-header";
 import { SidebarNav } from "@/components/ui/sidebar/sidebar-nav";
 import { Menu, X } from "@/lib/icons";
+import { useSidebarStore } from "@/stores/sidebarStore";
 
 interface SidebarMobileProps {
   expanded: boolean;
@@ -20,28 +19,20 @@ export function SidebarMobile({
   topItems,
   bottomItems,
 }: SidebarMobileProps) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const openMobileSidebar = useCallback(() => {
-    setMobileOpen(true);
-  }, []);
-
-  const closeMobileSidebar = useCallback(() => {
-    setMobileOpen(false);
-  }, []);
+  const { mobileOpen, openMobile, closeMobile } = useSidebarStore();
 
   return (
     <>
-      <MobileMenuButton onClick={openMobileSidebar} />
+      <MobileMenuButton onClick={openMobile} />
       {mobileOpen && (
         <>
-          <MobileOverlay onClick={closeMobileSidebar} />
+          <MobileOverlay onClick={closeMobile} />
           <MobileSidebarPanel
             expanded={expanded}
             onToggle={onToggle}
             topItems={topItems}
             bottomItems={bottomItems}
-            onClose={closeMobileSidebar}
+            onClose={closeMobile}
           />
         </>
       )}
