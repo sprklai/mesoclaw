@@ -186,6 +186,12 @@ impl ModuleRegistry {
         Self { modules }
     }
 
+    /// Create a registry with no modules registered (useful for contexts where
+    /// module discovery hasn't run yet, e.g. the gateway daemon on startup).
+    pub fn empty() -> Self {
+        Self { modules: std::collections::HashMap::new() }
+    }
+
     pub fn len(&self) -> usize {
         self.modules.len()
     }

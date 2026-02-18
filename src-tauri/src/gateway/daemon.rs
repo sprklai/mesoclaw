@@ -13,7 +13,11 @@ use axum::{
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
-use crate::event_bus::EventBus;
+use crate::{
+    agent::session_router::SessionRouter,
+    event_bus::EventBus,
+    modules::ModuleRegistry,
+};
 
 use super::{
     auth::{auth_middleware, load_or_create_token},
@@ -41,11 +45,15 @@ pub fn pid_path() -> PathBuf {
 /// [`MAX_PORT_ATTEMPTS`] times before returning an error.
 ///
 /// Writes `daemon.pid` on successful bind.  Blocks until the server shuts down.
-pub async fn start_gateway(bus: Arc<dyn EventBus>) -> Result<(), String> {
+pub async fn start_gateway(
+    bus: Arc<dyn EventBus>,
+    sessions: Arc<SessionRouter>,
+    modules: Arc<ModuleRegistry>,
+) -> Result<(), String> {
     // Ensure the token exists before accepting connections.
     load_or_create_token()?;
 
-    let state: GatewayState = bus;
+    let state = GatewayState { bus, sessions, modules };
 
     // Build the router.
     let protected = Router::new()

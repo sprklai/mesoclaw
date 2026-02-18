@@ -140,8 +140,16 @@ pub fn run() {
                     .try_state::<Arc<dyn event_bus::EventBus>>()
                     .map(|s| s.inner().clone())
                     .ok_or("EventBus not initialised before gateway")?;
+                let sessions_for_gateway = Arc::new(agent::session_router::SessionRouter::new());
+                let modules_for_gateway = Arc::new(modules::ModuleRegistry::empty());
                 tokio::spawn(async move {
-                    if let Err(e) = gateway::start_gateway(bus_for_gateway).await {
+                    if let Err(e) = gateway::start_gateway(
+                        bus_for_gateway,
+                        sessions_for_gateway,
+                        modules_for_gateway,
+                    )
+                    .await
+                    {
                         log::error!("Gateway error: {e}");
                     }
                 });

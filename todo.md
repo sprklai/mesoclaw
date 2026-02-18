@@ -16,10 +16,10 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 |--------|------|------|-------------|----------|
 | ⏳ | `src-tauri/src/channels/tauri_ipc.rs` | 46 | Subscribe to `AgentTurn` events from EventBus once a user-message event is added to `AppEvent` (Phase 6+) | Medium |
 | ⏳ | `src-tauri/src/gateway/ws.rs` | 53 | Parse incoming WebSocket commands from client (Phase 2.6) | Medium |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 39 | Wire `start_session` route to actual agent session manager (Phase 3) | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 57 | Return real sessions from agent session store (Phase 3) | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 66 | Query real provider health instead of returning stub (Phase 3) | Medium |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 83–135 | Wire all module routes (`list`, `health`, `start`, `stop`, `reload`) to `ModuleRegistry` (Phase 6) | High |
+| ✅ | `src-tauri/src/gateway/routes.rs` | 39 | Wire `start_session` route to actual agent session manager (Phase 3) | High |
+| ✅ | `src-tauri/src/gateway/routes.rs` | 57 | Return real sessions from agent session store (Phase 3) | High |
+| ⏳ | `src-tauri/src/gateway/routes.rs` | 66 | Query real provider health from DB instead of stub (needs DbPool in GatewayState — Phase 3) | Medium |
+| ✅ | `src-tauri/src/gateway/routes.rs` | 83–135 | Wire module routes (`list`, `health`) to `ModuleRegistry`; start/stop/reload remain 501 (need SidecarService lifecycle) | High |
 | ⏳ | `src-tauri/src/services/notification_service.rs` | 199 | Call `tauri_plugin_notification` to show OS notifications (Phase 4 follow-up) | Medium |
 | ✅ | `src-tauri/src/agent/agent_commands.rs` | 32 | Implement proper provider resolution from app state in `run_agent_command` | High |
 | ✅ | `src-tauri/src/agent/agent_commands.rs` | 43 | Implement session cancellation via `CancellationToken` | High |
