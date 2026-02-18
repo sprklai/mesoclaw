@@ -5,8 +5,7 @@ pub mod config;
 pub mod database;
 mod plugins;
 pub mod services;
-pub mod skills;
-pub mod skills_embedded;
+pub mod prompts;
 
 use tauri::Manager;
 
