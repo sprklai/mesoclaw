@@ -103,6 +103,9 @@ impl SidecarTool {
 
 #[async_trait]
 impl Tool for SidecarTool {
+    // The module `id` field serves as the tool name (unique identifier).
+    // Clippy's misnamed_getters lint is a false positive here.
+    #[allow(clippy::misnamed_getters)]
     fn name(&self) -> &str {
         &self.manifest.module.id
     }

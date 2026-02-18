@@ -122,8 +122,13 @@ impl SidecarService {
 
     /// Stop the service process.
     pub async fn stop(&self) -> Result<(), String> {
-        let mut guard = self.child.lock().map_err(|e| e.to_string())?;
-        if let Some(mut child) = guard.take() {
+        // Take the child out while holding the lock, then drop the lock before
+        // awaiting — a MutexGuard must not be held across an await point.
+        let child_opt = {
+            let mut guard = self.child.lock().map_err(|e| e.to_string())?;
+            guard.take()
+        };
+        if let Some(mut child) = child_opt {
             let _ = child.kill().await;
         }
         self.set_status(ServiceStatus::Stopped);

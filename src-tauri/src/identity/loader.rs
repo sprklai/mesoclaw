@@ -65,14 +65,12 @@ impl IdentityLoader {
         let dir_clone = dir.clone();
 
         let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
-            if let Ok(event) = res {
-                if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
-                    if let Ok(updated) = load_from_dir(&dir_clone) {
-                        *cache_clone.lock().expect("identity cache lock") = updated;
+            if let Ok(event) = res
+                && matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_))
+                    && let Ok(updated) = load_from_dir(&dir_clone) {
+                        *cache_clone.lock().unwrap_or_else(|e| e.into_inner()) = updated;
                         let _ = bus.publish(AppEvent::SystemReady);
                     }
-                }
-            }
         })
         .map_err(|e| format!("failed to create file watcher: {e}"))?;
 
@@ -82,20 +80,20 @@ impl IdentityLoader {
 
         Ok(Arc::new(Self {
             dir,
-            identity: Mutex::new(cache.lock().expect("lock").clone()),
+            identity: Mutex::new(cache.lock().unwrap_or_else(|e| e.into_inner()).clone()),
             _watcher: Some(watcher),
         }))
     }
 
     /// Return a snapshot of the current identity.
     pub fn get(&self) -> Identity {
-        self.identity.lock().expect("identity lock poisoned").clone()
+        self.identity.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     /// Reload a single file from disk (or fall back to default) and update the cache.
     pub fn reload(&self) -> Result<(), String> {
         let updated = load_from_dir(&self.dir)?;
-        *self.identity.lock().expect("identity lock") = updated;
+        *self.identity.lock().unwrap_or_else(|e| e.into_inner()) = updated;
         Ok(())
     }
 
@@ -153,11 +151,10 @@ impl IdentityLoader {
         .map(|(header, body)| format!("{header}\n\n{body}"))
         .collect();
 
-        if let Some(ctx) = daily_context {
-            if !ctx.trim().is_empty() {
+        if let Some(ctx) = daily_context
+            && !ctx.trim().is_empty() {
                 parts.push(format!("# Memory\n\n{ctx}"));
             }
-        }
 
         parts.join("\n\n---\n\n")
     }

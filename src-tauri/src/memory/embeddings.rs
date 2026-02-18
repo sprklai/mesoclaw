@@ -98,7 +98,7 @@ impl LruEmbeddingCache {
     pub fn new(provider: Box<dyn EmbeddingProvider>, capacity: usize) -> Self {
         let cap = std::num::NonZeroUsize::new(capacity).unwrap_or(
             // Safety: 10_000 is non-zero.
-            std::num::NonZeroUsize::new(10_000).expect("10_000 is non-zero"),
+            std::num::NonZeroUsize::MIN.saturating_add(9_999),
         );
         Self {
             inner: provider,

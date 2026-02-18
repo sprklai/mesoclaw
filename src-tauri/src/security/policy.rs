@@ -72,7 +72,7 @@ impl SlidingWindow {
     /// Returns `true` if the action is within the rate limit and records it.
     /// Returns `false` if the limit has been exceeded.
     fn try_record(&self) -> bool {
-        let mut ts = self.timestamps.lock().expect("rate-limiter lock poisoned");
+        let mut ts = self.timestamps.lock().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
         // Drop expired entries.
         ts.retain(|&t| now.duration_since(t) < self.window);
@@ -202,14 +202,13 @@ impl SecurityPolicy {
         }
 
         // 5. Workspace confinement.
-        if let Some(ref root) = self.workspace_root {
-            if !canonical.starts_with(root) {
+        if let Some(ref root) = self.workspace_root
+            && !canonical.starts_with(root) {
                 return ValidationResult::Denied(format!(
                     "path is outside the workspace root '{}'",
                     root.display()
                 ));
             }
-        }
 
         ValidationResult::Allowed
     }
@@ -235,7 +234,7 @@ impl SecurityPolicy {
         };
         self.action_log
             .lock()
-            .expect("audit-log lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .push(entry);
     }
 
@@ -243,7 +242,7 @@ impl SecurityPolicy {
     pub fn audit_log(&self) -> Vec<AuditEntry> {
         self.action_log
             .lock()
-            .expect("audit-log lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .clone()
     }
 
@@ -277,7 +276,6 @@ impl SecurityPolicy {
 /// executable rather than the benign-looking assignment token.
 fn extract_executable(command: &str) -> String {
     command
-        .trim()
         .split_whitespace()
         .find(|token| !token.contains('='))
         .unwrap_or("")

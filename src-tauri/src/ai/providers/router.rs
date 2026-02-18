@@ -51,7 +51,7 @@ pub enum TaskType {
 
 impl TaskType {
     /// Parse a task type from a string (case-insensitive).
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_type_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "code" | "coding" | "development" => TaskType::Code,
             "general" | "chat" | "conversation" => TaskType::General,
@@ -483,17 +483,17 @@ mod tests {
 
     #[test]
     fn task_type_from_str_known_values() {
-        assert_eq!(TaskType::from_str("code"), TaskType::Code);
-        assert_eq!(TaskType::from_str("coding"), TaskType::Code);
-        assert_eq!(TaskType::from_str("general"), TaskType::General);
-        assert_eq!(TaskType::from_str("FAST"), TaskType::Fast);
-        assert_eq!(TaskType::from_str("creative"), TaskType::Creative);
-        assert_eq!(TaskType::from_str("analysis"), TaskType::Analysis);
+        assert_eq!(TaskType::from_type_str("code"), TaskType::Code);
+        assert_eq!(TaskType::from_type_str("coding"), TaskType::Code);
+        assert_eq!(TaskType::from_type_str("general"), TaskType::General);
+        assert_eq!(TaskType::from_type_str("FAST"), TaskType::Fast);
+        assert_eq!(TaskType::from_type_str("creative"), TaskType::Creative);
+        assert_eq!(TaskType::from_type_str("analysis"), TaskType::Analysis);
     }
 
     #[test]
     fn task_type_from_str_unknown_falls_back_to_other() {
-        assert_eq!(TaskType::from_str("unknown-type"), TaskType::Other);
+        assert_eq!(TaskType::from_type_str("unknown-type"), TaskType::Other);
     }
 
     // ── Alias keys ────────────────────────────────────────────────────────

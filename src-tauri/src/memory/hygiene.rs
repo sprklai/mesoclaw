@@ -185,7 +185,7 @@ impl MemoryHygiene {
 
             let dest = self.archive_dir().join(
                 path.file_name()
-                    .expect("file_name always present for a regular file"),
+                    .unwrap_or_default(),
             );
             match fs::rename(&path, &dest) {
                 Ok(()) => {
