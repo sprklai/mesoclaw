@@ -1,7 +1,7 @@
 //! Template loader and registry.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -44,12 +44,14 @@ impl TemplateRegistry {
         };
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map(|e| e == "md").unwrap_or(false) {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Some(template) = parse_template(&content, &path) {
-                        map.insert(template.id.clone(), template);
-                    }
-                }
+            if !path.extension().map(|e| e == "md").unwrap_or(false) {
+                continue;
+            }
+            let Ok(content) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            if let Some(template) = parse_template(&content, &path) {
+                map.insert(template.id.clone(), template);
             }
         }
     }
@@ -138,41 +140,40 @@ fn skill_info_from_template(t: &PromptTemplate) -> SkillInfo {
 /// ---
 /// Template content with {{ variable }} placeholders
 /// ```
-fn parse_template(content: &str, path: &PathBuf) -> Option<PromptTemplate> {
+fn parse_template(content: &str, path: &Path) -> Option<PromptTemplate> {
     let stem = path.file_stem()?.to_string_lossy().to_string();
 
-    if content.starts_with("---") {
-        let rest = &content[3..];
-        if let Some(end) = rest.find("---") {
-            let frontmatter = &rest[..end];
-            let body = rest[end + 3..].trim().to_string();
+    if let Some(rest) = content.strip_prefix("---")
+        && let Some(end) = rest.find("---")
+    {
+        let frontmatter = &rest[..end];
+        let body = rest[end + 3..].trim().to_string();
 
-            let mut id = stem.clone();
-            let mut name = stem.clone();
-            let mut description = String::new();
-            let mut category = "general".to_string();
+        let mut id = stem.clone();
+        let mut name = stem.clone();
+        let mut description = String::new();
+        let mut category = "general".to_string();
 
-            for line in frontmatter.lines() {
-                if let Some((k, v)) = line.split_once(':') {
-                    match k.trim() {
-                        "id" => id = v.trim().to_string(),
-                        "name" => name = v.trim().to_string(),
-                        "description" => description = v.trim().to_string(),
-                        "category" => category = v.trim().to_string(),
-                        _ => {}
-                    }
+        for line in frontmatter.lines() {
+            if let Some((k, v)) = line.split_once(':') {
+                match k.trim() {
+                    "id" => id = v.trim().to_string(),
+                    "name" => name = v.trim().to_string(),
+                    "description" => description = v.trim().to_string(),
+                    "category" => category = v.trim().to_string(),
+                    _ => {}
                 }
             }
-
-            return Some(PromptTemplate {
-                id,
-                name,
-                description,
-                category,
-                template: body,
-                parameters: vec![],
-            });
         }
+
+        return Some(PromptTemplate {
+            id,
+            name,
+            description,
+            category,
+            template: body,
+            parameters: vec![],
+        });
     }
 
     // No frontmatter — use the filename as id and name.

@@ -114,6 +114,8 @@ pub async fn get_or_init_registry() -> Arc<TemplateRegistry> {
     registry.load().await;
     // A concurrent call may have won the race; ignore the error if so.
     let _ = REGISTRY.set(registry.clone());
-    // Return the version that was actually stored.
+    // Return the version that was actually stored (the winner of any concurrent race).
+    // SAFETY: either we just called set() above, or get() already returned Some.
+    #[allow(clippy::expect_used)]
     REGISTRY.get().expect("registry was just set").clone()
 }
