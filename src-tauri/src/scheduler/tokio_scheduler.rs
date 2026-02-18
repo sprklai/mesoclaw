@@ -8,8 +8,11 @@
 //! A `SystemError` event is emitted and the job's error count is incremented.
 //!
 //! ## Persistence
-//! Jobs are held in memory.  Persistence to SQLite is a planned follow-up
-//! (see TODO in [`TokioScheduler::add_job`]).
+//! Jobs are persisted to the `scheduled_jobs` SQLite table and reloaded on startup.
+//!
+//! ## AgentLoop integration
+//! When `AgentComponents` are supplied the scheduler can execute `Heartbeat`
+//! and `AgentTurn` payloads through the real agent loop.
 
 use std::{
     collections::HashMap,
@@ -24,11 +27,26 @@ use tokio::sync::watch;
 use uuid::Uuid;
 
 use crate::{
+    agent::loop_::{AgentConfig, AgentLoop},
+    ai::provider::LLMProvider,
     database::{schema::scheduled_jobs, DbPool},
     event_bus::{AppEvent, EventBus},
+    identity::loader::IdentityLoader,
+    security::SecurityPolicy,
+    tools::ToolRegistry,
 };
 
 use super::traits::{JobExecution, JobId, JobPayload, JobStatus, Schedule, ScheduledJob, Scheduler};
+
+// ─── AgentComponents ─────────────────────────────────────────────────────────
+
+/// Everything needed to spin up an [`AgentLoop`] inside a scheduled job.
+pub struct AgentComponents {
+    pub provider: Arc<dyn LLMProvider>,
+    pub tool_registry: Arc<ToolRegistry>,
+    pub security_policy: Arc<SecurityPolicy>,
+    pub identity_loader: Arc<IdentityLoader>,
+}
 
 // ─── Diesel row type ─────────────────────────────────────────────────────────
 
@@ -106,32 +124,53 @@ type HistoryMap = HashMap<JobId, Vec<JobExecution>>;
 
 // ─── TokioScheduler ───────────────────────────────────────────────────────────
 
-/// In-memory, Tokio-driven scheduler with optional SQLite persistence.
+/// In-memory, Tokio-driven scheduler with optional SQLite persistence
+/// and optional agent loop integration.
 pub struct TokioScheduler {
     jobs: Arc<RwLock<JobMap>>,
     history: Arc<RwLock<HistoryMap>>,
     bus: Arc<dyn EventBus>,
     /// Optional database pool for job persistence.
     pool: Option<DbPool>,
+    /// Optional agent components for running Heartbeat / AgentTurn payloads.
+    agent: Option<Arc<AgentComponents>>,
     /// Send `true` to stop the background task.
     stop_tx: watch::Sender<bool>,
     stop_rx: watch::Receiver<bool>,
 }
 
 impl TokioScheduler {
-    /// Create a scheduler without persistence (used in tests and early boot).
+    /// Create a scheduler without persistence or agent (used in tests).
     pub fn new(bus: Arc<dyn EventBus>) -> Arc<Self> {
-        Self::new_with_persistence(bus, None)
+        Self::new_internal(bus, None, None)
     }
 
-    /// Create a scheduler with SQLite persistence.
+    /// Create a scheduler with SQLite persistence but no agent.
     pub fn new_with_persistence(bus: Arc<dyn EventBus>, pool: Option<DbPool>) -> Arc<Self> {
+        Self::new_internal(bus, pool, None)
+    }
+
+    /// Create a fully-wired scheduler with persistence and agent loop support.
+    pub fn new_with_agent(
+        bus: Arc<dyn EventBus>,
+        pool: Option<DbPool>,
+        agent: AgentComponents,
+    ) -> Arc<Self> {
+        Self::new_internal(bus, pool, Some(Arc::new(agent)))
+    }
+
+    fn new_internal(
+        bus: Arc<dyn EventBus>,
+        pool: Option<DbPool>,
+        agent: Option<Arc<AgentComponents>>,
+    ) -> Arc<Self> {
         let (stop_tx, stop_rx) = watch::channel(false);
         let scheduler = Arc::new(Self {
             jobs: Arc::new(RwLock::new(HashMap::new())),
             history: Arc::new(RwLock::new(HashMap::new())),
             bus,
             pool,
+            agent,
             stop_tx,
             stop_rx,
         });
@@ -226,6 +265,7 @@ impl Scheduler for TokioScheduler {
         let jobs = self.jobs.clone();
         let history = self.history.clone();
         let bus = self.bus.clone();
+        let agent = self.agent.clone();
         let mut stop_rx = self.stop_rx.clone();
 
         tokio::spawn(async move {
@@ -254,6 +294,7 @@ impl Scheduler for TokioScheduler {
                             let history_clone = history.clone();
                             let jobs_clone = jobs.clone();
                             let job_clone = job.clone();
+                            let agent_clone = agent.clone();
 
                             tokio::spawn(async move {
                                 // Emit CronFired / HeartbeatTick event.
@@ -272,8 +313,11 @@ impl Scheduler for TokioScheduler {
 
                                 // Execute with timeout for stuck detection.
                                 let timeout = Duration::from_secs(STUCK_THRESHOLD_SECS);
-                                let status = tokio::time::timeout(timeout, execute_job(&job_clone))
-                                    .await;
+                                let status = tokio::time::timeout(
+                                    timeout,
+                                    execute_job(&job_clone, agent_clone.as_deref(), bus_clone.clone()),
+                                )
+                                .await;
 
                                 let (job_status, output) = match status {
                                     Ok((s, o)) => (s, o),
@@ -380,23 +424,54 @@ impl Scheduler for TokioScheduler {
 
 /// Execute a job's payload, returning `(status, output)`.
 ///
-/// Agent-turn execution is deferred pending full agent state wiring (Phase 3
-/// follow-up).  The Heartbeat and Notify payloads are lightweight.
-async fn execute_job(job: &ScheduledJob) -> (JobStatus, String) {
+/// When `agent` is `Some`, `Heartbeat` and `AgentTurn` payloads are executed
+/// through a real `AgentLoop`.  Without agent components they log and skip.
+async fn execute_job(
+    job: &ScheduledJob,
+    agent: Option<&AgentComponents>,
+    bus: Arc<dyn EventBus>,
+) -> (JobStatus, String) {
     match &job.payload {
         JobPayload::Heartbeat => {
-            // ## TODO (Phase 3 follow-up): run heartbeat items via AgentLoop.
-            (JobStatus::Success, "Heartbeat tick recorded.".to_string())
+            let Some(agent) = agent else {
+                return (JobStatus::Success, "Heartbeat tick recorded (no agent wired).".to_string());
+            };
+            let system_prompt = agent.identity_loader.build_system_prompt();
+            let prompt = "Run your heartbeat checklist. Review any pending tasks, check system status, and report anything that needs attention.";
+            let loop_ = AgentLoop::new(
+                agent.provider.clone(),
+                agent.tool_registry.clone(),
+                agent.security_policy.clone(),
+                Some(bus),
+                AgentConfig::default(),
+            );
+            match loop_.run(&system_prompt, prompt).await {
+                Ok(response) => (JobStatus::Success, response),
+                Err(e) => (JobStatus::Failed, format!("Heartbeat agent error: {e}")),
+            }
         }
         JobPayload::AgentTurn { prompt } => {
-            // ## TODO (Phase 3 follow-up): run prompt through AgentLoop.
-            (
-                JobStatus::Skipped,
-                format!("AgentTurn skipped (not yet wired): {prompt}"),
-            )
+            let Some(agent) = agent else {
+                return (
+                    JobStatus::Skipped,
+                    format!("AgentTurn skipped (no agent components): {prompt}"),
+                );
+            };
+            let system_prompt = agent.identity_loader.build_system_prompt();
+            let loop_ = AgentLoop::new(
+                agent.provider.clone(),
+                agent.tool_registry.clone(),
+                agent.security_policy.clone(),
+                Some(bus),
+                AgentConfig::default(),
+            );
+            match loop_.run(&system_prompt, prompt).await {
+                Ok(response) => (JobStatus::Success, response),
+                Err(e) => (JobStatus::Failed, format!("AgentTurn error: {e}")),
+            }
         }
         JobPayload::Notify { message } => {
-            // Just log — the event was already published before execute_job is called.
+            // Event already published before execute_job is called.
             (JobStatus::Success, format!("Notification sent: {message}"))
         }
     }

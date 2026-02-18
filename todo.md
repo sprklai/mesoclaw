@@ -28,8 +28,8 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | ✅ | `src-tauri/src/scheduler/commands.rs` | 12–45 | Resolve managed `TokioScheduler` from app state in all scheduler IPC commands | Medium |
 | ✅ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 217 | Persist scheduled jobs to SQLite `scheduled_jobs` table — `add_job` upserts, `new_with_persistence` loads on startup | Low |
 | ✅ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 226 | Delete from `scheduled_jobs` SQLite table on `remove_job` | Low |
-| ⏳ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 262 | Run heartbeat items via `AgentLoop` (Phase 3 follow-up) | Medium |
-| ⏳ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 266 | Run `AgentTurn` prompt through `AgentLoop` (Phase 3 follow-up) | Medium |
+| ✅ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 262 | Run heartbeat items via `AgentLoop` — wired when `AgentComponents` present, graceful skip otherwise | Medium |
+| ✅ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 266 | Run `AgentTurn` prompt through `AgentLoop` — wired when `AgentComponents` present | Medium |
 | ✅ | `src-tauri/src/memory/commands.rs` | 17–41 | Resolve managed `InMemoryStore` from app state in all memory IPC commands | Medium |
 | ⏳ | `src-tauri/src/modules/mod.rs` | 17 | Configure bundled sidecar binaries in `tauri.conf.json` | Low |
 | ⏳ | `src-tauri/src/bin/cli.rs` | 424 | Implement `memory` CLI subcommand once memory service REST endpoint exists (Phase 3) | Low |

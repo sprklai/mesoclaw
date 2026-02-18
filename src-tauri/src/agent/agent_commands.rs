@@ -40,11 +40,13 @@ pub type SessionCancelMap =
 
 /// Resolve the active LLM provider from the database + OS keyring.
 ///
+/// Public so other subsystems (scheduler, CLI) can obtain a provider.
+///
 /// Lookup order:
 /// 1. `settings.default_provider_id` → concrete provider row
 /// 2. First `is_active = 1` provider as fallback
 /// 3. Read API key from OS keyring using format `api_key:{provider_id}`
-fn resolve_active_provider(pool: &DbPool) -> Result<Arc<dyn LLMProvider>, String> {
+pub fn resolve_active_provider(pool: &DbPool) -> Result<Arc<dyn LLMProvider>, String> {
     let mut conn = pool.get().map_err(|e| format!("DB pool: {e}"))?;
 
     // 1. Read the preferred provider id from settings (column is nullable).

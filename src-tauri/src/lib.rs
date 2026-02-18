@@ -201,17 +201,42 @@ pub fn run() {
             let pool = database::init(app.handle())?;
             app.manage(pool.clone());
 
-            // Initialize and manage the scheduler with SQLite persistence.
+            // Initialize and manage the scheduler with SQLite persistence + agent.
             {
                 use scheduler::traits::Scheduler as _;
                 let bus_sched: Arc<dyn event_bus::EventBus> = app
                     .try_state::<Arc<dyn event_bus::EventBus>>()
                     .map(|s| s.inner().clone())
                     .ok_or("EventBus not initialised before scheduler")?;
-                let sched = scheduler::TokioScheduler::new_with_persistence(
-                    bus_sched,
-                    Some(pool.clone()),
-                );
+                let policy_sched = app
+                    .try_state::<Arc<security::SecurityPolicy>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("SecurityPolicy not initialised before scheduler")?;
+                let registry_sched = app
+                    .try_state::<Arc<tools::ToolRegistry>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("ToolRegistry not initialised before scheduler")?;
+                let id_loader_sched = app
+                    .try_state::<Arc<identity::IdentityLoader>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("IdentityLoader not initialised before scheduler")?;
+
+                // Try to resolve the active LLM provider; scheduler still works without one.
+                let agent_components = agent::agent_commands::resolve_active_provider(&pool)
+                    .ok()
+                    .map(|provider| scheduler::tokio_scheduler::AgentComponents {
+                        provider,
+                        tool_registry: registry_sched,
+                        security_policy: policy_sched,
+                        identity_loader: id_loader_sched,
+                    });
+
+                let sched = if let Some(components) = agent_components {
+                    scheduler::TokioScheduler::new_with_agent(bus_sched, Some(pool.clone()), components)
+                } else {
+                    log::warn!("scheduler: no LLM provider configured; Heartbeat/AgentTurn payloads will be skipped");
+                    scheduler::TokioScheduler::new_with_persistence(bus_sched, Some(pool.clone()))
+                };
                 let sched_clone = Arc::clone(&sched);
                 tauri::async_runtime::spawn(async move { sched_clone.start().await });
                 app.manage(sched);
