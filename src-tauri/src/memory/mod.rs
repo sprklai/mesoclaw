@@ -27,6 +27,7 @@ pub mod chunker;
 pub mod commands;
 pub mod daily;
 pub mod embeddings;
+pub mod hygiene;
 pub mod store;
 pub mod tools;
 pub mod traits;
@@ -40,6 +41,7 @@ pub use commands::{
     forget_memory_command, get_daily_memory_command, search_memory_command, store_memory_command,
 };
 pub use daily::DailyMemory;
+pub use hygiene::{HygieneConfig, HygieneReport, MemoryHygiene};
 pub use embeddings::{
     EmbeddingProvider, LruEmbeddingCache, MockEmbeddingProvider, cosine_similarity,
 };
