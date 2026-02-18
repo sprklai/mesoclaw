@@ -12,9 +12,11 @@
 
 pub mod agent_commands;
 pub mod loop_;
+pub mod session_router;
 pub mod tool_parser;
 
 pub use loop_::{AgentConfig, AgentLoop, AgentMessage};
+pub use session_router::{Session, SessionKey, SessionMessage, SessionRouter};
 pub use tool_parser::ParsedToolCall;
 
 pub use agent_commands::{cancel_agent_session_command, start_agent_session_command};
