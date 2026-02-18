@@ -9,14 +9,8 @@ use crate::config::app_identity::CREDENTIALS_SERVICE;
 pub enum CredentialType {
     /// Vercel AI Gateway API key
     VercelAIGateway,
-    /// Database connection password
-    DatabasePassword,
     /// Generic API key
     ApiKey,
-    /// SSH password for tunnel authentication
-    SshPassword,
-    /// SSH private key passphrase
-    SshPassphrase,
 }
 
 impl CredentialType {
@@ -26,14 +20,7 @@ impl CredentialType {
             CredentialType::VercelAIGateway => {
                 format!("{}.vercel-ai-gateway", CREDENTIALS_SERVICE)
             }
-            CredentialType::DatabasePassword => {
-                format!("{}.database-password", CREDENTIALS_SERVICE)
-            }
             CredentialType::ApiKey => format!("{}.api-key", CREDENTIALS_SERVICE),
-            CredentialType::SshPassword => format!("{}.ssh-password", CREDENTIALS_SERVICE),
-            CredentialType::SshPassphrase => {
-                format!("{}.ssh-passphrase", CREDENTIALS_SERVICE)
-            }
         }
     }
 }
@@ -210,109 +197,6 @@ pub fn secure_clear(s: &mut String) {
     s.zeroize();
 }
 
-/// Helper functions for SSH credential management
-impl CredentialStore {
-    /// Save SSH password to keyring
-    ///
-    /// # Arguments
-    /// * `workspace_id` - Workspace identifier for the credential
-    /// * `password` - SSH password to store
-    ///
-    /// # Example
-    /// ```no_run
-    /// use local_ts_lib::services::credential_store::CredentialStore;
-    ///
-    /// let store = CredentialStore::new();
-    /// store.save_ssh_password("workspace-123", "my-ssh-password")
-    ///     .expect("Failed to save SSH password");
-    /// ```
-    pub fn save_ssh_password(&self, workspace_id: &str, password: &str) -> Result<(), CredentialError> {
-        self.save_credentials(CredentialType::SshPassword, workspace_id, password)
-    }
-
-    /// Get SSH password from keyring
-    ///
-    /// # Arguments
-    /// * `workspace_id` - Workspace identifier for the credential
-    ///
-    /// # Returns
-    /// The SSH password as a String, or an error if not found
-    pub fn get_ssh_password(&self, workspace_id: &str) -> Result<String, CredentialError> {
-        self.get_credentials(CredentialType::SshPassword, workspace_id)
-    }
-
-    /// Delete SSH password from keyring
-    pub fn delete_ssh_password(&self, workspace_id: &str) -> Result<(), CredentialError> {
-        self.delete_credentials(CredentialType::SshPassword, workspace_id)
-    }
-
-    /// Save SSH passphrase to keyring
-    ///
-    /// # Arguments
-    /// * `workspace_id` - Workspace identifier for the credential
-    /// * `passphrase` - SSH key passphrase to store
-    pub fn save_ssh_passphrase(&self, workspace_id: &str, passphrase: &str) -> Result<(), CredentialError> {
-        self.save_credentials(CredentialType::SshPassphrase, workspace_id, passphrase)
-    }
-
-    /// Get SSH passphrase from keyring
-    pub fn get_ssh_passphrase(&self, workspace_id: &str) -> Result<String, CredentialError> {
-        self.get_credentials(CredentialType::SshPassphrase, workspace_id)
-    }
-
-    /// Delete SSH passphrase from keyring
-    pub fn delete_ssh_passphrase(&self, workspace_id: &str) -> Result<(), CredentialError> {
-        self.delete_credentials(CredentialType::SshPassphrase, workspace_id)
-    }
-
-    /// Check if SSH credentials exist for a workspace
-    pub fn ssh_credentials_exist(&self, workspace_id: &str) -> (bool, bool) {
-        (
-            self.credential_exists(CredentialType::SshPassword, workspace_id),
-            self.credential_exists(CredentialType::SshPassphrase, workspace_id),
-        )
-    }
-
-    /// Save database password to keyring
-    ///
-    /// # Arguments
-    /// * `workspace_id` - Workspace identifier for the credential
-    /// * `password` - Database password to store
-    ///
-    /// # Example
-    /// ```no_run
-    /// use local_ts_lib::services::credential_store::CredentialStore;
-    ///
-    /// let store = CredentialStore::new();
-    /// store.save_database_password("workspace-123", "my-db-password")
-    ///     .expect("Failed to save database password");
-    /// ```
-    pub fn save_database_password(&self, workspace_id: &str, password: &str) -> Result<(), CredentialError> {
-        self.save_credentials(CredentialType::DatabasePassword, workspace_id, password)
-    }
-
-    /// Get database password from keyring
-    ///
-    /// # Arguments
-    /// * `workspace_id` - Workspace identifier for the credential
-    ///
-    /// # Returns
-    /// The database password as a String, or an error if not found
-    pub fn get_database_password(&self, workspace_id: &str) -> Result<String, CredentialError> {
-        self.get_credentials(CredentialType::DatabasePassword, workspace_id)
-    }
-
-    /// Delete database password from keyring
-    pub fn delete_database_password(&self, workspace_id: &str) -> Result<(), CredentialError> {
-        self.delete_credentials(CredentialType::DatabasePassword, workspace_id)
-    }
-
-    /// Check if database password exists for a workspace
-    pub fn database_password_exists(&self, workspace_id: &str) -> bool {
-        self.credential_exists(CredentialType::DatabasePassword, workspace_id)
-    }
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -374,12 +258,12 @@ mod tests {
         let username = test_username("nonexistent");
 
         // Try to get credentials that don't exist
-        let result = store.get_credentials(CredentialType::DatabasePassword, &username);
+        let result = store.get_credentials(CredentialType::ApiKey, &username);
 
         assert!(result.is_err());
         match result {
             Err(CredentialError::NotFound(cred_type, user)) => {
-                assert_eq!(cred_type, CredentialType::DatabasePassword);
+                assert_eq!(cred_type, CredentialType::ApiKey);
                 assert_eq!(user, username);
             }
             _ => panic!("Expected NotFound error"),
@@ -440,156 +324,5 @@ mod tests {
         let mut sensitive_data = String::from("sk-1234567890abcdef");
         secure_clear(&mut sensitive_data);
         assert_eq!(sensitive_data, "");
-    }
-
-    #[test]
-    fn test_save_and_get_ssh_password() {
-        let store = CredentialStore::new();
-        let workspace_id = test_username("ssh_password");
-        let password = "test_ssh_password";
-
-        // Save SSH password
-        store
-            .save_ssh_password(&workspace_id, password)
-            .expect("Failed to save SSH password");
-
-        // Retrieve SSH password
-        let retrieved = store
-            .get_ssh_password(&workspace_id)
-            .expect("Failed to get SSH password");
-
-        assert_eq!(retrieved, password);
-
-        // Cleanup
-        let _ = store.delete_ssh_password(&workspace_id);
-    }
-
-    #[test]
-    fn test_save_and_get_ssh_passphrase() {
-        let store = CredentialStore::new();
-        let workspace_id = test_username("ssh_passphrase");
-        let passphrase = "test_ssh_passphrase";
-
-        // Save SSH passphrase
-        store
-            .save_ssh_passphrase(&workspace_id, passphrase)
-            .expect("Failed to save SSH passphrase");
-
-        // Retrieve SSH passphrase
-        let retrieved = store
-            .get_ssh_passphrase(&workspace_id)
-            .expect("Failed to get SSH passphrase");
-
-        assert_eq!(retrieved, passphrase);
-
-        // Cleanup
-        let _ = store.delete_ssh_passphrase(&workspace_id);
-    }
-
-    #[test]
-    fn test_delete_ssh_credentials() {
-        let store = CredentialStore::new();
-        let workspace_id = test_username("delete_ssh");
-
-        // Save SSH password and passphrase
-        store
-            .save_ssh_password(&workspace_id, "password")
-            .expect("Failed to save SSH password");
-        store
-            .save_ssh_passphrase(&workspace_id, "passphrase")
-            .expect("Failed to save SSH passphrase");
-
-        // Verify they exist
-        let (has_password, has_passphrase) = store.ssh_credentials_exist(&workspace_id);
-        assert!(has_password);
-        assert!(has_passphrase);
-
-        // Delete SSH password
-        store
-            .delete_ssh_password(&workspace_id)
-            .expect("Failed to delete SSH password");
-
-        // Verify only password is deleted
-        let (has_password_after, has_passphrase_after) = store.ssh_credentials_exist(&workspace_id);
-        assert!(!has_password_after);
-        assert!(has_passphrase_after);
-
-        // Delete SSH passphrase
-        store
-            .delete_ssh_passphrase(&workspace_id)
-            .expect("Failed to delete SSH passphrase");
-
-        // Verify both are deleted
-        let (has_password_final, has_passphrase_final) = store.ssh_credentials_exist(&workspace_id);
-        assert!(!has_password_final);
-        assert!(!has_passphrase_final);
-    }
-
-    #[test]
-    fn test_get_nonexistent_ssh_credentials() {
-        let store = CredentialStore::new();
-        let workspace_id = test_username("nonexistent_ssh");
-
-        // Try to get SSH password that doesn't exist
-        let result = store.get_ssh_password(&workspace_id);
-        assert!(result.is_err());
-
-        // Try to get SSH passphrase that doesn't exist
-        let result = store.get_ssh_passphrase(&workspace_id);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_save_and_get_database_password() {
-        let store = CredentialStore::new();
-        let workspace_id = test_username("db_password");
-        let password = "test_db_password";
-
-        // Save database password
-        store
-            .save_database_password(&workspace_id, password)
-            .expect("Failed to save database password");
-
-        // Retrieve database password
-        let retrieved = store
-            .get_database_password(&workspace_id)
-            .expect("Failed to get database password");
-
-        assert_eq!(retrieved, password);
-
-        // Cleanup
-        let _ = store.delete_database_password(&workspace_id);
-    }
-
-    #[test]
-    fn test_delete_database_password() {
-        let store = CredentialStore::new();
-        let workspace_id = test_username("delete_db");
-
-        // Save database password
-        store
-            .save_database_password(&workspace_id, "password")
-            .expect("Failed to save database password");
-
-        // Verify it exists
-        assert!(store.database_password_exists(&workspace_id));
-
-        // Delete database password
-        store
-            .delete_database_password(&workspace_id)
-            .expect("Failed to delete database password");
-
-        // Verify it's deleted
-        assert!(!store.database_password_exists(&workspace_id));
-    }
-
-    #[test]
-    fn test_get_nonexistent_database_password() {
-        let store = CredentialStore::new();
-        let workspace_id = test_username("nonexistent_db");
-
-        // Try to get database password that doesn't exist
-        let result = store.get_database_password(&workspace_id);
-        assert!(result.is_err());
     }
 }
