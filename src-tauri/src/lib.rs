@@ -150,6 +150,35 @@ pub fn run() {
                 .map_err(|e| format!("identity loader: {e}"))?;
             app.manage(id_loader);
 
+            // Run the boot sequence.  Creates ~/.mesoclaw/ dirs, loads config,
+            // starts the scheduler, starts channels, and emits SystemReady.
+            {
+                let bus_boot: Arc<dyn event_bus::EventBus> = app
+                    .try_state::<Arc<dyn event_bus::EventBus>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("EventBus not initialised before BootSequence")?;
+                let channel_mgr = Arc::new(channels::ChannelManager::new());
+                // Register the Tauri IPC channel so desktop events flow into the agent loop.
+                let ipc_ch = Arc::new(channels::TauriIpcChannel::new(Arc::clone(&bus_boot)));
+                let channel_mgr_clone = Arc::clone(&channel_mgr);
+                let bus_boot_clone = Arc::clone(&bus_boot);
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = channel_mgr_clone.register(ipc_ch).await {
+                        log::warn!("boot: failed to register tauri-ipc channel: {e}");
+                    }
+                    match services::boot::BootSequence::new(bus_boot_clone, channel_mgr_clone) {
+                        Ok(seq) => match seq.run().await {
+                            Ok(ctx) => {
+                                log::info!("boot: sequence complete; {} channel handle(s)", ctx.channel_handles.len());
+                                // Background scheduler keeps running until the process exits.
+                            }
+                            Err(e) => log::error!("boot: sequence failed: {e}"),
+                        },
+                        Err(e) => log::error!("boot: could not create BootSequence: {e}"),
+                    }
+                });
+            }
+
             // Initialize database and manage the connection pool
             let pool = database::init(app.handle())?;
             app.manage(pool.clone());
