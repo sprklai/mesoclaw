@@ -312,6 +312,11 @@ pub fn run() {
             // Agent session commands
             agent::agent_commands::start_agent_session_command,
             agent::agent_commands::cancel_agent_session_command,
+            // Channel management commands
+            commands::channels::connect_channel_command,
+            commands::channels::disconnect_channel_command,
+            commands::channels::test_channel_connection_command,
+            commands::channels::list_channels_command,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]

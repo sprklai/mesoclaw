@@ -1,5 +1,6 @@
 pub mod ai_providers;
 pub mod approval;
+pub mod channels;
 pub mod chat;
 pub mod file_browser;
 pub mod keychain;
