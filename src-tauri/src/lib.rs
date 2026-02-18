@@ -125,7 +125,13 @@ pub fn run() {
             let mut registry = tools::ToolRegistry::new();
             tools::register_builtin_tools(&mut registry, policy.clone());
             app.manage(policy);
-            app.manage(registry);
+            // Store registry in an Arc so agent_commands can clone a cheap handle.
+            app.manage(Arc::new(registry));
+
+            // Initialize session cancellation map for agent_commands.
+            let cancel_map: agent::agent_commands::SessionCancelMap =
+                Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
+            app.manage(cancel_map);
 
             // Start the HTTP gateway daemon (when compiled with the gateway feature).
             #[cfg(feature = "gateway")]

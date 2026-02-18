@@ -241,16 +241,58 @@ impl AgentLoop {
                 };
             }
             ValidationResult::NeedsApproval => {
-                // ## TODO: implement full approval flow via EventBus
-                // For now, emit an event and deny (no blocking wait).
-                let msg = "Tool requires user approval (autonomy level too low)";
-                self.emit_tool_result(&call.name, msg, false);
-                return AgentMessage::ToolResult {
-                    tool_name: call.name.clone(),
-                    call_id: call.call_id.clone(),
-                    result: msg.to_string(),
-                    success: false,
-                };
+                // Emit ApprovalNeeded and wait up to 30 s for a matching ApprovalResponse.
+                if let Some(bus) = &self.bus {
+                    let action_id = uuid::Uuid::new_v4().to_string();
+                    let _ = bus.publish(AppEvent::ApprovalNeeded {
+                        action_id: action_id.clone(),
+                        tool_name: call.name.clone(),
+                        description: format!("Agent wants to run tool '{}'", call.name),
+                        risk_level: "medium".to_string(),
+                    });
+
+                    let mut rx = bus.subscribe();
+                    let approved = tokio::time::timeout(
+                        std::time::Duration::from_secs(30),
+                        async {
+                            loop {
+                                match rx.recv().await {
+                                    Ok(AppEvent::ApprovalResponse {
+                                        action_id: aid,
+                                        approved,
+                                    }) if aid == action_id => break approved,
+                                    Ok(_) => continue,
+                                    Err(_) => break false,
+                                }
+                            }
+                        },
+                    )
+                    .await
+                    .unwrap_or(false); // timeout → deny
+
+                    if !approved {
+                        let msg =
+                            "Tool execution denied by user (or approval timed out after 30 s)";
+                        self.emit_tool_result(&call.name, msg, false);
+                        return AgentMessage::ToolResult {
+                            tool_name: call.name.clone(),
+                            call_id: call.call_id.clone(),
+                            result: msg.to_string(),
+                            success: false,
+                        };
+                    }
+                    // approved → fall through to normal execution
+                } else {
+                    // No EventBus configured — deny conservatively.
+                    let msg = "Tool requires approval but no EventBus is available";
+                    self.emit_tool_result(&call.name, msg, false);
+                    return AgentMessage::ToolResult {
+                        tool_name: call.name.clone(),
+                        call_id: call.call_id.clone(),
+                        result: msg.to_string(),
+                        success: false,
+                    };
+                }
             }
             ValidationResult::Allowed => {}
         }

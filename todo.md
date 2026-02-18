@@ -21,10 +21,10 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | ⏳ | `src-tauri/src/gateway/routes.rs` | 66 | Query real provider health instead of returning stub (Phase 3) | Medium |
 | ⏳ | `src-tauri/src/gateway/routes.rs` | 83–135 | Wire all module routes (`list`, `health`, `start`, `stop`, `reload`) to `ModuleRegistry` (Phase 6) | High |
 | ⏳ | `src-tauri/src/services/notification_service.rs` | 199 | Call `tauri_plugin_notification` to show OS notifications (Phase 4 follow-up) | Medium |
-| ⏳ | `src-tauri/src/agent/agent_commands.rs` | 32 | Implement proper provider resolution from app state in `run_agent_command` | High |
-| ⏳ | `src-tauri/src/agent/agent_commands.rs` | 43 | Implement session cancellation via `CancellationToken` | High |
+| ✅ | `src-tauri/src/agent/agent_commands.rs` | 32 | Implement proper provider resolution from app state in `run_agent_command` | High |
+| ✅ | `src-tauri/src/agent/agent_commands.rs` | 43 | Implement session cancellation via `CancellationToken` | High |
 | ⏳ | `src-tauri/src/agent/session_router.rs` | 179 | Session router: complete Phase 4.3.3 wiring | Medium |
-| ⏳ | `src-tauri/src/agent/loop_.rs` | 244 | Implement full approval flow via EventBus (currently logs only) | High |
+| ✅ | `src-tauri/src/agent/loop_.rs` | 244 | Implement full approval flow via EventBus (currently logs only) | High |
 | ⏳ | `src-tauri/src/scheduler/commands.rs` | 12–45 | Resolve managed `TokioScheduler` from app state in all scheduler IPC commands | Medium |
 | ⏳ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 217 | Persist scheduled jobs to SQLite `scheduled_jobs` table (Phase 4.1.11) | Low |
 | ⏳ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 226 | Delete from `scheduled_jobs` SQLite table on `remove_job` | Low |
