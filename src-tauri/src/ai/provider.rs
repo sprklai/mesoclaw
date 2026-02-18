@@ -27,6 +27,11 @@ pub trait LLMProvider: Send + Sync {
 
     /// Get the provider name
     fn provider_name(&self) -> &str;
+
+    /// Pre-establish connection to provider. Default no-op; providers may override.
+    async fn warmup(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Factory for creating LLM providers

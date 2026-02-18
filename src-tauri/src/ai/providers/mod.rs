@@ -3,9 +3,11 @@ use std::sync::Arc;
 use crate::ai::provider::LLMProvider;
 
 pub mod openai_compatible;
+pub mod reliable;
 
 // Public re-exports
 pub use openai_compatible::{OpenAICompatibleConfig, OpenAICompatibleProvider};
+pub use reliable::ReliableProvider;
 
 /// Provider type enum for known providers
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
