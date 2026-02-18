@@ -132,11 +132,13 @@ opt-level = 2
 
 # Production optimizations
 [profile.release]
-# Link-time optimization for smaller, faster binaries
-lto = "thin"
-# Optimize for performance
-opt-level = 3
+# Full link-time optimization for maximum dead-code elimination
+lto = true
+# Optimize for binary size over speed
+opt-level = "z"
 # Strip debug symbols for smaller binary size
 strip = true
 # Use fewer codegen units for better optimization at cost of compile time
 codegen-units = 1
+# Remove panic unwinding code for smaller binary size (~100KB savings)
+panic = "abort"
