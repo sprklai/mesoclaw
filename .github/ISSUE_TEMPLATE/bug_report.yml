@@ -1,0 +1,106 @@
+name: Bug Report
+description: Report a defect in MesoClaw
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report! Please fill in as many details as possible.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One-line description of the bug.
+      placeholder: "e.g. Agent crashes when tool call returns empty JSON"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      options:
+        - agent
+        - provider (AI)
+        - channel (Telegram/IPC)
+        - memory
+        - security
+        - tools
+        - frontend UI
+        - CLI / gateway
+        - build / CI
+        - other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - S0 — Data loss / crash on startup
+        - S1 — Core functionality broken
+        - S2 — Significant degradation, workaround exists
+        - S3 — Minor / cosmetic
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: Current Behavior
+      description: What happens now?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What should happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal steps needed to trigger the bug.
+      placeholder: |
+        1. Open Settings → AI Provider
+        2. Set provider to Ollama
+        3. Send a message
+        4. See error
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: MesoClaw Version
+      placeholder: "e.g. 0.0.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows 11
+        - Windows 10
+        - Ubuntu 24.04
+        - Ubuntu 22.04
+        - Other Linux
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: regression
+    attributes:
+      label: Regression
+      options:
+        - label: This worked in a previous version

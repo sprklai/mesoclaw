@@ -1,0 +1,66 @@
+name: Feature Request
+description: Propose a new feature or enhancement
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Please search existing issues and the roadmap before filing a new request.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      placeholder: "e.g. Support Claude 3.5 Sonnet as a selectable model"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this solve? Who is affected?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your ideal implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches did you consider?
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: How do we know when this is done?
+      placeholder: |
+        - [ ] User can select Claude 3.5 Sonnet from the model dropdown
+        - [ ] Streaming works correctly
+        - [ ] Token count is displayed
+
+  - type: dropdown
+    id: arch-impact
+    attributes:
+      label: Architecture Impact
+      options:
+        - None — isolated change
+        - Low — touches 1-2 modules
+        - Medium — crosses subsystem boundaries
+        - High — affects core runtime / security
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: breaking
+    attributes:
+      label: Breaking Change
+      options:
+        - label: This feature introduces breaking changes to existing behavior or APIs

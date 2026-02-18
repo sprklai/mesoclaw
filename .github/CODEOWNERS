@@ -1,0 +1,21 @@
+# CODEOWNERS — auto-request review from the right people.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: everything goes to the project maintainer
+*                                   @rakeshdhote
+
+# Security-critical paths require maintainer sign-off
+src-tauri/src/security/**           @rakeshdhote
+src-tauri/src/agent/**              @rakeshdhote
+.github/**                          @rakeshdhote
+
+# AI providers — anyone on the core team can review
+src-tauri/src/ai/**                 @rakeshdhote
+src/stores/**                       @rakeshdhote
+
+# Channels integration
+src-tauri/src/channels/**           @rakeshdhote
+
+# Docs and CI changes are lower risk
+docs/**                             @rakeshdhote
+*.md                                @rakeshdhote

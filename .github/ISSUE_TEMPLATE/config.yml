@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability
+    url: https://github.com/rakeshdhote/tauriclaw/security/advisories/new
+    about: Please report security vulnerabilities via GitHub Security Advisories, not public issues.
+  - name: Contribution Guide
+    url: https://github.com/rakeshdhote/tauriclaw/blob/main/CONTRIBUTING.md
+    about: Read the contribution guide before opening a PR.
+  - name: Discussions
+    url: https://github.com/rakeshdhote/tauriclaw/discussions
+    about: Questions and general discussion belong in Discussions.

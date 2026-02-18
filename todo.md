@@ -144,3 +144,17 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | 2026-02-18 | Feature | `src/stores/mobileSettingsStore.ts` | localStorage-persisted mobile prefs: haptic toggle, push notifications, battery, background refresh (Phase 7.4.7) |
 | 2026-02-18 | Feature | `src/components/settings/MobileSettings.tsx` | Mobile Settings tab: haptic toggle, push notification opt-in, Android/iOS guidance (Phase 7.4.7) |
 | 2026-02-18 | Bugfix | `src-tauri/src/event_bus/tauri_bridge.rs` | Use `tauri::async_runtime::spawn` instead of `tokio::spawn` for Tauri runtime consistency |
+| 2026-02-18 | CI/CD | `.github/workflows/ci.yml` | Unified CI pipeline: fmt + clippy + test + bun test on 3-platform matrix with Rust/Bun caching (Phase 8.1) |
+| 2026-02-18 | CI/CD | `.github/workflows/release.yml` | Multi-platform signed release pipeline: 8 desktop configurations, macOS notarization, Windows Azure signing, updater keys (Phase 8.2) |
+| 2026-02-18 | CI/CD | `.github/workflows/build-test.yml` | Unsigned test build workflow for manual verification across all platforms (Phase 8.2) |
+| 2026-02-18 | CI/CD | `.github/workflows/mobile.yml` | iOS (TestFlight) and Android (Google Play Internal) build pipeline (Phase 8.3) |
+| 2026-02-18 | CI/CD | `.github/workflows/labeler.yml` | PR auto-labeling via `actions/labeler@v5` (Phase 8.4) |
+| 2026-02-18 | CI/CD | `.github/workflows/stale.yml` | Auto-close stale issues after 60+14 days (Phase 8.4) |
+| 2026-02-18 | Config | `.github/dependabot.yml` | Weekly Cargo + npm/Bun + Actions dependency update PRs (Phase 8.4) |
+| 2026-02-18 | Config | `.github/labeler.yml` | PR label mappings for 11 file-path categories (Phase 8.4) |
+| 2026-02-18 | Docs | `.github/ISSUE_TEMPLATE/` | Bug report + feature request YAML forms + config disabling blank issues (Phase 8.5) |
+| 2026-02-18 | Docs | `.github/pull_request_template.md` | Structured PR form: summary, change type, validation evidence, security impact (Phase 8.5) |
+| 2026-02-18 | Docs | `CONTRIBUTING.md` | Full contributor guide: setup, collaboration tracks A/B/C, commit convention, extensibility examples (Phase 8.5) |
+| 2026-02-18 | Docs | `SECURITY.md` | Security policy: GitHub Advisories reporting, 48h/1w/2w SLA, architecture summary (Phase 8.5) |
+| 2026-02-18 | Docs | `.github/CODEOWNERS` | Auto-review routing for security/agent/CI paths (Phase 8.5) |
+| 2026-02-18 | Docs | `CODE_OF_CONDUCT.md` | Contributor Covenant v2.1 — community standards and enforcement (Phase 8.5) |

@@ -1,0 +1,51 @@
+# Auto-label PRs by changed files.
+# Ref: https://github.com/actions/labeler
+
+core:
+  - changed-files:
+    - any-glob-to-any-file: "src-tauri/src/*.rs"
+
+frontend:
+  - changed-files:
+    - any-glob-to-any-file: "src/**"
+
+ai:
+  - changed-files:
+    - any-glob-to-any-file: "src-tauri/src/ai/**"
+
+security:
+  - changed-files:
+    - any-glob-to-any-file: "src-tauri/src/security/**"
+
+agent:
+  - changed-files:
+    - any-glob-to-any-file: "src-tauri/src/agent/**"
+
+memory:
+  - changed-files:
+    - any-glob-to-any-file: "src-tauri/src/memory/**"
+
+tools:
+  - changed-files:
+    - any-glob-to-any-file: "src-tauri/src/tools/**"
+
+channels:
+  - changed-files:
+    - any-glob-to-any-file: "src-tauri/src/channels/**"
+
+ci:
+  - changed-files:
+    - any-glob-to-any-file: ".github/**"
+
+docs:
+  - changed-files:
+    - any-glob-to-any-file: "docs/**"
+    - any-glob-to-any-file: "*.md"
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file: "Cargo.toml"
+    - any-glob-to-any-file: "Cargo.lock"
+    - any-glob-to-any-file: "package.json"
+    - any-glob-to-any-file: "bun.lockb"
+    - any-glob-to-any-file: "src-tauri/Cargo.toml"
