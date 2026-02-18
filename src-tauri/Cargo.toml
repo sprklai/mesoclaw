@@ -4,6 +4,7 @@ version = "0.0.1"
 description = "Clean Tauri 2 boilerplate with integrated AI capabilities."
 authors = ["NSR Technologies Inc."]
 edition = "2024"
+default-run = "mesoclaw-desktop"
 
 [lints.rust]
 unsafe_code = "deny"

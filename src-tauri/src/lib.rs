@@ -3,10 +3,12 @@ pub mod ai;
 mod commands;
 pub mod config;
 pub mod database;
+pub mod event_bus;
 mod plugins;
 pub mod services;
 pub mod prompts;
 
+use std::sync::Arc;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -49,6 +51,12 @@ pub fn run() {
 
             // Initialize store plugin for persistent settings
             app.handle().plugin(tauri_plugin_store::Builder::new().build())?;
+
+            // Initialize and register the application event bus.
+            let bus: Arc<dyn event_bus::EventBus> =
+                Arc::new(event_bus::TokioBroadcastBus::new());
+            event_bus::TauriBridge::new(bus.clone(), app.handle().clone()).start();
+            app.manage(bus);
 
             // Initialize database and manage the connection pool
             let pool = database::init(app.handle())?;
