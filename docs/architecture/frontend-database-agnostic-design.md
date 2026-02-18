@@ -2,7 +2,7 @@
 
 Status: Archived on 2026-02-18.
 
-This document describes a legacy multi-database architecture (PostgreSQL/MySQL/MongoDB, SSH options, and database-type-specific UI) that is no longer implemented in the current codebase.
+This document describes a legacy multi-database architecture (external DB providers, SSH options, and database-type-specific UI) that is no longer implemented in the current codebase.
 
 Current direction:
 - Prompt-template based skill system

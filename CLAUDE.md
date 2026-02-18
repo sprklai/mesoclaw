@@ -4,11 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**MesoClaw** is an AI-powered database comprehension desktop application built with Tauri 2. It helps developers quickly understand unfamiliar databases through AI-powered schema analysis, relationship inference, and query understanding.
+**MesoClaw** is an AI-powered desktop application built with Tauri 2. It provides multi-provider LLM chat with a prompt-template skill system and secure API key management.
 
 - **Frontend**: React 19 + TypeScript + Vite + TanStack Router + Zustand + Tailwind CSS 4
-- **Backend**: Rust 2024 + Tauri 2 + Diesel ORM + Tokio async runtime
-- **Databases**: SQLite (complete), PostgreSQL
+- **Backend**: Rust 2024 + Tauri 2 + Diesel ORM (SQLite for app settings) + Tokio async runtime
 - **AI**: Multi-provider LLM support (OpenAI, Anthropic, Google AI, Groq, Vercel AI Gateway, Ollama)
 
 ## Quick Start
@@ -52,81 +51,56 @@ This project follows a **clean architecture** pattern with clear separation betw
 │                  Backend (Rust/Tauri)                       │
 ├─────────────────────────────────────────────────────────────┤
 │  Commands Layer (src-tauri/src/commands/)                   │
-│  ├─ database_commands.rs   - Workspace management          │
-│  ├─ schema_commands.rs     - Schema introspection          │
-│  ├─ explanation_commands.rs - AI explanations              │
-│  └─ skill_commands.rs      - AI skill execution            │
+│  ├─ llm.rs                 - LLM provider config           │
+│  ├─ ai_providers.rs        - Provider/model management     │
+│  ├─ skills.rs              - Skill settings (no-op stubs)  │
+│  └─ settings.rs            - App settings                  │
 ├─────────────────────────────────────────────────────────────┤
 │  Services Layer (src-tauri/src/services/)                   │
-│  ├─ workspace_service.rs   - Workspace CRUD                │
-│  ├─ introspection_service.rs - Schema analysis             │
 │  ├─ credential_store.rs    - OS keyring integration        │
 │  └─ settings.rs            - App settings persistence       │
 ├─────────────────────────────────────────────────────────────┤
 │  Database Layer (src-tauri/src/database/)                   │
-│  ├─ providers/             - DatabaseProvider trait         │
-│  │   ├─ sqlite.rs          - SQLite implementation         │
-│  │   ├─ postgres.rs        - PostgreSQL implementation     │
-│  │   ├─ mysql.rs           - MySQL implementation          │
-│  │   └─ mongodb.rs         - MongoDB implementation        │
-│  └─ models/                - Diesel ORM models             │
+│  └─ models/                - Diesel ORM models (SQLite)    │
 ├─────────────────────────────────────────────────────────────┤
 │  AI Layer (src-tauri/src/ai/)                               │
 │  ├─ llm_provider.rs        - LLMProvider trait             │
-│  ├─ providers/             - Provider implementations      │
-│  ├─ agents/                - AI agents (interpretation, etc)│
-│  ├─ prompts/               - Prompt templates              │
-│  └─ cache.rs               - Explanation cache (LRU)       │
+│  └─ providers/             - Provider implementations      │
 ├─────────────────────────────────────────────────────────────┤
-│  Skills System (src-tauri/src/skills/)                      │
-│  ├─ loader.rs              - Skill discovery and loading   │
-│  ├─ selector.rs            - LLM-based skill selection     │
-│  ├─ composer.rs            - Skill composition             │
-│  └─ executor.rs            - Skill execution with tools    │
+│  Prompts Layer (src-tauri/src/prompts/)                     │
+│  ├─ mod.rs                 - Template registry & selection │
+│  └─ loader.rs              - Filesystem template loader    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Architectural Patterns
 
-1. **Provider Pattern**: All database types implement `DatabaseProvider` trait for consistent behavior
-2. **Agent Pattern**: AI agents (schema interpretation, relationship inference, query explanation) use multi-stage prompting
-3. **Skill System**: Modular AI capabilities that can be enabled/disabled and composed together
+1. **Provider Pattern**: All AI providers implement the `LLMProvider` trait for consistent behavior
+2. **Prompt Template System**: Filesystem-based skill templates in `~/.config/<appDir>/skills/` loaded by `src-tauri/src/prompts/`
+3. **Skill System**: Lightweight no-op stubs in `src-tauri/src/commands/skills.rs` expose settings UI
 4. **Async/Await**: Tokio runtime for async I/O in backend, React hooks for async UI state
 
 ## Common Development Tasks
 
-### Adding a New Database Provider
+### Adding a New AI Skill (Prompt Template)
 
-1. Implement `DatabaseProvider` trait in `src-tauri/src/database/providers/`
-2. Add connection configuration to `database/models/workspace.rs`
-3. Add provider to `database/mod.rs` enum
-4. Update frontend UI components to support new database type
-5. Add integration tests in provider module
+Skills are markdown files with YAML frontmatter in the app config skills directory:
 
-### Adding a New AI Skill
-
-Skills are markdown files with YAML frontmatter in `~/.config/<skillsConfigDirName>/skills/`:
-
-```yaml
+```markdown
 ---
 id: my-skill
 name: My Skill
 description: What this skill does
-category: understanding
-input_schema:
-  type: object
-  properties:
-    table_name:
-      type: string
-      description: Name of the table
+category: general
+defaultEnabled: true
 ---
 
-You are an expert database analyst. Given table: {{table_name}}
+You are a helpful assistant. {{request}}
 
-Analyze the schema and provide insights...
+Provide a clear and concise response...
 ```
 
-Register in `src-tauri/src/skills/registry.rs` for built-in skills.
+Place the file in the skills directory and call `reload_skills_command` to pick it up at runtime.
 
 ### Adding a New Tauri Command
 
@@ -178,7 +152,7 @@ App database location: Tauri app-local data directory (`app_local_data_dir`), ty
 
 ### Backend (Rust)
 
-- **Command naming**: All exported commands use `*_command` suffix (e.g., `get_schema_metadata_command`)
+- **Command naming**: All exported commands use `*_command` suffix (e.g., `get_llm_provider_config_command`)
 - **Error handling**: Commands return `Result<T, String>` for consistent error propagation
 - **Async patterns**: Use `async fn` with `tokio::sync` primitives
 - **Security**: API keys stored in OS keyring via `keyring` crate, sensitive data zeroized with `zeroize`
@@ -372,20 +346,18 @@ export const showError = (message: string, error?: Error) => {
 │   ├── src/
 │   │   ├── commands/           # Tauri IPC commands
 │   │   ├── services/           # Business logic services
-│   │   ├── database/           # Database providers and models
-│   │   ├── ai/                 # AI integration (providers, agents, prompts)
-│   │   ├── skills/             # AI skill system
+│   │   ├── database/           # Diesel ORM models (SQLite app settings)
+│   │   ├── ai/                 # AI integration (providers)
+│   │   ├── prompts/            # Filesystem-based prompt template system
 │   │   ├── lib.rs              # Library entry point (app setup)
 │   │   └── main.rs             # Binary entry point
 │   ├── migrations/             # Diesel database migrations
 │   ├── Cargo.toml              # Rust dependencies
 │   ├── tauri.conf.json         # Tauri configuration
 │   └── CLAUDE.md               # Backend code standards
-├── docs/                       # Phase documentation
-│   ├── phases/                 # Detailed phase docs (1.1-4.5)
-│   ├── features/               # Feature documentation (skills, chat)
-│   ├── database/               # Database connection guides
-│   └── plans/                  # Implementation plans (MongoDB, i18n)
+├── docs/                       # Documentation
+│   ├── features/               # Feature documentation
+│   └── plans/                  # Implementation plans
 ├── .claude/CLAUDE.md           # Comprehensive project standards
 ├── package.json                # Frontend dependencies
 └── README.md                   # Project overview and features
@@ -406,22 +378,20 @@ This project has **layered documentation**:
 
 **Complete**:
 
-- ✅ Phase 1: Backend Infrastructure (8 phases)
-- ✅ Phase 2: AI Integration (8 phases)
-- ✅ Phase 3: Frontend UI (8 phases)
-- ✅ Phase 4: IPC Commands (5 phases, 2 remaining)
-- ✅ SSH Tunnel Support (~95% complete)
-- ✅ MongoDB Integration (~95% complete)
-- ✅ AI Skill System (8 built-in skills)
+- ✅ Phase 0: Legacy database code removed; clean AI chat baseline
+- ✅ Phase 1: Build optimization and reliability (binary size, ReliableProvider)
+- ✅ Multi-provider LLM support (OpenAI, Anthropic, Google AI, Groq, Ollama, Vercel AI Gateway)
+- ✅ Prompt-template based skill system
+- ✅ Secure API key storage (OS keyring)
 
 **In Progress**:
 
-- Phase 4.6-4.7: LLM commands and command registration
+- Phase 2: See `docs/implementation-plan.md` for active tasks
 
 **Planned**:
 
-- Local LLM support (Ollama integration complete)
 - Internationalization (i18n)
+- Ollama model management improvements
 
 ## Build & Release
 
@@ -441,8 +411,7 @@ See `docs/RELEASING.md` for code signing setup.
 
 ## Getting Help
 
-- **Phase docs**: `docs/phases/PHASE_*.md` - Implementation details for each phase
+- **Implementation plan**: `docs/implementation-plan.md` - Active tasks and phases
+- **Index**: `docs/index.md` - Documentation index
 - **Feature docs**: `docs/features/*.md` - Skill system, chat functionality
-- **Database guides**: `docs/database/*.md` - Connection methods, testing, MongoDB
 - **README**: Project overview and feature list
-- **Issue tracking**: Track active issues and analysis in `docs/` root

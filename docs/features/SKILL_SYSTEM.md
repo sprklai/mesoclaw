@@ -2,7 +2,7 @@
 
 Status: Archived on 2026-02-18.
 
-This file documented the retired skill architecture that included database-type-specific behavior and references to MongoDB/MySQL/PostgreSQL workflows.
+This file documented the retired skill architecture that included database-type-specific behavior and multi-DB provider workflows.
 
 The active implementation is now a lightweight prompt-template system.
 
