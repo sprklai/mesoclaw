@@ -1,47 +1,90 @@
 //! Tauri IPC commands for scheduler management.
-//!
-//! ## TODO (Phase 4.1 follow-up)
-//! Wire commands to managed `Arc<TokioScheduler>` app state.  Requires
-//! deciding how to initialise the scheduler at Tauri startup.
 
-use serde_json::Value;
+use std::sync::Arc;
 
-/// List all registered scheduler jobs.
+use tauri::State;
+
+use crate::scheduler::{
+    traits::{JobPayload, Scheduler as _, ScheduledJob, Schedule, SessionTarget},
+    TokioScheduler,
+};
+
+/// List all registered scheduled jobs.
 #[tauri::command]
-pub async fn list_jobs_command() -> Result<Vec<Value>, String> {
-    // ## TODO: Resolve managed TokioScheduler from app state
-    Err("Scheduler not yet wired to app state. Planned for Phase 4 follow-up.".to_string())
+pub async fn list_jobs_command(
+    scheduler: State<'_, Arc<TokioScheduler>>,
+) -> Result<Vec<ScheduledJob>, String> {
+    Ok(scheduler.list_jobs().await)
 }
 
 /// Create a new scheduled job.
+///
+/// `schedule_json` must be a valid [`Schedule`] (e.g. `{"type":"interval","secs":1800}`).
+/// `payload_json` must be a valid [`JobPayload`].
 #[tauri::command]
 pub async fn create_job_command(
-    _name: String,
-    _schedule: Value,
-    _payload: Value,
-    _enabled: Option<bool>,
+    name: String,
+    schedule_json: serde_json::Value,
+    payload_json: serde_json::Value,
+    enabled: Option<bool>,
+    scheduler: State<'_, Arc<TokioScheduler>>,
 ) -> Result<String, String> {
-    // ## TODO: Resolve managed TokioScheduler from app state
-    Err("Scheduler not yet wired to app state. Planned for Phase 4 follow-up.".to_string())
+    let schedule: Schedule = serde_json::from_value(schedule_json)
+        .map_err(|e| format!("Invalid schedule: {e}"))?;
+    let payload: JobPayload = serde_json::from_value(payload_json)
+        .map_err(|e| format!("Invalid payload: {e}"))?;
+
+    let job = ScheduledJob {
+        id: String::new(), // assigned by scheduler
+        name,
+        schedule,
+        session_target: SessionTarget::Main,
+        payload,
+        enabled: enabled.unwrap_or(true),
+        error_count: 0,
+        next_run: None,
+    };
+
+    let id = scheduler.add_job(job).await;
+    Ok(id)
 }
 
-/// Enable or disable a job.
+/// Enable or disable a scheduled job.
+///
+/// Implemented as remove + re-add with the updated `enabled` flag because
+/// `Scheduler` does not expose a direct mutation method.
 #[tauri::command]
-pub async fn toggle_job_command(_job_id: String, _enabled: bool) -> Result<(), String> {
-    // ## TODO: Resolve managed TokioScheduler from app state
-    Err("Scheduler not yet wired to app state. Planned for Phase 4 follow-up.".to_string())
+pub async fn toggle_job_command(
+    job_id: String,
+    enabled: bool,
+    scheduler: State<'_, Arc<TokioScheduler>>,
+) -> Result<(), String> {
+    use crate::scheduler::traits::Scheduler as _;
+    let jobs = scheduler.list_jobs().await;
+    let mut job = jobs
+        .into_iter()
+        .find(|j| j.id == job_id)
+        .ok_or_else(|| format!("Job '{}' not found", job_id))?;
+    scheduler.remove_job(&job_id).await;
+    job.enabled = enabled;
+    scheduler.add_job(job).await;
+    Ok(())
 }
 
-/// Delete a scheduled job.
+/// Delete a scheduled job by id.
 #[tauri::command]
-pub async fn delete_job_command(_job_id: String) -> Result<bool, String> {
-    // ## TODO: Resolve managed TokioScheduler from app state
-    Err("Scheduler not yet wired to app state. Planned for Phase 4 follow-up.".to_string())
+pub async fn delete_job_command(
+    job_id: String,
+    scheduler: State<'_, Arc<TokioScheduler>>,
+) -> Result<bool, String> {
+    Ok(scheduler.remove_job(&job_id).await)
 }
 
 /// Retrieve execution history for a job.
 #[tauri::command]
-pub async fn job_history_command(_job_id: String) -> Result<Vec<Value>, String> {
-    // ## TODO: Resolve managed TokioScheduler from app state
-    Err("Scheduler not yet wired to app state. Planned for Phase 4 follow-up.".to_string())
+pub async fn job_history_command(
+    job_id: String,
+    scheduler: State<'_, Arc<TokioScheduler>>,
+) -> Result<Vec<crate::scheduler::traits::JobExecution>, String> {
+    Ok(scheduler.job_history(&job_id).await)
 }
