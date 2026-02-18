@@ -55,12 +55,12 @@ const DEFAULT_PORT = 18790;
 /** Read daemon config from the Tauri backend. Falls back to defaults. */
 export async function resolveDaemonConfig(): Promise<GatewayConfig | null> {
   try {
-    // The daemon writes its PID + port to ~/.mesoclaw/daemon.pid and its
-    // token to ~/.mesoclaw/daemon.token. We read these via the file-browser
-    // command since we have no dedicated IPC endpoint for this yet.
-    // ## TODO: add a dedicated get_daemon_config_command (Phase 2.7 completion)
-    return { port: DEFAULT_PORT, token: "" };
+    const config = await invoke<{ port: number; token: string }>(
+      "get_daemon_config_command",
+    );
+    return { port: config.port, token: config.token };
   } catch {
+    // Daemon not running yet — caller can retry or use Tauri IPC directly.
     return null;
   }
 }
@@ -195,8 +195,10 @@ export class GatewayClient {
     actionId: string,
     approved: boolean,
   ): Promise<void> {
-    // ## TODO: add a dedicated approval endpoint to the gateway REST API
-    // For now, call back to Tauri IPC which publishes the event to the bus.
+    // Publish the approval via Tauri IPC so the EventBus receives it
+    // regardless of whether the gateway is running.  The gateway REST API
+    // does not have a separate /approval endpoint — the EventBus is the
+    // single source of truth for approval routing.
     await invoke("approve_action_command", { actionId, approved });
   }
 }

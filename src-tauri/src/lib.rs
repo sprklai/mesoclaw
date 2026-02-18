@@ -275,6 +275,7 @@ pub fn run() {
             commands::skills::suggest_skills_command,
             // Approval command
             commands::approval::approve_action_command,
+            commands::approval::get_daemon_config_command,
             // Identity commands
             identity::commands::get_identity_file_command,
             identity::commands::update_identity_file_command,

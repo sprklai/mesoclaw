@@ -35,11 +35,11 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | ⏳ | `src-tauri/src/bin/cli.rs` | 424 | Implement `memory` CLI subcommand once memory service REST endpoint exists (Phase 3) | Low |
 | ⏳ | `src-tauri/src/bin/cli.rs` | 429 | Wire `identity` CLI subcommand to identity REST endpoint (Phase 2.6) | Low |
 | ⏳ | `src-tauri/src/bin/cli.rs` | 479 | Implement package-registry `install`/`remove` (Phase 6+) | Low |
-| ⏳ | `src/stores/identityStore.ts` | 7 | Migrate identity store to gateway REST API `/api/v1/identity/*` (Phase 3) | Medium |
-| ⏳ | `src/stores/llm.ts` | 4 | Migrate provider listing and session creation to gateway REST API (Phase 3) | Medium |
-| ⏳ | `src/lib/tauri/identity/index.ts` | 4 | Migrate identity CRUD to gateway REST API (Phase 3) | Medium |
-| ⏳ | `src/lib/gateway-client.ts` | 61 | Add dedicated `get_daemon_config_command` (Phase 2.7) | Low |
-| ⏳ | `src/lib/gateway-client.ts` | 198 | Add dedicated approval endpoint to gateway REST API | Medium |
+| 🔄 | `src/stores/identityStore.ts` | 7 | Migrate identity store to gateway REST API — blocked: no `/api/v1/identity/*` routes on gateway yet | Medium |
+| 🔄 | `src/stores/llm.ts` | 4 | Migrate provider listing to gateway — blocked: provider_status endpoint needs DbPool in GatewayState | Medium |
+| 🔄 | `src/lib/tauri/identity/index.ts` | 4 | Migrate identity CRUD to gateway — blocked: no gateway identity endpoints yet | Medium |
+| ✅ | `src/lib/gateway-client.ts` | 61 | `get_daemon_config_command` IPC reads daemon.pid (port) + daemon.token; `resolveDaemonConfig()` wired | Low |
+| ✅ | `src/lib/gateway-client.ts` | 198 | Approval endpoint resolved: `sendApprovalResponse` correctly uses `approve_action_command` IPC (EventBus is source of truth) | Medium |
 | ⏳ | `src-tauri/` | — | Phase 7.4.1–7.4.6, 7.4.8: `tauri ios init` + `tauri android init`, code signing, TestFlight / Google Play distribution — requires macOS + Xcode + Android SDK | High |
 | ⏳ | `src/components/settings/MobileSettings.tsx` | — | Wire push notifications to `tauri-plugin-notification` once APNs/FCM signing is configured (Phase 7.4.4) | Medium |
 
