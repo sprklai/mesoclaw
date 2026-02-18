@@ -4,6 +4,8 @@ import { useState } from "react";
 import { AdvancedSettingsTab } from "@/components/settings/AdvancedSettingsTab";
 import { AISettingsTab } from "@/components/settings/AISettingsTab";
 import { AppSettingsTab } from "@/components/settings/AppSettingsTab";
+import { IdentityEditor } from "@/components/settings/IdentityEditor";
+import { JobList } from "@/components/settings/JobList";
 import { SkillsSettingsTab } from "@/components/settings/SkillsSettingsTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useHandleSettings } from "@/hooks/use-handle-settings";
@@ -72,6 +74,12 @@ function SettingsPage() {
           <TabsTrigger value="app" className="flex-1 font-bold">
             App Settings
           </TabsTrigger>
+          <TabsTrigger value="identity" className="flex-1 font-bold">
+            Identity
+          </TabsTrigger>
+          <TabsTrigger value="scheduler" className="flex-1 font-bold">
+            Scheduler
+          </TabsTrigger>
           <TabsTrigger value="advanced" className="flex-1 font-bold">
             Advanced
           </TabsTrigger>
@@ -98,6 +106,12 @@ function SettingsPage() {
           />
         </TabsContent>
 
+        <TabsContent value="identity" className="mt-6">
+          <IdentityEditor />
+        </TabsContent>
+        <TabsContent value="scheduler" className="mt-6">
+          <JobList />
+        </TabsContent>
         <TabsContent value="advanced" className="mt-6">
           <AdvancedSettingsTab />
         </TabsContent>
