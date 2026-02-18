@@ -5,7 +5,9 @@ pub mod config;
 pub mod database;
 pub mod event_bus;
 mod plugins;
+pub mod security;
 pub mod services;
+pub mod tools;
 pub mod prompts;
 
 use std::sync::Arc;
@@ -57,6 +59,13 @@ pub fn run() {
                 Arc::new(event_bus::TokioBroadcastBus::new());
             event_bus::TauriBridge::new(bus.clone(), app.handle().clone()).start();
             app.manage(bus);
+
+            // Initialize security policy and tool registry.
+            let policy = Arc::new(security::SecurityPolicy::default_policy());
+            let mut registry = tools::ToolRegistry::new();
+            tools::register_builtin_tools(&mut registry, policy.clone());
+            app.manage(policy);
+            app.manage(registry);
 
             // Initialize database and manage the connection pool
             let pool = database::init(app.handle())?;
@@ -121,6 +130,8 @@ pub fn run() {
             commands::skills::list_skills_by_category_command,
             commands::skills::set_skill_auto_select_command,
             commands::skills::suggest_skills_command,
+            // Approval command
+            commands::approval::approve_action_command,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]
