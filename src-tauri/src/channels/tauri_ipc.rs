@@ -37,7 +37,7 @@ impl Channel for TauriIpcChannel {
         // Publish the agent response to the event bus so the frontend receives it.
         self.bus.publish(AppEvent::AgentComplete {
             session_id: "tauri".to_string(),
-            result: message.to_string(),
+            message: message.to_string(),
         })
     }
 
@@ -74,8 +74,8 @@ impl Channel for TauriIpcChannel {
 
 fn event_to_channel_message(event: AppEvent) -> Option<ChannelMessage> {
     match event {
-        AppEvent::AgentComplete { session_id, result } => {
-            Some(ChannelMessage::new("tauri-ipc", result).with_sender(session_id))
+        AppEvent::AgentComplete { session_id, message } => {
+            Some(ChannelMessage::new("tauri-ipc", message).with_sender(session_id))
         }
         _ => None,
     }

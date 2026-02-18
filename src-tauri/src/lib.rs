@@ -1,6 +1,7 @@
 pub mod adapters;
 pub mod agent;
 pub mod ai;
+pub mod channels;
 mod commands;
 pub mod config;
 pub mod database;
@@ -48,6 +49,9 @@ pub mod prelude {
 
     // Identity
     pub use crate::identity::loader::IdentityLoader;
+
+    // Channel abstraction
+    pub use crate::channels::{Channel, ChannelManager, ChannelMessage, TauriIpcChannel};
 }
 
 use std::sync::Arc;
