@@ -1,4 +1,5 @@
 pub mod adapters;
+pub mod agent;
 pub mod ai;
 mod commands;
 pub mod config;
@@ -164,6 +165,9 @@ pub fn run() {
             identity::commands::update_identity_file_command,
             identity::commands::list_identity_files_command,
             identity::commands::get_system_prompt_command,
+            // Agent session commands
+            agent::agent_commands::start_agent_session_command,
+            agent::agent_commands::cancel_agent_session_command,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]
