@@ -16,6 +16,40 @@ pub mod services;
 pub mod tools;
 pub mod prompts;
 
+/// Convenience re-exports for the most commonly used traits and types across
+/// the MesoClaw codebase.
+///
+/// ```rust
+/// use mesoclaw::prelude::*;
+/// ```
+pub mod prelude {
+    // AI provider trait
+    pub use crate::ai::provider::LLMProvider;
+    pub use crate::ai::providers::{CostTier, ModelRouter, ModelTarget, TaskType};
+    pub use crate::ai::types::{CompletionRequest, CompletionResponse, Message, MessageRole};
+
+    // Tool system
+    pub use crate::tools::{Tool, ToolRegistry, ToolResult};
+
+    // Memory subsystem
+    pub use crate::memory::traits::{Memory, MemoryCategory, MemoryEntry};
+
+    // Security
+    pub use crate::security::{AutonomyLevel, SecurityPolicy, ValidationResult};
+
+    // Event bus
+    pub use crate::event_bus::{AppEvent, EventBus, TokioBroadcastBus};
+
+    // Scheduler
+    pub use crate::scheduler::{JobPayload, Scheduler, Schedule};
+
+    // Configuration
+    pub use crate::config::{AppConfig, load_default_config};
+
+    // Identity
+    pub use crate::identity::loader::IdentityLoader;
+}
+
 use std::sync::Arc;
 use tauri::Manager;
 
