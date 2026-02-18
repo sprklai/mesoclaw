@@ -4,6 +4,7 @@ mod commands;
 pub mod config;
 pub mod database;
 pub mod event_bus;
+pub mod gateway;
 pub mod identity;
 mod plugins;
 pub mod security;
@@ -67,6 +68,20 @@ pub fn run() {
             tools::register_builtin_tools(&mut registry, policy.clone());
             app.manage(policy);
             app.manage(registry);
+
+            // Start the HTTP gateway daemon (when compiled with the gateway feature).
+            #[cfg(feature = "gateway")]
+            {
+                let bus_for_gateway: Arc<dyn event_bus::EventBus> = app
+                    .try_state::<Arc<dyn event_bus::EventBus>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("EventBus not initialised before gateway")?;
+                tokio::spawn(async move {
+                    if let Err(e) = gateway::start_gateway(bus_for_gateway).await {
+                        log::error!("Gateway error: {e}");
+                    }
+                });
+            }
 
             // Initialize identity loader with hot-reload watcher.
             let identity_dir = identity::default_identity_dir()?;
