@@ -50,6 +50,59 @@ use tokio::sync::{RwLock, mpsc};
 
 use super::traits::{Channel, ChannelMessage};
 
+// ─── DmPolicy ────────────────────────────────────────────────────────────────
+
+/// Controls how messages from senders not on the allow-list are handled.
+///
+/// Mirrors OpenClaw's `channels.telegram.dmPolicy` option.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum DmPolicy {
+    /// Only chat IDs on the allow-list receive responses (default).
+    #[default]
+    Allowlist,
+    /// Accept all inbound messages regardless of sender.
+    Open,
+    /// Silently ignore all inbound messages.
+    Disabled,
+}
+
+// ─── RetryPolicy ─────────────────────────────────────────────────────────────
+
+/// Reconnection policy for the long-polling loop.
+///
+/// Mirrors OpenClaw's `channels.telegram.retry` configuration block.
+#[derive(Debug, Clone)]
+pub struct RetryPolicy {
+    /// Maximum reconnection attempts before giving up (0 = unlimited).
+    pub max_attempts: u32,
+    /// Starting back-off delay in milliseconds.
+    pub min_delay_ms: u64,
+    /// Maximum back-off delay in milliseconds.
+    pub max_delay_ms: u64,
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            max_attempts: 0,
+            min_delay_ms: 1_000,
+            max_delay_ms: 60_000,
+        }
+    }
+}
+
+impl RetryPolicy {
+    /// Compute the back-off delay for `attempt` (0-indexed).
+    ///
+    /// Uses exponential back-off: `min_delay_ms × 2^attempt`, clamped to
+    /// `max_delay_ms`.
+    pub fn delay_for(&self, attempt: u32) -> Duration {
+        let ms = (self.min_delay_ms as f64 * 2f64.powi(attempt as i32))
+            .min(self.max_delay_ms as f64) as u64;
+        Duration::from_millis(ms.max(self.min_delay_ms))
+    }
+}
+
 // ─── TelegramConfig ──────────────────────────────────────────────────────────
 
 /// Configuration for [`TelegramChannel`].
@@ -62,6 +115,15 @@ pub struct TelegramConfig {
     pub allowed_chat_ids: Vec<i64>,
     /// Long-polling timeout in seconds (default: 30).
     pub polling_timeout_secs: u32,
+    /// How to handle messages from senders not on the allow-list.
+    pub dm_policy: DmPolicy,
+    /// Retry / reconnection policy for the polling loop.
+    pub retry: RetryPolicy,
+    /// In group chats (negative chat IDs), require the bot to be @-mentioned
+    /// or the message to be a bot command before forwarding to the agent.
+    pub require_group_mention: bool,
+    /// The bot's username (without `@`) used for mention detection in groups.
+    pub bot_username: Option<String>,
 }
 
 impl TelegramConfig {
@@ -71,6 +133,10 @@ impl TelegramConfig {
             token: token.into(),
             allowed_chat_ids: Vec::new(),
             polling_timeout_secs: 30,
+            dm_policy: DmPolicy::default(),
+            retry: RetryPolicy::default(),
+            require_group_mention: true,
+            bot_username: None,
         }
     }
 
@@ -80,6 +146,10 @@ impl TelegramConfig {
             token: token.into(),
             allowed_chat_ids,
             polling_timeout_secs: 30,
+            dm_policy: DmPolicy::default(),
+            retry: RetryPolicy::default(),
+            require_group_mention: true,
+            bot_username: None,
         }
     }
 }
@@ -114,6 +184,10 @@ pub struct TelegramChannel {
     token: String,
     allowed_chat_ids: Arc<RwLock<Vec<i64>>>,
     polling_timeout_secs: u32,
+    dm_policy: DmPolicy,
+    retry: RetryPolicy,
+    require_group_mention: bool,
+    bot_username: Option<String>,
 }
 
 impl TelegramChannel {
@@ -123,6 +197,10 @@ impl TelegramChannel {
             token: config.token,
             allowed_chat_ids: Arc::new(RwLock::new(config.allowed_chat_ids)),
             polling_timeout_secs: config.polling_timeout_secs,
+            dm_policy: config.dm_policy,
+            retry: config.retry,
+            require_group_mention: config.require_group_mention,
+            bot_username: config.bot_username,
         }
     }
 
@@ -342,6 +420,10 @@ impl TelegramChannel {
     }
 
     /// Run the long-polling loop with exponential back-off on errors.
+    ///
+    /// Access policy (`dm_policy`) and group-mention gating are applied here.
+    /// Bot commands carry a `bot_command` metadata key so the agent loop can
+    /// route them differently from regular messages.
     async fn poll_loop(&self, tx: mpsc::Sender<ChannelMessage>) -> Result<(), String> {
         // payloads::setters::* provides .offset() and .timeout() builder methods.
         use teloxide::prelude::*;
@@ -370,19 +452,61 @@ impl TelegramChannel {
 
                         if let UpdateKind::Message(ref msg) = update.kind {
                             let chat_id = msg.chat.id.0;
+                            let is_group = chat_id < 0;
 
-                            // Silently ignore unknown senders.
-                            if !allowed.read().await.contains(&chat_id) {
-                                continue;
+                            // ── Access policy (mirrors OpenClaw dmPolicy) ──
+                            match &self.dm_policy {
+                                DmPolicy::Disabled => continue,
+                                DmPolicy::Open => {} // allow all senders
+                                DmPolicy::Allowlist => {
+                                    if !allowed.read().await.contains(&chat_id) {
+                                        continue; // silently ignore unknown senders
+                                    }
+                                }
                             }
 
-                            let content = msg
-                                .text()
-                                .map(str::to_string)
-                                .unwrap_or_else(|| Self::describe_media(msg));
+                            let text = msg.text().map(str::to_string);
+                            let bot_cmd = text
+                                .as_deref()
+                                .and_then(Self::parse_bot_command);
 
-                            let channel_msg = ChannelMessage::new("telegram", content)
-                                .with_sender(chat_id.to_string());
+                            // ── /allow {id} is handled in-channel ──────────
+                            if let Some(BotCommand::Allow(new_id)) = &bot_cmd {
+                                self.allow_chat(*new_id).await;
+                                log::info!("telegram: added chat_id {new_id} to allow-list via /allow");
+                                continue; // do not forward to agent
+                            }
+
+                            // ── Group mention gating (mirrors requireMention) ──
+                            if is_group && self.require_group_mention && bot_cmd.is_none() {
+                                let mentioned = match &self.bot_username {
+                                    Some(uname) => text
+                                        .as_deref()
+                                        .map(|t| {
+                                            t.contains(&format!("@{uname}"))
+                                                || t.to_lowercase()
+                                                    .contains(&uname.to_lowercase())
+                                        })
+                                        .unwrap_or(false),
+                                    None => false,
+                                };
+                                if !mentioned {
+                                    continue; // ignore un-mentioned group messages
+                                }
+                            }
+
+                            let content = text.unwrap_or_else(|| Self::describe_media(msg));
+
+                            let mut channel_msg =
+                                ChannelMessage::new("telegram", content)
+                                    .with_sender(chat_id.to_string());
+
+                            // Tag bot commands so the agent loop can route them.
+                            if let Some(ref cmd) = bot_cmd {
+                                channel_msg
+                                    .metadata
+                                    .insert("bot_command".into(), format!("{cmd:?}"));
+                            }
 
                             // If the receiver was dropped, stop gracefully.
                             if tx.send(channel_msg).await.is_err() {
@@ -396,7 +520,14 @@ impl TelegramChannel {
                         return Ok(());
                     }
                     log::warn!("telegram: polling error (attempt {attempt}): {e}");
-                    let backoff = Self::reconnect_backoff(attempt);
+                    // Use RetryPolicy for configurable back-off.
+                    if self.retry.max_attempts > 0 && attempt >= self.retry.max_attempts {
+                        return Err(format!(
+                            "telegram: exceeded max reconnect attempts ({})",
+                            self.retry.max_attempts
+                        ));
+                    }
+                    let backoff = self.retry.delay_for(attempt);
                     attempt = attempt.saturating_add(1);
                     tokio::time::sleep(backoff).await;
                 }
@@ -654,7 +785,7 @@ mod tests {
         assert!(!ch.is_allowed(999).await);
     }
 
-    // ── Reconnection back-off ─────────────────────────────────────────────────
+    // ── Reconnection back-off (legacy static helper) ──────────────────────────
 
     #[test]
     fn backoff_attempt_0_is_1s() {
@@ -694,5 +825,59 @@ mod tests {
             TelegramChannel::reconnect_backoff(100),
             Duration::from_secs(60)
         );
+    }
+
+    // ── RetryPolicy ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn retry_policy_default_values() {
+        let r = RetryPolicy::default();
+        assert_eq!(r.max_attempts, 0);
+        assert_eq!(r.min_delay_ms, 1_000);
+        assert_eq!(r.max_delay_ms, 60_000);
+    }
+
+    #[test]
+    fn retry_policy_delay_attempt_0_equals_min() {
+        let r = RetryPolicy::default();
+        assert_eq!(r.delay_for(0), Duration::from_millis(1_000));
+    }
+
+    #[test]
+    fn retry_policy_delay_doubles_each_attempt() {
+        let r = RetryPolicy::default();
+        assert_eq!(r.delay_for(1), Duration::from_millis(2_000));
+        assert_eq!(r.delay_for(2), Duration::from_millis(4_000));
+        assert_eq!(r.delay_for(3), Duration::from_millis(8_000));
+    }
+
+    #[test]
+    fn retry_policy_delay_capped_at_max() {
+        let r = RetryPolicy::default(); // max 60_000 ms
+        assert_eq!(r.delay_for(10), Duration::from_millis(60_000));
+    }
+
+    // ── DmPolicy ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn dm_policy_default_is_allowlist() {
+        assert_eq!(DmPolicy::default(), DmPolicy::Allowlist);
+    }
+
+    // ── TelegramConfig new fields ─────────────────────────────────────────────
+
+    #[test]
+    fn config_new_has_allowlist_policy() {
+        let cfg = TelegramConfig::new("tok");
+        assert_eq!(cfg.dm_policy, DmPolicy::Allowlist);
+        assert!(cfg.require_group_mention);
+        assert!(cfg.bot_username.is_none());
+    }
+
+    #[test]
+    fn config_with_allowed_ids_preserves_new_fields() {
+        let cfg = TelegramConfig::with_allowed_ids("tok", vec![1, 2]);
+        assert_eq!(cfg.dm_policy, DmPolicy::Allowlist);
+        assert!(cfg.require_group_mention);
     }
 }

@@ -99,6 +99,32 @@ impl SessionKey {
             peer: task.to_owned(),
         }
     }
+
+    /// Session key for a Telegram DM (positive chat ID).
+    ///
+    /// Each Telegram user gets a persistent session so the agent retains
+    /// per-user context — mirrors OpenClaw's per-peer session isolation.
+    pub fn telegram_dm(chat_id: i64) -> Self {
+        Self {
+            agent: "main".to_owned(),
+            scope: "dm".to_owned(),
+            channel: "telegram".to_owned(),
+            peer: chat_id.to_string(),
+        }
+    }
+
+    /// Session key for a Telegram group chat (negative chat ID).
+    ///
+    /// Group sessions are isolated so group chatter does not pollute the
+    /// main DM context.
+    pub fn telegram_group(chat_id: i64) -> Self {
+        Self {
+            agent: "isolated".to_owned(),
+            scope: "group".to_owned(),
+            channel: "telegram".to_owned(),
+            peer: chat_id.to_string(),
+        }
+    }
 }
 
 impl std::fmt::Display for SessionKey {
@@ -197,6 +223,8 @@ impl SessionRouter {
     /// | `"user"`      | `main:dm:tauri:user`                    |
     /// | `"heartbeat"` | `main:heartbeat:scheduler:check`        |
     /// | `"cron"`      | `isolated:task:scheduler:{context}`     |
+    /// | `"telegram"`  | `main:dm:telegram:{chat_id}` (DM)       |
+    /// |               | `isolated:group:telegram:{chat_id}` (group) |
     /// | other         | `isolated:task:{channel}:{context}`     |
     pub fn resolve(&self, channel: &str, context: Option<&str>) -> SessionKey {
         let ctx = context.unwrap_or("default");
@@ -209,6 +237,16 @@ impl SessionRouter {
                 channel: "scheduler".to_owned(),
                 peer: ctx.to_owned(),
             },
+            // Telegram DMs get per-user persistent sessions; groups are isolated.
+            // Context is expected to be the Telegram chat_id as a string.
+            "telegram" => {
+                let chat_id: i64 = ctx.parse().unwrap_or(0);
+                if chat_id < 0 {
+                    SessionKey::telegram_group(chat_id)
+                } else {
+                    SessionKey::telegram_dm(chat_id)
+                }
+            }
             other => SessionKey::isolated_task(&format!("{other}:{ctx}")),
         }
     }
@@ -463,5 +501,57 @@ mod tests {
         r.get_or_create(k2).unwrap();
         let keys = r.list_keys();
         assert_eq!(keys.len(), 2);
+    }
+
+    // ── Telegram session keys (OpenClaw per-peer isolation pattern) ───────────
+
+    #[test]
+    fn telegram_dm_key_is_not_isolated() {
+        let key = SessionKey::telegram_dm(123_456_789);
+        assert!(!key.is_isolated());
+        assert_eq!(key.channel, "telegram");
+        assert_eq!(key.scope, "dm");
+        assert_eq!(key.peer, "123456789");
+    }
+
+    #[test]
+    fn telegram_group_key_is_isolated() {
+        let key = SessionKey::telegram_group(-1_001_234_567_890);
+        assert!(key.is_isolated());
+        assert_eq!(key.channel, "telegram");
+        assert_eq!(key.scope, "group");
+    }
+
+    #[test]
+    fn resolve_telegram_dm_chat_id() {
+        let r = router();
+        let key = r.resolve("telegram", Some("123456789"));
+        assert!(!key.is_isolated());
+        assert_eq!(key.scope, "dm");
+        assert_eq!(key.channel, "telegram");
+        assert_eq!(key.peer, "123456789");
+    }
+
+    #[test]
+    fn resolve_telegram_group_chat_id() {
+        let r = router();
+        let key = r.resolve("telegram", Some("-1001234567890"));
+        assert!(key.is_isolated());
+        assert_eq!(key.scope, "group");
+    }
+
+    #[test]
+    fn separate_telegram_users_get_separate_sessions() {
+        let r = router();
+        let alice = r.resolve("telegram", Some("111"));
+        let bob = r.resolve("telegram", Some("222"));
+        r.push_message(&alice, "user", "alice msg").unwrap();
+        r.push_message(&bob, "user", "bob msg").unwrap();
+
+        let alice_session = r.get_session(&alice).unwrap();
+        let bob_session = r.get_session(&bob).unwrap();
+        assert_eq!(alice_session.messages[0].content, "alice msg");
+        assert_eq!(bob_session.messages[0].content, "bob msg");
+        assert_eq!(r.session_count(), 2);
     }
 }
