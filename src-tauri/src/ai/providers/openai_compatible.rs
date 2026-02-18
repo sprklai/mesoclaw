@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
+use crate::config::app_identity::{OPENROUTER_HTTP_REFERER, OPENROUTER_TITLE};
+
 use crate::ai::provider::{LLMProvider, Result, StreamResponse};
 use crate::ai::types::{
     CompletionRequest, CompletionResponse, Message as AppMessage, MessageRole, StreamChunk,
@@ -233,6 +235,8 @@ impl OpenAICompatibleConfig {
             "https://openrouter.ai/api/v1",
             "anthropic/claude-sonnet-4.5",
         )
+        .with_header("HTTP-Referer", OPENROUTER_HTTP_REFERER)
+        .with_header("X-Title", OPENROUTER_TITLE)
     }
 
     /// Create configuration for Vercel AI Gateway

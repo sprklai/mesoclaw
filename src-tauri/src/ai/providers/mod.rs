@@ -3,17 +3,9 @@ use std::sync::Arc;
 use crate::ai::provider::LLMProvider;
 
 pub mod openai_compatible;
-pub mod openrouter;
-pub mod vercel_gateway;
 
 // Public re-exports
 pub use openai_compatible::{OpenAICompatibleConfig, OpenAICompatibleProvider};
-pub use openrouter::OpenRouterProvider;
-pub use vercel_gateway::VercelAIGatewayProvider;
-
-// Private imports for internal use
-use openrouter::OpenRouterConfig;
-use vercel_gateway::VercelAIGatewayConfig;
 
 /// Provider type enum for known providers
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,44 +40,26 @@ pub fn create_provider(
     base_url: Option<&str>,
     default_model: Option<&str>,
 ) -> Result<Arc<dyn LLMProvider>, String> {
-    match provider_type {
-        ProviderType::VercelAIGateway => {
-            let mut config = VercelAIGatewayConfig::new(api_key);
-            if let Some(url) = base_url {
-                config = config.with_base_url(url);
-            }
-            if let Some(model) = default_model {
-                config = config.with_default_model(model);
-            }
-            Ok(Arc::new(VercelAIGatewayProvider::new(config)?))
-        }
-        ProviderType::OpenRouter => {
-            let mut config = OpenRouterConfig::new(api_key);
-            if let Some(url) = base_url {
-                config = config.with_base_url(url);
-            }
-            if let Some(model) = default_model {
-                config = config.with_default_model(model);
-            }
-            Ok(Arc::new(OpenRouterProvider::new(config)?))
-        }
+    let (mut config, name) = match provider_type {
+        ProviderType::VercelAIGateway => (
+            OpenAICompatibleConfig::vercel_gateway(api_key),
+            "vercel-ai-gateway",
+        ),
+        ProviderType::OpenRouter => (
+            OpenAICompatibleConfig::openrouter(api_key),
+            "openrouter",
+        ),
+    };
+
+    if let Some(url) = base_url {
+        config.base_url = url.to_string();
     }
-}
+    if let Some(model) = default_model {
+        config.default_model = model.to_string();
+    }
 
-/*
-// Database-specific provider creation - commented out for boilerplate
-// Re-implement if you need database-backed provider configuration
-
-/// Create a provider from database configuration
-pub async fn create_provider_from_db(
-    pool: &crate::database::DbPool,
-    provider_id: &str,
-    api_key: &str,
-) -> Result<Arc<dyn LLMProvider>, String> {
-    // Implementation removed - database-specific
-    Err("Database-backed provider creation not implemented in boilerplate".to_string())
+    Ok(Arc::new(OpenAICompatibleProvider::new(config, name)?))
 }
-*/
 
 #[cfg(test)]
 mod tests {
@@ -131,5 +105,11 @@ mod tests {
         );
         assert!(result.is_ok());
     }
-}
 
+    #[test]
+    fn test_openrouter_has_required_headers() {
+        let config = OpenAICompatibleConfig::openrouter("test-key");
+        assert!(config.extra_headers.contains_key("HTTP-Referer"));
+        assert!(config.extra_headers.contains_key("X-Title"));
+    }
+}

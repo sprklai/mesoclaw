@@ -15,7 +15,7 @@ pub mod verbosity;
 // pub use cache::ExplanationCache;
 pub use context::ContextManager;
 pub use provider::{LLMProvider, ProviderFactory};
-pub use providers::{OpenRouterProvider, VercelAIGatewayProvider};
+pub use providers::{OpenAICompatibleConfig, OpenAICompatibleProvider};
 // Terminology is commented out in terminology.rs - database-specific
 // pub use terminology::Terminology;
 pub use types::{CompletionRequest, CompletionResponse, Message, MessageRole, StreamChunk};
