@@ -56,7 +56,21 @@ impl SidecarTool {
     /// Always true for native; container runtimes require the `containers`
     /// feature and auto-detection logic in `modules::container`.
     pub fn runtime_available(&self) -> bool {
-        self.manifest.runtime.runtime_type == RuntimeType::Native
+        match self.manifest.runtime.runtime_type {
+            RuntimeType::Native => true,
+            _ => {
+                // Container runtimes are only supported when the `containers` feature
+                // is enabled and a runtime binary is found on the system.
+                #[cfg(feature = "containers")]
+                {
+                    super::container::detect_runtime().is_some()
+                }
+                #[cfg(not(feature = "containers"))]
+                {
+                    false
+                }
+            }
+        }
     }
 
     // ── Internal helpers ─────────────────────────────────────────────────────
@@ -130,25 +144,12 @@ impl Tool for SidecarTool {
             .cloned()
             .unwrap_or_else(|| args.clone());
 
-        // ── 4. Spawn process ─────────────────────────────────────────────────
+        // ── 4. Spawn process (native or container) ───────────────────────────
         let timeout = Duration::from_secs(
             self.manifest.runtime.timeout_secs.unwrap_or(30),
         );
 
-        let mut cmd = tokio::process::Command::new(command);
-        cmd.args(&self.manifest.runtime.args)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null());
-
-        // Forward manifest-specified env vars.
-        for (k, v) in &self.manifest.runtime.env {
-            cmd.env(k, v);
-        }
-
-        let mut child = cmd.spawn().map_err(|e| {
-            format!("failed to spawn sidecar '{}': {e}", command)
-        })?;
+        let mut child = self.spawn_child().await?;
 
         let mut stdin = child.stdin.take().ok_or("child has no stdin")?;
         let stdout = child.stdout.take().ok_or("child has no stdout")?;
@@ -190,6 +191,80 @@ impl Tool for SidecarTool {
 
         self.emit_result(&tool_result.output, tool_result.success);
         Ok(tool_result)
+    }
+}
+
+// ─── Spawn helpers ─────────────────────────────────────────────────────────────
+
+impl SidecarTool {
+    /// Spawn the child process for this module using the appropriate runtime.
+    async fn spawn_child(&self) -> Result<tokio::process::Child, String> {
+        match self.manifest.runtime.runtime_type {
+            RuntimeType::Native => self.spawn_native_child(),
+
+            #[cfg(feature = "containers")]
+            RuntimeType::Docker | RuntimeType::Podman => self.spawn_container_child().await,
+
+            #[cfg(not(feature = "containers"))]
+            _ => Err(format!(
+                "module '{}' requires a container runtime but the `containers` \
+                 feature is not enabled",
+                self.manifest.module.id
+            )),
+        }
+    }
+
+    /// Spawn a native process for a `RuntimeType::Native` module.
+    fn spawn_native_child(&self) -> Result<tokio::process::Child, String> {
+        let command = &self.manifest.runtime.command;
+        let mut cmd = tokio::process::Command::new(command);
+        cmd.args(&self.manifest.runtime.args)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null());
+        for (k, v) in &self.manifest.runtime.env {
+            cmd.env(k, v);
+        }
+        cmd.spawn()
+            .map_err(|e| format!("failed to spawn sidecar '{}': {e}", command))
+    }
+
+    /// Spawn a container via the auto-detected container runtime.
+    ///
+    /// For Docker/Podman modules:
+    /// - `manifest.runtime.command` is the container image name.
+    /// - `manifest.runtime.args[0]` is the command inside the container.
+    /// - `manifest.runtime.args[1..]` are arguments to that command.
+    #[cfg(feature = "containers")]
+    async fn spawn_container_child(&self) -> Result<tokio::process::Child, String> {
+        use super::container::{detect_runtime, ContainerConfig};
+
+        let runtime = detect_runtime().ok_or_else(|| {
+            format!(
+                "module '{}' requires a container runtime but neither Docker nor \
+                 Podman was found",
+                self.manifest.module.id
+            )
+        })?;
+
+        let config = ContainerConfig {
+            image: self.manifest.runtime.command.clone(),
+            command: self.manifest.runtime.args.first().cloned().unwrap_or_default(),
+            args: self
+                .manifest
+                .runtime
+                .args
+                .get(1..)
+                .unwrap_or(&[])
+                .to_vec(),
+            env: self.manifest.runtime.env.clone(),
+            memory_limit_mb: Some(self.manifest.security.max_memory_mb),
+            network_disabled: !self.manifest.security.allow_network,
+            timeout_secs: self.manifest.runtime.timeout_secs,
+            volumes: vec![],
+        };
+
+        runtime.spawn(&config).await
     }
 }
 

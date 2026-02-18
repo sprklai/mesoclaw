@@ -25,11 +25,20 @@ pub mod manifest;
 pub mod protocol;
 pub mod sidecar_tool;
 
+#[cfg(feature = "containers")]
+pub mod container;
+
+#[cfg(feature = "mcp-client")]
+pub mod mcp_client;
+
 pub use manifest::{
     load_manifest, parse_manifest, ModuleManifest, ModuleType, ParametersConfig,
     RuntimeConfig, RuntimeType, SecurityConfig,
 };
 pub use sidecar_tool::SidecarTool;
+
+#[cfg(feature = "mcp-client")]
+pub use mcp_client::{McpClient, McpTool, McpToolProxy};
 
 use std::{collections::HashMap, path::Path, sync::Arc};
 
