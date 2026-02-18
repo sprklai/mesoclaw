@@ -183,7 +183,7 @@ fn run_repl(raw: bool, json: bool) {
     let stdin = io::stdin();
     loop {
         print!("mesoclaw> ");
-        io::stdout().flush().expect("failed to flush stdout");
+        io::stdout().flush().unwrap_or_else(|e| eprintln!("flush error: {e}"));
 
         let mut line = String::new();
         match stdin.lock().read_line(&mut line) {
