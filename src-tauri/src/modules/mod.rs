@@ -23,6 +23,7 @@
 
 pub mod manifest;
 pub mod protocol;
+pub mod sidecar_service;
 pub mod sidecar_tool;
 
 #[cfg(feature = "containers")]

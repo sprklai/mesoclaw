@@ -298,6 +298,7 @@ mod tests {
             },
             security: SecurityConfig::default(),
             parameters: ParametersConfig::default(),
+            service: Default::default(),
         }
     }
 

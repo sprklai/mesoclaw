@@ -115,6 +115,62 @@ pub struct ParametersConfig {
     pub schema: Option<String>,
 }
 
+// ─── ServiceConfig ─────────────────────────────────────────────────────────────
+
+/// Optional `[service]` section — only used when `module.type = "service"`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ServiceConfig {
+    /// TCP port the service listens on (used to construct default endpoints).
+    pub http_port: Option<u16>,
+    /// Path to the health check endpoint (e.g. `"/health"`).
+    #[serde(default = "default_health_endpoint")]
+    pub health_endpoint: String,
+    /// Path to the JSON-RPC execution endpoint (e.g. `"/execute"`).
+    #[serde(default = "default_execute_endpoint")]
+    pub execute_endpoint: String,
+    /// Maximum seconds to wait for the service to become healthy on start.
+    #[serde(default = "default_startup_timeout")]
+    pub startup_timeout_secs: u64,
+    /// Interval between health-check polls in seconds.
+    #[serde(default = "default_health_poll_secs")]
+    pub health_poll_secs: u64,
+}
+
+fn default_health_endpoint() -> String {
+    "/health".to_owned()
+}
+
+fn default_execute_endpoint() -> String {
+    "/execute".to_owned()
+}
+
+fn default_startup_timeout() -> u64 {
+    30
+}
+
+fn default_health_poll_secs() -> u64 {
+    10
+}
+
+impl ServiceConfig {
+    /// Build the base URL for the service given the host.
+    pub fn base_url(&self, host: &str) -> Option<String> {
+        self.http_port.map(|p| format!("http://{host}:{p}"))
+    }
+
+    /// Build the full health check URL.
+    pub fn health_url(&self, host: &str) -> Option<String> {
+        self.base_url(host)
+            .map(|base| format!("{base}{}", self.health_endpoint))
+    }
+
+    /// Build the full execute URL.
+    pub fn execute_url(&self, host: &str) -> Option<String> {
+        self.base_url(host)
+            .map(|base| format!("{base}{}", self.execute_endpoint))
+    }
+}
+
 // ─── Top-level manifest ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,6 +181,8 @@ pub struct ModuleManifest {
     pub security: SecurityConfig,
     #[serde(default)]
     pub parameters: ParametersConfig,
+    #[serde(default)]
+    pub service: ServiceConfig,
 }
 
 impl ModuleManifest {
