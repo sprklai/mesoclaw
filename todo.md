@@ -26,8 +26,8 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | ⏳ | `src-tauri/src/agent/session_router.rs` | 179 | Session router: complete Phase 4.3.3 wiring | Medium |
 | ✅ | `src-tauri/src/agent/loop_.rs` | 244 | Implement full approval flow via EventBus (currently logs only) | High |
 | ✅ | `src-tauri/src/scheduler/commands.rs` | 12–45 | Resolve managed `TokioScheduler` from app state in all scheduler IPC commands | Medium |
-| ⏳ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 217 | Persist scheduled jobs to SQLite `scheduled_jobs` table (Phase 4.1.11) | Low |
-| ⏳ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 226 | Delete from `scheduled_jobs` SQLite table on `remove_job` | Low |
+| ✅ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 217 | Persist scheduled jobs to SQLite `scheduled_jobs` table — `add_job` upserts, `new_with_persistence` loads on startup | Low |
+| ✅ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 226 | Delete from `scheduled_jobs` SQLite table on `remove_job` | Low |
 | ⏳ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 262 | Run heartbeat items via `AgentLoop` (Phase 3 follow-up) | Medium |
 | ⏳ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 266 | Run `AgentTurn` prompt through `AgentLoop` (Phase 3 follow-up) | Medium |
 | ✅ | `src-tauri/src/memory/commands.rs` | 17–41 | Resolve managed `InMemoryStore` from app state in all memory IPC commands | Medium |

@@ -133,19 +133,6 @@ pub fn run() {
                 Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
             app.manage(cancel_map);
 
-            // Initialize and manage the scheduler so IPC commands can reach it.
-            {
-                use scheduler::traits::Scheduler as _;
-                let bus_sched: Arc<dyn event_bus::EventBus> = app
-                    .try_state::<Arc<dyn event_bus::EventBus>>()
-                    .map(|s| s.inner().clone())
-                    .ok_or("EventBus not initialised before scheduler")?;
-                let sched = scheduler::TokioScheduler::new(bus_sched);
-                let sched_clone = Arc::clone(&sched);
-                tauri::async_runtime::spawn(async move { sched_clone.start().await });
-                app.manage(sched);
-            }
-
             // Initialize and manage the in-memory store so IPC commands can reach it.
             app.manage(Arc::new(memory::store::InMemoryStore::new_mock()));
 
@@ -213,6 +200,22 @@ pub fn run() {
             // Initialize database and manage the connection pool
             let pool = database::init(app.handle())?;
             app.manage(pool.clone());
+
+            // Initialize and manage the scheduler with SQLite persistence.
+            {
+                use scheduler::traits::Scheduler as _;
+                let bus_sched: Arc<dyn event_bus::EventBus> = app
+                    .try_state::<Arc<dyn event_bus::EventBus>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("EventBus not initialised before scheduler")?;
+                let sched = scheduler::TokioScheduler::new_with_persistence(
+                    bus_sched,
+                    Some(pool.clone()),
+                );
+                let sched_clone = Arc::clone(&sched);
+                tauri::async_runtime::spawn(async move { sched_clone.start().await });
+                app.manage(sched);
+            }
 
             plugins::system_tray::setup(app, &pool)?;
 
