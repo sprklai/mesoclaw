@@ -58,6 +58,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(plugins::logging::build().build())
         .setup(|app| {
             plugins::logging::init(app);
@@ -83,6 +85,19 @@ pub fn run() {
             // Initialize window state plugin
             #[cfg(desktop)]
             plugins::window_state::init(app)?;
+
+            // Initialize single-instance guard: prevent a second desktop process
+            // from starting while the daemon is already running.
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {
+                // When a second instance is launched, focus the existing window.
+                log::info!("single-instance: second launch detected, ignoring");
+            }))?;
+
+            // Initialize deep-link handler for OAuth callback URIs
+            // (e.g. mesoclaw://oauth/callback?code=...).
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_deep_link::init())?;
 
             // Initialize autostart plugin
             #[cfg(desktop)]

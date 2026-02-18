@@ -32,6 +32,11 @@
     "store:allow-values",
     "store:allow-entries",
     "store:allow-length",
-    "store:allow-reset"
+    "store:allow-reset",
+    "shell:allow-open",
+    "updater:default",
+    "updater:allow-check",
+    "updater:allow-download-and-install",
+    "deep-link:default"
   ]
 }
