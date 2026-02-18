@@ -57,7 +57,7 @@ cli = []
 # Tauri desktop GUI binary
 desktop = []
 # Gateway server (inter-process communication hub) — Phase 2
-gateway = ["axum", "tower-http", "tokio-tungstenite"]
+gateway = ["axum", "tower-http"]
 # Sidecar process management — required by containers and mcp-client
 sidecars = []
 # Container runtime integration (requires sidecar management)
@@ -112,7 +112,8 @@ notify = { version = "6", features = ["macos_fsevent"] }
 # Gateway (Phase 2.5)
 axum = { version = "0.7", features = ["ws", "macros"], optional = true }
 tower-http = { version = "0.5", features = ["cors", "trace"], optional = true }
-tokio-tungstenite = { version = "0.21", optional = true }
+# Non-optional: needed by both gateway server and CLI WebSocket client.
+tokio-tungstenite = "0.21"
 
 # CLI dependencies
 clap = { version = "4", features = ["derive"] }

@@ -1,3 +1,17 @@
+/**
+ * LLM provider configuration store.
+ *
+ * ## TODO: migrate provider listing + session creation to gateway REST API (Phase 3)
+ * The following operations should be moved to GatewayClient HTTP calls once
+ * the corresponding gateway routes are implemented:
+ *   - loadProvidersAndModels  → GET /api/v1/providers
+ *   - Provider health check   → GET /api/v1/providers/status
+ *
+ * Operations that MUST remain on Tauri IPC (OS-level, no gateway equivalent):
+ *   - API key read/write/delete (keychain commands: keychain_get/set/delete)
+ *   - configure_llm_provider_command (writes to app SQLite DB via Diesel)
+ *   - add/delete model and provider commands (writes to app SQLite DB)
+ */
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 

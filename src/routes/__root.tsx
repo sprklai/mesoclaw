@@ -3,6 +3,7 @@ import { Outlet, createRootRoute } from "@tanstack/react-router";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/ui/sidebar";
 import { APP_IDENTITY } from "@/config/app-identity";
+import { GatewayStatus } from "@/components/ui/gateway-status";
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -48,6 +49,7 @@ function RootLayout() {
             />
             <span className="text-xl font-bold">{APP_IDENTITY.productName}</span>
           </div>
+          <GatewayStatus />
         </div>
 
         {/*
