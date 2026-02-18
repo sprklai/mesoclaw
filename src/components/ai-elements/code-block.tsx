@@ -6,7 +6,7 @@
  *
  * Features:
  * - Text wrap toggle for long lines
- * - Database-agnostic language detection (SQL, MongoDB)
+ * - Language detection (SQL, JavaScript, JSON)
  * - Copy to clipboard functionality
  *
  * Based on: https://ai-sdk.dev/elements/components/code-block
@@ -52,9 +52,6 @@ function getLanguageColor(language: string): string {
   // Map common aliases
   if (["postgresql", "mysql", "sqlite"].includes(normalizedLang)) {
     return languageColors.sql;
-  }
-  if (["mongo"].includes(normalizedLang)) {
-    return languageColors.mongodb;
   }
   if (["ts", "typescript"].includes(normalizedLang)) {
     return "text-blue-300";

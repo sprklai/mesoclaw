@@ -88,19 +88,3 @@ export {
   ArtifactClose,
   ArtifactContent,
 } from "./artifact";
-
-// Database Selector components
-export {
-  DatabaseSelector,
-  DatabaseSelectorContent,
-  DatabaseSelectorDescription,
-  DatabaseSelectorDialog,
-  DatabaseSelectorEmpty,
-  DatabaseSelectorGroup,
-  DatabaseSelectorInput,
-  DatabaseSelectorItem,
-  DatabaseSelectorList,
-  DatabaseSelectorLogo,
-  DatabaseSelectorName,
-  DatabaseSelectorTrigger,
-} from "./database-selector";

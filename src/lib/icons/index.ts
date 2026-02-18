@@ -2,19 +2,15 @@
  * Centralized Icon System
  *
  * This module provides a single import point for all icons used in the application.
- * Icons are organized into three categories:
+ * Icons are organized into two categories:
  *
  * 1. **UI Icons** (lucide-react) - General UI icons for navigation, actions, status, etc.
- * 2. **Database Icons** (react-icons) - Brand-specific icons for database systems
- * 3. **AI Icons** (@lobehub/icons) - AI provider logos and branding
+ * 2. **AI Icons** (@lobehub/icons) - AI provider logos and branding
  *
  * @example
  * ```tsx
  * // Import any icon from the centralized system
- * import { Database, Loader2, SiPostgresql, Claude } from '@/lib/icons';
- *
- * // Import database icon utilities
- * import { getDatabaseIcon, DatabaseType } from '@/lib/icons';
+ * import { Database, Loader2, Claude } from '@/lib/icons';
  * ```
  *
  * @module icons
@@ -142,27 +138,6 @@ export {
   // Connection & Network
   WifiOff,
 } from "./ui-icons";
-
-// ============================================
-// DATABASE ICONS (React Icons)
-// ============================================
-export {
-  // Individual database icons
-  SiCockroachlabs,
-  SiMariadb,
-  SiMongodb,
-  SiMysql,
-  SiPlanetscale,
-  SiPostgresql,
-  SiSqlite,
-  SiSupabase,
-
-  // Registry and utilities
-  DATABASE_BRAND_COLORS,
-  DATABASE_ICONS,
-  getDatabaseBrandColor,
-  getDatabaseIcon,
-} from "./database-icons";
 
 // ============================================
 // AI PROVIDER ICONS (@lobehub/icons)
