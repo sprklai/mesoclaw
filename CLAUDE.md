@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Frontend**: React 19 + TypeScript + Vite + TanStack Router + Zustand + Tailwind CSS 4
 - **Backend**: Rust 2024 + Tauri 2 + Diesel ORM + Tokio async runtime
-- **Databases**: SQLite (complete), PostgreSQL, MySQL (95% complete), MongoDB (95% complete)
+- **Databases**: SQLite (complete), PostgreSQL
 - **AI**: Multi-provider LLM support (OpenAI, Anthropic, Google AI, Groq, Vercel AI Gateway, Ollama)
 
 ## Quick Start
@@ -220,6 +220,7 @@ When implementing features that are not yet complete or using mock/placeholder i
    - Update status when addressed
 
 Example:
+
 ```typescript
 // ## TODO: Implement actual authentication
 // See todo.md line 42
@@ -249,6 +250,7 @@ When you notice a pattern used multiple times across files:
    - **Date formatting**: Shared date/time utilities
 
 Example - Toast utility:
+
 ```typescript
 // src/lib/toast.ts
 import { toast } from "sonner";
@@ -260,7 +262,7 @@ export const showSuccess = (message: string) => {
 export const showError = (message: string, error?: Error) => {
   toast.error(message, {
     description: error?.message,
-    duration: 5000
+    duration: 5000,
   });
 };
 ```
@@ -282,6 +284,7 @@ export const showError = (message: string, error?: Error) => {
 ### Error Handling Patterns
 
 1. **Frontend**: Use try-catch with user-friendly error messages
+
    ```typescript
    try {
      await invoke("command_name");
@@ -292,6 +295,7 @@ export const showError = (message: string, error?: Error) => {
    ```
 
 2. **Backend**: Return `Result<T, String>` from commands
+
    ```rust
    #[tauri::command]
    pub fn my_command() -> Result<String, String> {
@@ -309,12 +313,14 @@ export const showError = (message: string, error?: Error) => {
 ### Testing Best Practices
 
 1. **Test naming**: Descriptive test names that explain what is being tested
+
    ```typescript
    it("should validate email format correctly", () => {});
    it("should handle empty input gracefully", () => {});
    ```
 
 2. **Arrange-Act-Assert**: Structure tests clearly
+
    ```typescript
    it("should add two numbers", () => {
      // Arrange
@@ -414,7 +420,6 @@ This project has **layered documentation**:
 
 **Planned**:
 
-- Supabase database integration
 - Local LLM support (Ollama integration complete)
 - Internationalization (i18n)
 
