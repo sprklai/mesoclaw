@@ -4,6 +4,7 @@ mod commands;
 pub mod config;
 pub mod database;
 pub mod event_bus;
+pub mod identity;
 mod plugins;
 pub mod security;
 pub mod services;
@@ -66,6 +67,16 @@ pub fn run() {
             tools::register_builtin_tools(&mut registry, policy.clone());
             app.manage(policy);
             app.manage(registry);
+
+            // Initialize identity loader with hot-reload watcher.
+            let identity_dir = identity::default_identity_dir()?;
+            let bus_ref: Arc<dyn event_bus::EventBus> = app
+                .try_state::<Arc<dyn event_bus::EventBus>>()
+                .map(|s| s.inner().clone())
+                .ok_or("EventBus not initialised before IdentityLoader")?;
+            let id_loader = identity::IdentityLoader::new_with_watcher(identity_dir, bus_ref)
+                .map_err(|e| format!("identity loader: {e}"))?;
+            app.manage(id_loader);
 
             // Initialize database and manage the connection pool
             let pool = database::init(app.handle())?;
@@ -132,6 +143,11 @@ pub fn run() {
             commands::skills::suggest_skills_command,
             // Approval command
             commands::approval::approve_action_command,
+            // Identity commands
+            identity::commands::get_identity_file_command,
+            identity::commands::update_identity_file_command,
+            identity::commands::list_identity_files_command,
+            identity::commands::get_system_prompt_command,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]

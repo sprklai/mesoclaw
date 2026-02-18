@@ -108,6 +108,7 @@ urlencoding = "2"
 serde_yaml = "0.9"
 tera = "1"
 tracing = "0.1"
+notify = { version = "6", features = ["macos_fsevent"] }
 
 # CLI dependencies
 clap = { version = "4", features = ["derive"] }
