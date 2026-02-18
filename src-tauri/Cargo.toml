@@ -112,6 +112,8 @@ notify = { version = "6", features = ["macos_fsevent"] }
 # Module system (Phase 2.8)
 toml = "0.8"
 which = "7"
+# Scheduler (Phase 4.1)
+cron = "0.12"
 # Gateway (Phase 2.5)
 axum = { version = "0.7", features = ["ws", "macros"], optional = true }
 tower-http = { version = "0.5", features = ["cors", "trace"], optional = true }

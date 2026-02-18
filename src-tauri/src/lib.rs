@@ -9,6 +9,7 @@ pub mod gateway;
 pub mod identity;
 pub mod memory;
 pub mod modules;
+pub mod scheduler;
 mod plugins;
 pub mod security;
 pub mod services;
