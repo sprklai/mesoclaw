@@ -25,6 +25,7 @@
 
 pub mod chunker;
 pub mod commands;
+pub mod daily;
 pub mod embeddings;
 pub mod store;
 pub mod tools;
@@ -38,6 +39,7 @@ pub use chunker::{Chunk, ChunkConfig, split_into_chunks};
 pub use commands::{
     forget_memory_command, get_daily_memory_command, search_memory_command, store_memory_command,
 };
+pub use daily::DailyMemory;
 pub use embeddings::{
     EmbeddingProvider, LruEmbeddingCache, MockEmbeddingProvider, cosine_similarity,
 };

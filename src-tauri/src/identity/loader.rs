@@ -133,8 +133,17 @@ impl IdentityLoader {
     /// Build the complete system prompt from all identity files, in the
     /// canonical assembly order: SOUL → AGENTS → USER → TOOLS → placeholders.
     pub fn build_system_prompt(&self) -> String {
+        self.build_system_prompt_with_daily(None)
+    }
+
+    /// Build the system prompt and optionally append a daily-memory context
+    /// block after the identity sections.
+    ///
+    /// `daily_context` should be produced by
+    /// [`crate::memory::DailyMemory::build_daily_context`].
+    pub fn build_system_prompt_with_daily(&self, daily_context: Option<&str>) -> String {
         let id = self.get();
-        [
+        let mut parts: Vec<String> = [
             ("# Soul", id.soul.as_str()),
             ("# Agents", id.agents.as_str()),
             ("# User", id.user.as_str()),
@@ -142,8 +151,15 @@ impl IdentityLoader {
         ]
         .iter()
         .map(|(header, body)| format!("{header}\n\n{body}"))
-        .collect::<Vec<_>>()
-        .join("\n\n---\n\n")
+        .collect();
+
+        if let Some(ctx) = daily_context {
+            if !ctx.trim().is_empty() {
+                parts.push(format!("# Memory\n\n{ctx}"));
+            }
+        }
+
+        parts.join("\n\n---\n\n")
     }
 }
 
