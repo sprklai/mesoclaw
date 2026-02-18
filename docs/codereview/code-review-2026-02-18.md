@@ -14,7 +14,7 @@ Reviewed all commits from `1653997` through `09f02f1` on `master`:
 
 ## Findings (Ordered by Severity)
 
-### 1) High: Skill configuration commands now acknowledge writes but never persist them
+### 1) High: Skill configuration commands now acknowledge writes but never persist them ✅ Fixed
 - Location: `src-tauri/src/commands/skills.rs:61`, `src-tauri/src/commands/skills.rs:71`, `src-tauri/src/commands/skills.rs:82`, `src-tauri/src/commands/skills.rs:104`
 - Location: `src-tauri/src/commands/skills.rs:39`
 - What happens:
@@ -23,19 +23,19 @@ Reviewed all commits from `1653997` through `09f02f1` on `master`:
 - Impact:
   - Frontend/API callers receive successful responses for writes that are discarded.
   - UI state can drift from persisted backend state expectations and reset on reload.
-- Recommendation:
-  - Either implement persistence (db/file) or return explicit `Err("not supported")` so callers can gate UX and avoid false success.
+- Resolution (commit `a0bd8e6`):
+  - All four write commands now return `Err("not supported: ...")` with a descriptive message. Callers can detect the error and gate their UI accordingly.
 
-### 2) Medium: Skill suggestion endpoint is effectively disabled
+### 2) Medium: Skill suggestion endpoint is effectively disabled ✅ Fixed
 - Location: `src-tauri/src/commands/skills.rs:116`
 - What happens:
   - `suggest_skills_command` always returns an empty list.
 - Impact:
   - Any feature relying on server-side suggestions silently degrades.
-- Recommendation:
-  - Implement minimal keyword/category matching over prompt metadata, or return explicit not-supported errors until a replacement strategy exists.
+- Resolution (commit `a0bd8e6`):
+  - Implemented keyword matching: request is split into words, each word is checked against skill name + description + category. Results are scored by `matched_words / total_words` and returned sorted by descending relevance. Empty requests return `[]`.
 
-### 3) Medium: Release profile optimization commit is currently ineffective in workspace layout
+### 3) Medium: Release profile optimization commit is currently ineffective in workspace layout ✅ Fixed
 - Location: `src-tauri/Cargo.toml:134`
 - Supporting evidence: `cargo check --manifest-path src-tauri/Cargo.toml --lib` emits:
   - `profiles for the non root package will be ignored, specify profiles at the workspace root`
@@ -43,18 +43,20 @@ Reviewed all commits from `1653997` through `09f02f1` on `master`:
   - `[profile.release]` changes added to `src-tauri/Cargo.toml` are ignored because this crate is a workspace member and profile settings must be defined at workspace root (`Cargo.toml`).
 - Impact:
   - Claimed binary-size optimization may not be applied in real release builds.
-- Recommendation:
-  - Move release profile configuration to workspace root `Cargo.toml`.
+- Resolution (commit `a0bd8e6`):
+  - Moved all `[profile.dev]`, `[profile.dev.package."*"]`, and `[profile.release]` sections to the workspace root `Cargo.toml`. Left a comment in `src-tauri/Cargo.toml` explaining the placement. Confirmed `cargo check` emits no profile-ignored warnings.
 
-### 4) Medium: `ReliableProvider` capability reporting can misrepresent fallback behavior
+### 4) Medium: `ReliableProvider` capability reporting can misrepresent fallback behavior ✅ Fixed
 - Location: `src-tauri/src/ai/providers/reliable.rs:97`, `src-tauri/src/ai/providers/reliable.rs:101`
 - What happens:
   - `context_limit()` and `supports_tools()` always proxy the primary provider.
   - If execution falls back to a provider with stricter limits or different feature support, pre-checks based on wrapper metadata may be invalid.
 - Impact:
   - Requests accepted under primary limits may fail after fallback switch.
-- Recommendation:
-  - Expose conservative aggregate capabilities (e.g., minimum context limit across chain; tool support based on fallback policy), or document that fallback providers must be capability-compatible.
+- Resolution (commit `a0bd8e6`):
+  - `context_limit()` now returns the minimum across the primary and all fallback providers.
+  - `supports_tools()` now returns `true` only when every provider in the chain supports tools.
+  - All 4 existing `reliable::tests` still pass.
 
 ## Commit-by-Commit Notes
 - `1653997`: Safe lint cleanup; no functional issue found.
