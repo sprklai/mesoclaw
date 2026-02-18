@@ -1,277 +1,122 @@
-//! Tauri commands for the skill system.
+//! Tauri commands for the prompt template system.
 //!
-//! These commands expose skill functionality to the frontend.
+//! Replaces the previous complex skill system with lightweight, filesystem-based
+//! prompt templates. All IPC command names and signatures are kept stable so
+//! the frontend requires no changes.
+//!
+//! Commands that previously required database access (settings, enable/disable,
+//! auto-select) are now no-ops — all templates are always available.
 
-use tauri::State;
+use std::collections::HashMap;
 
-// Database-specific imports commented out
-// use crate::adapters::KnoAdapter;
-// use crate::ai::providers::create_provider_from_db;
-// use crate::database::connection_manager::ConnectionManager;
-use crate::database::DbPool;
-use crate::skills::{
-    get_or_init_registry, reload_registry, SelectionContext, SkillInfo,
-    SkillSettings, SkillSettingsService, SkillUserConfig,
+use crate::prompts::{
+    get_or_init_registry, SkillDefinition, SkillInfo, SkillSettings, SkillSuggestion,
+    SkillUserConfig,
 };
 
-/// List all available skills.
+/// List all available prompt templates as `SkillInfo` objects.
 #[tauri::command]
-pub async fn list_available_skills_command(
-    _pool: State<'_, DbPool>,
-) -> Result<Vec<SkillInfo>, String> {
+pub async fn list_available_skills_command() -> Result<Vec<SkillInfo>, String> {
     let registry = get_or_init_registry().await;
-    Ok(registry.get_skill_infos())
+    Ok(registry.skill_infos().await)
 }
 
-/// Get detailed information about a specific skill.
+/// Get detailed information (full `SkillDefinition`) for a specific template.
 #[tauri::command]
-pub async fn get_skill_details_command(
-    skill_id: String,
-    _pool: State<'_, DbPool>,
-) -> Result<crate::skills::SkillDefinition, String> {
+pub async fn get_skill_details_command(skill_id: String) -> Result<SkillDefinition, String> {
     let registry = get_or_init_registry().await;
     registry
         .get(&skill_id)
-        .ok_or_else(|| format!("Skill not found: {}", skill_id))
+        .await
+        .ok_or_else(|| format!("Template not found: {skill_id}"))
 }
 
 /// Get skill settings for a workspace.
+///
+/// In the template system every template is always enabled, so this returns a
+/// synthetic `SkillSettings` with all templates marked enabled.
 #[tauri::command]
 pub async fn get_skill_settings_command(
-    workspace_id: String,
-    pool: State<'_, DbPool>,
+    _workspace_id: String,
 ) -> Result<SkillSettings, String> {
-    let service = SkillSettingsService::new(pool.inner().clone());
-    service
-        .get_settings(&workspace_id)
-        .map_err(|e| format!("Failed to get skill settings: {}", e))
+    let registry = get_or_init_registry().await;
+    let skills = registry
+        .skill_infos()
+        .await
+        .into_iter()
+        .map(|info| SkillUserConfig {
+            skill_id: info.id,
+            enabled: true,
+            priority_override: None,
+        })
+        .collect();
+    Ok(SkillSettings {
+        auto_select: false,
+        skills,
+    })
 }
 
-/// Set whether a skill is enabled for a workspace.
+/// Enable or disable a skill for a workspace (no-op in the template system).
 #[tauri::command]
 pub async fn set_skill_enabled_command(
-    workspace_id: String,
-    skill_id: String,
-    enabled: bool,
-    pool: State<'_, DbPool>,
+    _workspace_id: String,
+    _skill_id: String,
+    _enabled: bool,
 ) -> Result<(), String> {
-    let service = SkillSettingsService::new(pool.inner().clone());
-    service
-        .set_skill_enabled(&workspace_id, &skill_id, enabled)
-        .map_err(|e| format!("Failed to update skill setting: {}", e))
+    Ok(())
 }
 
-/// Update skill configuration for a workspace.
+/// Update skill configuration for a workspace (no-op in the template system).
 #[tauri::command]
 pub async fn update_skill_config_command(
-    workspace_id: String,
-    skill_id: String,
-    enabled: bool,
-    priority_override: Option<i32>,
-    pool: State<'_, DbPool>,
+    _workspace_id: String,
+    _skill_id: String,
+    _enabled: bool,
+    _priority_override: Option<i32>,
 ) -> Result<(), String> {
-    let service = SkillSettingsService::new(pool.inner().clone());
-    let config = SkillUserConfig {
-        enabled,
-        priority_override,
-    };
-    service
-        .update_skill_config(&workspace_id, &skill_id, config)
-        .map_err(|e| format!("Failed to update skill config: {}", e))
+    Ok(())
 }
 
-/// Initialize default skill settings for a workspace.
+/// Initialise default skill settings for a workspace (no-op in the template system).
 #[tauri::command]
-pub async fn initialize_skill_defaults_command(
-    workspace_id: String,
-    pool: State<'_, DbPool>,
-) -> Result<(), String> {
-    let registry = get_or_init_registry().await;
-
-    // Get skills that are enabled by default
-    let default_enabled: Vec<String> = registry
-        .list_all()
-        .into_iter()
-        .filter(|s| s.feature.default_enabled)
-        .map(|s| s.id)
-        .collect();
-
-    let service = SkillSettingsService::new(pool.inner().clone());
-    service
-        .initialize_defaults(&workspace_id, &default_enabled)
-        .map_err(|e| format!("Failed to initialize defaults: {}", e))
+pub async fn initialize_skill_defaults_command(_workspace_id: String) -> Result<(), String> {
+    Ok(())
 }
 
-/*
-// Database-specific skill execution commands - commented out for boilerplate
-// Re-implement these if you need database-backed skill execution
-
-/// Execute a request using the skill system.
-#[tauri::command]
-pub async fn execute_with_skills_command(
-    workspace_id: String,
-    request: String,
-    entity_type: Option<String>,
-    task_hint: Option<String>,
-    provider_id: String,
-    api_key: String,
-    connection_manager: State<'_, Arc<ConnectionManager>>,
-    pool: State<'_, DbPool>,
-) -> Result<SkillOutput, String> {
-    Err("Database-backed skill execution not implemented in boilerplate".to_string())
-}
-
-/// Execute a specific skill by ID.
-#[tauri::command]
-pub async fn execute_skill_command(
-    workspace_id: String,
-    skill_id: String,
-    request: String,
-    provider_id: String,
-    api_key: String,
-    connection_manager: State<'_, Arc<ConnectionManager>>,
-    pool: State<'_, DbPool>,
-) -> Result<SkillOutput, String> {
-    Err("Database-backed skill execution not implemented in boilerplate".to_string())
-}
-*/
-
-/// Reload skills from all sources.
+/// Reload templates from the filesystem.
 #[tauri::command]
 pub async fn reload_skills_command() -> Result<(), String> {
-    reload_registry()
-        .await
-        .map_err(|e| format!("Failed to reload skills: {}", e))
+    let registry = get_or_init_registry().await;
+    registry.load().await;
+    Ok(())
 }
 
-/// List skills grouped by category.
+/// List templates grouped by category.
 #[tauri::command]
 pub async fn list_skills_by_category_command(
-) -> Result<std::collections::HashMap<String, Vec<SkillInfo>>, String> {
+) -> Result<HashMap<String, Vec<SkillInfo>>, String> {
     let registry = get_or_init_registry().await;
-
-    let all_skills = registry.get_skill_infos();
-    let mut by_category: std::collections::HashMap<String, Vec<SkillInfo>> =
-        std::collections::HashMap::new();
-
-    for skill in all_skills {
-        by_category
-            .entry(skill.category.clone())
-            .or_default()
-            .push(skill);
-    }
-
-    Ok(by_category)
+    Ok(registry.by_category().await)
 }
 
-/// Toggle auto-select mode for a workspace.
+/// Toggle auto-select mode for a workspace (no-op in the template system).
 #[tauri::command]
 pub async fn set_skill_auto_select_command(
-    workspace_id: String,
-    auto_select: bool,
-    pool: State<'_, DbPool>,
+    _workspace_id: String,
+    _auto_select: bool,
 ) -> Result<(), String> {
-    let service = SkillSettingsService::new(pool.inner().clone());
-    service
-        .set_auto_select(&workspace_id, auto_select)
-        .map_err(|e| format!("Failed to update auto-select: {}", e))
+    Ok(())
 }
 
-/// Skill suggestion for a given request.
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillSuggestion {
-    pub skill_id: String,
-    pub skill_name: String,
-    pub description: String,
-    pub relevance_score: f32,
-    pub matched_triggers: Vec<String>,
-}
-
-/// Get skill suggestions for a user request.
+/// Suggest skills for a given request.
 ///
-/// Returns a list of skills that might be relevant for the given request,
-/// based on trigger matching. This is useful for showing skill chips in the UI.
+/// The template system does not perform AI-based selection, so this always
+/// returns an empty list.
 #[tauri::command]
 pub async fn suggest_skills_command(
-    workspace_id: String,
-    request: String,
-    database_type: Option<String>,
-    pool: State<'_, DbPool>,
+    _workspace_id: String,
+    _request: String,
+    _database_type: Option<String>,
 ) -> Result<Vec<SkillSuggestion>, String> {
-    use crate::skills::SkillSelector;
-
-    let registry = get_or_init_registry().await;
-
-    // Get enabled skills for this workspace
-    let settings_service = SkillSettingsService::new(pool.inner().clone());
-    let settings = settings_service
-        .get_settings(&workspace_id)
-        .map_err(|e| format!("Failed to get skill settings: {}", e))?;
-
-    // Build selection context
-    let context = SelectionContext {
-        request: request.clone(),
-        database_type,
-        entity_type: None,
-        task_hint: None,
-        available_context: vec!["schema".to_string(), "database_type".to_string()],
-        enabled_skills: settings.enabled_skills,
-    };
-
-    // Use selector to pre-filter matching skills
-    let selector = SkillSelector::new(registry.clone());
-    let candidates = selector.pre_filter(&context);
-
-    // Convert to suggestions with relevance scoring
-    let request_lower = request.to_lowercase();
-    let suggestions: Vec<SkillSuggestion> = candidates
-        .into_iter()
-        .map(|skill| {
-            // Calculate relevance based on trigger matches
-            let mut matched_triggers = Vec::new();
-            let mut score: f32 = 0.0;
-
-            for trigger in &skill.triggers.task_types {
-                if request_lower.contains(&trigger.to_lowercase()) {
-                    matched_triggers.push(trigger.clone());
-                    score += 0.3;
-                }
-            }
-
-            for entity in &skill.triggers.entity_types {
-                if request_lower.contains(&entity.to_lowercase()) {
-                    matched_triggers.push(entity.clone());
-                    score += 0.2;
-                }
-            }
-
-            // Boost score if skill name appears in request
-            if request_lower.contains(&skill.name.to_lowercase()) {
-                score += 0.5;
-            }
-
-            // Cap at 1.0
-            score = score.min(1.0);
-
-            SkillSuggestion {
-                skill_id: skill.id.clone(),
-                skill_name: skill.name.clone(),
-                description: skill.description.clone(),
-                relevance_score: score,
-                matched_triggers,
-            }
-        })
-        .filter(|s| s.relevance_score > 0.0 || !s.matched_triggers.is_empty())
-        .collect();
-
-    // Sort by relevance score descending
-    let mut sorted = suggestions;
-    sorted.sort_by(|a, b| {
-        b.relevance_score
-            .partial_cmp(&a.relevance_score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-
-    Ok(sorted)
+    Ok(vec![])
 }

@@ -28,7 +28,7 @@ pub trait ApplicationAdapter: Send + Sync {
     /// Map skill output to application-specific format (optional).
     fn map_output(
         &self,
-        output: crate::skills::types::SkillOutput,
+        output: crate::prompts::SkillOutput,
     ) -> Result<serde_json::Value, AdapterError> {
         Ok(serde_json::to_value(output)?)
     }
