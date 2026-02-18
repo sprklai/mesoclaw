@@ -38,8 +38,13 @@
 
 pub mod manager;
 pub mod tauri_ipc;
+#[cfg(feature = "channels-telegram")]
+pub mod telegram;
 pub mod traits;
 
 pub use manager::ChannelManager;
 pub use tauri_ipc::TauriIpcChannel;
 pub use traits::{Channel, ChannelEvent, ChannelMessage};
+
+#[cfg(feature = "channels-telegram")]
+pub use telegram::{BotCommand, TelegramChannel, TelegramConfig};
