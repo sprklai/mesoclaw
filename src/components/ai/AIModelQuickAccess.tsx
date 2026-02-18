@@ -25,7 +25,6 @@ const LOCAL_PROVIDER_IDS = ["ollama"];
 interface AIModelQuickAccessProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workspaceId?: string;
   mode?: "workspace" | "global-default";
   filterAvailable?: boolean;
   onSelectGlobalDefault?: (
@@ -42,7 +41,6 @@ interface ProviderCategory {
 export function AIModelQuickAccess({
   open,
   onOpenChange,
-  workspaceId,
   mode = "workspace",
   filterAvailable = false,
   onSelectGlobalDefault,
@@ -145,7 +143,7 @@ export function AIModelQuickAccess({
     if (mode === "global-default" && onSelectGlobalDefault) {
       await onSelectGlobalDefault(providerId, modelId);
     } else {
-      await saveProviderConfig(providerId, modelId, workspaceId);
+      await saveProviderConfig(providerId, modelId);
     }
     onOpenChange(false);
   };

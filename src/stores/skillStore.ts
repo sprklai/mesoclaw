@@ -3,8 +3,7 @@
  *
  * Provides:
  * - List of available skills grouped by category
- * - Per-workspace skill enable/disable state
- * - Skill execution with automatic or manual selection
+ * - Skill enable/disable state (all templates are always enabled)
  */
 
 import { create } from "zustand";
@@ -26,10 +25,8 @@ interface SkillStore {
   // State
   /** All available skills grouped by category */
   skillsByCategory: Record<string, SkillInfo[]>;
-  /** Current workspace's skill settings */
+  /** Current skill settings */
   settings: SkillSettings | null;
-  /** Currently selected workspace ID for settings */
-  currentWorkspaceId: string | null;
   /** Loading state */
   isLoading: boolean;
   /** Error state */
@@ -40,15 +37,15 @@ interface SkillStore {
   // Actions
   /** Load all available skills */
   loadSkills: () => Promise<void>;
-  /** Load settings for a specific workspace */
-  loadSettings: (workspaceId: string) => Promise<void>;
-  /** Initialize default settings for a workspace */
-  initializeDefaults: (workspaceId: string) => Promise<void>;
+  /** Load skill settings */
+  loadSettings: () => Promise<void>;
+  /** Initialize default settings (no-op in template system) */
+  initializeDefaults: () => Promise<void>;
   /** Toggle a skill's enabled state */
   toggleSkill: (skillId: string, enabled: boolean) => Promise<void>;
   /** Toggle auto-select mode */
   toggleAutoSelect: (enabled: boolean) => Promise<void>;
-  /** Get skills enabled for the current workspace */
+  /** Get all enabled skills */
   getEnabledSkills: () => SkillInfo[];
   /** Get skills by category that are enabled */
   getEnabledByCategory: (category: string) => SkillInfo[];
@@ -64,7 +61,6 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   // Initial state
   skillsByCategory: {},
   settings: null,
-  currentWorkspaceId: null,
   isLoading: false,
   error: null,
   skillDetailsCache: new Map(),
@@ -82,16 +78,10 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     }
   },
 
-  loadSettings: async (workspaceId: string) => {
-    set({ isLoading: true, error: null, currentWorkspaceId: workspaceId });
+  loadSettings: async () => {
+    set({ isLoading: true, error: null });
     try {
-      const rawSettings = await getSkillSettings(workspaceId);
-      // Ensure all fields have defaults for backward compatibility
-      const settings: SkillSettings = {
-        enabledSkills: rawSettings.enabledSkills ?? [],
-        skillConfigs: rawSettings.skillConfigs ?? {},
-        autoSelect: rawSettings.autoSelect ?? true,
-      };
+      const settings = await getSkillSettings();
       set({ settings, isLoading: false });
     } catch (error) {
       const message =
@@ -102,13 +92,12 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     }
   },
 
-  initializeDefaults: async (workspaceId: string) => {
+  initializeDefaults: async () => {
     set({ isLoading: true, error: null });
     try {
-      await initializeSkillDefaults(workspaceId);
-      // Reload settings after initialization
-      const settings = await getSkillSettings(workspaceId);
-      set({ settings, currentWorkspaceId: workspaceId, isLoading: false });
+      await initializeSkillDefaults();
+      const settings = await getSkillSettings();
+      set({ settings, isLoading: false });
     } catch (error) {
       const message =
         error instanceof Error
@@ -119,27 +108,32 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   },
 
   toggleSkill: async (skillId: string, enabled: boolean) => {
-    const { currentWorkspaceId, settings } = get();
-    if (!currentWorkspaceId || !settings) {
-      set({ error: "No workspace selected" });
+    const { settings } = get();
+    if (!settings) {
+      set({ error: "Settings not loaded" });
       return;
     }
 
     // Optimistic update
     const previousSettings = settings;
-    const newEnabledSkills = enabled
-      ? [...settings.enabledSkills, skillId]
-      : settings.enabledSkills.filter((id) => id !== skillId);
+    const existingConfig = settings.skills.find(
+      (skill) => skill.skillId === skillId
+    );
+    const nextSkills = existingConfig
+      ? settings.skills.map((skill) =>
+          skill.skillId === skillId ? { ...skill, enabled } : skill
+        )
+      : [...settings.skills, { skillId, enabled }];
 
     set({
       settings: {
         ...settings,
-        enabledSkills: newEnabledSkills,
+        skills: nextSkills,
       },
     });
 
     try {
-      await setSkillEnabled(currentWorkspaceId, skillId, enabled);
+      await setSkillEnabled(skillId, enabled);
     } catch (error) {
       // Rollback on error
       set({ settings: previousSettings });
@@ -150,9 +144,9 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   },
 
   toggleAutoSelect: async (enabled: boolean) => {
-    const { currentWorkspaceId, settings } = get();
-    if (!currentWorkspaceId || !settings) {
-      set({ error: "No workspace selected" });
+    const { settings } = get();
+    if (!settings) {
+      set({ error: "Settings not loaded" });
       return;
     }
 
@@ -166,7 +160,7 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     });
 
     try {
-      await setSkillAutoSelect(currentWorkspaceId, enabled);
+      await setSkillAutoSelect(enabled);
     } catch (error) {
       // Rollback on error
       set({ settings: previousSettings });
@@ -180,7 +174,9 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     const { skillsByCategory, settings } = get();
     if (!settings) return [];
 
-    const enabledSet = new Set(settings.enabledSkills);
+    const enabledSet = new Set(
+      settings.skills.filter((skill) => skill.enabled).map((skill) => skill.skillId)
+    );
     const allSkills = Object.values(skillsByCategory).flat();
     return allSkills.filter((skill) => enabledSet.has(skill.id));
   },
@@ -190,7 +186,9 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     if (!settings) return [];
 
     const categorySkills = skillsByCategory[category] || [];
-    const enabledSet = new Set(settings.enabledSkills);
+    const enabledSet = new Set(
+      settings.skills.filter((skill) => skill.enabled).map((skill) => skill.skillId)
+    );
     return categorySkills.filter((skill) => enabledSet.has(skill.id));
   },
 
@@ -198,15 +196,11 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await reloadSkills();
-      const skillsByCategory = await listSkillsByCategory();
-      set({ skillsByCategory, isLoading: false });
-
-      // Reload settings if we have a workspace
-      const { currentWorkspaceId } = get();
-      if (currentWorkspaceId) {
-        const settings = await getSkillSettings(currentWorkspaceId);
-        set({ settings });
-      }
+      const [skillsByCategory, settings] = await Promise.all([
+        listSkillsByCategory(),
+        getSkillSettings(),
+      ]);
+      set({ skillsByCategory, settings, isLoading: false });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to refresh skills";
@@ -254,5 +248,5 @@ export function useSkillCategories(): string[] {
 export function useIsSkillEnabled(skillId: string): boolean {
   const settings = useSkillStore((state) => state.settings);
   if (!settings) return false;
-  return settings.enabledSkills.includes(skillId);
+  return settings.skills.some((skill) => skill.skillId === skillId && skill.enabled);
 }

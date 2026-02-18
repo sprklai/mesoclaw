@@ -51,21 +51,12 @@ interface LLMStore {
   // API key cache - stores keys in memory for all providers
   apiKeyCache: ApiKeyCache;
 
-  // Workspace-specific configurations (maps workspace ID to config)
-  workspaceConfigs: Map<string, LLMProviderConfig>;
-
   // Loading states
   isLoading: boolean;
   isLoadingProviders: boolean;
 
   // Initialize the store (load config from backend)
-  initialize: (workspaceId?: string) => Promise<void>;
-
-  // Get configuration for a specific workspace (falls back to global)
-  getWorkspaceConfig: (workspaceId: string) => Promise<LLMProviderConfig>;
-
-  // Load configuration for a specific workspace
-  loadWorkspaceConfig: (workspaceId: string) => Promise<void>;
+  initialize: () => Promise<void>;
 
   // Load providers and models from backend
   loadProvidersAndModels: () => Promise<void>;
@@ -117,11 +108,7 @@ interface LLMStore {
   resetAndSeedModels: () => Promise<number>;
 
   // Save provider + model configuration to backend
-  saveProviderConfig: (
-    providerId: string,
-    modelId: string,
-    workspaceId?: string
-  ) => Promise<void>;
+  saveProviderConfig: (providerId: string, modelId: string) => Promise<void>;
 
   // Discover Ollama models
   discoverOllamaModels: () => Promise<number>;
@@ -165,90 +152,28 @@ export const useLLMStore = create<LLMStore>((set, get) => ({
   providersWithModels: [],
   providersWithKeyStatus: [],
   apiKeyCache: {},
-  workspaceConfigs: new Map(),
   isLoading: true,
   isLoadingProviders: false,
 
-  initialize: async (workspaceId?: string) => {
+  initialize: async () => {
     try {
-      // Get provider and model from backend (SQLite)
       const configResponse = await invoke<{
         providerId: string;
         modelId: string;
-      }>("get_llm_provider_config_command", {
-        workspaceId: workspaceId ?? null,
-      });
+      }>("get_llm_provider_config_command");
 
       const newConfig = createConfig(
         configResponse.providerId,
         configResponse.modelId
       );
-
-      // Store in workspace configs if workspaceId provided
-      if (workspaceId) {
-        set((state) => {
-          const newWorkspaceConfigs = new Map(state.workspaceConfigs);
-          newWorkspaceConfigs.set(workspaceId, newConfig);
-          return {
-            config: newConfig,
-            workspaceConfigs: newWorkspaceConfigs,
-            isLoading: false,
-          };
-        });
-      } else {
-        set({ config: newConfig, isLoading: false });
-      }
+      set({ config: newConfig, isLoading: false });
     } catch (error) {
       console.warn(
         "[LLMStore] Failed to load config from backend, using defaults:",
         error
       );
-      // Fall back to defaults
       const newConfig = createConfig(DEFAULT_PROVIDER, DEFAULT_MODEL);
       set({ config: newConfig, isLoading: false });
-    }
-  },
-
-  getWorkspaceConfig: async (workspaceId: string) => {
-    const state = get();
-
-    // Check if we have a workspace-specific config
-    const workspaceConfig = state.workspaceConfigs.get(workspaceId);
-    if (workspaceConfig) {
-      return workspaceConfig;
-    }
-
-    // Otherwise, load it from backend
-    await get().loadWorkspaceConfig(workspaceId);
-
-    // Return the newly loaded config
-    return get().workspaceConfigs.get(workspaceId) || state.config!;
-  },
-
-  loadWorkspaceConfig: async (workspaceId: string) => {
-    try {
-      const configResponse = await invoke<{
-        providerId: string;
-        modelId: string;
-      }>("get_llm_provider_config_command", {
-        workspaceId,
-      });
-
-      const newConfig = createConfig(
-        configResponse.providerId,
-        configResponse.modelId
-      );
-
-      set((state) => {
-        const newWorkspaceConfigs = new Map(state.workspaceConfigs);
-        newWorkspaceConfigs.set(workspaceId, newConfig);
-        return { workspaceConfigs: newWorkspaceConfigs };
-      });
-    } catch (error) {
-      console.error(
-        `[LLMStore] Failed to load workspace config for ${workspaceId}:`,
-        error
-      );
     }
   },
 
@@ -448,36 +373,12 @@ export const useLLMStore = create<LLMStore>((set, get) => ({
     await get().loadProvidersAndModels();
   },
 
-  saveProviderConfig: async (
-    providerId: string,
-    modelId: string,
-    workspaceId?: string
-  ) => {
+  saveProviderConfig: async (providerId: string, modelId: string) => {
     await invoke("configure_llm_provider_command", {
       providerId,
       modelId,
-      workspaceId: workspaceId ?? null,
     });
-
-    const newConfig = createConfig(providerId, modelId);
-
-    if (workspaceId) {
-      // Update workspace-specific config
-      set((state) => {
-        const newWorkspaceConfigs = new Map(state.workspaceConfigs);
-        newWorkspaceConfigs.set(workspaceId, newConfig);
-        return { workspaceConfigs: newWorkspaceConfigs };
-      });
-
-      // If this is the active workspace, also update the current config
-      const { config } = get();
-      if (config) {
-        set({ config: newConfig });
-      }
-    } else {
-      // Update global config
-      set({ config: newConfig });
-    }
+    set({ config: createConfig(providerId, modelId) });
   },
 
   discoverOllamaModels: async () => {

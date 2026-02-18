@@ -73,7 +73,6 @@ pub struct SkillUserConfig {
 #[serde(rename_all = "camelCase")]
 pub struct SelectionContext {
     pub request: String,
-    pub database_type: Option<String>,
 }
 
 /// Skill suggestion returned by `suggest_skills_command`.

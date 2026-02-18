@@ -4,7 +4,7 @@
  * Allows users to configure which AI skills are enabled for their workspace.
  */
 
-import { Loader2, RefreshCw, Info, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { SkillInfo } from "@/lib/tauri/skills/types";
@@ -17,10 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useSkillStore, useSkillCategories } from "@/stores/skillStore";
 
-interface SkillsSettingsTabProps {
-  /** Current workspace ID (optional - uses global settings if not provided) */
-  workspaceId?: string | null;
-}
+interface SkillsSettingsTabProps {}
 
 /** Skill category display configuration */
 const CATEGORY_CONFIG: Record<
@@ -29,15 +26,15 @@ const CATEGORY_CONFIG: Record<
 > = {
   performance: {
     title: "Performance",
-    description: "Skills for optimizing queries and database performance",
+    description: "Templates for faster and clearer responses",
   },
   understanding: {
     title: "Understanding",
-    description: "Skills for explaining schemas, tables, and relationships",
+    description: "Templates for explanations and deeper analysis",
   },
   security: {
     title: "Security",
-    description: "Skills for auditing security and identifying vulnerabilities",
+    description: "Templates for risk checks and security reviews",
   },
   documentation: {
     title: "Documentation",
@@ -45,7 +42,7 @@ const CATEGORY_CONFIG: Record<
   },
   general: {
     title: "General",
-    description: "General-purpose database skills",
+    description: "General-purpose prompt templates",
   },
 };
 
@@ -65,9 +62,7 @@ function SourceBadge({ source }: { source: SkillInfo["source"] }) {
     string,
     { label: string; variant: "default" | "secondary" | "outline" }
   > = {
-    Embedded: { label: "Built-in", variant: "secondary" },
-    Local: { label: "Local", variant: "outline" },
-    Remote: { label: "Community", variant: "default" },
+    filesystem: { label: "Local", variant: "outline" },
   };
 
   const config = variants[source] || { label: "Unknown", variant: "outline" };
@@ -116,7 +111,7 @@ function SkillRow({
   );
 }
 
-export function SkillsSettingsTab({ workspaceId }: SkillsSettingsTabProps) {
+export function SkillsSettingsTab(_props: SkillsSettingsTabProps) {
   const {
     skillsByCategory,
     settings,
@@ -124,7 +119,6 @@ export function SkillsSettingsTab({ workspaceId }: SkillsSettingsTabProps) {
     error,
     loadSkills,
     loadSettings,
-    initializeDefaults,
     toggleSkill,
     toggleAutoSelect,
     refresh,
@@ -137,26 +131,8 @@ export function SkillsSettingsTab({ workspaceId }: SkillsSettingsTabProps) {
   // Load skills and settings on mount
   useEffect(() => {
     loadSkills();
-  }, [loadSkills]);
-
-  useEffect(() => {
-    if (workspaceId) {
-      loadSettings(workspaceId);
-    }
-  }, [workspaceId, loadSettings]);
-
-  // Initialize defaults if no settings exist
-  useEffect(() => {
-    if (workspaceId && settings && settings.enabledSkills.length === 0) {
-      // Check if any skills are available and none are enabled
-      const hasSkills = Object.values(skillsByCategory).some(
-        (skills) => skills.length > 0
-      );
-      if (hasSkills) {
-        initializeDefaults(workspaceId);
-      }
-    }
-  }, [workspaceId, settings, skillsByCategory, initializeDefaults]);
+    loadSettings();
+  }, [loadSkills, loadSettings]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -173,8 +149,11 @@ export function SkillsSettingsTab({ workspaceId }: SkillsSettingsTabProps) {
     await toggleAutoSelect(enabled);
   };
 
+
   const isSkillEnabled = (skillId: string): boolean => {
-    return settings?.enabledSkills.includes(skillId) ?? false;
+    return (
+      settings?.skills.some((skill) => skill.skillId === skillId && skill.enabled) ?? false
+    );
   };
 
   // Loading state
@@ -183,21 +162,6 @@ export function SkillsSettingsTab({ workspaceId }: SkillsSettingsTabProps) {
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         <span className="ml-2 text-muted-foreground">Loading skills...</span>
-      </div>
-    );
-  }
-
-  // No workspace selected
-  if (!workspaceId) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Info className="h-8 w-8 text-muted-foreground mb-3" />
-        <p className="text-muted-foreground">
-          Select a workspace to configure skills.
-        </p>
-        <p className="text-sm text-muted-foreground mt-1">
-          Skills are configured per workspace to match your database type.
-        </p>
       </div>
     );
   }

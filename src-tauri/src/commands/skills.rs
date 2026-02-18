@@ -1,10 +1,10 @@
 //! Tauri commands for the prompt template system.
 //!
 //! Replaces the previous complex skill system with lightweight, filesystem-based
-//! prompt templates. All IPC command names and signatures are kept stable so
-//! the frontend requires no changes.
+//! prompt templates. All IPC command names are kept stable so the frontend
+//! requires no changes.
 //!
-//! Commands that previously required database access (settings, enable/disable,
+//! Commands that previously required workspace context (settings, enable/disable,
 //! auto-select) are now no-ops — all templates are always available.
 
 use std::collections::HashMap;
@@ -31,14 +31,12 @@ pub async fn get_skill_details_command(skill_id: String) -> Result<SkillDefiniti
         .ok_or_else(|| format!("Template not found: {skill_id}"))
 }
 
-/// Get skill settings for a workspace.
+/// Get skill settings.
 ///
 /// In the template system every template is always enabled, so this returns a
 /// synthetic `SkillSettings` with all templates marked enabled.
 #[tauri::command]
-pub async fn get_skill_settings_command(
-    _workspace_id: String,
-) -> Result<SkillSettings, String> {
+pub async fn get_skill_settings_command() -> Result<SkillSettings, String> {
     let registry = get_or_init_registry().await;
     let skills = registry
         .skill_infos()
@@ -56,20 +54,18 @@ pub async fn get_skill_settings_command(
     })
 }
 
-/// Enable or disable a skill for a workspace (no-op in the template system).
+/// Enable or disable a skill (no-op in the template system).
 #[tauri::command]
 pub async fn set_skill_enabled_command(
-    _workspace_id: String,
     _skill_id: String,
     _enabled: bool,
 ) -> Result<(), String> {
     Ok(())
 }
 
-/// Update skill configuration for a workspace (no-op in the template system).
+/// Update skill configuration (no-op in the template system).
 #[tauri::command]
 pub async fn update_skill_config_command(
-    _workspace_id: String,
     _skill_id: String,
     _enabled: bool,
     _priority_override: Option<i32>,
@@ -77,9 +73,9 @@ pub async fn update_skill_config_command(
     Ok(())
 }
 
-/// Initialise default skill settings for a workspace (no-op in the template system).
+/// Initialise default skill settings (no-op in the template system).
 #[tauri::command]
-pub async fn initialize_skill_defaults_command(_workspace_id: String) -> Result<(), String> {
+pub async fn initialize_skill_defaults_command() -> Result<(), String> {
     Ok(())
 }
 
@@ -99,12 +95,9 @@ pub async fn list_skills_by_category_command(
     Ok(registry.by_category().await)
 }
 
-/// Toggle auto-select mode for a workspace (no-op in the template system).
+/// Toggle auto-select mode (no-op in the template system).
 #[tauri::command]
-pub async fn set_skill_auto_select_command(
-    _workspace_id: String,
-    _auto_select: bool,
-) -> Result<(), String> {
+pub async fn set_skill_auto_select_command(_auto_select: bool) -> Result<(), String> {
     Ok(())
 }
 
@@ -114,9 +107,7 @@ pub async fn set_skill_auto_select_command(
 /// returns an empty list.
 #[tauri::command]
 pub async fn suggest_skills_command(
-    _workspace_id: String,
     _request: String,
-    _database_type: Option<String>,
 ) -> Result<Vec<SkillSuggestion>, String> {
     Ok(vec![])
 }

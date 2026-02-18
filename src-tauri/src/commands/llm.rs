@@ -25,51 +25,30 @@ pub struct TestResult {
     pub model: Option<String>,
 }
 
-/// Configure the LLM provider (save provider and model preference to database)
-/// API keys are now stored in Stronghold on the frontend
-///
-/// If workspace_id is provided, stores the configuration for that specific workspace.
-/// Otherwise, stores the global default configuration.
+/// Configure the LLM provider (save provider and model preference to database).
+/// API keys are stored in the OS keychain on the frontend.
 #[tauri::command]
 pub fn configure_llm_provider_command(
     pool: State<'_, DbPool>,
     provider_id: String,
     model_id: String,
-    workspace_id: Option<String>,
 ) -> Result<(), String> {
-    if let Some(_ws_id) = workspace_id {
-        // Workspace-specific configuration removed - database-specific
-        return Err("Workspace-specific LLM config not implemented in boilerplate".to_string());
-    } else {
-        // Store global configuration
-        let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
-        let settings_update = SettingsUpdate {
-            llm_model: Some(format!("{}/{}", provider_id, model_id)),
-            ..Default::default()
-        };
-        update_settings(&mut conn, settings_update)
-            .map_err(|e| format!("Failed to save provider/model preference: {}", e))?;
-    }
-
+    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let settings_update = SettingsUpdate {
+        llm_model: Some(format!("{}/{}", provider_id, model_id)),
+        ..Default::default()
+    };
+    update_settings(&mut conn, settings_update)
+        .map_err(|e| format!("Failed to save provider/model preference: {}", e))?;
     Ok(())
 }
 
-/// Get the current LLM provider configuration
-/// Returns both provider_id and model_id
-///
-/// If workspace_id is provided, returns workspace-specific config (or None if not set).
-/// Otherwise, returns global default configuration.
+/// Get the current LLM provider configuration.
+/// Returns both provider_id and model_id.
 #[tauri::command]
 pub fn get_llm_provider_config_command(
     pool: State<'_, DbPool>,
-    workspace_id: Option<String>,
 ) -> Result<LLMProviderConfigResponse, String> {
-    if workspace_id.is_some() {
-        // Workspace-specific configuration removed - database-specific
-        return Err("Workspace-specific LLM config not implemented in boilerplate".to_string());
-    }
-
-    // Get global configuration only
     let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
     let settings = crate::services::settings::get_settings(&mut conn)
         .map_err(|e| format!("Failed to load settings: {}", e))?;

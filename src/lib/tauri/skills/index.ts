@@ -4,12 +4,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import type {
-  SkillDefinition,
-  SkillInfo,
-  SkillOutput,
-  SkillSettings,
-} from "./types";
+import type { SkillDefinition, SkillInfo, SkillSettings } from "./types";
 
 /**
  * List all available skills.
@@ -30,42 +25,34 @@ export async function getSkillDetails(
 }
 
 /**
- * Get skill settings for a workspace.
+ * Get skill settings (all templates are always enabled).
  */
-export async function getSkillSettings(
-  workspaceId: string
-): Promise<SkillSettings> {
-  return invoke<SkillSettings>("get_skill_settings_command", {
-    workspaceId,
-  });
+export async function getSkillSettings(): Promise<SkillSettings> {
+  return invoke<SkillSettings>("get_skill_settings_command");
 }
 
 /**
- * Set whether a skill is enabled for a workspace.
+ * Set whether a skill is enabled (no-op in the template system).
  */
 export async function setSkillEnabled(
-  workspaceId: string,
   skillId: string,
   enabled: boolean
 ): Promise<void> {
   return invoke("set_skill_enabled_command", {
-    workspaceId,
     skillId,
     enabled,
   });
 }
 
 /**
- * Update skill configuration for a workspace.
+ * Update skill configuration (no-op in the template system).
  */
 export async function updateSkillConfig(
-  workspaceId: string,
   skillId: string,
   enabled: boolean,
   priorityOverride?: number
 ): Promise<void> {
   return invoke("update_skill_config_command", {
-    workspaceId,
     skillId,
     enabled,
     priorityOverride,
@@ -73,56 +60,10 @@ export async function updateSkillConfig(
 }
 
 /**
- * Initialize default skill settings for a workspace.
+ * Initialize default skill settings (no-op in the template system).
  */
-export async function initializeSkillDefaults(
-  workspaceId: string
-): Promise<void> {
-  return invoke("initialize_skill_defaults_command", {
-    workspaceId,
-  });
-}
-
-/**
- * Execute a request using the skill system with automatic skill selection.
- */
-export async function executeWithSkills(
-  workspaceId: string,
-  request: string,
-  providerId: string,
-  apiKey: string,
-  options?: {
-    entityType?: string;
-    taskHint?: string;
-  }
-): Promise<SkillOutput> {
-  return invoke<SkillOutput>("execute_with_skills_command", {
-    workspaceId,
-    request,
-    entityType: options?.entityType,
-    taskHint: options?.taskHint,
-    providerId,
-    apiKey,
-  });
-}
-
-/**
- * Execute a specific skill by ID.
- */
-export async function executeSkill(
-  workspaceId: string,
-  skillId: string,
-  request: string,
-  providerId: string,
-  apiKey: string
-): Promise<SkillOutput> {
-  return invoke<SkillOutput>("execute_skill_command", {
-    workspaceId,
-    skillId,
-    request,
-    providerId,
-    apiKey,
-  });
+export async function initializeSkillDefaults(): Promise<void> {
+  return invoke("initialize_skill_defaults_command");
 }
 
 /**
@@ -142,14 +83,10 @@ export async function listSkillsByCategory(): Promise<
 }
 
 /**
- * Toggle auto-select mode for a workspace.
+ * Toggle auto-select mode (no-op in the template system).
  */
-export async function setSkillAutoSelect(
-  workspaceId: string,
-  autoSelect: boolean
-): Promise<void> {
+export async function setSkillAutoSelect(autoSelect: boolean): Promise<void> {
   return invoke("set_skill_auto_select_command", {
-    workspaceId,
     autoSelect,
   });
 }
@@ -168,18 +105,14 @@ export interface SkillSuggestion {
 /**
  * Get skill suggestions for a user request.
  *
- * Returns skills that might be relevant based on trigger matching.
- * Useful for showing skill chips in the chat UI.
+ * Returns an empty list — the template system does not perform AI-based
+ * selection.
  */
 export async function suggestSkills(
-  workspaceId: string,
-  request: string,
-  databaseType?: string
+  request: string
 ): Promise<SkillSuggestion[]> {
   return invoke<SkillSuggestion[]>("suggest_skills_command", {
-    workspaceId,
     request,
-    databaseType,
   });
 }
 
@@ -187,8 +120,6 @@ export async function suggestSkills(
 export type {
   SkillDefinition,
   SkillInfo,
-  SkillOutput,
   SkillSettings,
-  SkillSource,
   SkillUserConfig,
 } from "./types";
