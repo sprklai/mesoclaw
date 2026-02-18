@@ -73,10 +73,15 @@ impl Channel for TauriIpcChannel {
 }
 
 fn event_to_channel_message(event: AppEvent) -> Option<ChannelMessage> {
+    // `AgentComplete` is an *output* event emitted by `send()`.  Re-ingesting
+    // it here would create a feedback loop where every agent response is
+    // immediately re-queued as a new inbound message.  We return `None` for
+    // all events until a dedicated user-turn event is added to `AppEvent`
+    // (Phase 6+), at which point this match should handle only that variant.
+    //
+    // ## TODO (6.1): match on AppEvent::UserTurn (or equivalent) once added.
     match event {
-        AppEvent::AgentComplete { session_id, message } => {
-            Some(ChannelMessage::new("tauri-ipc", message).with_sender(session_id))
-        }
+        AppEvent::AgentComplete { .. } => None,
         _ => None,
     }
 }

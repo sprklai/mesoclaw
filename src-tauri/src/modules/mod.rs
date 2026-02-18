@@ -162,6 +162,7 @@ impl ModuleRegistry {
                     let id = manifest.module.id.clone();
                     let tool = Arc::new(SidecarTool::new(
                         manifest,
+                        path.clone(),
                         policy.clone(),
                         bus.clone(),
                     ));

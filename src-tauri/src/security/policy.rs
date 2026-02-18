@@ -270,12 +270,16 @@ impl SecurityPolicy {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/// Extract the first token (the executable name) from a shell command string.
+/// Extract the executable name from a shell command string.
+///
+/// Skips leading environment-variable assignments of the form `VAR=value` so
+/// that inputs like `FOO=1 rm -rf /tmp/x` correctly identify `rm` as the
+/// executable rather than the benign-looking assignment token.
 fn extract_executable(command: &str) -> String {
     command
         .trim()
         .split_whitespace()
-        .next()
+        .find(|token| !token.contains('='))
         .unwrap_or("")
         .to_string()
 }
@@ -311,6 +315,8 @@ const BLOCKED_EXECUTABLES: &[&str] = &[
 /// Detect shell injection patterns; returns a reason string if found.
 fn detect_injection(command: &str) -> Option<String> {
     let patterns: &[(&str, &str)] = &[
+        ("\n", "newline command separator"),
+        ("\r", "carriage-return in command"),
         ("`", "backtick command substitution"),
         ("$(", "command substitution $()"),
         ("${", "variable substitution ${}"),
@@ -473,6 +479,42 @@ mod tests {
     #[test]
     fn high_risk_kill() {
         assert_eq!(supervised().classify_command_risk("kill -9 1234"), RiskLevel::High);
+    }
+
+    // ── env-prefix bypass ───────────────────────────────────────────────
+
+    #[test]
+    fn env_prefix_blocked_executable_denied() {
+        // FOO=1 rm ... — `rm` is blocked; env prefix must not hide it.
+        let r = supervised().validate_command("FOO=1 rm -rf /tmp/x");
+        assert!(matches!(r, ValidationResult::Denied(_)));
+    }
+
+    #[test]
+    fn env_prefix_multiple_vars_blocked_executable_denied() {
+        let r = full().validate_command("A=1 B=2 rm -rf /");
+        assert!(matches!(r, ValidationResult::Denied(_)));
+    }
+
+    #[test]
+    fn env_prefix_preserves_low_risk_classification() {
+        // VAR=x ls — still low risk
+        let p = supervised();
+        assert_eq!(p.classify_command_risk("PATH=/usr ls -la"), RiskLevel::Low);
+    }
+
+    // ── Newline injection ───────────────────────────────────────────────
+
+    #[test]
+    fn newline_injection_denied() {
+        let r = supervised().validate_command("ls\nrm -rf /tmp");
+        assert!(matches!(r, ValidationResult::Denied(_)));
+    }
+
+    #[test]
+    fn carriage_return_injection_denied() {
+        let r = supervised().validate_command("ls\r\nrm -rf /tmp");
+        assert!(matches!(r, ValidationResult::Denied(_)));
     }
 
     // ── Injection detection ─────────────────────────────────────────────

@@ -60,7 +60,11 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 
 | Status | File | Line | Description | Impact | Priority |
 |--------|------|------|-------------|--------|----------|
-| | | | | | |
+| ✅ | `src-tauri/src/security/policy.rs` | 274 | `extract_executable` checked only first token — `FOO=1 rm …` bypassed block list | Security boundary unreliable | High |
+| ✅ | `src-tauri/src/security/policy.rs` | 312 | `detect_injection` missed `\n`/`\r` — multiline commands evaded check | Security boundary unreliable | High |
+| ✅ | `src-tauri/src/modules/sidecar_tool.rs` | 218 | `spawn_native_child` didn't set `current_dir` — scaffolded `"./<name>"` failed to resolve | Freshly created modules un-runnable | High |
+| ✅ | `src-tauri/src/bin/cli.rs` | 366 | `daemon start` blocked the shell (foreground server) | Scripts/UX blocked until termination | Medium |
+| ✅ | `src-tauri/src/channels/tauri_ipc.rs` | 75 | `event_to_channel_message` converted `AgentComplete` → inbound msg, creating feedback loop | Potential echo storm in agent loop | Medium |
 
 ---
 
@@ -84,7 +88,7 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 
 | Status | File | Line | Description | Risk Level | Priority |
 |--------|------|------|-------------|------------|----------|
-| | | | | | |
+| ✅ | `src-tauri/src/security/policy.rs` | 274–330 | Shell policy bypass via env-prefix and newline forms — fixed by patching `extract_executable` and `detect_injection` | High | High |
 
 ---
 
@@ -121,3 +125,9 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | 2026-02-18 | Feature | `src-tauri/src/channels/tauri_ipc.rs` | `TauriIpcChannel` wrapping `EventBus` (Phase 6.1) |
 | 2026-02-18 | Feature | `src-tauri/src/channels/manager.rs` | `ChannelManager` — register/send/start_all/health_all (Phase 6.1) |
 | 2026-02-18 | Feature | `src-tauri/src/services/boot.rs` | `BootSequence` — 9-step ordered startup with `SystemReady` (Phase 6.2) |
+| 2026-02-18 | Security | `src-tauri/src/security/policy.rs` | Shell policy bypass: `extract_executable` now skips `VAR=value` tokens; `detect_injection` blocks `\n`/`\r` |
+| 2026-02-18 | Bugfix | `src-tauri/src/modules/sidecar_tool.rs` | `SidecarTool` now stores `module_dir` and passes it as `current_dir` to `spawn_native_child` |
+| 2026-02-18 | Bugfix | `src-tauri/src/modules/mod.rs` | Module registry passes discovered `path` as `module_dir` when constructing `SidecarTool` |
+| 2026-02-18 | Bugfix | `src-tauri/src/gateway/routes.rs` | Stub endpoints `create_session`, `start_module`, `stop_module` now return 501 NOT_IMPLEMENTED instead of 201/202 |
+| 2026-02-18 | Bugfix | `src-tauri/src/bin/cli.rs` | `daemon start` self-spawns with `--foreground` flag and returns to shell; no longer blocks |
+| 2026-02-18 | Bugfix | `src-tauri/src/channels/tauri_ipc.rs` | `event_to_channel_message` returns `None` for `AgentComplete` — removes output→input feedback loop |

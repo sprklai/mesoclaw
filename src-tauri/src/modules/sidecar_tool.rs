@@ -28,6 +28,9 @@ use super::{
 /// A `Tool` implementation that delegates execution to a spawned sidecar process.
 pub struct SidecarTool {
     manifest: ModuleManifest,
+    /// Directory containing the module's manifest.toml.  Relative commands
+    /// (e.g. `"./<name>"`) are resolved from this directory.
+    module_dir: std::path::PathBuf,
     policy: Arc<SecurityPolicy>,
     /// Optional EventBus for emitting tool-start / tool-result events.
     bus: Option<Arc<dyn EventBus>>,
@@ -36,10 +39,11 @@ pub struct SidecarTool {
 impl SidecarTool {
     pub fn new(
         manifest: ModuleManifest,
+        module_dir: std::path::PathBuf,
         policy: Arc<SecurityPolicy>,
         bus: Option<Arc<dyn EventBus>>,
     ) -> Self {
-        Self { manifest, policy, bus }
+        Self { manifest, module_dir, policy, bus }
     }
 
     pub fn module_type(&self) -> &ModuleType {
@@ -215,13 +219,18 @@ impl SidecarTool {
     }
 
     /// Spawn a native process for a `RuntimeType::Native` module.
+    ///
+    /// The process inherits `module_dir` as its working directory so that
+    /// relative command paths (e.g. `"./<name>"` written by the scaffold) are
+    /// resolved correctly regardless of the daemon's own CWD.
     fn spawn_native_child(&self) -> Result<tokio::process::Child, String> {
         let command = &self.manifest.runtime.command;
         let mut cmd = tokio::process::Command::new(command);
         cmd.args(&self.manifest.runtime.args)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null());
+            .stderr(std::process::Stdio::null())
+            .current_dir(&self.module_dir);
         for (k, v) in &self.manifest.runtime.env {
             cmd.env(k, v);
         }
@@ -320,21 +329,21 @@ mod tests {
     #[test]
     fn name_from_manifest() {
         let m = make_manifest("my-tool", "echo");
-        let t = SidecarTool::new(m, supervised_policy(), None);
+        let t = SidecarTool::new(m, std::path::PathBuf::from("."), supervised_policy(), None);
         assert_eq!(t.name(), "my-tool");
     }
 
     #[test]
     fn description_from_manifest() {
         let m = make_manifest("my-tool", "echo");
-        let t = SidecarTool::new(m, supervised_policy(), None);
+        let t = SidecarTool::new(m, std::path::PathBuf::from("."), supervised_policy(), None);
         assert_eq!(t.description(), "test module");
     }
 
     #[test]
     fn parameters_schema_is_object() {
         let m = make_manifest("my-tool", "echo");
-        let t = SidecarTool::new(m, supervised_policy(), None);
+        let t = SidecarTool::new(m, std::path::PathBuf::from("."), supervised_policy(), None);
         let schema = t.parameters_schema();
         assert!(schema.is_object());
     }
@@ -342,14 +351,14 @@ mod tests {
     #[test]
     fn module_type_returns_type() {
         let m = make_manifest("svc", "daemon");
-        let t = SidecarTool::new(m, supervised_policy(), None);
+        let t = SidecarTool::new(m, std::path::PathBuf::from("."), supervised_policy(), None);
         assert_eq!(*t.module_type(), ModuleType::Tool);
     }
 
     #[test]
     fn native_runtime_is_available() {
         let m = make_manifest("t", "cat");
-        let t = SidecarTool::new(m, supervised_policy(), None);
+        let t = SidecarTool::new(m, std::path::PathBuf::from("."), supervised_policy(), None);
         assert!(t.runtime_available());
     }
 
@@ -358,7 +367,7 @@ mod tests {
         // ReadOnly policy denies medium/high risk commands; `echo` is low risk
         // but `rm` is high risk and should be denied.
         let m = make_manifest("rm-tool", "rm");
-        let t = SidecarTool::new(m, readonly_policy(), None);
+        let t = SidecarTool::new(m, std::path::PathBuf::from("."), readonly_policy(), None);
         let result = t
             .execute(serde_json::json!({"method":"execute","params":{}}))
             .await;
@@ -370,7 +379,7 @@ mod tests {
     #[tokio::test]
     async fn nonexistent_binary_returns_error() {
         let m = make_manifest("ghost", "this-binary-does-not-exist-xyzzy");
-        let t = SidecarTool::new(m, supervised_policy(), None);
+        let t = SidecarTool::new(m, std::path::PathBuf::from("."), supervised_policy(), None);
         let result = t
             .execute(serde_json::json!({"method":"echo","params":{}}))
             .await;

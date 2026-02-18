@@ -37,17 +37,16 @@ pub async fn create_session(
     Json(req): Json<CreateSessionRequest>,
 ) -> impl IntoResponse {
     // ## TODO: wire to actual agent session manager (Phase 3)
-    let session_id = uuid::Uuid::new_v4().to_string();
     log::info!(
-        "Gateway: create_session (provider={:?})",
+        "Gateway: create_session (provider={:?}) — stub, not yet implemented",
         req.provider_id
     );
     (
-        StatusCode::CREATED,
-        Json(SessionResponse {
-            session_id,
-            status: "created".to_string(),
-        }),
+        StatusCode::NOT_IMPLEMENTED,
+        Json(serde_json::json!({
+            "error": "session management not yet implemented",
+            "note": "stub – Phase 3"
+        })),
     )
 }
 
@@ -111,8 +110,8 @@ pub async fn start_module(
 ) -> impl IntoResponse {
     // ## TODO: delegate to ModuleRegistry::start(id) (Phase 6)
     (
-        StatusCode::ACCEPTED,
-        Json(json!({ "id": params.id, "status": "starting", "note": "stub – Phase 6" })),
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({ "id": params.id, "error": "module start not yet implemented", "note": "stub – Phase 6" })),
     )
 }
 
@@ -123,8 +122,8 @@ pub async fn stop_module(
 ) -> impl IntoResponse {
     // ## TODO: delegate to ModuleRegistry::stop(id) (Phase 6)
     (
-        StatusCode::ACCEPTED,
-        Json(json!({ "id": params.id, "status": "stopping", "note": "stub – Phase 6" })),
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({ "id": params.id, "error": "module stop not yet implemented", "note": "stub – Phase 6" })),
     )
 }
 

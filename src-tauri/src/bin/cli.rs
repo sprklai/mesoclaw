@@ -77,6 +77,11 @@ struct DaemonArgs {
     /// Daemon action: start | stop | status | restart.
     #[arg(default_value = "status")]
     action: String,
+
+    /// Run the daemon in the foreground without detaching.
+    /// Used internally when the binary self-spawns for background execution.
+    #[arg(long, hide = true)]
+    foreground: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -370,10 +375,29 @@ async fn handle_daemon(args: &DaemonArgs) {
             }
             #[cfg(feature = "gateway")]
             {
+                if !args.foreground {
+                    // Self-spawn with --foreground so `daemon start` returns to
+                    // the shell immediately instead of blocking.
+                    let exe = std::env::current_exe()
+                        .unwrap_or_else(|_| PathBuf::from("mesoclaw"));
+                    match std::process::Command::new(&exe)
+                        .arg("daemon")
+                        .arg("start")
+                        .arg("--foreground")
+                        .stdin(std::process::Stdio::null())
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
+                        .spawn()
+                    {
+                        Ok(_) => println!("daemon: starting in background"),
+                        Err(e) => print_err(&format!("failed to start daemon: {e}")),
+                    }
+                    return;
+                }
                 use std::sync::Arc;
                 use local_ts_lib::{event_bus::TokioBroadcastBus, gateway::start_gateway};
                 let bus = Arc::new(TokioBroadcastBus::new());
-                println!("Starting daemon…");
+                log::info!("daemon: running in foreground");
                 if let Err(e) = start_gateway(bus).await {
                     print_err(&format!("daemon failed: {e}"));
                 }
