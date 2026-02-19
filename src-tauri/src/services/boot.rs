@@ -23,7 +23,6 @@ use crate::{
     event_bus::{AppEvent, EventBus},
     identity::loader::{IdentityLoader, default_identity_dir},
     memory::daily::DailyMemory,
-    scheduler::{Scheduler, TokioScheduler},
 };
 
 // ─── BootContext ──────────────────────────────────────────────────────────────
@@ -33,8 +32,6 @@ use crate::{
 /// Callers should store this in `tauri::State` or pass it to the relevant
 /// subsystems after `BootSequence::run()` returns.
 pub struct BootContext {
-    /// The scheduler started during boot (already running).
-    pub scheduler: Arc<TokioScheduler>,
     /// The channel manager with all registered channels started.
     pub channels: Arc<ChannelManager>,
     /// Background task handles for channel listeners.
@@ -119,10 +116,7 @@ impl BootSequence {
         // Provider warm-up is best-effort; failures are non-fatal.
         // The real health checks happen via ProviderHealthChange events later.
 
-        // ── Step 6: Start scheduler ───────────────────────────────────────────
-        log::info!("[boot] starting background job scheduler");
-        let scheduler = TokioScheduler::new(Arc::clone(&self.bus));
-        scheduler.start().await;
+        // ── Step 6: (scheduler started by lib.rs with persistence + agent wiring) ──
 
         // ── Step 7: Start channels ─────────────────────────────────────────────
         log::info!("[boot] starting channels");
@@ -140,7 +134,6 @@ impl BootSequence {
         }
 
         Ok(BootContext {
-            scheduler,
             channels: self.channels,
             channel_handles,
             message_rx,
@@ -224,8 +217,6 @@ mod tests {
         assert!(tmp.path().join("modules").exists());
         assert!(tmp.path().join("skills").exists());
         assert!(tmp.path().join("logs").exists());
-        // Cleanup background scheduler
-        ctx.scheduler.stop().await;
     }
 
     #[tokio::test]
@@ -240,7 +231,6 @@ mod tests {
             tmp.path().to_path_buf(),
         );
         let ctx = seq.run().await.unwrap();
-        ctx.scheduler.stop().await;
 
         // SystemReady should be in the broadcast stream.
         // Drain until we find it or exhaust buffered events.
@@ -260,7 +250,6 @@ mod tests {
         let seq = make_seq(&tmp);
         // No BOOT.md — should complete without error.
         let ctx = seq.run().await.unwrap();
-        ctx.scheduler.stop().await;
     }
 
     #[tokio::test]
@@ -275,6 +264,5 @@ mod tests {
         let seq = make_seq(&tmp);
         // Should run without error; the items are logged (not executed).
         let ctx = seq.run().await.unwrap();
-        ctx.scheduler.stop().await;
     }
 }
