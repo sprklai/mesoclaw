@@ -5,12 +5,20 @@
  * MesoClaw daemon gateway connection tracked by `useGatewayStore`.
  */
 
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useGatewayStore } from "@/stores/gatewayStore";
 
 export function GatewayStatus() {
   const connected = useGatewayStore((s) => s.connected);
   const checking = useGatewayStore((s) => s.checking);
+  const checkConnection = useGatewayStore((s) => s.checkConnection);
+
+  useEffect(() => {
+    checkConnection();
+    const interval = setInterval(checkConnection, 10_000);
+    return () => clearInterval(interval);
+  }, [checkConnection]);
 
   const label = checking ? "Connecting…" : connected ? "Daemon" : "Offline";
 

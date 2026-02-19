@@ -9,7 +9,7 @@ import { create } from "zustand";
 import {
   type AppEvent,
   GatewayClient,
-  createDefaultClient,
+  resolveDaemonConfig,
 } from "@/lib/gateway-client";
 
 const MAX_EVENTS = 100;
@@ -45,9 +45,18 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
   checkConnection: async () => {
     set({ checking: true, error: null });
     try {
-      const client = createDefaultClient();
+      const config = await resolveDaemonConfig();
+      if (!config) {
+        set({ connected: false, checking: false, error: "Daemon not running" });
+        return;
+      }
+      const client = new GatewayClient(config);
       const reachable = await client.isReachable();
-      set({ connected: reachable, checking: false });
+      if (reachable) {
+        set({ connected: true, checking: false, port: config.port });
+      } else {
+        set({ connected: false, checking: false });
+      }
     } catch (err) {
       set({
         connected: false,

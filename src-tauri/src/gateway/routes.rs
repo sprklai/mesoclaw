@@ -137,7 +137,7 @@ pub async fn list_modules(State(state): State<GatewayState>) -> impl IntoRespons
 }
 
 /// Path parameters for module-specific routes.
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct ModuleId {
     pub id: String,
 }
@@ -149,7 +149,11 @@ pub async fn module_health(
     axum::extract::Path(params): axum::extract::Path<ModuleId>,
 ) -> impl IntoResponse {
     match state.modules.get(&params.id) {
-        Some(_) => Json(json!({ "id": params.id, "healthy": true, "registered": true })),
+        Some(_) => (
+            StatusCode::OK,
+            Json(json!({ "id": params.id, "healthy": true, "registered": true })),
+        )
+            .into_response(),
         None => (
             StatusCode::NOT_FOUND,
             Json(json!({ "id": params.id, "healthy": false, "error": "module not found" })),
