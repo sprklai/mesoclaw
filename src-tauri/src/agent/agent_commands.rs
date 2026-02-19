@@ -132,8 +132,21 @@ pub async fn start_agent_session_command(
         map.insert(session_id.clone(), Arc::clone(&flag));
     }
 
+    // Helper: always remove the cancel-map entry before returning.
+    let cleanup = |cancel_map: &State<'_, SessionCancelMap>, id: &str| {
+        if let Ok(mut map) = cancel_map.lock() {
+            map.remove(id);
+        }
+    };
+
     // Resolve LLM provider from DB + keyring.
-    let provider = resolve_active_provider(&pool)?;
+    let provider = match resolve_active_provider(&pool) {
+        Ok(p) => p,
+        Err(e) => {
+            cleanup(&cancel_map, &session_id);
+            return Err(e);
+        }
+    };
 
     // Clone Arc handles out of Tauri State wrappers.
     let registry = Arc::clone(&*tool_registry);
@@ -143,21 +156,21 @@ pub async fn start_agent_session_command(
     // Build system prompt from identity files.
     let system_prompt = identity_loader.build_system_prompt();
 
-    // Construct and run the agent loop.
+    // Construct and run the agent loop, wiring the cancellation flag so the
+    // loop aborts at the next iteration boundary when cancel is requested.
     let agent = AgentLoop::new(
         provider,
         registry,
         policy,
         Some(bus.clone()),
         AgentConfig::default(),
-    );
+    )
+    .with_cancel_flag(Arc::clone(&flag));
+
     let result = agent.run(&system_prompt, &message).await;
 
-    // Remove the cancellation entry when done.
-    {
-        let mut map = cancel_map.lock().map_err(|e| format!("lock: {e}"))?;
-        map.remove(&session_id);
-    }
+    // Remove the cancellation entry when done (success or failure).
+    cleanup(&cancel_map, &session_id);
 
     let response_text = result?;
 

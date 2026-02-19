@@ -22,7 +22,10 @@
 //! return partial response + "max iterations reached" warning
 //! ```
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering as AtomicOrdering},
+};
 
 use crate::{
     ai::{
@@ -138,6 +141,9 @@ pub struct AgentLoop {
     security_policy: Arc<SecurityPolicy>,
     bus: Option<Arc<dyn EventBus>>,
     config: AgentConfig,
+    /// Optional cancellation flag.  When set to `true` the loop aborts at the
+    /// next iteration boundary and returns `Err("cancelled")`.
+    cancel_flag: Option<Arc<AtomicBool>>,
 }
 
 impl AgentLoop {
@@ -155,7 +161,15 @@ impl AgentLoop {
             security_policy,
             bus,
             config,
+            cancel_flag: None,
         }
+    }
+
+    /// Attach a cancellation flag.  When the flag is set to `true` the loop
+    /// aborts at the next iteration boundary with `Err("cancelled")`.
+    pub fn with_cancel_flag(mut self, flag: Arc<AtomicBool>) -> Self {
+        self.cancel_flag = Some(flag);
+        self
     }
 
     // ── Public entry points ───────────────────────────────────────────────────
@@ -187,6 +201,13 @@ impl AgentLoop {
         let mut iteration = 0;
 
         loop {
+            // ── Cancellation check ─────────────────────────────────────────
+            if let Some(ref flag) = self.cancel_flag {
+                if flag.load(AtomicOrdering::SeqCst) {
+                    return Err("cancelled".to_string());
+                }
+            }
+
             // ── Trim history if needed ─────────────────────────────────────
             self.trim_history(history);
 
