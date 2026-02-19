@@ -7,7 +7,10 @@ use axum::{
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
-use crate::{agent::session_router::SessionRouter, event_bus::EventBus, modules::ModuleRegistry};
+use crate::{
+    agent::session_router::SessionRouter, database::DbPool, event_bus::EventBus,
+    identity::IdentityLoader, modules::ModuleRegistry,
+};
 
 use super::{
     auth::{auth_middleware, load_or_create_token},
@@ -38,6 +41,8 @@ pub async fn start_gateway(
     bus: Arc<dyn EventBus>,
     sessions: Arc<SessionRouter>,
     modules: Arc<ModuleRegistry>,
+    db_pool: DbPool,
+    identity_loader: Arc<IdentityLoader>,
 ) -> Result<(), String> {
     // Ensure the token exists before accepting connections.
     load_or_create_token()?;
@@ -46,6 +51,8 @@ pub async fn start_gateway(
         bus,
         sessions,
         modules,
+        db_pool,
+        identity_loader,
     };
 
     // Build the router.

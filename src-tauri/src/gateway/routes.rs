@@ -1,11 +1,16 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
     agent::session_router::{SessionKey, SessionRouter},
+    database::DbPool,
+    database::models::ai_provider::AIProviderData,
+    database::schema::ai_providers,
     event_bus::EventBus,
+    identity::IdentityLoader,
     modules::ModuleRegistry,
 };
 
@@ -17,6 +22,8 @@ pub struct GatewayState {
     pub bus: Arc<dyn EventBus>,
     pub sessions: Arc<SessionRouter>,
     pub modules: Arc<ModuleRegistry>,
+    pub db_pool: DbPool,
+    pub identity_loader: Arc<IdentityLoader>,
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────
@@ -76,12 +83,37 @@ pub async fn list_sessions(State(state): State<GatewayState>) -> impl IntoRespon
 
 // ─── Provider status ──────────────────────────────────────────────────────────
 
-pub async fn provider_status(State(_state): State<GatewayState>) -> impl IntoResponse {
-    // Provider health is surfaced via ProviderHealthChange events on the
-    // EventBus.  For now return a minimal status acknowledging the service.
-    // Full DB-backed health query is deferred until the gateway has access
-    // to DbPool (wired when Phase 3 REST migration is complete).
-    Json(json!({ "status": "ok", "note": "live provider health pending Phase 3 REST migration" }))
+pub async fn provider_status(State(state): State<GatewayState>) -> impl IntoResponse {
+    let mut conn = match state.db_pool.get() {
+        Ok(c) => c,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "status": "error", "error": format!("database error: {e}") })),
+            )
+                .into_response();
+        }
+    };
+
+    let providers = ai_providers::table
+        .filter(ai_providers::is_active.eq(1))
+        .load::<crate::database::models::ai_provider::AIProvider>(&mut conn)
+        .map(|rows| {
+            rows.into_iter()
+                .map(|p| {
+                    let data = AIProviderData::from(p);
+                    json!({
+                        "id": data.id,
+                        "name": data.name,
+                        "isActive": data.is_active,
+                        "requiresApiKey": data.requires_api_key,
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    Json(json!({ "status": "ok", "providers": providers, "count": providers.len() })).into_response()
 }
 
 // ─── Module management ────────────────────────────────────────────────────────

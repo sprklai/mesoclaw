@@ -395,11 +395,57 @@ async fn handle_daemon(args: &DaemonArgs) {
                     }
                     return;
                 }
-                use local_ts_lib::{event_bus::TokioBroadcastBus, gateway::start_gateway};
+                use local_ts_lib::{
+                    agent::session_router::SessionRouter,
+                    event_bus::TokioBroadcastBus,
+                    gateway::start_gateway,
+                    identity::IdentityLoader,
+                    modules::ModuleRegistry,
+                };
                 use std::sync::Arc;
-                let bus = Arc::new(TokioBroadcastBus::new());
+                let bus: Arc<dyn local_ts_lib::event_bus::EventBus> =
+                    Arc::new(TokioBroadcastBus::new());
+                let sessions = Arc::new(SessionRouter::new());
+                let modules = Arc::new(ModuleRegistry::empty());
+
+                // Build a standalone DbPool from the default app data path.
+                let db_path = dirs::data_local_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+                    .join("com.mesoclaw.app")
+                    .join("app.db");
+                let db_pool = {
+                    use diesel::r2d2::{self, ConnectionManager};
+                    use diesel::sqlite::SqliteConnection;
+                    let manager =
+                        ConnectionManager::<SqliteConnection>::new(db_path.to_string_lossy().as_ref());
+                    r2d2::Pool::builder()
+                        .max_size(5)
+                        .build(manager)
+                        .map_err(|e| format!("failed to create db pool: {e}"))
+                };
+                let db_pool = match db_pool {
+                    Ok(p) => p,
+                    Err(e) => {
+                        print_err(&format!("daemon: db pool init failed: {e}"));
+                        return;
+                    }
+                };
+
+                // Identity loader (no watcher in CLI mode).
+                let identity_loader = match local_ts_lib::identity::default_identity_dir()
+                    .and_then(|dir| IdentityLoader::new(dir))
+                {
+                    Ok(loader) => loader,
+                    Err(e) => {
+                        print_err(&format!("daemon: identity loader init failed: {e}"));
+                        return;
+                    }
+                };
+
                 log::info!("daemon: running in foreground");
-                if let Err(e) = start_gateway(bus).await {
+                if let Err(e) =
+                    start_gateway(bus, sessions, modules, db_pool, identity_loader).await
+                {
                     print_err(&format!("daemon failed: {e}"));
                 }
             }
@@ -445,14 +491,313 @@ async fn handle_agent(args: &AgentArgs, raw: bool, json_mode: bool) {
     }
 }
 
-async fn handle_memory(args: &MemoryArgs, _raw: bool, _json_mode: bool) {
-    // ## TODO: implement memory commands once memory service exists (Phase 3)
-    println!("memory {}: not yet implemented (Phase 3)", args.action);
+async fn handle_memory(args: &MemoryArgs, raw: bool, json_mode: bool) {
+    let Some(client) = require_gateway().await else {
+        return;
+    };
+    match args.action.as_str() {
+        "store" => {
+            let Some(key) = &args.key else {
+                print_err("memory store requires a key: mesoclaw memory store <key> <content>");
+                return;
+            };
+            let Some(content) = &args.value else {
+                print_err("memory store requires content: mesoclaw memory store <key> <content>");
+                return;
+            };
+            match client
+                .client
+                .post(format!("{}/api/v1/memory", client.base_url))
+                .header("Authorization", client.auth_header())
+                .json(&json!({ "key": key, "content": content }))
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    println!("stored memory entry '{key}'");
+                }
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("memory store failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("memory store: {e}")),
+            }
+        }
+        "search" => {
+            let query = args.key.as_deref().unwrap_or("");
+            if query.is_empty() {
+                print_err("memory search requires a query: mesoclaw memory search <query>");
+                return;
+            }
+            match client
+                .client
+                .get(format!("{}/api/v1/memory/search", client.base_url))
+                .header("Authorization", client.auth_header())
+                .query(&[("q", query)])
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => match resp.json::<Value>().await {
+                    Ok(v) => print_value(&v, raw, json_mode),
+                    Err(e) => print_err(&format!("memory search: failed to parse response: {e}")),
+                },
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("memory search failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("memory search: {e}")),
+            }
+        }
+        "forget" => {
+            let Some(key) = &args.key else {
+                print_err("memory forget requires a key: mesoclaw memory forget <key>");
+                return;
+            };
+            match client
+                .client
+                .delete(format!("{}/api/v1/memory/{key}", client.base_url))
+                .header("Authorization", client.auth_header())
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    println!("forgot memory entry '{key}'");
+                }
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("memory forget failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("memory forget: {e}")),
+            }
+        }
+        "list" => {
+            match client
+                .client
+                .get(format!("{}/api/v1/memory", client.base_url))
+                .header("Authorization", client.auth_header())
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => match resp.json::<Value>().await {
+                    Ok(v) => print_value(&v, raw, json_mode),
+                    Err(e) => print_err(&format!("memory list: failed to parse response: {e}")),
+                },
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("memory list failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("memory list: {e}")),
+            }
+        }
+        other => print_err(&format!(
+            "unknown memory action '{other}'. Use: store | search | forget | list"
+        )),
+    }
 }
 
-async fn handle_identity(args: &IdentityArgs, _raw: bool, _json_mode: bool) {
-    // ## TODO: wire to identity REST endpoint (Phase 2.6 completion)
-    println!("identity {}: not yet implemented (Phase 3)", args.action);
+async fn handle_identity(args: &IdentityArgs, raw: bool, json_mode: bool) {
+    let Some(client) = require_gateway().await else {
+        return;
+    };
+    match args.action.as_str() {
+        "list" => {
+            match client
+                .client
+                .get(format!("{}/api/v1/identity", client.base_url))
+                .header("Authorization", client.auth_header())
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => match resp.json::<Value>().await {
+                    Ok(v) => print_value(&v, raw, json_mode),
+                    Err(e) => {
+                        print_err(&format!("identity list: failed to parse response: {e}"))
+                    }
+                },
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("identity list failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("identity list: {e}")),
+            }
+        }
+        "get" => {
+            let Some(file_name) = &args.name else {
+                print_err("identity get requires a file name: mesoclaw identity get <file>");
+                return;
+            };
+            match client
+                .client
+                .get(format!("{}/api/v1/identity/{file_name}", client.base_url))
+                .header("Authorization", client.auth_header())
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => match resp.json::<Value>().await {
+                    Ok(v) => print_value(&v, raw, json_mode),
+                    Err(e) => {
+                        print_err(&format!("identity get: failed to parse response: {e}"))
+                    }
+                },
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("identity get failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("identity get: {e}")),
+            }
+        }
+        "set" => {
+            let Some(file_name) = &args.name else {
+                print_err(
+                    "identity set requires a file name and content: mesoclaw identity set <file> <content>",
+                );
+                return;
+            };
+            // For `identity set`, we need a content argument. Since IdentityArgs
+            // only has `name`, read content from stdin if not provided inline.
+            let content = read_identity_content_from_stdin();
+            if content.is_empty() {
+                print_err("identity set: no content provided. Pipe content via stdin.");
+                return;
+            }
+            match client
+                .client
+                .put(format!("{}/api/v1/identity/{file_name}", client.base_url))
+                .header("Authorization", client.auth_header())
+                .json(&json!({ "content": content }))
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    println!("updated identity file '{file_name}'");
+                }
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("identity set failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("identity set: {e}")),
+            }
+        }
+        "edit" => {
+            let Some(file_name) = &args.name else {
+                print_err("identity edit requires a file name: mesoclaw identity edit <file>");
+                return;
+            };
+            // Fetch current content from gateway.
+            let current = match client
+                .client
+                .get(format!("{}/api/v1/identity/{file_name}", client.base_url))
+                .header("Authorization", client.auth_header())
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => match resp.json::<Value>().await {
+                    Ok(v) => v
+                        .get("content")
+                        .and_then(|c| c.as_str())
+                        .unwrap_or_default()
+                        .to_string(),
+                    Err(e) => {
+                        print_err(&format!("identity edit: failed to parse response: {e}"));
+                        return;
+                    }
+                },
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("identity edit: fetch failed ({status}): {body}"));
+                    return;
+                }
+                Err(e) => {
+                    print_err(&format!("identity edit: {e}"));
+                    return;
+                }
+            };
+
+            // Write to temp file, open in $EDITOR, read back.
+            let edited = match open_in_editor(&current, file_name) {
+                Ok(text) => text,
+                Err(e) => {
+                    print_err(&format!("identity edit: {e}"));
+                    return;
+                }
+            };
+
+            if edited == current {
+                println!("no changes — identity file '{file_name}' unchanged");
+                return;
+            }
+
+            match client
+                .client
+                .put(format!("{}/api/v1/identity/{file_name}", client.base_url))
+                .header("Authorization", client.auth_header())
+                .json(&json!({ "content": edited }))
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    println!("updated identity file '{file_name}'");
+                }
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("identity edit: save failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("identity edit: {e}")),
+            }
+        }
+        other => print_err(&format!(
+            "unknown identity action '{other}'. Use: list | get | set | edit"
+        )),
+    }
+}
+
+/// Read all of stdin (non-blocking check: only if stdin is not a TTY).
+fn read_identity_content_from_stdin() -> String {
+    if io::stdin().is_terminal() {
+        return String::new();
+    }
+    let mut buf = String::new();
+    let stdin = io::stdin();
+    for line in stdin.lock().lines() {
+        match line {
+            Ok(l) => {
+                buf.push_str(&l);
+                buf.push('\n');
+            }
+            Err(_) => break,
+        }
+    }
+    buf
+}
+
+/// Open `content` in `$EDITOR` (or `vi`) via a temp file, return edited text.
+fn open_in_editor(content: &str, suffix: &str) -> Result<String, String> {
+    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+    let dir = std::env::temp_dir();
+    let tmp_path = dir.join(format!("mesoclaw-identity-{suffix}"));
+    fs::write(&tmp_path, content).map_err(|e| format!("failed to write temp file: {e}"))?;
+
+    let status = std::process::Command::new(&editor)
+        .arg(&tmp_path)
+        .status()
+        .map_err(|e| format!("failed to launch editor '{editor}': {e}"))?;
+
+    if !status.success() {
+        return Err(format!("editor exited with status {status}"));
+    }
+    let edited = fs::read_to_string(&tmp_path)
+        .map_err(|e| format!("failed to read edited file: {e}"))?;
+    let _ = fs::remove_file(&tmp_path);
+    Ok(edited)
 }
 
 async fn handle_module(args: &ModuleArgs, raw: bool, json_mode: bool) {

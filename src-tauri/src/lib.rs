@@ -137,26 +137,9 @@ pub fn run() {
             app.manage(Arc::new(memory::store::InMemoryStore::new_mock()));
 
             // Start the HTTP gateway daemon (when compiled with the gateway feature).
-            #[cfg(feature = "gateway")]
-            {
-                let bus_for_gateway: Arc<dyn event_bus::EventBus> = app
-                    .try_state::<Arc<dyn event_bus::EventBus>>()
-                    .map(|s| s.inner().clone())
-                    .ok_or("EventBus not initialised before gateway")?;
-                let sessions_for_gateway = Arc::new(agent::session_router::SessionRouter::new());
-                let modules_for_gateway = Arc::new(modules::ModuleRegistry::empty());
-                tokio::spawn(async move {
-                    if let Err(e) = gateway::start_gateway(
-                        bus_for_gateway,
-                        sessions_for_gateway,
-                        modules_for_gateway,
-                    )
-                    .await
-                    {
-                        log::error!("Gateway error: {e}");
-                    }
-                });
-            }
+            // NOTE: The gateway spawn is deferred until after database and identity
+            // loader initialisation so that DbPool and IdentityLoader are available.
+            // See the `#[cfg(feature = "gateway")]` block further below.
 
             // Initialize identity loader with hot-reload watcher.
             let identity_dir = identity::default_identity_dir()?;
@@ -255,6 +238,35 @@ pub fn run() {
             // Initialize database and manage the connection pool
             let pool = database::init(app.handle())?;
             app.manage(pool.clone());
+
+            // Start the HTTP gateway daemon (deferred until DB + identity are ready).
+            #[cfg(feature = "gateway")]
+            {
+                let bus_for_gateway: Arc<dyn event_bus::EventBus> = app
+                    .try_state::<Arc<dyn event_bus::EventBus>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("EventBus not initialised before gateway")?;
+                let sessions_for_gateway = Arc::new(agent::session_router::SessionRouter::new());
+                let modules_for_gateway = Arc::new(modules::ModuleRegistry::empty());
+                let pool_for_gateway = pool.clone();
+                let identity_for_gateway: Arc<identity::IdentityLoader> = app
+                    .try_state::<Arc<identity::IdentityLoader>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("IdentityLoader not initialised before gateway")?;
+                tokio::spawn(async move {
+                    if let Err(e) = gateway::start_gateway(
+                        bus_for_gateway,
+                        sessions_for_gateway,
+                        modules_for_gateway,
+                        pool_for_gateway,
+                        identity_for_gateway,
+                    )
+                    .await
+                    {
+                        log::error!("Gateway error: {e}");
+                    }
+                });
+            }
 
             // Initialize and manage the scheduler with SQLite persistence + agent.
             {
