@@ -11,7 +11,7 @@ use crate::{
     database::schema::ai_providers,
     event_bus::EventBus,
     identity::IdentityLoader,
-    modules::ModuleRegistry,
+    modules::{ModuleRegistry, SidecarModule},
 };
 
 // ─── Shared gateway state ─────────────────────────────────────────────────────
@@ -157,59 +157,70 @@ pub async fn module_health(
     }
 }
 
-/// Start a service-type module.
-///
-/// Full start/stop lifecycle requires `SidecarService` management, which is
-/// wired in Phase 4.4.  Returns 501 until that wiring is complete.
+/// Start a service-type module via the SidecarModule trait.
 #[tracing::instrument(name = "gateway.start_module", skip(state), fields(id = %params.id))]
 pub async fn start_module(
     State(state): State<GatewayState>,
     axum::extract::Path(params): axum::extract::Path<ModuleId>,
 ) -> impl IntoResponse {
-    if state.modules.get(&params.id).is_none() {
-        return (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "id": params.id, "error": "module not found" })),
-        );
+    let module = match state.modules.get(&params.id) {
+        Some(m) => Arc::clone(m),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "id": params.id, "error": "module not found" })),
+            )
+                .into_response();
+        }
+    };
+    match SidecarModule::start(module.as_ref()).await {
+        Ok(()) => Json(json!({ "id": params.id, "status": "started" })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "id": params.id, "error": e })),
+        )
+            .into_response(),
     }
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(
-            json!({ "id": params.id, "error": "module lifecycle (start/stop) requires SidecarService wiring" }),
-        ),
-    )
 }
 
-/// Stop a running service-type module.
+/// Stop a running service-type module via the SidecarModule trait.
 #[tracing::instrument(name = "gateway.stop_module", skip(state), fields(id = %params.id))]
 pub async fn stop_module(
     State(state): State<GatewayState>,
     axum::extract::Path(params): axum::extract::Path<ModuleId>,
 ) -> impl IntoResponse {
-    if state.modules.get(&params.id).is_none() {
-        return (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "id": params.id, "error": "module not found" })),
-        );
+    let module = match state.modules.get(&params.id) {
+        Some(m) => Arc::clone(m),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "id": params.id, "error": "module not found" })),
+            )
+                .into_response();
+        }
+    };
+    match SidecarModule::stop(module.as_ref()).await {
+        Ok(()) => Json(json!({ "id": params.id, "status": "stopped" })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "id": params.id, "error": e })),
+        )
+            .into_response(),
     }
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(
-            json!({ "id": params.id, "error": "module lifecycle (start/stop) requires SidecarService wiring" }),
-        ),
-    )
 }
 
 /// Reload (re-discover) all modules from disk.
 ///
-/// ModuleRegistry::discover() requires a mutable ToolRegistry and rebuilds
+/// `ModuleRegistry::discover()` requires a mutable `ToolRegistry` and rebuilds
 /// the map from scratch; a live reload while tools are executing is unsafe
-/// without quiescing.  Returns 501 until a safe reload protocol is designed.
-pub async fn reload_modules(State(_state): State<GatewayState>) -> impl IntoResponse {
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(
-            json!({ "error": "hot module reload not yet safe; restart the daemon to re-discover modules" }),
-        ),
-    )
+/// without quiescing.  For now we report the currently registered modules and
+/// advise restarting the daemon to pick up new ones.
+pub async fn reload_modules(State(state): State<GatewayState>) -> impl IntoResponse {
+    let ids: Vec<&str> = state.modules.ids();
+    Json(json!({
+        "status": "no_change",
+        "note": "hot module reload not yet safe; restart the daemon to re-discover modules",
+        "current_modules": ids,
+        "count": ids.len(),
+    }))
 }
