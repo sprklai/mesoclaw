@@ -37,7 +37,11 @@ pub async fn connect_channel_command(
         .get(&name)
         .copied()
         .ok_or_else(|| format!("Channel '{name}' not found"))?;
-    Ok(ChannelStatusPayload { name, connected, error: None })
+    Ok(ChannelStatusPayload {
+        name,
+        connected,
+        error: None,
+    })
 }
 
 /// Unregister the named channel from the channel manager.
@@ -78,7 +82,11 @@ pub async fn list_channels_command(
         .into_iter()
         .map(|name| {
             let connected = health.get(&name).copied().unwrap_or(false);
-            ChannelStatusPayload { name, connected, error: None }
+            ChannelStatusPayload {
+                name,
+                connected,
+                error: None,
+            }
         })
         .collect())
 }
@@ -115,11 +123,17 @@ mod tests {
     }
 
     fn healthy(name: &str) -> Arc<dyn Channel> {
-        Arc::new(FakeChannel { id: name.to_string(), healthy: true })
+        Arc::new(FakeChannel {
+            id: name.to_string(),
+            healthy: true,
+        })
     }
 
     fn unhealthy(name: &str) -> Arc<dyn Channel> {
-        Arc::new(FakeChannel { id: name.to_string(), healthy: false })
+        Arc::new(FakeChannel {
+            id: name.to_string(),
+            healthy: false,
+        })
     }
 
     #[tokio::test]
@@ -135,7 +149,11 @@ mod tests {
             .into_iter()
             .map(|name| {
                 let connected = health.get(&name).copied().unwrap_or(false);
-                ChannelStatusPayload { name, connected, error: None }
+                ChannelStatusPayload {
+                    name,
+                    connected,
+                    error: None,
+                }
             })
             .collect();
 
