@@ -158,6 +158,12 @@ Design  Bite-sized  TDD     Unit/    Git    Code
 
 ---
 
+## 🔭 Observability
+
+- **[Observability](./observability.md)** - Tracing spans, log file locations, RUST_LOG control, and how to read production logs
+
+---
+
 ## 🔄 Workflow Guide
 
 ### Starting a New Feature

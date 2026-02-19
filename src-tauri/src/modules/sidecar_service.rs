@@ -81,6 +81,7 @@ impl SidecarService {
     /// The health check polls `service.health_url("127.0.0.1")` at
     /// `service.health_poll_secs` intervals for up to
     /// `service.startup_timeout_secs` seconds.
+    #[tracing::instrument(name = "sidecar.start", skip(self), fields(id = %self.manifest.module.id))]
     pub async fn start(&self) -> Result<(), String> {
         self.set_status(ServiceStatus::Starting);
 
@@ -128,6 +129,7 @@ impl SidecarService {
     }
 
     /// Stop the service process.
+    #[tracing::instrument(name = "sidecar.stop", skip(self), fields(id = %self.manifest.module.id))]
     pub async fn stop(&self) -> Result<(), String> {
         // Take the child out while holding the lock, then drop the lock before
         // awaiting — a MutexGuard must not be held across an await point.
@@ -145,6 +147,7 @@ impl SidecarService {
     /// Send a JSON request to the service's execute endpoint.
     ///
     /// Returns the parsed JSON response body.
+    #[tracing::instrument(name = "sidecar.execute", skip(self, payload), fields(id = %self.manifest.module.id))]
     pub async fn execute(&self, payload: Value) -> Result<Value, String> {
         let url = self
             .manifest

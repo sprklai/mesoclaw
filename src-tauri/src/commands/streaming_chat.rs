@@ -30,6 +30,7 @@ pub struct ChatMessage {
 
 /// Stream chat completion with SSE-style events
 #[tauri::command]
+#[tracing::instrument(name = "command.stream_chat", skip_all, fields(provider = %request.provider_id, model = %request.model_id, session = %request.session_id))]
 pub async fn stream_chat_command(
     app: AppHandle,
     pool: State<'_, DbPool>,

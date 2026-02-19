@@ -1,10 +1,6 @@
 # Cargo build configuration for better performance across all platforms
 
 [build]
-# Use multiple codegen units for faster compilation, especially in debug mode
-# More codegen units = faster compilation, slightly slower runtime
-codegen-units = 256
-
 # Enable pipelined compilation for better parallelism
 pipelining = true
 

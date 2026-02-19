@@ -177,6 +177,7 @@ impl McpClient {
     /// Start the server process and complete the MCP handshake.
     ///
     /// Returns the list of tools advertised by the server.
+    #[tracing::instrument(name = "mcp.start", skip(self), fields(module = %self.module_id))]
     pub async fn start(&self) -> Result<Vec<McpTool>, String> {
         let mut proc_guard = self.process.lock().await;
 
@@ -261,6 +262,7 @@ impl McpClient {
     }
 
     /// Call a tool on the MCP server.
+    #[tracing::instrument(name = "mcp.call_tool", skip(self, input), fields(module = %self.module_id, tool = %tool_name))]
     pub async fn call_tool(&self, tool_name: &str, input: Value) -> Result<Value, String> {
         let mut proc_guard = self.process.lock().await;
         let proc = proc_guard
