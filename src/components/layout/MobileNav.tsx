@@ -35,8 +35,9 @@ export function MobileNav() {
       className={cn(
         // Visible only on mobile (< 768px)
         "fixed bottom-0 left-0 right-0 z-50 md:hidden",
-        // Background and border
-        "border-t border-border bg-background",
+        // Background and border with blur lift
+        "border-t border-border bg-background/95 backdrop-blur-sm",
+        "shadow-[0_-4px_20px_rgba(0,0,0,0.06)]",
       )}
       aria-label="Mobile navigation"
     >
