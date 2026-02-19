@@ -120,9 +120,26 @@ struct ConfigArgs {
 
 #[derive(Parser, Debug)]
 struct ScheduleArgs {
+    /// Schedule action: list | add | toggle | remove | history
     #[arg(default_value = "list")]
     action: String,
+    /// Job ID (for toggle, remove, history).
+    id: Option<String>,
+    /// Human-readable job name (for add).
+    #[arg(long)]
     name: Option<String>,
+    /// Cron expression, e.g. "0 9 * * 1-5" (for add; mutually exclusive with --interval).
+    #[arg(long)]
+    cron: Option<String>,
+    /// Interval in seconds (for add; mutually exclusive with --cron).
+    #[arg(long)]
+    interval: Option<u64>,
+    /// Prompt text for an AgentTurn payload (for add). Omit for a Heartbeat job.
+    #[arg(long)]
+    prompt: Option<String>,
+    /// Delete the job automatically after it runs once (for add).
+    #[arg(long, default_value_t = false)]
+    once: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -309,6 +326,63 @@ impl GatewayClient {
             .json::<Value>()
             .await
     }
+
+    async fn list_scheduler_jobs(&self) -> reqwest::Result<Value> {
+        self.client
+            .get(format!("{}/api/v1/scheduler/jobs", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn create_scheduler_job(&self, body: Value) -> reqwest::Result<Value> {
+        self.client
+            .post(format!("{}/api/v1/scheduler/jobs", self.base_url))
+            .header("Authorization", self.auth_header())
+            .json(&body)
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn toggle_scheduler_job(&self, job_id: &str) -> reqwest::Result<Value> {
+        self.client
+            .put(format!(
+                "{}/api/v1/scheduler/jobs/{job_id}/toggle",
+                self.base_url
+            ))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn delete_scheduler_job(&self, job_id: &str) -> reqwest::Result<Value> {
+        self.client
+            .delete(format!("{}/api/v1/scheduler/jobs/{job_id}", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn scheduler_job_history(&self, job_id: &str) -> reqwest::Result<Value> {
+        self.client
+            .get(format!(
+                "{}/api/v1/scheduler/jobs/{job_id}/history",
+                self.base_url
+            ))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
 }
 
 /// Resolve or start the gateway, returning a ready client.
@@ -365,9 +439,7 @@ async fn dispatch(command: &Commands, raw: bool, json_mode: bool) {
         Commands::Memory(args) => handle_memory(args, raw, json_mode).await,
         Commands::Identity(args) => handle_identity(args, raw, json_mode).await,
         Commands::Config(args) => handle_config(args, raw, json_mode).await,
-        Commands::Schedule(args) => {
-            println!("schedule {}: not yet implemented (Phase 4)", args.action);
-        }
+        Commands::Schedule(args) => handle_schedule(args, raw, json_mode).await,
         Commands::Channel(args) => handle_channel(args, raw, json_mode).await,
         Commands::Module(args) => handle_module(args, raw, json_mode).await,
         Commands::Gui => {
@@ -1129,6 +1201,176 @@ fn remove_module(name: &str, force: bool) {
     match std::fs::remove_dir_all(&target) {
         Ok(()) => println!("Removed module '{name}'."),
         Err(e) => print_err(&format!("failed to remove module '{name}': {e}")),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Schedule handler
+// ---------------------------------------------------------------------------
+
+/// Manage scheduled jobs via the gateway scheduler API.
+///
+/// Actions:
+///   list             — show all jobs
+///   add              — create a job (requires --name and --cron or --interval)
+///   toggle <id>      — enable/disable a job
+///   remove <id>      — delete a job
+///   history <id>     — show execution history for a job
+async fn handle_schedule(args: &ScheduleArgs, raw: bool, _json_mode: bool) {
+    let Some(client) = require_gateway().await else {
+        return;
+    };
+
+    match args.action.as_str() {
+        "list" => match client.list_scheduler_jobs().await {
+            Ok(v) => {
+                if raw {
+                    println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default());
+                    return;
+                }
+                let jobs = v
+                    .get("jobs")
+                    .and_then(|j| j.as_array())
+                    .cloned()
+                    .unwrap_or_default();
+                if jobs.is_empty() {
+                    println!("No scheduled jobs.");
+                    return;
+                }
+                println!(
+                    "{:<38} {:<24} {:<12} {}",
+                    "ID", "Name", "Enabled", "Schedule"
+                );
+                println!("{}", "-".repeat(90));
+                for job in &jobs {
+                    let id = job.get("id").and_then(|v| v.as_str()).unwrap_or("-");
+                    let name = job.get("name").and_then(|v| v.as_str()).unwrap_or("-");
+                    let enabled = job
+                        .get("enabled")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    let schedule = job
+                        .get("schedule")
+                        .map(|s| serde_json::to_string(s).unwrap_or_default())
+                        .unwrap_or_default();
+                    println!(
+                        "{id:<38} {name:<24} {:<12} {schedule}",
+                        if enabled { "yes" } else { "no" }
+                    );
+                }
+            }
+            Err(e) => print_err(&format!("failed to list jobs: {e}")),
+        },
+
+        "add" => {
+            let name = match &args.name {
+                Some(n) => n.clone(),
+                None => {
+                    print_err("--name is required for 'add'");
+                    return;
+                }
+            };
+            let schedule = match (&args.cron, args.interval) {
+                (Some(expr), _) => json!({ "Cron": { "expr": expr } }),
+                (None, Some(secs)) => json!({ "Interval": { "secs": secs } }),
+                (None, None) => {
+                    print_err("either --cron or --interval is required for 'add'");
+                    return;
+                }
+            };
+            let payload = match &args.prompt {
+                Some(p) => json!({ "AgentTurn": { "prompt": p } }),
+                None => json!("Heartbeat"),
+            };
+            let body = json!({
+                "name": name,
+                "schedule": schedule,
+                "payload": payload,
+                "enabled": true,
+                "delete_after_run": args.once,
+            });
+            match client.create_scheduler_job(body).await {
+                Ok(v) => {
+                    let id = v.get("id").and_then(|v| v.as_str()).unwrap_or("?");
+                    println!("Created job {id} ('{name}').");
+                }
+                Err(e) => print_err(&format!("failed to create job: {e}")),
+            }
+        }
+
+        "toggle" => {
+            let id = match &args.id {
+                Some(id) => id.clone(),
+                None => {
+                    print_err("provide job id: mesoclaw schedule toggle <id>");
+                    return;
+                }
+            };
+            match client.toggle_scheduler_job(&id).await {
+                Ok(v) => {
+                    let enabled = v.get("enabled").and_then(|e| e.as_bool()).unwrap_or(false);
+                    println!(
+                        "Job {id} is now {}.",
+                        if enabled { "enabled" } else { "disabled" }
+                    );
+                }
+                Err(e) => print_err(&format!("failed to toggle job: {e}")),
+            }
+        }
+
+        "remove" | "delete" => {
+            let id = match &args.id {
+                Some(id) => id.clone(),
+                None => {
+                    print_err("provide job id: mesoclaw schedule remove <id>");
+                    return;
+                }
+            };
+            match client.delete_scheduler_job(&id).await {
+                Ok(_) => println!("Deleted job {id}."),
+                Err(e) => print_err(&format!("failed to delete job: {e}")),
+            }
+        }
+
+        "history" => {
+            let id = match &args.id {
+                Some(id) => id.clone(),
+                None => {
+                    print_err("provide job id: mesoclaw schedule history <id>");
+                    return;
+                }
+            };
+            match client.scheduler_job_history(&id).await {
+                Ok(v) => {
+                    if raw {
+                        println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default());
+                        return;
+                    }
+                    let entries = v
+                        .get("history")
+                        .and_then(|h| h.as_array())
+                        .cloned()
+                        .unwrap_or_default();
+                    if entries.is_empty() {
+                        println!("No history for job {id}.");
+                        return;
+                    }
+                    println!("{:<28} {:<10} {}", "Run At", "Status", "Output");
+                    println!("{}", "-".repeat(72));
+                    for entry in &entries {
+                        let ran_at = entry.get("ran_at").and_then(|v| v.as_str()).unwrap_or("-");
+                        let status = entry.get("status").and_then(|v| v.as_str()).unwrap_or("-");
+                        let output = entry.get("output").and_then(|v| v.as_str()).unwrap_or("");
+                        println!("{ran_at:<28} {status:<10} {output}");
+                    }
+                }
+                Err(e) => print_err(&format!("failed to fetch history: {e}")),
+            }
+        }
+
+        other => print_err(&format!(
+            "unknown schedule action '{other}'. Use: list | add | toggle | remove | history"
+        )),
     }
 }
 
