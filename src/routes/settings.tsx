@@ -5,23 +5,37 @@ import { AdvancedSettingsTab } from "@/components/settings/AdvancedSettingsTab";
 import { AISettingsTab } from "@/components/settings/AISettingsTab";
 import { AppSettingsTab } from "@/components/settings/AppSettingsTab";
 import { ChannelList } from "@/components/settings/ChannelList";
-import { MobileSettings } from "@/components/settings/MobileSettings";
 import { IdentityEditor } from "@/components/settings/IdentityEditor";
 import { JobList } from "@/components/settings/JobList";
+import { MobileSettings } from "@/components/settings/MobileSettings";
 import { ModuleList } from "@/components/settings/ModuleList";
+import { SettingsNav, type SettingsSection } from "@/components/settings/SettingsNav";
 import { SkillsSettingsTab } from "@/components/settings/SkillsSettingsTab";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { useHandleSettings } from "@/hooks/use-handle-settings";
-import { Settings } from "@/lib/icons";
-// Workspace store removed
-// import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/settings")({
+  validateSearch: (search) => ({
+    tab: (search.tab as string) ?? "ai",
+  }),
   component: SettingsPage,
 });
 
+const SETTINGS_SECTIONS: SettingsSection[] = [
+  { id: "ai", label: "AI Provider", description: "Providers, models, API keys" },
+  { id: "skills", label: "Skills", description: "Prompt templates" },
+  { id: "app", label: "App Settings", description: "Theme, autostart, notifications" },
+  { id: "identity", label: "Identity", description: "Agent name and personality" },
+  { id: "scheduler", label: "Scheduler", description: "Scheduled jobs" },
+  { id: "modules", label: "Modules", description: "Sidecar modules" },
+  { id: "channels", label: "Channels", description: "Telegram and other channels" },
+  { id: "mobile", label: "Mobile", description: "Mobile-specific settings" },
+  { id: "advanced", label: "Advanced", description: "Developer and advanced options" },
+];
+
 function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("ai");
+  const { tab } = Route.useSearch();
+  const [activeSection, setActiveSection] = useState(tab ?? "ai");
 
   const {
     theme,
@@ -38,7 +52,7 @@ function SettingsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-muted-foreground">Loading settings...</p>
+        <p className="text-muted-foreground">Loading settings…</p>
       </div>
     );
   }
@@ -51,92 +65,49 @@ function SettingsPage() {
     );
   }
 
+  const activeLabel =
+    SETTINGS_SECTIONS.find((s) => s.id === activeSection)?.label ?? "Settings";
+
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 sm:space-y-8">
-      {/* Header with icon */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-          <Settings className="h-5 w-5 text-primary" />
+    <div className="mx-auto w-full max-w-5xl">
+      <PageHeader title="Settings" description="Configure your AI providers and application" />
+
+      <div className="flex gap-8">
+        {/* Left nav */}
+        <div className="w-full shrink-0 md:w-48">
+          <SettingsNav
+            sections={SETTINGS_SECTIONS}
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+          />
         </div>
-        <div>
-          <h1 className="text-xl font-bold sm:text-2xl">Settings</h1>
-          <p className="text-sm text-muted-foreground">
-            Configure your AI providers and model settings
-          </p>
+
+        {/* Content area */}
+        <div className="min-w-0 flex-1">
+          <h2 className="mb-6 text-lg font-semibold">{activeLabel}</h2>
+
+          {activeSection === "ai" && <AISettingsTab />}
+          {activeSection === "skills" && <SkillsSettingsTab />}
+          {activeSection === "app" && (
+            <AppSettingsTab
+              theme={theme}
+              settings={settings}
+              isSaving={isSaving}
+              onUpdateSetting={handleUpdateSetting}
+              onAutostartChange={handleAutostartChange}
+              onTrayVisibilityChange={handleTrayVisibilityChange}
+              onNotificationChange={handleNotificationChange}
+              autostartEnabled={autostartEnabled}
+            />
+          )}
+          {activeSection === "identity" && <IdentityEditor />}
+          {activeSection === "scheduler" && <JobList />}
+          {activeSection === "modules" && <ModuleList />}
+          {activeSection === "channels" && <ChannelList />}
+          {activeSection === "mobile" && <MobileSettings />}
+          {activeSection === "advanced" && <AdvancedSettingsTab />}
         </div>
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full">
-          <TabsTrigger value="ai" className="flex-1 font-bold">
-            AI Provider
-          </TabsTrigger>
-          <TabsTrigger value="skills" className="flex-1 font-bold">
-            Skills
-          </TabsTrigger>
-          <TabsTrigger value="app" className="flex-1 font-bold">
-            App Settings
-          </TabsTrigger>
-          <TabsTrigger value="identity" className="flex-1 font-bold">
-            Identity
-          </TabsTrigger>
-          <TabsTrigger value="scheduler" className="flex-1 font-bold">
-            Scheduler
-          </TabsTrigger>
-          <TabsTrigger value="modules" className="flex-1 font-bold">
-            Modules
-          </TabsTrigger>
-          <TabsTrigger value="channels" className="flex-1 font-bold">
-            Channels
-          </TabsTrigger>
-          <TabsTrigger value="mobile" className="flex-1 font-bold">
-            Mobile
-          </TabsTrigger>
-          <TabsTrigger value="advanced" className="flex-1 font-bold">
-            Advanced
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="ai" className="mt-6">
-          <AISettingsTab />
-        </TabsContent>
-
-        <TabsContent value="skills" className="mt-6">
-          <SkillsSettingsTab />
-        </TabsContent>
-
-        <TabsContent value="app" className="mt-6">
-          <AppSettingsTab
-            theme={theme}
-            settings={settings}
-            isSaving={isSaving}
-            onUpdateSetting={handleUpdateSetting}
-            onAutostartChange={handleAutostartChange}
-            onTrayVisibilityChange={handleTrayVisibilityChange}
-            onNotificationChange={handleNotificationChange}
-            autostartEnabled={autostartEnabled}
-          />
-        </TabsContent>
-
-        <TabsContent value="identity" className="mt-6">
-          <IdentityEditor />
-        </TabsContent>
-        <TabsContent value="scheduler" className="mt-6">
-          <JobList />
-        </TabsContent>
-        <TabsContent value="modules" className="mt-6">
-          <ModuleList />
-        </TabsContent>
-        <TabsContent value="channels" className="mt-6">
-          <ChannelList />
-        </TabsContent>
-        <TabsContent value="mobile" className="mt-6">
-          <MobileSettings />
-        </TabsContent>
-        <TabsContent value="advanced" className="mt-6">
-          <AdvancedSettingsTab />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
