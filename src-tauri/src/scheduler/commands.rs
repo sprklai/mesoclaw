@@ -45,6 +45,8 @@ pub async fn create_job_command(
         enabled: enabled.unwrap_or(true),
         error_count: 0,
         next_run: None,
+        active_hours: None,
+        delete_after_run: false,
     };
 
     let id = scheduler.add_job(job).await;

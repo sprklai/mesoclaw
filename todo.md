@@ -34,14 +34,14 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | ✅ | `src-tauri/src/modules/mod.rs` | 17 | `tauri.conf.json` now has `externalBin: []` placeholder; pattern documented in mod.rs | Low |
 | ✅ | `src-tauri/src/cli.rs` | 424 | `memory` subcommand: store/search/forget/list via gateway `/api/v1/memory/*` | Low |
 | ✅ | `src-tauri/src/cli.rs` | 429 | `identity` subcommand: list/get/set/edit via gateway `/api/v1/identity/*` | Low |
-| ⏳ | `src-tauri/src/bin/cli.rs` | 479 | Implement package-registry `install`/`remove` (Phase 6+) | Low |
+| ✅ | `src-tauri/src/cli.rs` | — | Package-registry `install`/`remove` implemented: git clone + local copy for install, directory removal with confirmation for remove | Low |
 | ✅ | `src/stores/identityStore.ts` | 7 | Migrated to gateway REST API via GatewayClient identity methods | Medium |
 | ✅ | `src/stores/llm.ts` | 4 | Provider listing tries gateway first (`GET /api/v1/providers`), falls back to Tauri IPC | Medium |
 | ✅ | `src/lib/tauri/identity/index.ts` | 4 | Identity CRUD migrated to gateway `/api/v1/identity/*`; `getSystemPrompt` stays on IPC | Medium |
 | ✅ | `src/lib/gateway-client.ts` | 61 | `get_daemon_config_command` IPC reads daemon.pid (port) + daemon.token; `resolveDaemonConfig()` wired | Low |
 | ✅ | `src/lib/gateway-client.ts` | 198 | Approval endpoint resolved: `sendApprovalResponse` correctly uses `approve_action_command` IPC (EventBus is source of truth) | Medium |
-| ⏳ | `src-tauri/` | — | Phase 7.4.1–7.4.6, 7.4.8: `tauri ios init` + `tauri android init`, code signing, TestFlight / Google Play distribution — requires macOS + Xcode + Android SDK | High |
-| ⏳ | `src/components/settings/MobileSettings.tsx` | — | Wire push notifications to `tauri-plugin-notification` once APNs/FCM signing is configured (Phase 7.4.4) | Medium |
+| 🔄 | `src-tauri/` | — | Phase 7.4.1–7.4.6, 7.4.8: `tauri ios init` + `tauri android init`, code signing, TestFlight / Google Play distribution — **blocked: requires macOS + Xcode + Android SDK** | High |
+| 🔄 | `src/components/settings/MobileSettings.tsx` | — | Wire push notifications to `tauri-plugin-notification` once APNs/FCM signing is configured (Phase 7.4.4) — **blocked: depends on mobile signing above** | Medium |
 
 ---
 

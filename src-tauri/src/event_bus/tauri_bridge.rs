@@ -60,6 +60,7 @@ fn is_ui_relevant(event: &AppEvent) -> bool {
             | AppEvent::AgentComplete { .. }
             | AppEvent::ApprovalNeeded { .. }
             | AppEvent::HeartbeatTick { .. }
+            | AppEvent::HeartbeatAlert { .. }
             | AppEvent::ChannelMessage { .. }
             | AppEvent::SystemReady
             | AppEvent::SystemError { .. }

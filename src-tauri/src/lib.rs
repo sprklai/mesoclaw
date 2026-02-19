@@ -239,37 +239,9 @@ pub fn run() {
             let pool = database::init(app.handle())?;
             app.manage(pool.clone());
 
-            // Start the HTTP gateway daemon (deferred until DB + identity are ready).
-            #[cfg(feature = "gateway")]
-            {
-                let bus_for_gateway: Arc<dyn event_bus::EventBus> = app
-                    .try_state::<Arc<dyn event_bus::EventBus>>()
-                    .map(|s| s.inner().clone())
-                    .ok_or("EventBus not initialised before gateway")?;
-                let sessions_for_gateway = Arc::new(agent::session_router::SessionRouter::new());
-                let modules_for_gateway = Arc::new(modules::ModuleRegistry::empty());
-                let pool_for_gateway = pool.clone();
-                let identity_for_gateway: Arc<identity::IdentityLoader> = app
-                    .try_state::<Arc<identity::IdentityLoader>>()
-                    .map(|s| s.inner().clone())
-                    .ok_or("IdentityLoader not initialised before gateway")?;
-                tauri::async_runtime::spawn(async move {
-                    if let Err(e) = gateway::start_gateway(
-                        bus_for_gateway,
-                        sessions_for_gateway,
-                        modules_for_gateway,
-                        pool_for_gateway,
-                        identity_for_gateway,
-                    )
-                    .await
-                    {
-                        log::error!("Gateway error: {e}");
-                    }
-                });
-            }
-
-            // Initialize and manage the scheduler with SQLite persistence + agent.
-            {
+            // Initialize scheduler before the gateway so it can be threaded in.
+            // Initialised with SQLite persistence + agent loop support.
+            let sched = {
                 use scheduler::traits::Scheduler as _;
                 let bus_sched: Arc<dyn event_bus::EventBus> = app
                     .try_state::<Arc<dyn event_bus::EventBus>>()
@@ -298,15 +270,87 @@ pub fn run() {
                         identity_loader: id_loader_sched,
                     });
 
-                let sched = if let Some(components) = agent_components {
+                let s = if let Some(components) = agent_components {
                     scheduler::TokioScheduler::new_with_agent(bus_sched, Some(pool.clone()), components)
                 } else {
                     log::warn!("scheduler: no LLM provider configured; Heartbeat/AgentTurn payloads will be skipped");
                     scheduler::TokioScheduler::new_with_persistence(bus_sched, Some(pool.clone()))
                 };
-                let sched_clone = Arc::clone(&sched);
-                tauri::async_runtime::spawn(async move { sched_clone.start().await });
-                app.manage(sched);
+
+                // Start the background tick loop.
+                let s_start = Arc::clone(&s);
+                tauri::async_runtime::spawn(async move { s_start.start().await });
+
+                // Auto-seed a default 30-min heartbeat job if none exists.
+                let s_seed = Arc::clone(&s);
+                tauri::async_runtime::spawn(async move {
+                    use scheduler::traits::Scheduler as _;
+                    let jobs = s_seed.list_jobs().await;
+                    if !jobs
+                        .iter()
+                        .any(|j| matches!(j.payload, scheduler::traits::JobPayload::Heartbeat))
+                    {
+                        s_seed
+                            .add_job(scheduler::traits::ScheduledJob {
+                                id: String::new(),
+                                name: "Heartbeat".to_string(),
+                                schedule: scheduler::traits::Schedule::Interval {
+                                    secs: scheduler::DEFAULT_HEARTBEAT_INTERVAL_SECS,
+                                },
+                                session_target: scheduler::traits::SessionTarget::Main,
+                                payload: scheduler::traits::JobPayload::Heartbeat,
+                                enabled: true,
+                                error_count: 0,
+                                next_run: None,
+                                active_hours: None,
+                                delete_after_run: false,
+                            })
+                            .await;
+                        log::info!(
+                            "scheduler: seeded default heartbeat job ({} min interval)",
+                            scheduler::DEFAULT_HEARTBEAT_INTERVAL_SECS / 60
+                        );
+                    }
+                });
+
+                s
+            };
+            app.manage(Arc::clone(&sched));
+
+            // Start the HTTP gateway daemon (deferred until DB + identity are ready).
+            #[cfg(feature = "gateway")]
+            {
+                let bus_for_gateway: Arc<dyn event_bus::EventBus> = app
+                    .try_state::<Arc<dyn event_bus::EventBus>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("EventBus not initialised before gateway")?;
+                let sessions_for_gateway = Arc::new(agent::session_router::SessionRouter::new());
+                let modules_for_gateway = Arc::new(modules::ModuleRegistry::empty());
+                let pool_for_gateway = pool.clone();
+                let identity_for_gateway: Arc<identity::IdentityLoader> = app
+                    .try_state::<Arc<identity::IdentityLoader>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("IdentityLoader not initialised before gateway")?;
+                let memory_for_gateway: Arc<memory::store::InMemoryStore> = app
+                    .try_state::<Arc<memory::store::InMemoryStore>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("MemoryStore not initialised before gateway")?;
+                let sched_for_gateway = Arc::clone(&sched);
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = gateway::start_gateway(
+                        bus_for_gateway,
+                        sessions_for_gateway,
+                        modules_for_gateway,
+                        pool_for_gateway,
+                        identity_for_gateway,
+                        memory_for_gateway,
+                        sched_for_gateway,
+                    )
+                    .await
+                    {
+                        log::error!("Gateway error: {e}");
+                    }
+                });
             }
 
             // ── Channel-Agent Bridge ──────────────────────────────────────────────────────

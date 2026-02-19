@@ -65,6 +65,8 @@ struct ScheduledJobRow {
     error_count: i32,
     next_run: Option<String>,
     created_at: String,
+    active_hours_json: Option<String>,
+    delete_after_run: i32,
 }
 
 impl ScheduledJobRow {
@@ -79,11 +81,16 @@ impl ScheduledJobRow {
             error_count: job.error_count as i32,
             next_run: job.next_run.map(|t| t.to_rfc3339()),
             created_at: Utc::now().to_rfc3339(),
+            active_hours_json: job
+                .active_hours
+                .as_ref()
+                .and_then(|h| serde_json::to_string(h).ok()),
+            delete_after_run: if job.delete_after_run { 1 } else { 0 },
         })
     }
 
     fn into_job(self) -> Option<ScheduledJob> {
-        use super::traits::SessionTarget;
+        use super::traits::{ActiveHours, SessionTarget};
         let schedule: Schedule = serde_json::from_str(&self.schedule_json).ok()?;
         let payload: JobPayload = serde_json::from_str(&self.payload_json).ok()?;
         let session_target = if self.session_target.contains("Isolated") {
@@ -95,6 +102,9 @@ impl ScheduledJobRow {
             .next_run
             .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
             .map(|dt| dt.with_timezone(&Utc));
+        let active_hours: Option<ActiveHours> = self
+            .active_hours_json
+            .and_then(|s| serde_json::from_str(&s).ok());
         Some(ScheduledJob {
             id: self.id,
             name: self.name,
@@ -104,6 +114,8 @@ impl ScheduledJobRow {
             enabled: self.enabled != 0,
             error_count: self.error_count as u32,
             next_run,
+            active_hours,
+            delete_after_run: self.delete_after_run != 0,
         })
     }
 }
@@ -317,6 +329,29 @@ impl Scheduler for TokioScheduler {
                         };
 
                         for job in due {
+                            // ── Active-hours gate ──────────────────────────
+                            // For Heartbeat jobs with an active_hours window,
+                            // skip when local hour is outside and reschedule.
+                            if matches!(job.payload, JobPayload::Heartbeat) {
+                                if let Some(ref hours) = job.active_hours {
+                                    use chrono::Timelike as _;
+                                    let local_hour = chrono::Local::now().hour() as u8;
+                                    if local_hour < hours.start_hour
+                                        || local_hour >= hours.end_hour
+                                    {
+                                        if let Ok(mut map) = jobs.write()
+                                            && let Some(j) = map.get_mut(&job.id)
+                                        {
+                                            j.next_run = Self::compute_next_run(&j.schedule);
+                                            if let Some(ref pool) = pool {
+                                                Self::persist_job_with_pool(pool, j);
+                                            }
+                                        }
+                                        continue;
+                                    }
+                                }
+                            }
+
                             let started_at = Utc::now();
                             let bus_clone = bus.clone();
                             let history_clone = history.clone();
@@ -373,9 +408,25 @@ impl Scheduler for TokioScheduler {
                                 };
                                 Self::record_history(&history_clone, exec);
 
-                                // Reschedule and update error_count, then persist.
-                                if let Ok(mut map) = jobs_clone.write()
-                                    && let Some(j) = map.get_mut(&job_clone.id) {
+                                // Reschedule / delete-after-run / persist.
+                                if let Ok(mut map) = jobs_clone.write() {
+                                    if job_clone.delete_after_run
+                                        && job_status == JobStatus::Success
+                                    {
+                                        // One-shot: remove from in-memory registry and SQLite.
+                                        map.remove(&job_clone.id);
+                                        if let Some(ref pool) = pool_clone {
+                                            if let Ok(mut conn) = pool.get() {
+                                                use crate::database::schema::scheduled_jobs;
+                                                let _ = diesel::delete(
+                                                    scheduled_jobs::table.filter(
+                                                        scheduled_jobs::id.eq(&job_clone.id),
+                                                    ),
+                                                )
+                                                .execute(&mut conn);
+                                            }
+                                        }
+                                    } else if let Some(j) = map.get_mut(&job_clone.id) {
                                         if job_status == JobStatus::Success {
                                             j.error_count = 0;
                                         } else {
@@ -384,11 +435,12 @@ impl Scheduler for TokioScheduler {
                                         j.next_run = Self::compute_next_run(&j.schedule);
 
                                         // Persist updated next_run and error_count so
-                                        // restarts don't lose run state (Finding #4).
+                                        // restarts don't lose run state.
                                         if let Some(ref pool) = pool_clone {
                                             Self::persist_job_with_pool(pool, j);
                                         }
                                     }
+                                }
                             });
                         }
                     }
@@ -474,16 +526,28 @@ async fn execute_job(
                 );
             };
             let system_prompt = agent.identity_loader.build_system_prompt();
-            let prompt = "Run your heartbeat checklist. Review any pending tasks, check system status, and report anything that needs attention.";
+            let prompt = "Run your heartbeat checklist. Review any pending tasks, check system status, and report anything that needs attention. If nothing needs attention, reply with HEARTBEAT_OK and nothing else.";
             let loop_ = AgentLoop::new(
                 agent.provider.clone(),
                 agent.tool_registry.clone(),
                 agent.security_policy.clone(),
-                Some(bus),
+                Some(bus.clone()),
                 AgentConfig::default(),
             );
             match loop_.run(&system_prompt, prompt).await {
-                Ok(response) => (JobStatus::Success, response),
+                Ok(response) => {
+                    let trimmed = response.trim();
+                    // Detect HEARTBEAT_OK sentinel: suppress alert when the response
+                    // starts or ends with it and has no other meaningful content.
+                    let is_ok = trimmed.starts_with("HEARTBEAT_OK")
+                        || trimmed.ends_with("HEARTBEAT_OK");
+                    if !is_ok {
+                        let _ = bus.publish(AppEvent::HeartbeatAlert {
+                            content: response.clone(),
+                        });
+                    }
+                    (JobStatus::Success, response)
+                }
                 Err(e) => (JobStatus::Failed, format!("Heartbeat agent error: {e}")),
             }
         }
@@ -536,6 +600,8 @@ mod tests {
             enabled: true,
             error_count: 0,
             next_run: None,
+            active_hours: None,
+            delete_after_run: false,
         }
     }
 

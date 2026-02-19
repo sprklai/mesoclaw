@@ -36,6 +36,11 @@ pub enum AppEvent {
     HeartbeatTick {
         timestamp: String,
     },
+    /// Emitted when a heartbeat agent run returns meaningful content (not `HEARTBEAT_OK`).
+    /// Consumers (notification service, channel bridge) should surface this to the user.
+    HeartbeatAlert {
+        content: String,
+    },
     CronFired {
         job_id: String,
         schedule: String,
@@ -73,6 +78,7 @@ pub enum EventType {
     ApprovalNeeded,
     ApprovalResponse,
     HeartbeatTick,
+    HeartbeatAlert,
     CronFired,
     ChannelMessage,
     MemoryStored,
@@ -96,6 +102,7 @@ impl EventType {
             Self::ApprovalNeeded => matches!(event, AppEvent::ApprovalNeeded { .. }),
             Self::ApprovalResponse => matches!(event, AppEvent::ApprovalResponse { .. }),
             Self::HeartbeatTick => matches!(event, AppEvent::HeartbeatTick { .. }),
+            Self::HeartbeatAlert => matches!(event, AppEvent::HeartbeatAlert { .. }),
             Self::CronFired => matches!(event, AppEvent::CronFired { .. }),
             Self::ChannelMessage => matches!(event, AppEvent::ChannelMessage { .. }),
             Self::MemoryStored => matches!(event, AppEvent::MemoryStored { .. }),

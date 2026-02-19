@@ -50,6 +50,8 @@ diesel::table! {
         error_count -> Integer,
         next_run -> Nullable<Text>,
         created_at -> Text,
+        active_hours_json -> Nullable<Text>,
+        delete_after_run -> Integer,
     }
 }
 

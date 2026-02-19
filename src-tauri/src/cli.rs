@@ -19,7 +19,7 @@ use std::{
 use clap::{Parser, Subcommand};
 use futures::{SinkExt, StreamExt};
 use serde_json::{Value, json};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
 
 // ---------------------------------------------------------------------------
 // Top-level CLI struct
@@ -142,6 +142,12 @@ struct ModuleArgs {
     /// Runtime for `create` (native | docker | podman).
     #[arg(long, default_value = "native")]
     runtime: String,
+    /// Source for `install`: a git URL (https://... or git@...) or a local directory path.
+    #[arg(long)]
+    url: Option<String>,
+    /// Skip confirmation prompt for destructive actions like `remove`.
+    #[arg(long, short = 'f')]
+    force: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -238,13 +244,6 @@ impl GatewayClient {
             .await?
             .json::<Value>()
             .await
-    }
-
-    fn ws_url(&self) -> String {
-        self.base_url
-            .replace("http://", "ws://")
-            .replace("https://", "wss://")
-            + "/api/v1/ws"
     }
 
     async fn list_modules(&self) -> reqwest::Result<Value> {
@@ -396,14 +395,20 @@ async fn handle_daemon(args: &DaemonArgs) {
                     return;
                 }
                 use local_ts_lib::{
-                    agent::session_router::SessionRouter, event_bus::TokioBroadcastBus,
-                    gateway::start_gateway, identity::IdentityLoader, modules::ModuleRegistry,
+                    agent::session_router::SessionRouter,
+                    event_bus::TokioBroadcastBus,
+                    gateway::start_gateway,
+                    identity::IdentityLoader,
+                    memory::store::InMemoryStore,
+                    modules::ModuleRegistry,
+                    scheduler::{TokioScheduler, traits::Scheduler as _},
                 };
                 use std::sync::Arc;
                 let bus: Arc<dyn local_ts_lib::event_bus::EventBus> =
                     Arc::new(TokioBroadcastBus::new());
                 let sessions = Arc::new(SessionRouter::new());
                 let modules = Arc::new(ModuleRegistry::empty());
+                let memory = Arc::new(InMemoryStore::new_mock());
 
                 // Build a standalone DbPool from the default app data path.
                 let db_path = dirs::data_local_dir()
@@ -440,9 +445,20 @@ async fn handle_daemon(args: &DaemonArgs) {
                     }
                 };
 
+                // Create a persistence-backed scheduler for the CLI daemon.
+                // Agent loop integration is not available here (no LLM provider wired),
+                // but Heartbeat/Notify jobs will still be recorded and persisted.
+                let sched = TokioScheduler::new_with_persistence(
+                    Arc::clone(&bus),
+                    Some(db_pool.clone()),
+                );
+                let sched_start = Arc::clone(&sched);
+                tokio::spawn(async move { sched_start.start().await });
+
                 log::info!("daemon: running in foreground");
                 if let Err(e) =
-                    start_gateway(bus, sessions, modules, db_pool, identity_loader).await
+                    start_gateway(bus, sessions, modules, db_pool, identity_loader, memory, sched)
+                        .await
                 {
                     print_err(&format!("daemon failed: {e}"));
                 }
@@ -847,9 +863,19 @@ async fn handle_module(args: &ModuleArgs, raw: bool, json_mode: bool) {
             };
             create_module_scaffold(name, &args.module_type, &args.runtime);
         }
-        "install" | "remove" => {
-            // ## TODO: implement package-registry install/remove (Phase 6+)
-            println!("module {}: not yet implemented (Phase 6)", args.action);
+        "install" => {
+            let Some(name) = &args.name else {
+                print_err("module install requires a module name: mesoclaw module install <name> [--url <source>]");
+                return;
+            };
+            install_module(name, args.url.as_deref());
+        }
+        "remove" => {
+            let Some(name) = &args.name else {
+                print_err("module remove requires a module name: mesoclaw module remove <name>");
+                return;
+            };
+            remove_module(name, args.force);
         }
         other => {
             print_err(&format!(
@@ -945,9 +971,276 @@ echo '{{"result": "ok", "output": "hello from {name}"}}'
     println!("  Edit manifest.toml to configure your module.");
 }
 
+/// Returns the canonical modules directory: `~/.mesoclaw/modules/`.
+fn modules_dir() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join(".mesoclaw")
+        .join("modules")
+}
+
+/// Install a module from a git URL or local path into `~/.mesoclaw/modules/<name>/`.
+///
+/// Sources:
+/// - `https://...` or `git@...` — cloned with `git clone`
+/// - `/path/to/dir` or `./path` — copied recursively
+/// - `None` — prints usage hint (no remote registry yet)
+fn install_module(name: &str, source: Option<&str>) {
+    let dest = modules_dir().join(name);
+
+    if dest.exists() {
+        print_err(&format!(
+            "module '{name}' is already installed at {dest:?}. \
+             Run `mesoclaw module remove {name}` first to reinstall."
+        ));
+        return;
+    }
+
+    let Some(src) = source else {
+        println!(
+            "Usage: mesoclaw module install <name> --url <source>\n\
+             <source> can be:\n\
+             • A git URL:   https://github.com/example/my-module\n\
+             • A local dir: /path/to/module  or  ./my-module"
+        );
+        return;
+    };
+
+    if let Err(e) = std::fs::create_dir_all(&dest) {
+        print_err(&format!("failed to create module directory: {e}"));
+        return;
+    }
+
+    let is_git = src.starts_with("https://")
+        || src.starts_with("http://")
+        || src.starts_with("git@")
+        || src.ends_with(".git");
+
+    if is_git {
+        println!("Cloning {src} → {dest:?} ...");
+        let status = std::process::Command::new("git")
+            .args(["clone", "--depth", "1", src, dest.to_str().unwrap_or(name)])
+            .status();
+        match status {
+            Ok(s) if s.success() => {
+                println!("Installed module '{name}' from {src}");
+                println!("Run `mesoclaw module reload` to pick it up without restarting.");
+            }
+            Ok(s) => {
+                let _ = std::fs::remove_dir_all(&dest);
+                print_err(&format!("git clone failed with exit code {s}"));
+            }
+            Err(e) => {
+                let _ = std::fs::remove_dir_all(&dest);
+                print_err(&format!("failed to run git: {e}"));
+            }
+        }
+    } else {
+        // Local path copy.
+        let src_path = PathBuf::from(src);
+        if !src_path.is_dir() {
+            let _ = std::fs::remove_dir_all(&dest);
+            print_err(&format!("source path '{src}' is not a directory"));
+            return;
+        }
+        match copy_dir_all(&src_path, &dest) {
+            Ok(count) => {
+                println!("Installed module '{name}' from {src_path:?} ({count} files copied)");
+                println!("Run `mesoclaw module reload` to pick it up without restarting.");
+            }
+            Err(e) => {
+                let _ = std::fs::remove_dir_all(&dest);
+                print_err(&format!("failed to copy module: {e}"));
+            }
+        }
+    }
+}
+
+/// Recursively copy a directory. Returns the number of files copied.
+fn copy_dir_all(src: &PathBuf, dst: &PathBuf) -> std::io::Result<usize> {
+    std::fs::create_dir_all(dst)?;
+    let mut count = 0;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let dst_entry = dst.join(entry.file_name());
+        if ty.is_dir() {
+            count += copy_dir_all(&entry.path(), &dst_entry)?;
+        } else {
+            std::fs::copy(entry.path(), &dst_entry)?;
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+/// Remove an installed module by deleting its directory from `~/.mesoclaw/modules/<name>/`.
+fn remove_module(name: &str, force: bool) {
+    let target = modules_dir().join(name);
+
+    if !target.exists() {
+        print_err(&format!("module '{name}' is not installed (looked in {target:?})"));
+        return;
+    }
+
+    if !force {
+        print!("Remove module '{name}' at {target:?}? [y/N] ");
+        let _ = io::stdout().flush();
+        let mut input = String::new();
+        if io::stdin().read_line(&mut input).is_err() || !input.trim().eq_ignore_ascii_case("y") {
+            println!("Aborted.");
+            return;
+        }
+    }
+
+    match std::fs::remove_dir_all(&target) {
+        Ok(()) => println!("Removed module '{name}'."),
+        Err(e) => print_err(&format!("failed to remove module '{name}': {e}")),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Interactive REPL with WebSocket streaming
 // ---------------------------------------------------------------------------
+
+type WsStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+
+/// Send a message to the agent and stream events until `agent_complete`.
+///
+/// Events rendered:
+/// - `agent_started`    → records the session_id
+/// - `agent_tool_start` → prints "→ tool_name(args)"
+/// - `agent_tool_result`→ prints "  ✓ result" or "  ✗ result"
+/// - `agent_complete`   → prints the final response and returns
+/// - `approval_needed`  → prompts the user and POSTs the decision
+async fn stream_agent_message(
+    content: &str,
+    ws: &mut WsStream,
+    base_url: &str,
+    token: &str,
+    http_client: &reqwest::Client,
+) {
+    let msg = json!({ "type": "agent_message", "content": content }).to_string();
+    if ws.send(Message::Text(msg)).await.is_err() {
+        print_err("WebSocket send failed — is the daemon still running?");
+        return;
+    }
+
+    while let Some(frame) = ws.next().await {
+        let text = match frame {
+            Ok(Message::Text(t)) => t,
+            Ok(Message::Close(_)) | Err(_) => break,
+            _ => continue,
+        };
+
+        let v: Value = match serde_json::from_str(&text) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        match v.get("type").and_then(|t| t.as_str()).unwrap_or("") {
+            "agent_started" => {
+                // session_id captured for potential cancellation
+                if let Some(id) = v.get("session_id").and_then(|s| s.as_str()) {
+                    eprintln!("\x1b[2m[session {id}]\x1b[0m");
+                }
+            }
+            "agent_tool_start" => {
+                let tool = v
+                    .get("tool_name")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("unknown");
+                let args = v
+                    .get("args")
+                    .map(|a| serde_json::to_string(a).unwrap_or_default())
+                    .unwrap_or_default();
+                eprintln!("\x1b[33m→\x1b[0m {tool}({args})");
+            }
+            "agent_tool_result" => {
+                let tool = v
+                    .get("tool_name")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("unknown");
+                let result = v
+                    .get("result")
+                    .and_then(|r| r.as_str())
+                    .unwrap_or("");
+                let success = v
+                    .get("success")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false);
+                if success {
+                    eprintln!("\x1b[32m  ✓\x1b[0m {tool}: {result}");
+                } else {
+                    eprintln!("\x1b[31m  ✗\x1b[0m {tool}: {result}");
+                }
+            }
+            "agent_complete" => {
+                if let Some(message) = v.get("message").and_then(|m| m.as_str()) {
+                    println!("{message}");
+                }
+                break;
+            }
+            "approval_needed" => {
+                let action_id = v
+                    .get("action_id")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let tool = v
+                    .get("tool_name")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("unknown");
+                let description = v
+                    .get("description")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("");
+                let risk = v
+                    .get("risk_level")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("unknown");
+
+                eprint!(
+                    "\x1b[33m[APPROVAL]\x1b[0m {tool}: {description} \x1b[2m(risk: {risk})\x1b[0m\nApprove? [y/N]: "
+                );
+                let _ = io::stderr().flush();
+
+                let mut answer = String::new();
+                let approved = if io::stdin().lock().read_line(&mut answer).is_ok() {
+                    matches!(answer.trim().to_lowercase().as_str(), "y" | "yes")
+                } else {
+                    false
+                };
+
+                // POST the approval decision to the gateway.
+                if !action_id.is_empty() {
+                    let url = format!("{base_url}/api/v1/approval/{action_id}");
+                    let _ = http_client
+                        .post(&url)
+                        .header("Authorization", format!("Bearer {token}"))
+                        .json(&json!({ "approved": approved }))
+                        .send()
+                        .await;
+                }
+
+                if approved {
+                    eprintln!("\x1b[32mApproved.\x1b[0m");
+                } else {
+                    eprintln!("\x1b[31mDenied.\x1b[0m");
+                }
+            }
+            "error" => {
+                let msg = v
+                    .get("error")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("unknown error");
+                print_err(msg);
+                break;
+            }
+            _ => {}
+        }
+    }
+}
 
 async fn run_repl(raw: bool, json_mode: bool) {
     // Detect stdin pipe mode.
@@ -957,27 +1250,40 @@ async fn run_repl(raw: bool, json_mode: bool) {
         println!("MesoClaw interactive shell. Type 'help' for commands, 'exit' to quit.");
     }
 
-    // Try to connect to the gateway WS endpoint.
-    let ws_stream = if let Some(client) = require_gateway().await {
-        let url = client.ws_url();
-        let ws_url = format!("{url}?token={}", client.token);
+    // Gather connection info (port + token) without consuming the client.
+    let conn_info = if let Some(port) = is_daemon_running() {
+        read_token().map(|token| (format!("http://127.0.0.1:{port}"), token))
+    } else {
+        if is_tty {
+            eprintln!("Gateway not running. Start it with: mesoclaw daemon start");
+        }
+        None
+    };
+
+    // Connect WebSocket.
+    let mut ws_stream: Option<WsStream> = None;
+    if let Some((ref base_url, ref token)) = conn_info {
+        let ws_url = format!(
+            "{}/api/v1/ws?token={}",
+            base_url.replace("http://", "ws://"),
+            token
+        );
         match connect_async(&ws_url).await {
             Ok((stream, _)) => {
                 if is_tty {
                     println!("Connected to daemon. Streaming enabled.\n");
                 }
-                Some(stream)
+                ws_stream = Some(stream);
             }
             Err(e) => {
                 if is_tty {
-                    eprintln!("WebSocket connect failed: {e}. Running in stub mode.\n");
+                    eprintln!("WebSocket connect failed: {e}. Subcommands still work.\n");
                 }
-                None
             }
         }
-    } else {
-        None
-    };
+    }
+
+    let http_client = reqwest::Client::new();
 
     // Pipe mode: read all stdin, send as one-shot message.
     if !is_tty {
@@ -992,15 +1298,12 @@ async fn run_repl(raw: bool, json_mode: bool) {
                 Err(_) => break,
             }
         }
-        if let Some(mut ws) = ws_stream {
-            let msg = json!({ "type": "message", "content": input.trim() }).to_string();
-            let _ = ws.send(Message::Text(msg)).await;
-            while let Some(Ok(Message::Text(response))) = ws.next().await {
-                let v: Value = serde_json::from_str(&response).unwrap_or(Value::String(response));
-                print_value(&v, raw, json_mode);
+        if let Some(ref mut ws) = ws_stream {
+            if let Some((ref base_url, ref token)) = conn_info {
+                stream_agent_message(input.trim(), ws, base_url, token, &http_client).await;
             }
         } else {
-            // No gateway — just echo back.
+            // No gateway — echo back.
             print!("{input}");
         }
         return;
@@ -1045,8 +1348,24 @@ async fn run_repl(raw: bool, json_mode: bool) {
                         }
                     }
                     Err(_) => {
-                        // Treat as a message to the agent.
-                        eprintln!("(gateway streaming not yet implemented — Phase 3)");
+                        // Treat as an agent message — stream the response.
+                        match (&mut ws_stream, &conn_info) {
+                            (Some(ws), Some((base_url, token))) => {
+                                stream_agent_message(
+                                    trimmed,
+                                    ws,
+                                    base_url,
+                                    token,
+                                    &http_client,
+                                )
+                                .await;
+                            }
+                            _ => {
+                                eprintln!(
+                                    "Not connected to gateway. Start daemon: mesoclaw daemon start"
+                                );
+                            }
+                        }
                     }
                 }
             }

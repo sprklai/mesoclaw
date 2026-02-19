@@ -20,6 +20,22 @@ pub enum Schedule {
     Cron { expr: String },
 }
 
+// ─── ActiveHours ─────────────────────────────────────────────────────────────
+
+/// Optional time window (local time) during which a Heartbeat job may fire.
+///
+/// Both values are in 24-hour format (0–23 inclusive).  A job with
+/// `active_hours` set is skipped when the local hour is outside
+/// `[start_hour, end_hour)`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveHours {
+    /// First hour of the active window (inclusive, 0–23).
+    pub start_hour: u8,
+    /// Last hour of the active window (exclusive, 0–23).
+    pub end_hour: u8,
+}
+
 // ─── SessionTarget ───────────────────────────────────────────────────────────
 
 /// Which session context a job runs in.
@@ -61,6 +77,12 @@ pub struct ScheduledJob {
     pub enabled: bool,
     pub error_count: u32,
     pub next_run: Option<DateTime<Utc>>,
+    /// Optional local-time window outside which the job is skipped.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_hours: Option<ActiveHours>,
+    /// When true the job is removed from the registry after its first successful run.
+    #[serde(default)]
+    pub delete_after_run: bool,
 }
 
 // ─── JobStatus ───────────────────────────────────────────────────────────────

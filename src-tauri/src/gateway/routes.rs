@@ -5,13 +5,21 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
-    agent::session_router::{SessionKey, SessionRouter},
+    agent::session_router::SessionRouter,
     database::DbPool,
     database::models::ai_provider::AIProviderData,
     database::schema::ai_providers,
-    event_bus::EventBus,
+    event_bus::{AppEvent, EventBus},
     identity::{IdentityLoader, types::IDENTITY_FILES, types::IdentityFileInfo},
+    memory::{
+        store::InMemoryStore,
+        traits::{Memory as _, MemoryCategory},
+    },
     modules::{ModuleRegistry, SidecarModule, SidecarTool},
+    scheduler::{
+        TokioScheduler,
+        traits::{JobPayload, Schedule, ScheduledJob, Scheduler as _, SessionTarget},
+    },
 };
 
 // ─── Shared gateway state ─────────────────────────────────────────────────────
@@ -24,6 +32,8 @@ pub struct GatewayState {
     pub modules: Arc<ModuleRegistry>,
     pub db_pool: DbPool,
     pub identity_loader: Arc<IdentityLoader>,
+    pub memory: Arc<InMemoryStore>,
+    pub scheduler: Arc<TokioScheduler>,
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────
@@ -301,4 +311,250 @@ pub async fn update_identity_file(
         )
             .into_response(),
     }
+}
+
+// ─── Memory endpoints ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct StoreMemoryRequest {
+    pub key: String,
+    pub content: String,
+    pub category: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchMemoryQuery {
+    pub q: String,
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MemoryKey {
+    pub key: String,
+}
+
+/// `GET /api/v1/memory` — list all stored memory entries.
+pub async fn list_memory(State(state): State<GatewayState>) -> impl IntoResponse {
+    match state.memory.recall("", 1000).await {
+        Ok(entries) => Json(json!({ "entries": entries, "count": entries.len() })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e })),
+        )
+            .into_response(),
+    }
+}
+
+/// `POST /api/v1/memory` — store a new memory entry.
+pub async fn store_memory(
+    State(state): State<GatewayState>,
+    Json(req): Json<StoreMemoryRequest>,
+) -> impl IntoResponse {
+    let category = match req.category.as_deref() {
+        Some("daily") => MemoryCategory::Daily,
+        Some("conversation") => MemoryCategory::Conversation,
+        Some(other) => MemoryCategory::Custom(other.to_string()),
+        None => MemoryCategory::Core,
+    };
+    match state.memory.store(&req.key, &req.content, category).await {
+        Ok(()) => Json(json!({ "key": req.key, "status": "stored" })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e })),
+        )
+            .into_response(),
+    }
+}
+
+/// `GET /api/v1/memory/search?q=...&limit=...` — hybrid search.
+pub async fn search_memory(
+    State(state): State<GatewayState>,
+    axum::extract::Query(params): axum::extract::Query<SearchMemoryQuery>,
+) -> impl IntoResponse {
+    let limit = params.limit.unwrap_or(10);
+    match state.memory.recall(&params.q, limit).await {
+        Ok(entries) => Json(json!({ "entries": entries, "count": entries.len() })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e })),
+        )
+            .into_response(),
+    }
+}
+
+/// `DELETE /api/v1/memory/{key}` — remove a memory entry by key.
+pub async fn forget_memory(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<MemoryKey>,
+) -> impl IntoResponse {
+    match state.memory.forget(&params.key).await {
+        Ok(true) => Json(json!({ "key": params.key, "status": "forgotten" })).into_response(),
+        Ok(false) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "key": params.key, "error": "entry not found" })),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e })),
+        )
+            .into_response(),
+    }
+}
+
+// ─── Approval endpoint ────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct ApprovalRequest {
+    pub approved: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ActionId {
+    pub action_id: String,
+}
+
+/// `POST /api/v1/approval/{action_id}` — approve or deny a pending agent action.
+///
+/// Publishes an `ApprovalResponse` event to the EventBus so the waiting agent
+/// loop can resume or abort accordingly.
+pub async fn send_approval(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<ActionId>,
+    Json(req): Json<ApprovalRequest>,
+) -> impl IntoResponse {
+    let event = AppEvent::ApprovalResponse {
+        action_id: params.action_id.clone(),
+        approved: req.approved,
+    };
+    match state.bus.publish(event) {
+        Ok(()) => Json(json!({
+            "action_id": params.action_id,
+            "approved": req.approved,
+            "status": "published"
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("failed to publish approval: {e}") })),
+        )
+            .into_response(),
+    }
+}
+
+// ─── Scheduler endpoints ──────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct CreateJobRequest {
+    pub name: String,
+    pub schedule: serde_json::Value,
+    pub payload: serde_json::Value,
+    pub enabled: Option<bool>,
+    pub active_hours: Option<serde_json::Value>,
+    pub delete_after_run: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ToggleJobRequest {
+    pub enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JobIdPath {
+    pub job_id: String,
+}
+
+/// `GET /api/v1/scheduler/jobs` — list all scheduled jobs.
+pub async fn list_scheduler_jobs(State(state): State<GatewayState>) -> impl IntoResponse {
+    let jobs = state.scheduler.list_jobs().await;
+    Json(json!({ "jobs": jobs, "count": jobs.len() }))
+}
+
+/// `POST /api/v1/scheduler/jobs` — create a new scheduled job.
+pub async fn create_scheduler_job(
+    State(state): State<GatewayState>,
+    Json(req): Json<CreateJobRequest>,
+) -> impl IntoResponse {
+    let schedule: Schedule = match serde_json::from_value(req.schedule) {
+        Ok(s) => s,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("invalid schedule: {e}") })),
+            )
+                .into_response();
+        }
+    };
+    let payload: JobPayload = match serde_json::from_value(req.payload) {
+        Ok(p) => p,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("invalid payload: {e}") })),
+            )
+                .into_response();
+        }
+    };
+    let active_hours = req
+        .active_hours
+        .and_then(|v| serde_json::from_value(v).ok());
+    let job = ScheduledJob {
+        id: String::new(),
+        name: req.name,
+        schedule,
+        session_target: SessionTarget::Main,
+        payload,
+        enabled: req.enabled.unwrap_or(true),
+        error_count: 0,
+        next_run: None,
+        active_hours,
+        delete_after_run: req.delete_after_run.unwrap_or(false),
+    };
+    let id = state.scheduler.add_job(job).await;
+    (StatusCode::CREATED, Json(json!({ "id": id, "status": "created" }))).into_response()
+}
+
+/// `PUT /api/v1/scheduler/jobs/{job_id}/toggle` — enable or disable a job.
+pub async fn toggle_scheduler_job(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<JobIdPath>,
+    Json(req): Json<ToggleJobRequest>,
+) -> impl IntoResponse {
+    let jobs = state.scheduler.list_jobs().await;
+    let Some(mut job) = jobs.into_iter().find(|j| j.id == params.job_id) else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": format!("job '{}' not found", params.job_id) })),
+        )
+            .into_response();
+    };
+    state.scheduler.remove_job(&params.job_id).await;
+    job.enabled = req.enabled;
+    state.scheduler.add_job(job).await;
+    Json(json!({ "id": params.job_id, "enabled": req.enabled, "status": "updated" })).into_response()
+}
+
+/// `DELETE /api/v1/scheduler/jobs/{job_id}` — delete a scheduled job.
+pub async fn delete_scheduler_job(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<JobIdPath>,
+) -> impl IntoResponse {
+    if state.scheduler.remove_job(&params.job_id).await {
+        Json(json!({ "id": params.job_id, "status": "deleted" })).into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": format!("job '{}' not found", params.job_id) })),
+        )
+            .into_response()
+    }
+}
+
+/// `GET /api/v1/scheduler/jobs/{job_id}/history` — execution history for a job.
+pub async fn scheduler_job_history(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<JobIdPath>,
+) -> impl IntoResponse {
+    let history = state.scheduler.job_history(&params.job_id).await;
+    Json(json!({ "job_id": params.job_id, "history": history, "count": history.len() }))
 }
