@@ -6,7 +6,6 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "log:default",
     "window-state:default",
     "autostart:allow-enable",
     "autostart:allow-disable",

@@ -61,13 +61,13 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    plugins::logging::init();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
-        .plugin(plugins::logging::build().build())
         .setup(|app| {
-            plugins::logging::init(app);
 
             // Initialize Stronghold with Argon2 password hashing
             // Resolve app local data directory for salt file
