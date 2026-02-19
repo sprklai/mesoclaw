@@ -7,20 +7,43 @@ use axum::{
     },
     response::IntoResponse,
 };
+use serde::Deserialize;
 
-use crate::event_bus::EventBus;
+use crate::event_bus::{AppEvent, EventBus};
 
 use super::routes::GatewayState;
 
 /// WebSocket upgrade handler at `GET /api/v1/ws`.
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
-    State(bus): State<GatewayState>,
+    State(state): State<GatewayState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_socket(socket, bus))
+    ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 
-async fn handle_socket(mut socket: WebSocket, bus: Arc<dyn EventBus>) {
+// ─── Incoming command types ──────────────────────────────────────────────────
+
+/// Envelope for all WebSocket commands sent by clients.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum WsCommand {
+    /// Route a message to the agent session.
+    AgentMessage {
+        content: String,
+        session_id: Option<String>,
+    },
+    /// Cancel a running agent session.
+    CancelSession {
+        session_id: String,
+    },
+    /// Ping / keep-alive (no-op, triggers a pong ack).
+    Ping,
+}
+
+// ─── Socket handler ──────────────────────────────────────────────────────────
+
+async fn handle_socket(mut socket: WebSocket, state: GatewayState) {
+    let bus: Arc<dyn EventBus> = state.bus.clone();
     let mut rx = bus.subscribe();
 
     loop {
@@ -46,16 +69,74 @@ async fn handle_socket(mut socket: WebSocket, bus: Arc<dyn EventBus>) {
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
             }
-            // Accept commands from the client (fire-and-forget for now).
+            // Parse and dispatch commands from the client.
             msg = socket.recv() => {
                 match msg {
-                    Some(Ok(Message::Text(_text))) => {
-                        // ## TODO: parse incoming commands from client (Phase 2.6)
+                    Some(Ok(Message::Text(text))) => {
+                        handle_client_command(&text, &bus, &mut socket).await;
                     }
                     Some(Ok(Message::Close(_))) | None => break,
                     _ => {}
                 }
             }
+        }
+    }
+}
+
+/// Parse a JSON command from the client and emit the appropriate event.
+async fn handle_client_command(
+    raw: &str,
+    bus: &Arc<dyn EventBus>,
+    socket: &mut WebSocket,
+) {
+    let cmd: WsCommand = match serde_json::from_str(raw) {
+        Ok(c) => c,
+        Err(e) => {
+            let err_msg = serde_json::json!({
+                "type": "error",
+                "error": format!("invalid command: {e}"),
+            });
+            let _ = socket
+                .send(Message::Text(err_msg.to_string()))
+                .await;
+            return;
+        }
+    };
+
+    match cmd {
+        WsCommand::AgentMessage {
+            content,
+            session_id,
+        } => {
+            let event = AppEvent::ChannelMessage {
+                channel: "ws".to_string(),
+                from: session_id.unwrap_or_default(),
+                content,
+            };
+            if let Err(e) = bus.publish(event) {
+                log::warn!("ws: failed to publish agent_message event: {e}");
+            }
+        }
+        WsCommand::CancelSession { session_id } => {
+            // Publish a system-level event that the agent loop can observe.
+            // The actual cancellation flag is managed by the SessionCancelMap,
+            // which is not directly accessible here.  An event-driven approach
+            // allows the cancel handler in the agent bridge to pick it up.
+            let event = AppEvent::SystemError {
+                message: format!("cancel_request:{session_id}"),
+            };
+            if let Err(e) = bus.publish(event) {
+                log::warn!("ws: failed to publish cancel event: {e}");
+            }
+            let ack = serde_json::json!({
+                "type": "cancel_ack",
+                "session_id": session_id,
+            });
+            let _ = socket.send(Message::Text(ack.to_string())).await;
+        }
+        WsCommand::Ping => {
+            let pong = serde_json::json!({ "type": "pong" });
+            let _ = socket.send(Message::Text(pong.to_string())).await;
         }
     }
 }
