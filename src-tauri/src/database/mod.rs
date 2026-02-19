@@ -36,8 +36,8 @@ pub enum DbError {
 fn get_database_path(app: &AppHandle) -> Result<PathBuf, DbError> {
     let app_dir = app
         .path()
-        .app_data_dir()
-        .map_err(|e| DbError::Init(format!("Failed to get app data directory: {}", e)))?;
+        .app_local_data_dir()
+        .map_err(|e| DbError::Init(format!("Failed to get app local data directory: {}", e)))?;
 
     std::fs::create_dir_all(&app_dir)
         .map_err(|e| DbError::Init(format!("Failed to create app data directory: {}", e)))?;

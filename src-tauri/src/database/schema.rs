@@ -40,6 +40,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    generated_prompts (id) {
+        id -> Text,
+        name -> Text,
+        artifact_type -> Text,
+        content -> Text,
+        disk_path -> Nullable<Text>,
+        created_at -> Timestamp,
+        provider_id -> Nullable<Text>,
+        model_id -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     scheduled_jobs (id) {
         id -> Text,
         name -> Text,
@@ -91,6 +104,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     ai_models,
     ai_providers,
     chat_sessions,
+    generated_prompts,
     scheduled_jobs,
     settings,
 );

@@ -68,6 +68,8 @@ enum Commands {
     Channel(ChannelArgs),
     /// Manage sidecar extension modules (list, install, remove, start, stop, health, reload, create).
     Module(ModuleArgs),
+    /// Generate AI-powered prompt artifacts (skills, agents, souls, etc.).
+    Generate(GenerateArgs),
     /// Launch the MesoClaw desktop GUI.
     Gui,
 }
@@ -158,6 +160,32 @@ struct ChannelArgs {
     /// Polling timeout in seconds (Telegram only).
     #[arg(long, default_value_t = 30u64)]
     polling_timeout: u64,
+}
+
+#[derive(Parser, Debug)]
+struct GenerateArgs {
+    #[command(subcommand)]
+    action: Option<GenerateAction>,
+
+    /// Artifact type: skill, agent, soul, claude-skill, generic
+    #[arg(long, short = 't')]
+    r#type: Option<String>,
+
+    /// Artifact name (kebab-case)
+    #[arg(long, short = 'n')]
+    name: Option<String>,
+
+    /// Natural language description of what to generate
+    #[arg(long, short = 'd')]
+    description: Option<String>,
+}
+
+#[derive(Subcommand, Debug)]
+enum GenerateAction {
+    /// List all previously generated artifacts
+    List,
+    /// Delete a generated artifact by ID
+    Delete { id: String },
 }
 
 #[derive(Parser, Debug)]
@@ -442,6 +470,7 @@ async fn dispatch(command: &Commands, raw: bool, json_mode: bool) {
         Commands::Schedule(args) => handle_schedule(args, raw, json_mode).await,
         Commands::Channel(args) => handle_channel(args, raw, json_mode).await,
         Commands::Module(args) => handle_module(args, raw, json_mode).await,
+        Commands::Generate(args) => handle_generate(args, raw, json_mode).await,
         Commands::Gui => {
             println!("gui: not yet implemented — launch mesoclaw-desktop directly");
         }
@@ -1973,7 +2002,7 @@ async fn run_repl(raw: bool, json_mode: bool) {
 
 fn print_help() {
     println!(
-        "Commands: daemon | agent | memory | identity | config | schedule | channel | module | gui | exit\n\
+        "Commands: daemon | agent | memory | identity | config | schedule | channel | module | generate | gui | exit\n\
          \n\
          config  list                          — list AI providers\n\
          config  set-key <provider> [<key>]    — save API key to keyring\n\
@@ -1985,6 +2014,38 @@ fn print_help() {
          channel status <name>                 — get channel connection status\n\
          channel remove <name>                 — remove channel configuration"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Generate handler
+// ---------------------------------------------------------------------------
+
+async fn handle_generate(args: &GenerateArgs, _raw: bool, _json_mode: bool) {
+    match &args.action {
+        Some(GenerateAction::List) => {
+            println!(
+                "generate list: use the desktop app UI or connect via gateway for full listing"
+            );
+        }
+        Some(GenerateAction::Delete { id }) => {
+            println!("generate delete {id}: use the desktop app UI or connect via gateway");
+        }
+        None => {
+            let artifact_type = args.r#type.as_deref().unwrap_or("generic");
+            let name = args.name.as_deref().unwrap_or("untitled");
+            let description = args.description.as_deref().unwrap_or("");
+            if description.is_empty() {
+                print_err(
+                    "generate requires --description (-d): mesoclaw generate -t skill -n my-skill -d \"A skill that...\"",
+                );
+                return;
+            }
+            println!(
+                "Generating '{artifact_type}' artifact '{name}': use the desktop app UI or connect via gateway.\n\
+                 Description: {description}"
+            );
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
