@@ -14,9 +14,16 @@
 //! | `mcp`     | started at boot     | JSON-RPC (MCP spec)   |
 //!
 //! # Bundled sidecar binaries (Tauri shell plugin)
-//! ## TODO: configure bundled sidecar binaries in tauri.conf.json
-//! ## `bundle.externalBin` and add tauri-plugin-shell once built-in helpers exist.
-//! ## See: https://v2.tauri.app/develop/sidecar/
+//!
+//! `tauri-plugin-shell` is registered in `lib.rs` and available for spawning
+//! bundled sidecar binaries listed in `tauri.conf.json` → `bundle.externalBin`.
+//! No built-in sidecar binaries are bundled yet; the array is empty.  When a
+//! built-in helper is added (e.g. an embedding model runner), add its
+//! target-triple-suffixed binary name to `externalBin` and use
+//! `app.shell().sidecar("binary-name")` to spawn it.
+//!
+//! See: <https://v2.tauri.app/develop/sidecar/>
+//!
 //! Dynamic user-installed modules under `~/.mesoclaw/modules/` continue to use
 //! `tokio::process::Command` directly and are **not** managed by the Tauri
 //! shell plugin.
