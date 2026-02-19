@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { GatewayStatus } from "@/components/ui/gateway-status";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SidebarHeader } from "@/components/ui/sidebar/sidebar-header";
 import { SidebarMobile } from "@/components/ui/sidebar/sidebar-mobile";
 import { SidebarNav } from "@/components/ui/sidebar/sidebar-nav";
@@ -87,11 +88,18 @@ export function Sidebar() {
 
         <SidebarNav items={navItems} expanded={expanded} />
 
-        {expanded && (
-          <div className="border-t border-sidebar-border px-3 py-2">
-            <GatewayStatus />
-          </div>
-        )}
+        <div className="space-y-2 border-t border-sidebar-border px-3 py-2">
+          {expanded ? (
+            <>
+              <ThemeToggle compact={false} />
+              <GatewayStatus />
+            </>
+          ) : (
+            <div className="flex justify-center">
+              <ThemeToggle compact={true} />
+            </div>
+          )}
+        </div>
 
         <SidebarNav
           items={SIDEBAR_BOTTOM_ITEMS}
