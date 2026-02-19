@@ -28,6 +28,7 @@ impl ChannelManager {
 
     /// Register a channel.  Returns an error if a channel with the same name
     /// already exists.
+    #[tracing::instrument(name = "channel.register", skip(self, channel), fields(channel = %channel.name()))]
     pub async fn register(&self, channel: Arc<dyn Channel>) -> Result<(), String> {
         let name = channel.name().to_string();
         let mut map = self.channels.write().await;
@@ -39,6 +40,7 @@ impl ChannelManager {
     }
 
     /// Unregister a channel by name.
+    #[tracing::instrument(name = "channel.unregister", skip(self))]
     pub async fn unregister(&self, name: &str) -> bool {
         self.channels.write().await.remove(name).is_some()
     }
@@ -59,6 +61,7 @@ impl ChannelManager {
 
     /// Check the health of all registered channels.  Returns a map of
     /// `channel_name → is_healthy`.
+    #[tracing::instrument(name = "channel.health_all", skip(self))]
     pub async fn health_all(&self) -> HashMap<String, bool> {
         let channels = self.channels.read().await;
         let mut result = HashMap::new();
@@ -69,6 +72,7 @@ impl ChannelManager {
     }
 
     /// Send a message via the named channel.
+    #[tracing::instrument(name = "channel.send", skip(self, message), fields(msg_len = message.len()))]
     pub async fn send(
         &self,
         channel_name: &str,
@@ -88,6 +92,7 @@ impl ChannelManager {
     /// Each channel is given a clone of the same sender, so a single receiver
     /// aggregates messages from all channels.  The returned receiver can be
     /// polled from the agent loop.
+    #[tracing::instrument(name = "channel.start_all", skip(self), fields(buffer))]
     pub async fn start_all(
         &self,
         buffer: usize,

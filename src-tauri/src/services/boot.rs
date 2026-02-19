@@ -81,6 +81,7 @@ impl BootSequence {
     }
 
     /// Execute all boot steps in order.  Returns [`BootContext`] on success.
+    #[tracing::instrument(name = "boot.run", skip(self))]
     pub async fn run(self) -> Result<BootContext, String> {
         // ── Step 1: Directory structure ───────────────────────────────────────
         log::info!("[boot] creating ~/.mesoclaw/ directory structure");

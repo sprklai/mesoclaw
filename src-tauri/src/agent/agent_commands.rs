@@ -114,6 +114,11 @@ pub fn resolve_active_provider(pool: &DbPool) -> Result<Arc<dyn LLMProvider>, St
 ///
 /// Returns the agent's final text response.
 #[tauri::command]
+#[tracing::instrument(
+    name = "command.agent.start",
+    skip_all,
+    fields(session_id = tracing::field::Empty, msg_len = message.len())
+)]
 pub async fn start_agent_session_command(
     message: String,
     pool: State<'_, DbPool>,
@@ -124,6 +129,7 @@ pub async fn start_agent_session_command(
     cancel_map: State<'_, SessionCancelMap>,
 ) -> Result<String, String> {
     let session_id = Uuid::new_v4().to_string();
+    tracing::Span::current().record("session_id", session_id.as_str());
 
     // Register a cancellation flag for this session.
     let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -194,6 +200,7 @@ pub async fn start_agent_session_command(
 /// Sets the cancellation flag so the agent loop will abort at the next
 /// iteration boundary.  Returns immediately; the session winds down shortly.
 #[tauri::command]
+#[tracing::instrument(name = "command.agent.cancel", skip(cancel_map))]
 pub async fn cancel_agent_session_command(
     session_id: String,
     cancel_map: State<'_, SessionCancelMap>,

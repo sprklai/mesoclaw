@@ -2,7 +2,6 @@ import { Brain, Cpu, Wifi, WifiOff } from "@/lib/icons";
 import { useContextPanelStore } from "@/stores/contextPanelStore";
 import { useGatewayStore } from "@/stores/gatewayStore";
 import { useLLMStore } from "@/stores/llm";
-import { cn } from "@/lib/utils";
 
 export function ContextPanel() {
   const content = useContextPanelStore((s) => s.content);
