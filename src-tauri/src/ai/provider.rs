@@ -34,15 +34,24 @@ pub trait LLMProvider: Send + Sync {
     }
 }
 
-/// Factory for creating LLM providers
+/// Factory for creating LLM providers by string ID.
+///
+/// Delegates to [`crate::ai::providers::create_provider`].  The API key must
+/// be supplied separately because the factory has no access to the OS keyring.
 pub struct ProviderFactory;
 
 impl ProviderFactory {
-    /// Create a provider from a configuration
-    pub fn create(_provider_type: &str) -> Result<Box<dyn LLMProvider>> {
-        // For now, this is a placeholder
-        // Will be implemented when we add specific providers
-        Err("LLM provider factory not yet implemented".to_string())
+    /// Create a provider from a string ID and API key.
+    ///
+    /// Recognised IDs: `"vercel-ai-gateway"`, `"openrouter"`.
+    /// Returns `Err` for unknown IDs.
+    pub fn create(provider_type: &str, api_key: &str) -> Result<Box<dyn LLMProvider>> {
+        use crate::ai::providers::{ProviderType, create_provider};
+        let pt = ProviderType::from_id(provider_type)
+            .ok_or_else(|| format!("unknown provider type: '{provider_type}'"))?;
+        create_provider(pt, api_key, None, None).map(|arc| -> Box<dyn LLMProvider> {
+            Box::new(crate::ai::providers::ReliableProvider::new(arc))
+        })
     }
 }
 
@@ -51,8 +60,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_provider_factory_placeholder() {
-        let result = ProviderFactory::create("vercel");
+    fn test_provider_factory_unknown_id() {
+        let result = ProviderFactory::create("unknown-provider", "");
         assert!(result.is_err());
+        assert!(result.err().unwrap().contains("unknown provider type"));
+    }
+
+    #[test]
+    fn test_provider_factory_known_id() {
+        assert!(ProviderFactory::create("vercel-ai-gateway", "test-key").is_ok());
     }
 }
