@@ -12,6 +12,7 @@ import {
   chatEn,
   aiEn,
   validationEn,
+  channelsEn,
 } from '@/locales';
 
 i18n
@@ -28,6 +29,7 @@ i18n
         chat: chatEn,
         ai: aiEn,
         validation: validationEn,
+        channels: channelsEn,
       },
     },
     fallbackLng: 'en',
@@ -40,6 +42,7 @@ i18n
       'chat',
       'ai',
       'validation',
+      'channels',
     ],
 
     interpolation: {

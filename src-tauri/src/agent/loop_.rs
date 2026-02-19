@@ -177,6 +177,14 @@ impl AgentLoop {
     /// Run a single-message agent turn with no prior history.
     ///
     /// Returns the final text response.
+    #[tracing::instrument(
+        name = "agent.run",
+        skip_all,
+        fields(
+            model = %self.config.model,
+            user_msg_len = user_message.len(),
+        )
+    )]
     pub async fn run(&self, system_prompt: &str, user_message: &str) -> Result<String, String> {
         let mut history = vec![
             AgentMessage::System {
@@ -194,6 +202,15 @@ impl AgentLoop {
     /// `history` is mutated in place — new assistant and tool-result messages
     /// are appended as the loop proceeds.  The caller should persist or discard
     /// the updated history as appropriate.
+    #[tracing::instrument(
+        name = "agent.run_with_history",
+        skip_all,
+        fields(
+            model = %self.config.model,
+            max_iterations = self.config.max_iterations,
+            history_len = history.len(),
+        )
+    )]
     pub async fn run_with_history(
         &self,
         history: &mut Vec<AgentMessage>,
@@ -267,6 +284,14 @@ impl AgentLoop {
     // ── Internal ─────────────────────────────────────────────────────────────
 
     /// Execute a single tool call, applying the security policy.
+    #[tracing::instrument(
+        name = "agent.tool",
+        skip_all,
+        fields(
+            tool = %call.name,
+            call_id = ?call.call_id,
+        )
+    )]
     async fn execute_tool_call(&self, call: &ParsedToolCall) -> AgentMessage {
         // Validate the tool name as if it were a command.
         match self.security_policy.validate_command(&call.name) {

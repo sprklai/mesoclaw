@@ -1,0 +1,19 @@
+{
+  "title": "Channels",
+  "description": "Incoming messages and replies",
+  "sidebar": {
+    "heading": "Channels",
+    "noChannels": "No channels connected.",
+    "configureLink": "Configure in Settings"
+  },
+  "messages": {
+    "empty": "No messages yet — waiting for inbound messages…",
+    "replyTo": "Reply to {{name}}"
+  },
+  "composer": {
+    "recipientLabel": "To: {{recipient}}",
+    "clearRecipient": "Clear reply recipient",
+    "placeholder": "Type a reply… Enter sends, Shift+Enter for newline"
+  },
+  "selectPrompt": "Select a channel"
+}

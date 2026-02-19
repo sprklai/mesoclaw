@@ -6,3 +6,4 @@ export { default as notificationsEn } from './en/notifications.json';
 export { default as chatEn } from './en/chat.json';
 export { default as aiEn } from './en/ai.json';
 export { default as validationEn } from './en/validation.json';
+export { default as channelsEn } from './en/channels.json';
