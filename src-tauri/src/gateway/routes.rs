@@ -11,7 +11,7 @@ use crate::{
     database::schema::ai_providers,
     event_bus::EventBus,
     identity::{IdentityLoader, types::IDENTITY_FILES, types::IdentityFileInfo},
-    modules::{ModuleRegistry, SidecarModule},
+    modules::{ModuleRegistry, SidecarModule, SidecarTool},
 };
 
 // ─── Shared gateway state ─────────────────────────────────────────────────────
@@ -168,8 +168,8 @@ pub async fn start_module(
     State(state): State<GatewayState>,
     axum::extract::Path(params): axum::extract::Path<ModuleId>,
 ) -> impl IntoResponse {
-    let module = match state.modules.get(&params.id) {
-        Some(m) => Arc::clone(m),
+    let module: Arc<SidecarTool> = match state.modules.get(&params.id) {
+        Some(m) => m,
         None => {
             return (
                 StatusCode::NOT_FOUND,
@@ -194,8 +194,8 @@ pub async fn stop_module(
     State(state): State<GatewayState>,
     axum::extract::Path(params): axum::extract::Path<ModuleId>,
 ) -> impl IntoResponse {
-    let module = match state.modules.get(&params.id) {
-        Some(m) => Arc::clone(m),
+    let module: Arc<SidecarTool> = match state.modules.get(&params.id) {
+        Some(m) => m,
         None => {
             return (
                 StatusCode::NOT_FOUND,
@@ -216,17 +216,25 @@ pub async fn stop_module(
 
 /// Reload (re-discover) all modules from disk.
 ///
-/// `ModuleRegistry::discover()` requires a mutable `ToolRegistry` and rebuilds
-/// the map from scratch; a live reload while tools are executing is unsafe
-/// without quiescing.  For now we report the currently registered modules and
-/// advise restarting the daemon to pick up new ones.
+/// Scans `~/.mesoclaw/modules/` and updates the in-memory registry: newly
+/// added manifests are registered, deleted ones are removed.  Modules already
+/// known to `ToolRegistry` (from startup) remain callable; **newly added**
+/// modules will appear in the registry but won't be callable by the agent loop
+/// until the daemon restarts (ToolRegistry requires `&mut self`).
 pub async fn reload_modules(State(state): State<GatewayState>) -> impl IntoResponse {
-    let ids: Vec<&str> = state.modules.ids();
+    let (added, removed) = state.modules.reload();
+    let ids = state.modules.ids();
     Json(json!({
-        "status": "no_change",
-        "note": "hot module reload not yet safe; restart the daemon to re-discover modules",
+        "status": "ok",
+        "added": added,
+        "removed": removed,
         "current_modules": ids,
         "count": ids.len(),
+        "note": if added > 0 {
+            "New modules discovered. Restart daemon to make them callable by the agent loop."
+        } else {
+            "Module registry is up to date."
+        },
     }))
 }
 

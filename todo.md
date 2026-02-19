@@ -54,7 +54,7 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | ✅ | `src-tauri/src/gateway/routes.rs` | 103 | `module_health` now returns 200 if registered, 404 if not found | `SidecarModule::health_check()` | High |
 | ✅ | `src-tauri/src/gateway/routes.rs` | 112 | `start_module` wired to `SidecarModule::start()` via `GatewayState` | `SidecarService::start(id)` | High |
 | ✅ | `src-tauri/src/gateway/routes.rs` | 124 | `stop_module` wired to `SidecarModule::stop()` via `GatewayState` | `SidecarService::stop(id)` | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 135 | `reload_modules` returns current state — full hot-reload deferred (quiescing protocol needed) | `ModuleRegistry::discover()` safe reload | Medium |
+| ✅ | `src-tauri/src/gateway/routes.rs` | 135 | `reload_modules` returns current state — full hot-reload deferred (quiescing protocol needed) | `ModuleRegistry::discover()` safe reload | Medium |
 | ✅ | `src-tauri/src/commands/channels.rs` | — | All 4 channel IPC commands de-stubbed and wired to real `ChannelManager` state | Real ChannelManager | High |
 
 ---

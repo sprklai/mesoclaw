@@ -48,7 +48,7 @@ pub use sidecar_tool::SidecarTool;
 #[cfg(feature = "mcp-client")]
 pub use mcp_client::{McpClient, McpTool, McpToolProxy};
 
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{collections::HashMap, path::{Path, PathBuf}, sync::Arc};
 
 use async_trait::async_trait;
 
@@ -116,7 +116,10 @@ impl SidecarModule for SidecarTool {
 /// Manages discovered sidecar modules and their registration in the
 /// application's `ToolRegistry`.
 pub struct ModuleRegistry {
-    modules: HashMap<String, Arc<SidecarTool>>,
+    modules: std::sync::RwLock<HashMap<String, Arc<SidecarTool>>>,
+    modules_dir: PathBuf,
+    policy: Arc<SecurityPolicy>,
+    bus: Option<Arc<dyn EventBus>>,
 }
 
 impl ModuleRegistry {
@@ -137,14 +140,24 @@ impl ModuleRegistry {
                 "ModuleRegistry: modules directory {:?} does not exist, skipping discovery",
                 modules_dir
             );
-            return Self { modules };
+            return Self {
+                modules: std::sync::RwLock::new(modules),
+                modules_dir: modules_dir.to_path_buf(),
+                policy,
+                bus,
+            };
         }
 
         let entries = match std::fs::read_dir(modules_dir) {
             Ok(e) => e,
             Err(e) => {
                 log::warn!("ModuleRegistry: failed to scan {:?}: {e}", modules_dir);
-                return Self { modules };
+                return Self {
+                    modules: std::sync::RwLock::new(modules),
+                    modules_dir: modules_dir.to_path_buf(),
+                    policy,
+                    bus,
+                };
             }
         };
 
@@ -183,32 +196,115 @@ impl ModuleRegistry {
             }
         }
 
-        Self { modules }
+        Self {
+            modules: std::sync::RwLock::new(modules),
+            modules_dir: modules_dir.to_path_buf(),
+            policy,
+            bus,
+        }
     }
 
     /// Create a registry with no modules registered (useful for contexts where
     /// module discovery hasn't run yet, e.g. the gateway daemon on startup).
     pub fn empty() -> Self {
         Self {
-            modules: std::collections::HashMap::new(),
+            modules: std::sync::RwLock::new(HashMap::new()),
+            modules_dir: PathBuf::new(),
+            policy: Arc::new(SecurityPolicy::default_policy()),
+            bus: None,
         }
     }
 
+    /// Re-scan the modules directory, updating the internal registry map.
+    ///
+    /// Newly discovered modules are added to the map; modules whose manifests
+    /// have been deleted are removed.  Already-registered modules are untouched.
+    ///
+    /// Note: newly added modules are **not** registered in `ToolRegistry` until
+    /// the daemon restarts, because `ToolRegistry` requires `&mut self` and is
+    /// held behind `Arc` in gateway state.
+    ///
+    /// Returns `(added, removed)` counts.
+    pub fn reload(&self) -> (usize, usize) {
+        if self.modules_dir == PathBuf::new() || !self.modules_dir.is_dir() {
+            return (0, 0);
+        }
+
+        // Scan the directory for current manifest ids.
+        let on_disk: HashMap<String, PathBuf> = match std::fs::read_dir(&self.modules_dir) {
+            Err(e) => {
+                log::warn!("ModuleRegistry::reload: cannot read {:?}: {e}", self.modules_dir);
+                return (0, 0);
+            }
+            Ok(entries) => entries
+                .flatten()
+                .filter(|e| e.path().is_dir())
+                .filter(|e| e.path().join("manifest.toml").exists())
+                .filter_map(|e| {
+                    let path = e.path();
+                    let manifest_path = path.join("manifest.toml");
+                    load_manifest(&manifest_path).ok().map(|m| (m.module.id, path))
+                })
+                .collect(),
+        };
+
+        let mut map = self.modules.write().unwrap();
+
+        // Add newly discovered modules.
+        let mut added = 0usize;
+        for (id, path) in &on_disk {
+            if map.contains_key(id) {
+                continue;
+            }
+            let manifest_path = path.join("manifest.toml");
+            match load_manifest(&manifest_path) {
+                Ok(manifest) => {
+                    let tool = Arc::new(SidecarTool::new(
+                        manifest,
+                        path.clone(),
+                        self.policy.clone(),
+                        self.bus.clone(),
+                    ));
+                    log::info!("ModuleRegistry::reload: added module '{id}' (restart to activate in ToolRegistry)");
+                    map.insert(id.clone(), tool);
+                    added += 1;
+                }
+                Err(e) => {
+                    log::warn!("ModuleRegistry::reload: skipping {manifest_path:?}: {e}");
+                }
+            }
+        }
+
+        // Remove modules whose manifests have been deleted from disk.
+        let to_remove: Vec<String> = map
+            .keys()
+            .filter(|id| !on_disk.contains_key(*id))
+            .cloned()
+            .collect();
+        let removed = to_remove.len();
+        for id in &to_remove {
+            map.remove(id);
+            log::info!("ModuleRegistry::reload: removed module '{id}'");
+        }
+
+        (added, removed)
+    }
+
     pub fn len(&self) -> usize {
-        self.modules.len()
+        self.modules.read().unwrap().len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.modules.is_empty()
+        self.modules.read().unwrap().is_empty()
     }
 
-    pub fn get(&self, id: &str) -> Option<&Arc<SidecarTool>> {
-        self.modules.get(id)
+    pub fn get(&self, id: &str) -> Option<Arc<SidecarTool>> {
+        self.modules.read().unwrap().get(id).cloned()
     }
 
     /// Ids of all registered modules.
-    pub fn ids(&self) -> Vec<&str> {
-        self.modules.keys().map(String::as_str).collect()
+    pub fn ids(&self) -> Vec<String> {
+        self.modules.read().unwrap().keys().cloned().collect()
     }
 }
 
@@ -353,6 +449,6 @@ command = "echo"
         let reg = ModuleRegistry::discover(dir.path(), &mut tr, policy(), None);
         let ids = reg.ids();
         assert_eq!(ids.len(), 1);
-        assert!(ids.contains(&"test-tool"));
+        assert!(ids.iter().any(|id| id == "test-tool"));
     }
 }
