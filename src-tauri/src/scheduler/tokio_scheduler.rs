@@ -222,6 +222,21 @@ impl TokioScheduler {
         }
     }
 
+    /// Persist a job using a pool reference directly (usable inside spawned tasks
+    /// where `&self` is unavailable).  Mirrors the logic of [`persist_job`].
+    fn persist_job_with_pool(pool: &DbPool, job: &ScheduledJob) {
+        let Ok(mut conn) = pool.get() else { return };
+        let Some(row) = ScheduledJobRow::from_job(job) else {
+            return;
+        };
+        if let Err(e) = diesel::replace_into(scheduled_jobs::table)
+            .values(&row)
+            .execute(&mut conn)
+        {
+            log::warn!("scheduler: failed to persist job '{}' after run: {e}", job.id);
+        }
+    }
+
     /// Delete a job from the database.
     fn delete_job_from_db(&self, id: &str) {
         let Some(ref pool) = self.pool else { return };
@@ -275,6 +290,7 @@ impl Scheduler for TokioScheduler {
         let history = self.history.clone();
         let bus = self.bus.clone();
         let agent = self.agent.clone();
+        let pool = self.pool.clone();
         let mut stop_rx = self.stop_rx.clone();
 
         tokio::spawn(async move {
@@ -304,6 +320,7 @@ impl Scheduler for TokioScheduler {
                             let jobs_clone = jobs.clone();
                             let job_clone = job.clone();
                             let agent_clone = agent.clone();
+                            let pool_clone = pool.clone();
 
                             tokio::spawn(async move {
                                 // Emit CronFired / HeartbeatTick event.
@@ -353,7 +370,7 @@ impl Scheduler for TokioScheduler {
                                 };
                                 Self::record_history(&history_clone, exec);
 
-                                // Reschedule and update error_count.
+                                // Reschedule and update error_count, then persist.
                                 if let Ok(mut map) = jobs_clone.write()
                                     && let Some(j) = map.get_mut(&job_clone.id) {
                                         if job_status == JobStatus::Success {
@@ -362,6 +379,12 @@ impl Scheduler for TokioScheduler {
                                             j.error_count += 1;
                                         }
                                         j.next_run = Self::compute_next_run(&j.schedule);
+
+                                        // Persist updated next_run and error_count so
+                                        // restarts don't lose run state (Finding #4).
+                                        if let Some(ref pool) = pool_clone {
+                                            Self::persist_job_with_pool(pool, j);
+                                        }
                                     }
                             });
                         }
