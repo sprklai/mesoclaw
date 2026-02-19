@@ -305,10 +305,7 @@ impl TelegramChannel {
 
         // Strip leading `/`, isolate the command word before any space or `@`.
         let raw = text.trim_start_matches('/');
-        let cmd = raw
-            .split_once([' ', '@'])
-            .map(|(c, _)| c)
-            .unwrap_or(raw);
+        let cmd = raw.split_once([' ', '@']).map(|(c, _)| c).unwrap_or(raw);
 
         match cmd.to_lowercase().as_str() {
             "start" => Some(BotCommand::Start),
