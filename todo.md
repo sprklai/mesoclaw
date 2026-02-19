@@ -55,6 +55,7 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | ⏳ | `src-tauri/src/gateway/routes.rs` | 112 | `start_module` returns 501 with reason (SidecarService lifecycle not wired) | `SidecarService::start(id)` | High |
 | ⏳ | `src-tauri/src/gateway/routes.rs` | 124 | `stop_module` returns 501 with reason (SidecarService lifecycle not wired) | `SidecarService::stop(id)` | High |
 | ⏳ | `src-tauri/src/gateway/routes.rs` | 135 | `reload_modules` returns 501 — hot reload requires quiescing running tools | `ModuleRegistry::discover()` safe reload | Medium |
+| ✅ | `src-tauri/src/commands/channels.rs` | — | All 4 channel IPC commands de-stubbed and wired to real `ChannelManager` state | Real ChannelManager | High |
 
 ---
 
@@ -168,3 +169,13 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | 2026-02-18 | Feature | `src-tauri/src/scheduler/tokio_scheduler.rs` | AgentLoop integration: Heartbeat/AgentTurn payloads executed through real AgentLoop when AgentComponents present |
 | 2026-02-18 | Feature | `src-tauri/src/commands/approval.rs` | get_daemon_config_command: reads daemon.pid (port) + daemon.token from ~/.mesoclaw/ |
 | 2026-02-18 | Feature | `src/lib/gateway-client.ts` | resolveDaemonConfig() wired to get_daemon_config_command IPC |
+| 2026-02-18 | Feature | `src-tauri/src/lib.rs` | ChannelManager added to Tauri managed state (`app.manage`) — IPC commands can now resolve it |
+| 2026-02-18 | Feature | `src-tauri/src/lib.rs` | Channel router task spawned after boot: polls `BootContext.message_rx` → publishes `AppEvent::ChannelMessage` to EventBus |
+| 2026-02-18 | Feature | `src-tauri/src/lib.rs` | Telegram boot registration: reads token + allowed_ids + timeout from `com.sprklai.mesoclaw` keyring on startup |
+| 2026-02-18 | Feature | `src-tauri/src/commands/channels.rs` | `list_channels_command` wired to real `ChannelManager::channel_names()` + `health_all()` |
+| 2026-02-18 | Feature | `src-tauri/src/commands/channels.rs` | `connect_channel_command` reads token/config from keyring and registers live `TelegramChannel` |
+| 2026-02-18 | Feature | `src-tauri/src/commands/channels.rs` | `disconnect_channel_command` calls `ChannelManager::unregister()` |
+| 2026-02-18 | Feature | `src-tauri/src/commands/channels.rs` | `test_channel_connection_command` returns real health from `ChannelManager::health_all()` |
+| 2026-02-18 | Feature | `src-tauri/Cargo.toml` | `channels-telegram` added to default features — enabled in all builds |
+| 2026-02-18 | Refactor | `src/stores/channelStore.ts` | `loadChannels` calls real `list_channels_command`; restores saved Telegram config from keyring on open |
+| 2026-02-18 | Refactor | `src/stores/channelStore.ts` | `updateTelegramConfig` persists token + allowed_ids + timeout to `com.sprklai.mesoclaw` keyring (same service as AI providers) |
