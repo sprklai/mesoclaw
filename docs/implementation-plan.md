@@ -857,6 +857,20 @@ Before proceeding to Phase 1, verify:
 - [x] Mobile settings: `MobileSettings` tab — haptic toggle, push notification opt-in, guidance ✅
 - [x] Mobile store: `mobileSettingsStore` — persisted device-local preferences ✅
 
+### Phase 7 Follow-up ✅ COMPLETE (2026-02-18) — Channel Runtime Wiring
+
+> Gap items identified post-checkpoint and resolved in a follow-up pass.
+
+- [x] `lib.rs`: `app.manage(Arc::clone(&channel_mgr))` — `ChannelManager` now in Tauri state; IPC commands can resolve it ✅
+- [x] `lib.rs`: channel router task — polls `BootContext.message_rx` and publishes `AppEvent::ChannelMessage` to EventBus ✅
+- [x] `lib.rs`: Telegram boot registration — reads token + allowed_ids + timeout from keyring (`com.sprklai.mesoclaw`) on startup ✅
+- [x] `commands/channels.rs`: all 4 IPC commands de-stubbed (`list`, `test`, `connect`, `disconnect`) wired to real `ChannelManager` ✅
+- [x] `commands/channels.rs`: `connect_channel_command` reads full config from keyring and registers live `TelegramChannel` ✅
+- [x] `Cargo.toml`: `channels-telegram` added to default features — no `--features` flag needed ✅
+- [x] `channelStore.ts`: `loadChannels` calls real `list_channels_command`; restores saved config from keyring on open ✅
+- [x] `channelStore.ts`: `updateTelegramConfig` persists token + allowed_ids + timeout to `com.sprklai.mesoclaw` keyring ✅
+- [ ] 7.1.5: Telegram → Agent Loop routing via `SessionRouter` — deferred (requires per-channel session architecture)
+
 ---
 
 ### Channel Crate Reference (Future Channels)
@@ -873,9 +887,9 @@ Before proceeding to Phase 1, verify:
 5. WhatsApp  → reqwest only    (official Business Cloud API — no unofficial crates)
 ```
 
-#### Telegram — `teloxide = "0.13"` ✅ IN USE
+#### Telegram — `teloxide = "0.13"` ✅ IN USE (default feature)
 
-Already wired as an optional dependency under the `channels-telegram` feature flag.
+Wired under the `channels-telegram` feature flag, which is now in the `default` features set — enabled in all standard builds.
 
 - **Crate**: [`teloxide`](https://crates.io/crates/teloxide) — ~825k all-time downloads, ~12k GitHub stars
 - **Why**: Full framework with dptree dispatcher, dialogue storage (SQLite/Redis), long-polling and webhook support, strongly-typed commands. Alternative `frankenstein` (~165k downloads) is a raw 1:1 API wrapper with no framework abstractions — no advantage over teloxide here.
