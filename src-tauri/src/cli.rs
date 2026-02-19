@@ -448,17 +448,22 @@ async fn handle_daemon(args: &DaemonArgs) {
                 // Create a persistence-backed scheduler for the CLI daemon.
                 // Agent loop integration is not available here (no LLM provider wired),
                 // but Heartbeat/Notify jobs will still be recorded and persisted.
-                let sched = TokioScheduler::new_with_persistence(
-                    Arc::clone(&bus),
-                    Some(db_pool.clone()),
-                );
+                let sched =
+                    TokioScheduler::new_with_persistence(Arc::clone(&bus), Some(db_pool.clone()));
                 let sched_start = Arc::clone(&sched);
                 tokio::spawn(async move { sched_start.start().await });
 
                 log::info!("daemon: running in foreground");
-                if let Err(e) =
-                    start_gateway(bus, sessions, modules, db_pool, identity_loader, memory, sched)
-                        .await
+                if let Err(e) = start_gateway(
+                    bus,
+                    sessions,
+                    modules,
+                    db_pool,
+                    identity_loader,
+                    memory,
+                    sched,
+                )
+                .await
                 {
                     print_err(&format!("daemon failed: {e}"));
                 }
@@ -865,7 +870,9 @@ async fn handle_module(args: &ModuleArgs, raw: bool, json_mode: bool) {
         }
         "install" => {
             let Some(name) = &args.name else {
-                print_err("module install requires a module name: mesoclaw module install <name> [--url <source>]");
+                print_err(
+                    "module install requires a module name: mesoclaw module install <name> [--url <source>]",
+                );
                 return;
             };
             install_module(name, args.url.as_deref());
@@ -1079,7 +1086,9 @@ fn remove_module(name: &str, force: bool) {
     let target = modules_dir().join(name);
 
     if !target.exists() {
-        print_err(&format!("module '{name}' is not installed (looked in {target:?})"));
+        print_err(&format!(
+            "module '{name}' is not installed (looked in {target:?})"
+        ));
         return;
     }
 
@@ -1161,14 +1170,8 @@ async fn stream_agent_message(
                     .get("tool_name")
                     .and_then(|s| s.as_str())
                     .unwrap_or("unknown");
-                let result = v
-                    .get("result")
-                    .and_then(|r| r.as_str())
-                    .unwrap_or("");
-                let success = v
-                    .get("success")
-                    .and_then(|b| b.as_bool())
-                    .unwrap_or(false);
+                let result = v.get("result").and_then(|r| r.as_str()).unwrap_or("");
+                let success = v.get("success").and_then(|b| b.as_bool()).unwrap_or(false);
                 if success {
                     eprintln!("\x1b[32m  ✓\x1b[0m {tool}: {result}");
                 } else {
@@ -1191,10 +1194,7 @@ async fn stream_agent_message(
                     .get("tool_name")
                     .and_then(|s| s.as_str())
                     .unwrap_or("unknown");
-                let description = v
-                    .get("description")
-                    .and_then(|s| s.as_str())
-                    .unwrap_or("");
+                let description = v.get("description").and_then(|s| s.as_str()).unwrap_or("");
                 let risk = v
                     .get("risk_level")
                     .and_then(|s| s.as_str())
@@ -1351,14 +1351,8 @@ async fn run_repl(raw: bool, json_mode: bool) {
                         // Treat as an agent message — stream the response.
                         match (&mut ws_stream, &conn_info) {
                             (Some(ws), Some((base_url, token))) => {
-                                stream_agent_message(
-                                    trimmed,
-                                    ws,
-                                    base_url,
-                                    token,
-                                    &http_client,
-                                )
-                                .await;
+                                stream_agent_message(trimmed, ws, base_url, token, &http_client)
+                                    .await;
                             }
                             _ => {
                                 eprintln!(

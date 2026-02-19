@@ -539,8 +539,8 @@ async fn execute_job(
                     let trimmed = response.trim();
                     // Detect HEARTBEAT_OK sentinel: suppress alert when the response
                     // starts or ends with it and has no other meaningful content.
-                    let is_ok = trimmed.starts_with("HEARTBEAT_OK")
-                        || trimmed.ends_with("HEARTBEAT_OK");
+                    let is_ok =
+                        trimmed.starts_with("HEARTBEAT_OK") || trimmed.ends_with("HEARTBEAT_OK");
                     if !is_ok {
                         let _ = bus.publish(AppEvent::HeartbeatAlert {
                             content: response.clone(),

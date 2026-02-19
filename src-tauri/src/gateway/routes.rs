@@ -511,7 +511,11 @@ pub async fn create_scheduler_job(
         delete_after_run: req.delete_after_run.unwrap_or(false),
     };
     let id = state.scheduler.add_job(job).await;
-    (StatusCode::CREATED, Json(json!({ "id": id, "status": "created" }))).into_response()
+    (
+        StatusCode::CREATED,
+        Json(json!({ "id": id, "status": "created" })),
+    )
+        .into_response()
 }
 
 /// `PUT /api/v1/scheduler/jobs/{job_id}/toggle` — enable or disable a job.
@@ -531,7 +535,8 @@ pub async fn toggle_scheduler_job(
     state.scheduler.remove_job(&params.job_id).await;
     job.enabled = req.enabled;
     state.scheduler.add_job(job).await;
-    Json(json!({ "id": params.job_id, "enabled": req.enabled, "status": "updated" })).into_response()
+    Json(json!({ "id": params.job_id, "enabled": req.enabled, "status": "updated" }))
+        .into_response()
 }
 
 /// `DELETE /api/v1/scheduler/jobs/{job_id}` — delete a scheduled job.
