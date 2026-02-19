@@ -336,6 +336,10 @@ pub fn run() {
                     .map(|s| s.inner().clone())
                     .ok_or("MemoryStore not initialised before gateway")?;
                 let sched_for_gateway = Arc::clone(&sched);
+                let cancel_map_for_gateway: agent::agent_commands::SessionCancelMap = app
+                    .try_state::<agent::agent_commands::SessionCancelMap>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("SessionCancelMap not initialised before gateway")?;
                 tauri::async_runtime::spawn(async move {
                     if let Err(e) = gateway::start_gateway(
                         bus_for_gateway,
@@ -345,6 +349,7 @@ pub fn run() {
                         identity_for_gateway,
                         memory_for_gateway,
                         sched_for_gateway,
+                        cancel_map_for_gateway,
                     )
                     .await
                     {
@@ -401,7 +406,7 @@ pub fn run() {
                                 // Skip the internal Tauri IPC channel — its messages are
                                 // already handled by the desktop UI; routing them through
                                 // the agent a second time would create a feedback loop.
-                                if channel == "tauri_ipc" {
+                                if channel == "tauri-ipc" {
                                     continue;
                                 }
 
@@ -564,7 +569,7 @@ pub fn run() {
             agent::agent_commands::start_agent_session_command,
             agent::agent_commands::cancel_agent_session_command,
             // Channel management commands
-            commands::channels::connect_channel_command,
+            commands::channels::channel_health_command,
             commands::channels::disconnect_channel_command,
             commands::channels::test_channel_connection_command,
             commands::channels::list_channels_command,

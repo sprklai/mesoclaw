@@ -8,8 +8,12 @@ use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
 use crate::{
-    agent::session_router::SessionRouter, database::DbPool, event_bus::EventBus,
-    identity::IdentityLoader, memory::store::InMemoryStore, modules::ModuleRegistry,
+    agent::{agent_commands::SessionCancelMap, session_router::SessionRouter},
+    database::DbPool,
+    event_bus::EventBus,
+    identity::IdentityLoader,
+    memory::store::InMemoryStore,
+    modules::ModuleRegistry,
     scheduler::TokioScheduler,
 };
 
@@ -49,6 +53,7 @@ pub async fn start_gateway(
     identity_loader: Arc<IdentityLoader>,
     memory: Arc<InMemoryStore>,
     scheduler: Arc<TokioScheduler>,
+    cancel_map: SessionCancelMap,
 ) -> Result<(), String> {
     // Ensure the token exists before accepting connections.
     load_or_create_token()?;
@@ -61,6 +66,7 @@ pub async fn start_gateway(
         identity_loader,
         memory,
         scheduler,
+        cancel_map,
     };
 
     // Build the router.

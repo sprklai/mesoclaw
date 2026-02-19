@@ -5,7 +5,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
-    agent::session_router::SessionRouter,
+    agent::{agent_commands::SessionCancelMap, session_router::SessionRouter},
     database::DbPool,
     database::models::ai_provider::AIProviderData,
     database::schema::ai_providers,
@@ -34,6 +34,8 @@ pub struct GatewayState {
     pub identity_loader: Arc<IdentityLoader>,
     pub memory: Arc<InMemoryStore>,
     pub scheduler: Arc<TokioScheduler>,
+    /// Shared cancel flags for running agent sessions.
+    pub cancel_map: SessionCancelMap,
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────

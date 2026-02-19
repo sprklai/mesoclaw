@@ -9,7 +9,10 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::event_bus::{AppEvent, EventBus};
+use crate::{
+    agent::agent_commands::SessionCancelMap,
+    event_bus::{AppEvent, EventBus},
+};
 
 use super::routes::GatewayState;
 
@@ -42,6 +45,7 @@ enum WsCommand {
 
 async fn handle_socket(mut socket: WebSocket, state: GatewayState) {
     let bus: Arc<dyn EventBus> = state.bus.clone();
+    let cancel_map = state.cancel_map.clone();
     let mut rx = bus.subscribe();
 
     loop {
@@ -71,7 +75,7 @@ async fn handle_socket(mut socket: WebSocket, state: GatewayState) {
             msg = socket.recv() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
-                        handle_client_command(&text, &bus, &mut socket).await;
+                        handle_client_command(&text, &bus, &cancel_map, &mut socket).await;
                     }
                     Some(Ok(Message::Close(_))) | None => break,
                     _ => {}
@@ -82,7 +86,12 @@ async fn handle_socket(mut socket: WebSocket, state: GatewayState) {
 }
 
 /// Parse a JSON command from the client and emit the appropriate event.
-async fn handle_client_command(raw: &str, bus: &Arc<dyn EventBus>, socket: &mut WebSocket) {
+async fn handle_client_command(
+    raw: &str,
+    bus: &Arc<dyn EventBus>,
+    cancel_map: &SessionCancelMap,
+    socket: &mut WebSocket,
+) {
     let cmd: WsCommand = match serde_json::from_str(raw) {
         Ok(c) => c,
         Err(e) => {
@@ -110,19 +119,33 @@ async fn handle_client_command(raw: &str, bus: &Arc<dyn EventBus>, socket: &mut 
             }
         }
         WsCommand::CancelSession { session_id } => {
-            // Publish a system-level event that the agent loop can observe.
-            // The actual cancellation flag is managed by the SessionCancelMap,
-            // which is not directly accessible here.  An event-driven approach
-            // allows the cancel handler in the agent bridge to pick it up.
-            let event = AppEvent::SystemError {
-                message: format!("cancel_request:{session_id}"),
+            // Set the atomic cancel flag for the session so the agent loop
+            // exits on its next iteration.
+            let flag = cancel_map
+                .lock()
+                .ok()
+                .and_then(|m| m.get(&session_id).cloned());
+
+            let (success, message) = match flag {
+                Some(f) => {
+                    f.store(true, std::sync::atomic::Ordering::SeqCst);
+                    log::info!("ws: cancel signal sent for session {session_id}");
+                    (
+                        true,
+                        format!("cancel signal sent for session '{session_id}'"),
+                    )
+                }
+                None => {
+                    log::warn!("ws: cancel requested for unknown session {session_id}");
+                    (false, format!("unknown session '{session_id}'"))
+                }
             };
-            if let Err(e) = bus.publish(event) {
-                log::warn!("ws: failed to publish cancel event: {e}");
-            }
+
             let ack = serde_json::json!({
                 "type": "cancel_ack",
                 "session_id": session_id,
+                "success": success,
+                "message": message,
             });
             let _ = socket.send(Message::Text(ack.to_string())).await;
         }

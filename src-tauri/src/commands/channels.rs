@@ -25,10 +25,11 @@ pub struct ChannelStatusPayload {
 
 /// Return the current health status for the named channel.
 ///
-/// For a full Telegram connect flow (load token → register → start listener),
+/// This is a health/probe command, not a full connect flow.  For a full
+/// Telegram connect flow (load token → register → start listener),
 /// see Phase 7.1.6 (token management UI).
 #[tauri::command]
-pub async fn connect_channel_command(
+pub async fn channel_health_command(
     name: String,
     mgr: State<'_, Arc<ChannelManager>>,
 ) -> Result<ChannelStatusPayload, String> {

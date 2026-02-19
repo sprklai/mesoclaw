@@ -77,11 +77,20 @@ pub async fn auth_middleware(
         }
     };
 
+    // Accept `Authorization: Bearer <token>` header (standard HTTP) or
+    // `?token=<token>` query parameter (required for WebSocket upgrades, which
+    // cannot set custom headers in the browser).
     let provided = headers
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
-        .map(str::to_string);
+        .map(str::to_string)
+        .or_else(|| {
+            request.uri().query().and_then(|q| {
+                q.split('&')
+                    .find_map(|part| part.strip_prefix("token=").map(str::to_string))
+            })
+        });
 
     match provided {
         Some(token) if token == expected => Ok(next.run(request).await),

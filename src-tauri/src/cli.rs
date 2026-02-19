@@ -454,6 +454,9 @@ async fn handle_daemon(args: &DaemonArgs) {
                 tokio::spawn(async move { sched_start.start().await });
 
                 log::info!("daemon: running in foreground");
+                // CLI daemon has no live agent sessions, so start with an empty cancel map.
+                let cancel_map: local_ts_lib::agent::agent_commands::SessionCancelMap =
+                    Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
                 if let Err(e) = start_gateway(
                     bus,
                     sessions,
@@ -462,6 +465,7 @@ async fn handle_daemon(args: &DaemonArgs) {
                     identity_loader,
                     memory,
                     sched,
+                    cancel_map,
                 )
                 .await
                 {
