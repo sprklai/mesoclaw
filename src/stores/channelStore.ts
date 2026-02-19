@@ -79,6 +79,15 @@ const DEFAULT_CHANNELS: ChannelEntry[] = [
   },
 ];
 
+// ─── Message types ────────────────────────────────────────────────────────────
+
+export interface ChannelIncomingMessage {
+  channel: string;
+  from: string;
+  content: string;
+  timestamp: string;
+}
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 interface ChannelStore {
@@ -86,6 +95,8 @@ interface ChannelStore {
   selectedChannel: string | null;
   isLoading: boolean;
   error: string | null;
+  /** Inbound messages keyed by channel name. */
+  messages: Record<string, ChannelIncomingMessage[]>;
 
   /** Load channel statuses from the backend. */
   loadChannels: () => Promise<void>;
@@ -101,6 +112,10 @@ interface ChannelStore {
   selectChannel: (name: string | null) => void;
   /** Internal: update the status of a named channel. */
   setChannelStatus: (name: string, status: ChannelStatus, error?: string | null) => void;
+  /** Append a message to the given channel's message history. */
+  addMessage: (channel: string, msg: ChannelIncomingMessage) => void;
+  /** Clear all messages for the given channel. */
+  clearMessages: (channel: string) => void;
 }
 
 export const useChannelStore = create<ChannelStore>((set, get) => ({
@@ -108,6 +123,7 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
   selectedChannel: null,
   isLoading: false,
   error: null,
+  messages: {},
 
   loadChannels: async () => {
     set({ isLoading: true, error: null });
@@ -209,5 +225,18 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
       channels: state.channels.map((ch) =>
         ch.name === name ? { ...ch, status, lastError: error } : ch,
       ),
+    })),
+
+  addMessage: (channel, msg) =>
+    set((state) => ({
+      messages: {
+        ...state.messages,
+        [channel]: [...(state.messages[channel] ?? []), msg],
+      },
+    })),
+
+  clearMessages: (channel) =>
+    set((state) => ({
+      messages: { ...state.messages, [channel]: [] },
     })),
 }));
