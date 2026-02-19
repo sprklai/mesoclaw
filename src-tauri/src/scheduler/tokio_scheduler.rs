@@ -233,7 +233,10 @@ impl TokioScheduler {
             .values(&row)
             .execute(&mut conn)
         {
-            log::warn!("scheduler: failed to persist job '{}' after run: {e}", job.id);
+            log::warn!(
+                "scheduler: failed to persist job '{}' after run: {e}",
+                job.id
+            );
         }
     }
 

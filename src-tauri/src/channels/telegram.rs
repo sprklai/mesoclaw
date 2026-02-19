@@ -466,14 +466,14 @@ impl TelegramChannel {
                             }
 
                             let text = msg.text().map(str::to_string);
-                            let bot_cmd = text
-                                .as_deref()
-                                .and_then(Self::parse_bot_command);
+                            let bot_cmd = text.as_deref().and_then(Self::parse_bot_command);
 
                             // ── /allow {id} is handled in-channel ──────────
                             if let Some(BotCommand::Allow(new_id)) = &bot_cmd {
                                 self.allow_chat(*new_id).await;
-                                log::info!("telegram: added chat_id {new_id} to allow-list via /allow");
+                                log::info!(
+                                    "telegram: added chat_id {new_id} to allow-list via /allow"
+                                );
                                 continue; // do not forward to agent
                             }
 
@@ -484,8 +484,7 @@ impl TelegramChannel {
                                         .as_deref()
                                         .map(|t| {
                                             t.contains(&format!("@{uname}"))
-                                                || t.to_lowercase()
-                                                    .contains(&uname.to_lowercase())
+                                                || t.to_lowercase().contains(&uname.to_lowercase())
                                         })
                                         .unwrap_or(false),
                                     None => false,
@@ -497,9 +496,8 @@ impl TelegramChannel {
 
                             let content = text.unwrap_or_else(|| Self::describe_media(msg));
 
-                            let mut channel_msg =
-                                ChannelMessage::new("telegram", content)
-                                    .with_sender(chat_id.to_string());
+                            let mut channel_msg = ChannelMessage::new("telegram", content)
+                                .with_sender(chat_id.to_string());
 
                             // Tag bot commands so the agent loop can route them.
                             if let Some(ref cmd) = bot_cmd {
