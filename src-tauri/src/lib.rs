@@ -297,6 +297,146 @@ pub fn run() {
                 app.manage(sched);
             }
 
+            // ── Channel-Agent Bridge ──────────────────────────────────────────────────────
+            // Subscribes to ChannelMessage events and auto-triggers the agent.
+            // Runs the agent loop for each inbound external-channel message and routes
+            // the response back via ChannelManager.send() so Telegram users get a reply.
+            {
+                use agent::{
+                    agent_commands::{resolve_active_provider, SessionCancelMap},
+                    loop_::{AgentConfig, AgentLoop},
+                };
+                use event_bus::{AppEvent, EventBus as _, EventFilter, EventType};
+
+                let bridge_bus: Arc<dyn event_bus::EventBus> = app
+                    .try_state::<Arc<dyn event_bus::EventBus>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("EventBus not initialised before channel-bridge")?;
+                let bridge_mgr: Arc<channels::ChannelManager> = app
+                    .try_state::<Arc<channels::ChannelManager>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("ChannelManager not initialised before channel-bridge")?;
+                let bridge_pool: database::DbPool = pool.clone();
+                let bridge_registry: Arc<tools::ToolRegistry> = app
+                    .try_state::<Arc<tools::ToolRegistry>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("ToolRegistry not initialised before channel-bridge")?;
+                let bridge_policy: Arc<security::SecurityPolicy> = app
+                    .try_state::<Arc<security::SecurityPolicy>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("SecurityPolicy not initialised before channel-bridge")?;
+                let bridge_identity: Arc<identity::IdentityLoader> = app
+                    .try_state::<Arc<identity::IdentityLoader>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("IdentityLoader not initialised before channel-bridge")?;
+                let bridge_cancel: SessionCancelMap = app
+                    .try_state::<SessionCancelMap>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("SessionCancelMap not initialised before channel-bridge")?;
+
+                tauri::async_runtime::spawn(async move {
+                    use tokio::sync::broadcast::error::RecvError;
+                    let mut rx = bridge_bus
+                        .subscribe_filtered(EventFilter::new(vec![EventType::ChannelMessage]));
+
+                    loop {
+                        match rx.recv().await {
+                            Ok(AppEvent::ChannelMessage { channel, from, content }) => {
+                                // Skip the internal Tauri IPC channel — its messages are
+                                // already handled by the desktop UI; routing them through
+                                // the agent a second time would create a feedback loop.
+                                if channel == "tauri_ipc" {
+                                    continue;
+                                }
+
+                                // Clone everything needed for the per-message spawned task.
+                                let bus = Arc::clone(&bridge_bus);
+                                let mgr = Arc::clone(&bridge_mgr);
+                                let pool = bridge_pool.clone();
+                                let reg = Arc::clone(&bridge_registry);
+                                let pol = Arc::clone(&bridge_policy);
+                                let ident = Arc::clone(&bridge_identity);
+                                let cmap = Arc::clone(&bridge_cancel);
+                                let chan = channel.clone();
+                                let chat_id = from.clone();
+
+                                tauri::async_runtime::spawn(async move {
+                                    let provider = match resolve_active_provider(&pool) {
+                                        Ok(p) => p,
+                                        Err(e) => {
+                                            log::warn!(
+                                                "channel-bridge [{chan}]: provider error: {e}"
+                                            );
+                                            return;
+                                        }
+                                    };
+
+                                    // Session ID follows the same pattern as desktop sessions.
+                                    let session_id =
+                                        format!("channel:dm:{chan}:{chat_id}");
+                                    let flag = Arc::new(
+                                        std::sync::atomic::AtomicBool::new(false),
+                                    );
+                                    if let Ok(mut map) = cmap.lock() {
+                                        map.insert(session_id.clone(), Arc::clone(&flag));
+                                    }
+
+                                    let _ = bus.publish(AppEvent::AgentStarted {
+                                        session_id: session_id.clone(),
+                                    });
+
+                                    let system_prompt = ident.build_system_prompt();
+                                    let agent = AgentLoop::new(
+                                        provider,
+                                        reg,
+                                        pol,
+                                        Some(bus.clone()),
+                                        AgentConfig::default(),
+                                    )
+                                    .with_cancel_flag(Arc::clone(&flag));
+
+                                    match agent.run(&system_prompt, &content).await {
+                                        Ok(response) => {
+                                            // Emit AgentComplete so TauriBridge forwards to
+                                            // the desktop frontend as well.
+                                            let _ = bus.publish(AppEvent::AgentComplete {
+                                                session_id: session_id.clone(),
+                                                message: response.clone(),
+                                            });
+                                            // Send response back through the originating channel.
+                                            if let Err(e) =
+                                                mgr.send(&chan, &response, Some(&chat_id)).await
+                                            {
+                                                log::warn!(
+                                                    "channel-bridge [{chan}]: send failed: {e}"
+                                                );
+                                            }
+                                        }
+                                        Err(e) => {
+                                            log::warn!(
+                                                "channel-bridge [{chan}]: agent error: {e}"
+                                            );
+                                        }
+                                    }
+
+                                    if let Ok(mut map) = cmap.lock() {
+                                        map.remove(&session_id);
+                                    }
+                                });
+                            }
+                            Ok(_) => {} // Non-ChannelMessage event passed through filter — discard.
+                            Err(RecvError::Lagged(n)) => {
+                                log::warn!("channel-bridge: lagged {n} events");
+                            }
+                            Err(RecvError::Closed) => {
+                                log::info!("channel-bridge: event bus closed, exiting");
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+
             plugins::system_tray::setup(app, &pool)?;
 
             Ok(())
