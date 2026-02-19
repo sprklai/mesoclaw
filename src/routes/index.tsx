@@ -1,101 +1,147 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Link } from "@tanstack/react-router";
-import { Sparkles, Zap } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { Link, createFileRoute } from "@tanstack/react-router";
+import { Brain, MessageSquare, Settings, Sparkles } from "lucide-react";
+import { GatewayStatus } from "@/components/ui/gateway-status";
 import { APP_IDENTITY } from "@/config/app-identity";
+import { useLLMStore } from "@/stores/llm";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
 function HomePage() {
-  const { t } = useTranslation("common");
+  const { config } = useLLMStore();
+
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+  const quickActions = [
+    {
+      icon: Sparkles,
+      label: "New Chat",
+      href: "/chat" as const,
+      description: "Start a conversation",
+    },
+    {
+      icon: Brain,
+      label: "Memory",
+      href: "/memory" as const,
+      description: "Search agent memory",
+    },
+    {
+      icon: MessageSquare,
+      label: "Channels",
+      href: "/channels" as const,
+      description: "View Telegram inbox",
+    },
+    {
+      icon: Settings,
+      label: "Settings",
+      href: "/settings" as const,
+      description: "Configure providers",
+    },
+  ];
 
   return (
-    /*
-     * Mobile-friendly home page layout:
-     * - Vertically centered on desktop, top-aligned with padding on mobile
-     * - Sticky bottom input area placeholder for future chat input
-     * - pb-safe ensures content is not obscured by iOS home indicator
-     */
-    <div className="flex h-full flex-col">
-      {/* Main scrollable content */}
-      <div className="flex flex-1 items-center justify-center overflow-auto">
-        <div className="w-full max-w-3xl px-4 py-6 text-center sm:px-6 md:px-8">
-          {/* ── Hero heading ──────────────────────────────────────── */}
-          <h1 className="text-2xl font-bold sm:text-3xl md:text-4xl">
-            {t("navigation.home")} — {APP_IDENTITY.productName}
+    <div className="mx-auto w-full max-w-4xl space-y-8">
+      {/* ── Greeting ── */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {greeting}, {APP_IDENTITY.productName}
           </h1>
-          <p className="mt-3 text-base text-muted-foreground sm:mt-4 sm:text-lg">
-            A production-ready foundation for building AI-powered desktop
-            applications with Tauri 2, React, and TypeScript.
+          <p className="mt-1 text-sm text-muted-foreground">
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
           </p>
+        </div>
+        <GatewayStatus />
+      </div>
 
-          {/* ── Feature cards ─────────────────────────────────────── */}
-          <div className="mt-8 grid gap-4 sm:mt-12 sm:gap-6 md:grid-cols-2">
+      {/* ── Quick actions grid ── */}
+      <section aria-labelledby="quick-actions-heading">
+        <h2
+          id="quick-actions-heading"
+          className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        >
+          Quick Actions
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {quickActions.map(({ icon: Icon, label, href, description }) => (
             <Link
-              to="/settings"
-              search={{ tab: "ai" }}
-              className="group rounded-lg border border-border bg-card p-5 text-left transition-colors hover:bg-accent sm:p-6"
+              key={href}
+              to={href}
+              className={cn(
+                "group flex flex-col gap-3 rounded-xl border border-border bg-card p-4",
+                "transition-all hover:border-primary/40 hover:shadow-sm",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              )}
             >
-              <div className="flex items-center gap-3">
-                <div className="rounded-md bg-primary/10 p-2">
-                  <Sparkles className="h-5 w-5 text-primary" aria-hidden />
-                </div>
-                <h2 className="text-lg font-semibold sm:text-xl">
-                  AI Integration
-                </h2>
+              <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+                <Icon className="size-4 text-primary" aria-hidden />
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">
-                Configure LLM providers, manage API keys securely, and customize
-                AI behavior for your application.
-              </p>
-              <div className="mt-4 text-sm font-medium text-primary group-hover:underline">
-                Configure AI Settings →
+              <div>
+                <p className="text-sm font-medium leading-none">{label}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {description}
+                </p>
               </div>
             </Link>
+          ))}
+        </div>
+      </section>
 
-            <Link
-              to="/settings"
-              search={{ tab: "skills" }}
-              className="group rounded-lg border border-border bg-card p-5 text-left transition-colors hover:bg-accent sm:p-6"
-            >
-              <div className="flex items-center gap-3">
-                <div className="rounded-md bg-primary/10 p-2">
-                  <Zap className="h-5 w-5 text-primary" aria-hidden />
-                </div>
-                <h2 className="text-lg font-semibold sm:text-xl">
-                  Skills System
-                </h2>
-              </div>
-              <p className="mt-3 text-sm text-muted-foreground">
-                Create custom AI skills with prompts and parameters. Build
-                reusable capabilities for your domain.
-              </p>
-              <div className="mt-4 text-sm font-medium text-primary group-hover:underline">
-                Manage Skills →
-              </div>
-            </Link>
-          </div>
-
-          {/* ── Quick start guide ─────────────────────────────────── */}
-          <div className="mt-8 space-y-4 sm:mt-12">
-            <h3 className="text-base font-semibold sm:text-lg">Quick Start</h3>
-            <div className="rounded-lg border border-border bg-muted/50 p-4 text-left text-sm">
-              <ol className="list-inside list-decimal space-y-2 text-muted-foreground">
-                <li>
-                  Configure your AI provider in Settings → AI Integration
-                </li>
-                <li>Create a skill with a custom prompt and parameters</li>
-                <li>
-                  Use the skill system to build AI-powered features in your app
-                </li>
-                <li>Extend with custom Tauri commands and React components</li>
-              </ol>
-            </div>
+      {/* ── System status ── */}
+      <section aria-labelledby="status-heading">
+        <h2
+          id="status-heading"
+          className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        >
+          System Status
+        </h2>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex flex-wrap gap-6">
+            <StatusRow
+              label="AI Provider"
+              value={config?.providerId ?? "Not configured"}
+              ok={!!config?.providerId}
+            />
+            <StatusRow
+              label="Model"
+              value={config?.modelId ?? "Not selected"}
+              ok={!!config?.modelId}
+            />
           </div>
         </div>
-      </div>
+      </section>
+    </div>
+  );
+}
+
+function StatusRow({
+  label,
+  value,
+  ok,
+}: {
+  label: string;
+  value: string;
+  ok: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className={cn(
+          "size-2 rounded-full",
+          ok ? "bg-green-500" : "bg-muted-foreground"
+        )}
+        aria-hidden
+      />
+      <span className="text-sm text-muted-foreground">{label}:</span>
+      <span className="text-sm font-medium">{value}</span>
     </div>
   );
 }
