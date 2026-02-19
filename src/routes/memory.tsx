@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 import { DailyTimeline } from "@/components/memory/DailyTimeline";
 import { MemorySearch } from "@/components/memory/MemorySearch";
@@ -14,21 +15,19 @@ function MemoryPage() {
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-hidden p-4">
-      <div>
-        <h1 className="text-xl font-semibold">Memory</h1>
-        <p className="text-sm text-muted-foreground">
-          Search the agent's semantic memory or browse daily journals.
-        </p>
-      </div>
+      <PageHeader
+        title="Memory"
+        description="Search the agent's semantic memory or browse daily journals."
+      />
 
       <Tabs
         value={tab}
         onValueChange={(v) => setTab(v as "search" | "timeline")}
         className="flex flex-1 flex-col overflow-hidden"
       >
-        <TabsList className="shrink-0">
-          <TabsTrigger value="search">Search</TabsTrigger>
-          <TabsTrigger value="timeline">Daily Timeline</TabsTrigger>
+        <TabsList className="shrink-0 rounded-full bg-muted p-1">
+          <TabsTrigger value="search" className="rounded-full">Search</TabsTrigger>
+          <TabsTrigger value="timeline" className="rounded-full">Daily Timeline</TabsTrigger>
         </TabsList>
 
         <TabsContent value="search" className="flex-1 overflow-y-auto pt-2">
