@@ -1,4 +1,5 @@
-import { Outlet, createRootRoute } from "@tanstack/react-router";
+import { Outlet, createRootRoute, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import { ContextPanel } from "@/components/layout/ContextPanel";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -6,6 +7,7 @@ import { Sidebar } from "@/components/ui/sidebar";
 import { useChannelMessages } from "@/hooks/useChannelMessages";
 import { useMobileSwipe } from "@/hooks/useMobileSwipe";
 import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
+import { useAppSettingsStore } from "@/stores/appSettingsStore";
 import { useSidebarStore } from "@/stores/sidebarStore";
 
 export const Route = createRootRoute({
@@ -15,6 +17,15 @@ export const Route = createRootRoute({
 function RootLayout() {
   const openMobile = useSidebarStore((state) => state.openMobile);
   const closeMobile = useSidebarStore((state) => state.closeMobile);
+  const onboardingCompleted = useAppSettingsStore((s) => s.onboardingCompleted);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!onboardingCompleted && pathname !== "/onboarding") {
+      navigate({ to: "/onboarding" });
+    }
+  }, [onboardingCompleted, pathname, navigate]);
 
   // Swipe right from the left edge → open sidebar; swipe left → close it.
   const { onTouchStart, onTouchEnd } = useMobileSwipe({
@@ -28,6 +39,14 @@ function RootLayout() {
 
   // Subscribe to Tauri app-event channel_message events for the full app lifetime.
   useChannelMessages();
+
+  if (pathname === "/onboarding") {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <Outlet />
+      </div>
+    );
+  }
 
   return (
     /*

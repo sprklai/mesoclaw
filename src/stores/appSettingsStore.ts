@@ -16,6 +16,9 @@ export interface AppSettings {
   // Privacy & Data
   cloudLlmEnabled: boolean;
   explanationVerbosity: "concise" | "standard" | "detailed";
+
+  // Onboarding
+  onboardingCompleted: boolean;
 }
 
 interface AppSettingsActions {
@@ -28,6 +31,7 @@ interface AppSettingsActions {
   setExplanationVerbosity: (
     verbosity: AppSettings["explanationVerbosity"]
   ) => void;
+  completeOnboarding: () => void;
   resetSettings: () => void;
 }
 
@@ -41,6 +45,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   notificationsEnabled: true,
   cloudLlmEnabled: true,
   explanationVerbosity: "standard",
+  onboardingCompleted: false,
 };
 
 export const useAppSettingsStore = create<AppSettingsStore>()(
@@ -57,6 +62,8 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       setCloudLlmEnabled: (cloudLlmEnabled) => set({ cloudLlmEnabled }),
       setExplanationVerbosity: (explanationVerbosity) =>
         set({ explanationVerbosity }),
+
+      completeOnboarding: () => set({ onboardingCompleted: true }),
 
       resetSettings: () => set(DEFAULT_SETTINGS),
     }),

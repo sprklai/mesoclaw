@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as ChannelsRouteImport } from './routes/channels'
@@ -18,6 +19,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MemoryRoute = MemoryRouteImport.update({
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/channels': typeof ChannelsRoute
   '/chat': typeof ChatRoute
   '/memory': typeof MemoryRoute
+  '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/channels': typeof ChannelsRoute
   '/chat': typeof ChatRoute
   '/memory': typeof MemoryRoute
+  '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,28 @@ export interface FileRoutesById {
   '/channels': typeof ChannelsRoute
   '/chat': typeof ChatRoute
   '/memory': typeof MemoryRoute
+  '/onboarding': typeof OnboardingRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/channels' | '/chat' | '/memory' | '/settings'
+  fullPaths:
+    | '/'
+    | '/channels'
+    | '/chat'
+    | '/memory'
+    | '/onboarding'
+    | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/channels' | '/chat' | '/memory' | '/settings'
-  id: '__root__' | '/' | '/channels' | '/chat' | '/memory' | '/settings'
+  to: '/' | '/channels' | '/chat' | '/memory' | '/onboarding' | '/settings'
+  id:
+    | '__root__'
+    | '/'
+    | '/channels'
+    | '/chat'
+    | '/memory'
+    | '/onboarding'
+    | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +98,7 @@ export interface RootRouteChildren {
   ChannelsRoute: typeof ChannelsRoute
   ChatRoute: typeof ChatRoute
   MemoryRoute: typeof MemoryRoute
+  OnboardingRoute: typeof OnboardingRoute
   SettingsRoute: typeof SettingsRoute
 }
 
@@ -86,6 +109,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/memory': {
@@ -124,6 +154,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChannelsRoute: ChannelsRoute,
   ChatRoute: ChatRoute,
   MemoryRoute: MemoryRoute,
+  OnboardingRoute: OnboardingRoute,
   SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport

@@ -227,7 +227,7 @@ mod tests {
         assert_eq!(config.default_model, "");
         assert_eq!(config.timeout, Duration::from_secs(30));
         assert_eq!(config.max_retries, 3);
-        assert!(config.extra_headers.contains_key("anthropic-version"));
+        assert!(config.extra_headers.is_empty());
     }
 
     #[test]
@@ -345,7 +345,7 @@ mod tests {
             .with_header("X-Custom-1", "value-1")
             .with_header("X-Custom-2", "value-2");
 
-        assert_eq!(config.extra_headers.len(), 3); // 2 custom + anthropic-version
+        assert_eq!(config.extra_headers.len(), 2); // 2 custom headers; anthropic-version is added only by anthropic() factory
         assert_eq!(
             config.extra_headers.get("X-Custom-1"),
             Some(&"value-1".to_string())
