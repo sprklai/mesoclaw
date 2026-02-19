@@ -1,9 +1,11 @@
 //! Tauri IPC commands for the Channels settings panel.
-//!
-//! ## TODO (7.2): These are stubs. Real connect/disconnect/test logic for
-//! Telegram and other channels will be wired in Phase 7 follow-up work.
+
+use std::sync::Arc;
 
 use serde::Serialize;
+use tauri::State;
+
+use crate::channels::ChannelManager;
 
 /// Status payload returned to the frontend after a connect or health-check.
 #[derive(Debug, Serialize)]
@@ -17,56 +19,93 @@ pub struct ChannelStatusPayload {
     pub error: Option<String>,
 }
 
-/// Attempt to connect the named channel.
-///
-/// ## TODO (7.2): Wire real Telegram connect logic once the `channels-telegram`
-/// feature is enabled and the ChannelManager is exposed via Tauri state.
+/// List all registered channels and their connection status.
 #[tauri::command]
-pub async fn connect_channel_command(name: String) -> Result<ChannelStatusPayload, String> {
-    // ## MOCK: returns an error indicating the channel is not yet implemented.
-    Err(format!(
-        "Channel '{name}' connect is not yet implemented. Configure the bot token and try again."
-    ))
-}
-
-/// Disconnect the named channel.
-///
-/// ## TODO (7.2): Wire real disconnect logic.
-#[tauri::command]
-pub async fn disconnect_channel_command(name: String) -> Result<(), String> {
-    // ## MOCK: no-op stub — channel manager not yet wired to Tauri state.
-    log::info!("disconnect_channel_command called for '{name}' (stub)");
-    Ok(())
+pub async fn list_channels_command(
+    mgr: State<'_, Arc<ChannelManager>>,
+) -> Result<Vec<ChannelStatusPayload>, String> {
+    let names = mgr.channel_names().await;
+    let health = mgr.health_all().await;
+    Ok(names
+        .into_iter()
+        .map(|name| {
+            let connected = health.get(&name).copied().unwrap_or(false);
+            ChannelStatusPayload { name, connected, error: None }
+        })
+        .collect())
 }
 
 /// Test connectivity for the named channel without fully connecting.
 ///
-/// Returns `true` if the health check passes, `false` otherwise.
-///
-/// ## TODO (7.2): Wire real health-check logic.
+/// Returns `true` if the channel is registered and healthy, `false` otherwise.
 #[tauri::command]
-pub async fn test_channel_connection_command(name: String) -> Result<bool, String> {
-    // ## MOCK: always returns false until real implementation is wired.
-    log::info!("test_channel_connection_command called for '{name}' (stub)");
-    Ok(false)
+pub async fn test_channel_connection_command(
+    name: String,
+    mgr: State<'_, Arc<ChannelManager>>,
+) -> Result<bool, String> {
+    let health = mgr.health_all().await;
+    Ok(health.get(&name).copied().unwrap_or(false))
 }
 
-/// List all registered channels and their connection status.
-///
-/// ## TODO (7.2): Return real status from ChannelManager state.
+/// Disconnect the named channel.
 #[tauri::command]
-pub async fn list_channels_command() -> Result<Vec<ChannelStatusPayload>, String> {
-    // ## MOCK: return the two default channels in a hardcoded disconnected state.
-    Ok(vec![
-        ChannelStatusPayload {
-            name: "tauri-ipc".to_string(),
+pub async fn disconnect_channel_command(
+    name: String,
+    mgr: State<'_, Arc<ChannelManager>>,
+) -> Result<(), String> {
+    if name == "tauri-ipc" {
+        return Err("Desktop IPC channel cannot be disconnected.".to_string());
+    }
+    mgr.unregister(&name).await;
+    log::info!("disconnect_channel_command: '{name}' removed");
+    Ok(())
+}
+
+/// Attempt to connect the named channel.
+///
+/// For Telegram: reads the bot token from the OS keyring (saved via `keychain_set`)
+/// and registers a new `TelegramChannel` with the `ChannelManager`. If the channel
+/// is already registered, returns current health.
+///
+/// Requires the `channels-telegram` Cargo feature for Telegram support.
+#[tauri::command]
+pub async fn connect_channel_command(
+    name: String,
+    _mgr: State<'_, Arc<ChannelManager>>,
+) -> Result<ChannelStatusPayload, String> {
+    #[cfg(feature = "channels-telegram")]
+    if name == "telegram" {
+        // Return current status if already registered.
+        let health = _mgr.health_all().await;
+        if health.contains_key("telegram") {
+            return Ok(ChannelStatusPayload {
+                name: "telegram".to_string(),
+                connected: *health.get("telegram").unwrap_or(&false),
+                error: None,
+            });
+        }
+        // Load token from OS keyring.
+        let entry = keyring::Entry::new("mesoclaw", "telegram_bot_token")
+            .map_err(|e| format!("keyring error: {e}"))?;
+        let token = entry.get_password().map_err(|_| {
+            "No Telegram bot token saved. Enter your token and click Save first.".to_string()
+        })?;
+        if token.is_empty() {
+            return Err(
+                "Telegram bot token is empty. Enter your token and click Save first.".to_string(),
+            );
+        }
+        let config = crate::channels::TelegramConfig::new(token);
+        let channel = Arc::new(crate::channels::TelegramChannel::new(config));
+        _mgr.register(channel).await?;
+        return Ok(ChannelStatusPayload {
+            name: "telegram".to_string(),
             connected: true,
             error: None,
-        },
-        ChannelStatusPayload {
-            name: "telegram".to_string(),
-            connected: false,
-            error: None,
-        },
-    ])
+        });
+    }
+
+    Err(format!(
+        "Channel '{name}' is not available in this build. Enable the corresponding Cargo feature."
+    ))
 }

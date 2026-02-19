@@ -112,10 +112,21 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
   loadChannels: async () => {
     set({ isLoading: true, error: null });
     try {
-      // ## TODO: implement backend command list_channels_command
-      // const entries = await invoke<ChannelEntry[]>("list_channels_command");
-      // set({ channels: entries, isLoading: false });
-      set({ isLoading: false });
+      const entries = await invoke<Array<{ name: string; connected: boolean; error: string | null }>>(
+        "list_channels_command",
+      );
+      set((state) => ({
+        channels: state.channels.map((ch) => {
+          const entry = entries.find((e) => e.name === ch.name);
+          if (!entry) return ch;
+          return {
+            ...ch,
+            status: (entry.connected ? "connected" : "disconnected") as ChannelStatus,
+            lastError: entry.error,
+          };
+        }),
+        isLoading: false,
+      }));
     } catch (err) {
       set({ error: String(err), isLoading: false });
     }
@@ -154,8 +165,15 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
   updateTelegramConfig: async (config) => {
     try {
-      // ## TODO: implement backend command update_telegram_config_command
-      // await invoke("update_telegram_config_command", { config });
+      // Save bot token to OS keyring if provided.
+      if (config.token) {
+        await invoke("keychain_set", {
+          service: "mesoclaw",
+          key: "telegram_bot_token",
+          value: config.token,
+        });
+      }
+      // Update local state.
       set((state) => ({
         channels: state.channels.map((ch) =>
           ch.name === "telegram"

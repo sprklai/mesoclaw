@@ -230,7 +230,7 @@ mod tests {
             channels,
             tmp.path().to_path_buf(),
         );
-        let ctx = seq.run().await.unwrap();
+        let _ctx = seq.run().await.unwrap();
 
         // SystemReady should be in the broadcast stream.
         // Drain until we find it or exhaust buffered events.
@@ -249,7 +249,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let seq = make_seq(&tmp);
         // No BOOT.md — should complete without error.
-        let ctx = seq.run().await.unwrap();
+        let _ctx = seq.run().await.unwrap();
     }
 
     #[tokio::test]
@@ -263,6 +263,6 @@ mod tests {
         .unwrap();
         let seq = make_seq(&tmp);
         // Should run without error; the items are logged (not executed).
-        let ctx = seq.run().await.unwrap();
+        let _ctx = seq.run().await.unwrap();
     }
 }

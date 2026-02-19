@@ -176,19 +176,57 @@ pub fn run() {
                     .map(|s| s.inner().clone())
                     .ok_or("EventBus not initialised before BootSequence")?;
                 let channel_mgr = Arc::new(channels::ChannelManager::new());
+                // Expose ChannelManager to Tauri IPC commands.
+                app.manage(Arc::clone(&channel_mgr));
                 // Register the Tauri IPC channel so desktop events flow into the agent loop.
                 let ipc_ch = Arc::new(channels::TauriIpcChannel::new(Arc::clone(&bus_boot)));
                 let channel_mgr_clone = Arc::clone(&channel_mgr);
                 let bus_boot_clone = Arc::clone(&bus_boot);
+                let bus_for_router = Arc::clone(&bus_boot);
                 tauri::async_runtime::spawn(async move {
                     if let Err(e) = channel_mgr_clone.register(ipc_ch).await {
                         log::warn!("boot: failed to register tauri-ipc channel: {e}");
+                    }
+                    // Register Telegram channel from keyring on startup (if token exists).
+                    #[cfg(feature = "channels-telegram")]
+                    {
+                        match keyring::Entry::new("mesoclaw", "telegram_bot_token") {
+                            Ok(entry) => {
+                                if let Ok(token) = entry.get_password() {
+                                    let config = channels::TelegramConfig::new(token);
+                                    let telegram = Arc::new(channels::TelegramChannel::new(config));
+                                    if let Err(e) = channel_mgr_clone.register(telegram).await {
+                                        log::warn!("boot: telegram channel registration failed: {e}");
+                                    } else {
+                                        log::info!("boot: telegram channel registered from keyring");
+                                    }
+                                } else {
+                                    log::info!("boot: no telegram bot token in keyring, channel not started");
+                                }
+                            }
+                            Err(e) => log::warn!("boot: keyring access failed for telegram: {e}"),
+                        }
                     }
                     match services::boot::BootSequence::new(bus_boot_clone, channel_mgr_clone) {
                         Ok(seq) => match seq.run().await {
                             Ok(ctx) => {
                                 log::info!("boot: sequence complete; {} channel handle(s)", ctx.channel_handles.len());
-                                // Background scheduler keeps running until the process exits.
+                                // Spawn channel router: forward all inbound channel messages to EventBus.
+                                let mut msg_rx = ctx.message_rx;
+                                let bus_router = bus_for_router;
+                                tauri::async_runtime::spawn(async move {
+                                    while let Some(msg) = msg_rx.recv().await {
+                                        let event = event_bus::AppEvent::ChannelMessage {
+                                            channel: msg.channel.clone(),
+                                            from: msg.sender.unwrap_or_default(),
+                                            content: msg.content.clone(),
+                                        };
+                                        if let Err(e) = bus_router.publish(event) {
+                                            log::warn!("channel-router: publish error: {e}");
+                                        }
+                                    }
+                                    log::info!("channel-router: receiver closed, task exiting");
+                                });
                             }
                             Err(e) => log::error!("boot: sequence failed: {e}"),
                         },
