@@ -859,6 +859,59 @@ Before proceeding to Phase 1, verify:
 
 ---
 
+### Channel Crate Reference (Future Channels)
+
+> Research completed 2026-02-18. Use this as the authoritative crate selection guide when implementing additional channels beyond Telegram.
+
+**Priority order for future channel work:**
+
+```
+1. Telegram  → teloxide        (ALREADY IN CARGO.TOML — channels-telegram feature)
+2. Matrix    → matrix-sdk      (bridges WhatsApp, Slack, and dozens more via Matrix bridges)
+3. Discord   → serenity        (batteries-included, same philosophy as teloxide)
+4. Slack     → slack-morphism  (or use Matrix bridge instead)
+5. WhatsApp  → reqwest only    (official Business Cloud API — no unofficial crates)
+```
+
+#### Telegram — `teloxide = "0.13"` ✅ IN USE
+
+Already wired as an optional dependency under the `channels-telegram` feature flag.
+
+- **Crate**: [`teloxide`](https://crates.io/crates/teloxide) — ~825k all-time downloads, ~12k GitHub stars
+- **Why**: Full framework with dptree dispatcher, dialogue storage (SQLite/Redis), long-polling and webhook support, strongly-typed commands. Alternative `frankenstein` (~165k downloads) is a raw 1:1 API wrapper with no framework abstractions — no advantage over teloxide here.
+- **Cargo.toml entry**: `teloxide = { version = "0.13", features = ["macros"], optional = true }`
+
+#### Discord — `serenity`
+
+- **Crate**: [`serenity`](https://crates.io/crates/serenity) — high-level, batteries-included Discord client; best fit for MesoClaw's channel abstraction layer
+- **Alternative**: [`twilight`](https://crates.io/crates/twilight) — low-level component library for advanced use cases requiring maximum control; not needed here
+- **Cargo.toml entry**: `serenity = { version = "0.12", features = ["client", "gateway", "rustls_backend", "model"], optional = true }`
+- **Feature flag**: `channels-discord = ["serenity"]`
+
+#### Matrix — `matrix-sdk` (highest strategic value after Telegram)
+
+- **Crate**: [`matrix-sdk`](https://crates.io/crates/matrix-sdk) — officially maintained by matrix.org, v0.16 (Dec 2025), supports Matrix 1.13–1.15, includes E2E encryption via `matrix-sdk-crypto`
+- **Why strategic**: One Matrix integration bridges to WhatsApp, Slack, Discord, IRC, Signal, and more via Matrix protocol bridges — avoids implementing each platform separately
+- **Cargo.toml entry**: `matrix-sdk = { version = "0.16", optional = true }`
+- **Feature flag**: `channels-matrix = ["matrix-sdk"]`
+
+#### WhatsApp — `reqwest` only (no third-party crate)
+
+- **Do NOT use**: [`whatsapp-rust`](https://crates.io/crates/whatsapp-rust) or similar unofficial crates — they reverse-engineer the WhatsApp protocol and violate Meta's Terms of Service, creating legal risk for a distributed desktop app
+- **Correct approach**: Official [WhatsApp Business Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api) via HTTP — use the existing `reqwest` dependency, no new crate needed
+- **Limitation**: Requires a Meta Business Account and approved phone number; not suitable for personal use bots
+- **Better alternative**: Use Matrix + `mautrix-whatsapp` bridge instead
+
+#### Slack — `slack-morphism`
+
+- **Crate**: [`slack-morphism`](https://crates.io/crates/slack-morphism) — most complete async Slack client; supports Events API, Socket Mode, Block Kit
+- **Alternatives rejected**: `slack-hook` (webhooks only), `slack-messaging` (Block Kit builder only, not a full client)
+- **Cargo.toml entry**: `slack-morphism = { version = "2", optional = true }`
+- **Feature flag**: `channels-slack = ["slack-morphism"]`
+- **Note**: Matrix bridge (`mautrix-slack`) is an alternative that avoids a separate integration
+
+---
+
 ## Phase 8: CI/CD, Distribution & Community
 
 **Goal**: Automate builds for all platforms, set up release pipelines, and create contribution infrastructure.
