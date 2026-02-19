@@ -305,10 +305,7 @@ impl TelegramChannel {
 
         // Strip leading `/`, isolate the command word before any space or `@`.
         let raw = text.trim_start_matches('/');
-        let cmd = raw
-            .split_once(|c: char| c == ' ' || c == '@')
-            .map(|(c, _)| c)
-            .unwrap_or(raw);
+        let cmd = raw.split_once([' ', '@']).map(|(c, _)| c).unwrap_or(raw);
 
         match cmd.to_lowercase().as_str() {
             "start" => Some(BotCommand::Start),
@@ -360,7 +357,9 @@ impl Channel for TelegramChannel {
             .map_err(|_| format!("telegram send: invalid chat_id '{recipient}'"))?;
 
         #[cfg(feature = "channels-telegram")]
-        return self.send_via_api(chat_id, message).await;
+        {
+            self.send_via_api(chat_id, message).await
+        }
 
         #[cfg(not(feature = "channels-telegram"))]
         {
