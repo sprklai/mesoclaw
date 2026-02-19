@@ -13,6 +13,7 @@ interface SidebarHeaderProps {
 export function SidebarHeader({ expanded, onToggle }: SidebarHeaderProps) {
   return (
     <div
+      data-tauri-drag-region
       className={cn(
         "flex h-14 items-center gap-2 border-b border-sidebar-border px-3",
         expanded ? "justify-between" : "justify-center"

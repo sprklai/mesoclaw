@@ -1,9 +1,8 @@
 import { Outlet, createRootRoute } from "@tanstack/react-router";
 
+import { ContextPanel } from "@/components/layout/ContextPanel";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/ui/sidebar";
-import { APP_IDENTITY } from "@/config/app-identity";
-import { GatewayStatus } from "@/components/ui/gateway-status";
 import { useChannelMessages } from "@/hooks/useChannelMessages";
 import { useMobileSwipe } from "@/hooks/useMobileSwipe";
 import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
@@ -60,29 +59,12 @@ function RootLayout() {
        * - On xl, leaves room for the right panel via the parent grid approach
        */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* ── Topbar / title bar ────────────────────────────────── */}
-        <div
-          data-tauri-drag-region
-          className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4"
-        >
-          <div className="flex items-center gap-3">
-            <img
-              src={APP_IDENTITY.iconAssetPath}
-              alt={`${APP_IDENTITY.productName} icon`}
-              className="h-7 w-7"
-              draggable={false}
-            />
-            <span className="text-xl font-bold">{APP_IDENTITY.productName}</span>
-          </div>
-          <GatewayStatus />
-        </div>
-
         {/*
          * Scrollable page content.
-         * pb-16 on mobile to avoid content being obscured by the MobileNav bar.
+         * pb-20 on mobile to avoid content being obscured by the MobileNav bar.
          * md:pb-0 removes that padding on desktop where MobileNav is hidden.
          */}
-        <div className="flex-1 overflow-auto p-4 pb-20 pt-6 md:p-6 md:pb-6">
+        <div className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">
           <Outlet />
         </div>
       </main>
@@ -94,7 +76,7 @@ function RootLayout() {
        * Width: 320px fixed (xl:w-80)
        */}
       <aside className="hidden border-l border-border xl:flex xl:w-80 xl:flex-col">
-        {/* Future: contextual panel content (schema details, AI assistant, etc.) */}
+        <ContextPanel />
       </aside>
 
       {/*
