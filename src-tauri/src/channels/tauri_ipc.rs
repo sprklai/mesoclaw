@@ -8,7 +8,7 @@
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
-use crate::event_bus::{AppEvent, EventBus};
+use crate::event_bus::{AppEvent, EventBus, EventFilter, EventType};
 
 use super::traits::{Channel, ChannelMessage};
 
@@ -42,14 +42,17 @@ impl Channel for TauriIpcChannel {
     }
 
     async fn listen(&self, tx: mpsc::Sender<ChannelMessage>) -> Result<(), String> {
-        // Subscribe to user-input events on the bus.
-        // ## TODO (6.1): Subscribe to AgentTurn events from EventBus once a
-        //                user-message event is added to AppEvent (Phase 6+).
-        let mut rx = self.bus.subscribe();
+        // Subscribe to ChannelMessage events on the bus.  Only messages whose
+        // `channel` field is `"tauri"` or `"tauri-ipc"` are forwarded — other
+        // channels (Telegram, webhook, etc.) are handled by their own Channel
+        // implementations and the channel-agent bridge in lib.rs.
+        let mut rx = self
+            .bus
+            .subscribe_filtered(EventFilter::new(vec![EventType::ChannelMessage]));
+
         loop {
             match rx.recv().await {
                 Ok(event) => {
-                    // Convert relevant events into ChannelMessages.
                     if let Some(msg) = event_to_channel_message(event)
                         && tx.send(msg).await.is_err()
                     {
@@ -73,15 +76,23 @@ impl Channel for TauriIpcChannel {
 }
 
 fn event_to_channel_message(event: AppEvent) -> Option<ChannelMessage> {
-    // `AgentComplete` is an *output* event emitted by `send()`.  Re-ingesting
-    // it here would create a feedback loop where every agent response is
-    // immediately re-queued as a new inbound message.  We return `None` for
-    // all events until a dedicated user-turn event is added to `AppEvent`
-    // (Phase 6+), at which point this match should handle only that variant.
-    //
-    // ## TODO (6.1): match on AppEvent::UserTurn (or equivalent) once added.
     match event {
-        AppEvent::AgentComplete { .. } => None,
+        // Forward ChannelMessage events that originated from the Tauri
+        // desktop frontend.  The boot sequence in lib.rs publishes these
+        // when inbound channel messages arrive.
+        AppEvent::ChannelMessage {
+            channel,
+            from,
+            content,
+        } if channel == "tauri" || channel == "tauri-ipc" || channel == "tauri_ipc" => {
+            let mut msg = ChannelMessage::new("tauri-ipc", content);
+            if !from.is_empty() {
+                msg = msg.with_sender(from);
+            }
+            Some(msg)
+        }
+        // All other events (including AgentComplete, which is an *output*
+        // event emitted by send()) are ignored to prevent feedback loops.
         _ => None,
     }
 }
