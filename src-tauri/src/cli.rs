@@ -1156,7 +1156,10 @@ async fn handle_channel(args: &ChannelArgs, raw: bool, json_mode: bool) {
             let telegram_status = if let Some(client) = require_gateway().await {
                 match client
                     .client
-                    .get(format!("{}/api/v1/channels/telegram/health", client.base_url))
+                    .get(format!(
+                        "{}/api/v1/channels/telegram/health",
+                        client.base_url
+                    ))
                     .header("Authorization", client.auth_header())
                     .send()
                     .await
@@ -1168,10 +1171,20 @@ async fn handle_channel(args: &ChannelArgs, raw: bool, json_mode: bool) {
                         .and_then(|v| v.get("connected").and_then(|b| b.as_bool()))
                         .map(|c| if c { "connected" } else { "disconnected" })
                         .unwrap_or("unknown"),
-                    _ => if telegram_configured { "configured (daemon not running)" } else { "not configured" },
+                    _ => {
+                        if telegram_configured {
+                            "configured (daemon not running)"
+                        } else {
+                            "not configured"
+                        }
+                    }
                 }
             } else {
-                if telegram_configured { "configured (daemon offline)" } else { "not configured" }
+                if telegram_configured {
+                    "configured (daemon offline)"
+                } else {
+                    "not configured"
+                }
             };
 
             let channels = json!([
@@ -1262,7 +1275,9 @@ async fn handle_channel(args: &ChannelArgs, raw: bool, json_mode: bool) {
                 }
             }
             Some(t) => print_err(&format!("unknown channel type '{t}'")),
-            None => print_err("channel remove requires a channel name: mesoclaw channel remove telegram"),
+            None => print_err(
+                "channel remove requires a channel name: mesoclaw channel remove telegram",
+            ),
         },
 
         other => print_err(&format!(
@@ -1312,7 +1327,10 @@ fn configure_telegram_channel(args: &ChannelArgs, service: &str) {
     let entries = [
         ("channel:telegram:token", token.as_str()),
         ("channel:telegram:allowed_chat_ids", chat_ids.as_str()),
-        ("channel:telegram:polling_timeout_secs", timeout_str.as_str()),
+        (
+            "channel:telegram:polling_timeout_secs",
+            timeout_str.as_str(),
+        ),
     ];
 
     for (key, value) in &entries {
@@ -1331,9 +1349,7 @@ fn configure_telegram_channel(args: &ChannelArgs, service: &str) {
     }
 
     println!("Telegram channel configured successfully.");
-    println!(
-        "Restart the daemon to connect: mesoclaw daemon stop && mesoclaw daemon start"
-    );
+    println!("Restart the daemon to connect: mesoclaw daemon stop && mesoclaw daemon start");
 }
 
 /// View and manage AI provider configuration.
