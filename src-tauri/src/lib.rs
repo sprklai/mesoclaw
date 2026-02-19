@@ -253,7 +253,7 @@ pub fn run() {
                     .try_state::<Arc<identity::IdentityLoader>>()
                     .map(|s| s.inner().clone())
                     .ok_or("IdentityLoader not initialised before gateway")?;
-                tokio::spawn(async move {
+                tauri::async_runtime::spawn(async move {
                     if let Err(e) = gateway::start_gateway(
                         bus_for_gateway,
                         sessions_for_gateway,
