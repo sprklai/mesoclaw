@@ -23,6 +23,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::event_bus::{AppEvent, EventBus};
 
+#[cfg(feature = "desktop")]
+use tauri_plugin_notification::NotificationExt;
+
 // ─── NotificationCategory ────────────────────────────────────────────────────
 
 /// Notification category — used for per-category preference settings.
@@ -131,6 +134,10 @@ pub fn event_to_notification(event: &AppEvent) -> Option<NotificationSpec> {
 pub struct NotificationService {
     config: Arc<RwLock<NotificationConfig>>,
     bus: Arc<dyn EventBus>,
+    /// When running inside the Tauri desktop shell, this handle is used to
+    /// dispatch real OS notifications via `tauri-plugin-notification`.
+    #[cfg(feature = "desktop")]
+    app_handle: Option<tauri::AppHandle>,
 }
 
 impl NotificationService {
@@ -138,6 +145,8 @@ impl NotificationService {
         Self {
             config: Arc::new(RwLock::new(NotificationConfig::default())),
             bus,
+            #[cfg(feature = "desktop")]
+            app_handle: None,
         }
     }
 
@@ -145,7 +154,17 @@ impl NotificationService {
         Self {
             config: Arc::new(RwLock::new(config)),
             bus,
+            #[cfg(feature = "desktop")]
+            app_handle: None,
         }
+    }
+
+    /// Attach a Tauri `AppHandle` so that `start()` can dispatch real OS
+    /// notifications via `tauri-plugin-notification`.
+    #[cfg(feature = "desktop")]
+    pub fn with_app_handle(mut self, handle: tauri::AppHandle) -> Self {
+        self.app_handle = Some(handle);
+        self
     }
 
     /// Update the notification configuration at runtime.
@@ -168,14 +187,14 @@ impl NotificationService {
 
     /// Start the background listener loop.
     ///
-    /// Dispatches OS desktop notifications using `tauri-plugin-notification`.
-    ///
-    /// ## TODO (Phase 4 follow-up)
-    /// Pass `tauri::AppHandle` and call the notification plugin for real
-    /// dispatch.  Currently logs the notification spec to the tracing layer.
+    /// Dispatches OS desktop notifications using `tauri-plugin-notification`
+    /// when an `AppHandle` is available, otherwise falls back to logging.
     pub fn start(self: Arc<Self>) {
         let config = self.config.clone();
         let mut rx = self.bus.subscribe();
+
+        #[cfg(feature = "desktop")]
+        let app_handle = self.app_handle.clone();
 
         tokio::spawn(async move {
             loop {
@@ -190,8 +209,36 @@ impl NotificationService {
                             .unwrap_or(false);
 
                         if enabled {
-                            // ## TODO: call tauri_plugin_notification to show OS notification.
-                            log::info!("[notification] {} — {}", spec.title, spec.body);
+                            #[cfg(feature = "desktop")]
+                            {
+                                if let Some(ref handle) = app_handle {
+                                    if let Err(e) = handle
+                                        .notification()
+                                        .builder()
+                                        .title(&spec.title)
+                                        .body(&spec.body)
+                                        .show()
+                                    {
+                                        log::warn!(
+                                            "[notification] OS notification failed: {e}"
+                                        );
+                                    }
+                                } else {
+                                    log::info!(
+                                        "[notification] {} — {}",
+                                        spec.title,
+                                        spec.body
+                                    );
+                                }
+                            }
+                            #[cfg(not(feature = "desktop"))]
+                            {
+                                log::info!(
+                                    "[notification] {} — {}",
+                                    spec.title,
+                                    spec.body
+                                );
+                            }
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
