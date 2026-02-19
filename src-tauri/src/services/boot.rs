@@ -265,4 +265,69 @@ mod tests {
         // Should run without error; the items are logged (not executed).
         let _ctx = seq.run().await.unwrap();
     }
+
+    #[tokio::test]
+    async fn channel_messages_reach_event_bus_via_router() {
+        use crate::channels::{Channel, ChannelManager, ChannelMessage};
+        use crate::event_bus::{AppEvent, EventBus, TokioBroadcastBus};
+        use async_trait::async_trait;
+        use tokio::sync::mpsc;
+
+        // A test channel that sends exactly one message then exits listen().
+        struct OneShot;
+
+        #[async_trait]
+        impl Channel for OneShot {
+            fn name(&self) -> &str {
+                "test-oneshot"
+            }
+            async fn send(&self, _: &str, _: Option<&str>) -> Result<(), String> {
+                Ok(())
+            }
+            async fn listen(&self, tx: mpsc::Sender<ChannelMessage>) -> Result<(), String> {
+                let msg = ChannelMessage::new("test-oneshot", "hello from router test");
+                let _ = tx.send(msg).await;
+                Ok(())
+            }
+            async fn health_check(&self) -> bool {
+                true
+            }
+        }
+
+        let bus = Arc::new(TokioBroadcastBus::new());
+        let mut bus_rx = bus.subscribe();
+
+        let mgr = Arc::new(ChannelManager::new());
+        mgr.register(Arc::new(OneShot)).await.unwrap();
+
+        let (mut message_rx, _handles) = mgr.start_all(8).await;
+
+        // Simulate the router task: drain message_rx → publish AppEvent::ChannelMessage.
+        let bus_clone = Arc::clone(&bus) as Arc<dyn EventBus>;
+        tokio::spawn(async move {
+            while let Some(msg) = message_rx.recv().await {
+                let _ = bus_clone.publish(AppEvent::ChannelMessage {
+                    channel: msg.channel,
+                    from: msg.sender.unwrap_or_default(),
+                    content: msg.content,
+                });
+            }
+        });
+
+        // Give the task a tick to run.
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        // Drain bus events and look for AppEvent::ChannelMessage.
+        let mut found = false;
+        while let Ok(evt) = bus_rx.try_recv() {
+            if matches!(evt, AppEvent::ChannelMessage { .. }) {
+                found = true;
+                break;
+            }
+        }
+        assert!(
+            found,
+            "AppEvent::ChannelMessage should have been published to the EventBus"
+        );
+    }
 }
