@@ -26,6 +26,29 @@ export interface GatewayHealth {
   service: string;
 }
 
+/** Identity file metadata returned by `GET /api/v1/identity`. */
+export interface IdentityFileInfo {
+  name: string;
+  /** Canonical filename, e.g. "SOUL.md" */
+  fileName: string;
+  description: string;
+}
+
+/** Provider status item returned by `GET /api/v1/providers`. */
+export interface ProviderStatusItem {
+  id: string;
+  name: string;
+  isActive: boolean;
+  requiresApiKey: boolean;
+}
+
+/** Response from `GET /api/v1/providers`. */
+export interface ProviderStatusResponse {
+  status: string;
+  providers: ProviderStatusItem[];
+  count: number;
+}
+
 /** Events forwarded from the Rust EventBus via the WebSocket connection. */
 export interface AppEvent {
   type:
@@ -105,6 +128,18 @@ export class GatewayClient {
     return res.json() as Promise<T>;
   }
 
+  private async put<T>(path: string, body: unknown): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: "PUT",
+      headers: this.headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new Error(`PUT ${path} failed: ${res.status} ${res.statusText}`);
+    }
+    return res.json() as Promise<T>;
+  }
+
   // ── Health ─────────────────────────────────────────────────────────────────
 
   async health(): Promise<GatewayHealth> {
@@ -132,8 +167,25 @@ export class GatewayClient {
 
   // ── Provider status ────────────────────────────────────────────────────────
 
-  async listProviders(): Promise<unknown> {
+  async listProviders(): Promise<ProviderStatusResponse> {
     return this.get("/api/v1/providers");
+  }
+
+  // ── Identity ──────────────────────────────────────────────────────────────
+
+  async listIdentityFiles(): Promise<{ files: IdentityFileInfo[]; count: number }> {
+    return this.get("/api/v1/identity");
+  }
+
+  async getIdentityFile(fileName: string): Promise<{ file: string; content: string }> {
+    return this.get(`/api/v1/identity/${encodeURIComponent(fileName)}`);
+  }
+
+  async updateIdentityFile(
+    fileName: string,
+    content: string,
+  ): Promise<{ file: string; status: string }> {
+    return this.put(`/api/v1/identity/${encodeURIComponent(fileName)}`, { content });
   }
 
   // ── WebSocket event stream ─────────────────────────────────────────────────

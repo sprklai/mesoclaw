@@ -33,9 +33,7 @@ enum WsCommand {
         session_id: Option<String>,
     },
     /// Cancel a running agent session.
-    CancelSession {
-        session_id: String,
-    },
+    CancelSession { session_id: String },
     /// Ping / keep-alive (no-op, triggers a pong ack).
     Ping,
 }
@@ -84,11 +82,7 @@ async fn handle_socket(mut socket: WebSocket, state: GatewayState) {
 }
 
 /// Parse a JSON command from the client and emit the appropriate event.
-async fn handle_client_command(
-    raw: &str,
-    bus: &Arc<dyn EventBus>,
-    socket: &mut WebSocket,
-) {
+async fn handle_client_command(raw: &str, bus: &Arc<dyn EventBus>, socket: &mut WebSocket) {
     let cmd: WsCommand = match serde_json::from_str(raw) {
         Ok(c) => c,
         Err(e) => {
@@ -96,9 +90,7 @@ async fn handle_client_command(
                 "type": "error",
                 "error": format!("invalid command: {e}"),
             });
-            let _ = socket
-                .send(Message::Text(err_msg.to_string()))
-                .await;
+            let _ = socket.send(Message::Text(err_msg.to_string())).await;
             return;
         }
     };

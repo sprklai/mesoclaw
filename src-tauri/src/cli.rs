@@ -396,11 +396,8 @@ async fn handle_daemon(args: &DaemonArgs) {
                     return;
                 }
                 use local_ts_lib::{
-                    agent::session_router::SessionRouter,
-                    event_bus::TokioBroadcastBus,
-                    gateway::start_gateway,
-                    identity::IdentityLoader,
-                    modules::ModuleRegistry,
+                    agent::session_router::SessionRouter, event_bus::TokioBroadcastBus,
+                    gateway::start_gateway, identity::IdentityLoader, modules::ModuleRegistry,
                 };
                 use std::sync::Arc;
                 let bus: Arc<dyn local_ts_lib::event_bus::EventBus> =
@@ -416,8 +413,9 @@ async fn handle_daemon(args: &DaemonArgs) {
                 let db_pool = {
                     use diesel::r2d2::{self, ConnectionManager};
                     use diesel::sqlite::SqliteConnection;
-                    let manager =
-                        ConnectionManager::<SqliteConnection>::new(db_path.to_string_lossy().as_ref());
+                    let manager = ConnectionManager::<SqliteConnection>::new(
+                        db_path.to_string_lossy().as_ref(),
+                    );
                     r2d2::Pool::builder()
                         .max_size(5)
                         .build(manager)
@@ -614,9 +612,7 @@ async fn handle_identity(args: &IdentityArgs, raw: bool, json_mode: bool) {
             {
                 Ok(resp) if resp.status().is_success() => match resp.json::<Value>().await {
                     Ok(v) => print_value(&v, raw, json_mode),
-                    Err(e) => {
-                        print_err(&format!("identity list: failed to parse response: {e}"))
-                    }
+                    Err(e) => print_err(&format!("identity list: failed to parse response: {e}")),
                 },
                 Ok(resp) => {
                     let status = resp.status();
@@ -640,9 +636,7 @@ async fn handle_identity(args: &IdentityArgs, raw: bool, json_mode: bool) {
             {
                 Ok(resp) if resp.status().is_success() => match resp.json::<Value>().await {
                     Ok(v) => print_value(&v, raw, json_mode),
-                    Err(e) => {
-                        print_err(&format!("identity get: failed to parse response: {e}"))
-                    }
+                    Err(e) => print_err(&format!("identity get: failed to parse response: {e}")),
                 },
                 Ok(resp) => {
                     let status = resp.status();
@@ -794,8 +788,8 @@ fn open_in_editor(content: &str, suffix: &str) -> Result<String, String> {
     if !status.success() {
         return Err(format!("editor exited with status {status}"));
     }
-    let edited = fs::read_to_string(&tmp_path)
-        .map_err(|e| format!("failed to read edited file: {e}"))?;
+    let edited =
+        fs::read_to_string(&tmp_path).map_err(|e| format!("failed to read edited file: {e}"))?;
     let _ = fs::remove_file(&tmp_path);
     Ok(edited)
 }

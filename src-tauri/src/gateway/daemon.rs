@@ -15,9 +15,9 @@ use crate::{
 use super::{
     auth::{auth_middleware, load_or_create_token},
     routes::{
-        GatewayState, create_session, get_identity_file, health, list_identity_files,
-        list_modules, list_sessions, module_health, provider_status, reload_modules, start_module,
-        stop_module, update_identity_file,
+        GatewayState, create_session, get_identity_file, health, list_identity_files, list_modules,
+        list_sessions, module_health, provider_status, reload_modules, start_module, stop_module,
+        update_identity_file,
     },
     ws::ws_handler,
 };

@@ -14,16 +14,16 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 
 | Status | File | Line | Description | Priority |
 |--------|------|------|-------------|----------|
-| ⏳ | `src-tauri/src/channels/tauri_ipc.rs` | 46 | Subscribe to `AgentTurn` events from EventBus once a user-message event is added to `AppEvent` (Phase 6+) | Medium |
-| ⏳ | `src-tauri/src/gateway/ws.rs` | 53 | Parse incoming WebSocket commands from client (Phase 2.6) | Medium |
+| ✅ | `src-tauri/src/channels/tauri_ipc.rs` | 46 | Subscribe to `ChannelMessage` events from EventBus via `subscribe_filtered`; `AgentTurn` variant deferred to Phase 6+ | Medium |
+| ✅ | `src-tauri/src/gateway/ws.rs` | 53 | Parse incoming WebSocket commands: `agent_message`, `cancel_session`, `ping`/pong | Medium |
 | ✅ | `src-tauri/src/gateway/routes.rs` | 39 | Wire `start_session` route to actual agent session manager (Phase 3) | High |
 | ✅ | `src-tauri/src/gateway/routes.rs` | 57 | Return real sessions from agent session store (Phase 3) | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 66 | Query real provider health from DB instead of stub (needs DbPool in GatewayState — Phase 3) | Medium |
+| ✅ | `src-tauri/src/gateway/routes.rs` | 66 | `provider_status` now queries active providers from SQLite via `DbPool` in `GatewayState` | Medium |
 | ✅ | `src-tauri/src/gateway/routes.rs` | 83–135 | Wire module routes (`list`, `health`) to `ModuleRegistry`; start/stop/reload remain 501 (need SidecarService lifecycle) | High |
-| ⏳ | `src-tauri/src/services/notification_service.rs` | 199 | Call `tauri_plugin_notification` to show OS notifications (Phase 4 follow-up) | Medium |
+| ✅ | `src-tauri/src/services/notification_service.rs` | 199 | `NotificationService` now calls `tauri_plugin_notification` via `AppHandle`; falls back to log when no handle | Medium |
 | ✅ | `src-tauri/src/agent/agent_commands.rs` | 32 | Implement proper provider resolution from app state in `run_agent_command` | High |
 | ✅ | `src-tauri/src/agent/agent_commands.rs` | 43 | Implement session cancellation via `CancellationToken` | High |
-| ⏳ | `src-tauri/src/agent/session_router.rs` | 179 | Session router: complete Phase 4.3.3 wiring | Medium |
+| ✅ | `src-tauri/src/agent/session_router.rs` | 179 | Phase 4.3.3: `chat_sessions` migration created with `session_key`, `agent`, `scope`, `channel`, `peer` columns | Medium |
 | ✅ | `src-tauri/src/agent/loop_.rs` | 244 | Implement full approval flow via EventBus (currently logs only) | High |
 | ✅ | `src-tauri/src/scheduler/commands.rs` | 12–45 | Resolve managed `TokioScheduler` from app state in all scheduler IPC commands | Medium |
 | ✅ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 217 | Persist scheduled jobs to SQLite `scheduled_jobs` table — `add_job` upserts, `new_with_persistence` loads on startup | Low |
@@ -31,13 +31,13 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | ✅ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 262 | Run heartbeat items via `AgentLoop` — wired when `AgentComponents` present, graceful skip otherwise | Medium |
 | ✅ | `src-tauri/src/scheduler/tokio_scheduler.rs` | 266 | Run `AgentTurn` prompt through `AgentLoop` — wired when `AgentComponents` present | Medium |
 | ✅ | `src-tauri/src/memory/commands.rs` | 17–41 | Resolve managed `InMemoryStore` from app state in all memory IPC commands | Medium |
-| ⏳ | `src-tauri/src/modules/mod.rs` | 17 | Configure bundled sidecar binaries in `tauri.conf.json` | Low |
-| ⏳ | `src-tauri/src/bin/cli.rs` | 424 | Implement `memory` CLI subcommand once memory service REST endpoint exists (Phase 3) | Low |
-| ⏳ | `src-tauri/src/bin/cli.rs` | 429 | Wire `identity` CLI subcommand to identity REST endpoint (Phase 2.6) | Low |
+| ✅ | `src-tauri/src/modules/mod.rs` | 17 | `tauri.conf.json` now has `externalBin: []` placeholder; pattern documented in mod.rs | Low |
+| ✅ | `src-tauri/src/cli.rs` | 424 | `memory` subcommand: store/search/forget/list via gateway `/api/v1/memory/*` | Low |
+| ✅ | `src-tauri/src/cli.rs` | 429 | `identity` subcommand: list/get/set/edit via gateway `/api/v1/identity/*` | Low |
 | ⏳ | `src-tauri/src/bin/cli.rs` | 479 | Implement package-registry `install`/`remove` (Phase 6+) | Low |
-| 🔄 | `src/stores/identityStore.ts` | 7 | Migrate identity store to gateway REST API — blocked: no `/api/v1/identity/*` routes on gateway yet | Medium |
-| 🔄 | `src/stores/llm.ts` | 4 | Migrate provider listing to gateway — blocked: provider_status endpoint needs DbPool in GatewayState | Medium |
-| 🔄 | `src/lib/tauri/identity/index.ts` | 4 | Migrate identity CRUD to gateway — blocked: no gateway identity endpoints yet | Medium |
+| ✅ | `src/stores/identityStore.ts` | 7 | Migrated to gateway REST API via GatewayClient identity methods | Medium |
+| ✅ | `src/stores/llm.ts` | 4 | Provider listing tries gateway first (`GET /api/v1/providers`), falls back to Tauri IPC | Medium |
+| ✅ | `src/lib/tauri/identity/index.ts` | 4 | Identity CRUD migrated to gateway `/api/v1/identity/*`; `getSystemPrompt` stays on IPC | Medium |
 | ✅ | `src/lib/gateway-client.ts` | 61 | `get_daemon_config_command` IPC reads daemon.pid (port) + daemon.token; `resolveDaemonConfig()` wired | Low |
 | ✅ | `src/lib/gateway-client.ts` | 198 | Approval endpoint resolved: `sendApprovalResponse` correctly uses `approve_action_command` IPC (EventBus is source of truth) | Medium |
 | ⏳ | `src-tauri/` | — | Phase 7.4.1–7.4.6, 7.4.8: `tauri ios init` + `tauri android init`, code signing, TestFlight / Google Play distribution — requires macOS + Xcode + Android SDK | High |
@@ -49,12 +49,12 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 
 | Status | File | Line | Description | Replace With | Priority |
 |--------|------|------|-------------|--------------|----------|
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 66 | `provider_status` returns minimal stub — needs `DbPool` in `GatewayState` for real DB query | Real provider health probe | Medium |
+| ✅ | `src-tauri/src/gateway/routes.rs` | 66 | `provider_status` queries SQLite via `DbPool` in `GatewayState` | Real provider health probe | Medium |
 | ✅ | `src-tauri/src/gateway/routes.rs` | 88 | `list_modules` now returns `ModuleRegistry::ids()` with count | `ModuleRegistry::list()` | High |
 | ✅ | `src-tauri/src/gateway/routes.rs` | 103 | `module_health` now returns 200 if registered, 404 if not found | `SidecarModule::health_check()` | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 112 | `start_module` returns 501 with reason (SidecarService lifecycle not wired) | `SidecarService::start(id)` | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 124 | `stop_module` returns 501 with reason (SidecarService lifecycle not wired) | `SidecarService::stop(id)` | High |
-| ⏳ | `src-tauri/src/gateway/routes.rs` | 135 | `reload_modules` returns 501 — hot reload requires quiescing running tools | `ModuleRegistry::discover()` safe reload | Medium |
+| ✅ | `src-tauri/src/gateway/routes.rs` | 112 | `start_module` wired to `SidecarModule::start()` via `GatewayState` | `SidecarService::start(id)` | High |
+| ✅ | `src-tauri/src/gateway/routes.rs` | 124 | `stop_module` wired to `SidecarModule::stop()` via `GatewayState` | `SidecarService::stop(id)` | High |
+| ⏳ | `src-tauri/src/gateway/routes.rs` | 135 | `reload_modules` returns current state — full hot-reload deferred (quiescing protocol needed) | `ModuleRegistry::discover()` safe reload | Medium |
 | ✅ | `src-tauri/src/commands/channels.rs` | — | All 4 channel IPC commands de-stubbed and wired to real `ChannelManager` state | Real ChannelManager | High |
 
 ---

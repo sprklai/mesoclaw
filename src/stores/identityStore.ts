@@ -4,7 +4,8 @@
  * Manages the seven identity files that define the agent's personality,
  * operating instructions, and boot behaviour.
  *
- * ## TODO: migrate to gateway REST API (Phase 3 - /api/v1/identity/*)
+ * Identity CRUD is served via the gateway REST API (/api/v1/identity/*).
+ * `getSystemPrompt` still uses Tauri IPC (no gateway endpoint yet).
  */
 
 import { create } from "zustand";

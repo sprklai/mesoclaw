@@ -113,7 +113,8 @@ pub async fn provider_status(State(state): State<GatewayState>) -> impl IntoResp
         })
         .unwrap_or_default();
 
-    Json(json!({ "status": "ok", "providers": providers, "count": providers.len() })).into_response()
+    Json(json!({ "status": "ok", "providers": providers, "count": providers.len() }))
+        .into_response()
 }
 
 // ─── Module management ────────────────────────────────────────────────────────
@@ -277,7 +278,10 @@ pub async fn update_identity_file(
     axum::extract::Path(params): axum::extract::Path<IdentityFileParam>,
     Json(req): Json<UpdateIdentityRequest>,
 ) -> impl IntoResponse {
-    match state.identity_loader.update_file(&params.file, &req.content) {
+    match state
+        .identity_loader
+        .update_file(&params.file, &req.content)
+    {
         Ok(()) => Json(json!({ "file": params.file, "status": "updated" })).into_response(),
         Err(e) => (
             StatusCode::BAD_REQUEST,

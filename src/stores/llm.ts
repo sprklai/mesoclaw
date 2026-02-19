@@ -1,21 +1,20 @@
 /**
  * LLM provider configuration store.
  *
- * ## TODO: migrate provider listing + session creation to gateway REST API (Phase 3)
- * The following operations should be moved to GatewayClient HTTP calls once
- * the corresponding gateway routes are implemented:
- *   - loadProvidersAndModels  → GET /api/v1/providers
- *   - Provider health check   → GET /api/v1/providers/status
+ * Provider listing uses the gateway REST API (GET /api/v1/providers) when the
+ * daemon is reachable, falling back to Tauri IPC otherwise.
  *
  * Operations that MUST remain on Tauri IPC (OS-level, no gateway equivalent):
  *   - API key read/write/delete (keychain commands: keychain_get/set/delete)
  *   - configure_llm_provider_command (writes to app SQLite DB via Diesel)
  *   - add/delete model and provider commands (writes to app SQLite DB)
+ *   - loadProvidersAndModels (gateway only returns basic provider info, not models)
  */
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 
 import { extractErrorMessage } from "@/lib/error-utils";
+import { getGatewayClient } from "@/lib/gateway-client";
 import { KeychainStorage } from "@/lib/keychain-storage";
 import {
   DEFAULT_MODEL,
@@ -206,6 +205,42 @@ export const useLLMStore = create<LLMStore>((set, get) => ({
   },
 
   loadProvidersWithKeyStatus: async () => {
+    // Try gateway first for basic provider listing, fall back to IPC.
+    const client = getGatewayClient();
+    if (client) {
+      try {
+        const res = await client.listProviders();
+        // Gateway returns basic info; enrich with hasApiKey from keychain + empty models.
+        const providers: ProviderWithKeyStatus[] = await Promise.all(
+          res.providers.map(async (p) => {
+            let hasApiKey = false;
+            if (p.requiresApiKey) {
+              try {
+                await KeychainStorage.getApiKey(p.id);
+                hasApiKey = true;
+              } catch {
+                // Key not set
+              }
+            }
+            return {
+              id: p.id,
+              name: p.name,
+              baseUrl: "",
+              requiresApiKey: p.requiresApiKey,
+              isActive: p.isActive,
+              isUserDefined: false,
+              hasApiKey,
+              models: [],
+            };
+          }),
+        );
+        set({ providersWithKeyStatus: providers });
+        return;
+      } catch {
+        // Gateway unavailable, fall through to IPC.
+      }
+    }
+
     try {
       const providers = await invoke<ProviderWithKeyStatus[]>(
         "list_providers_with_key_status_command"

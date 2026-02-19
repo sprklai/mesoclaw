@@ -219,25 +219,15 @@ impl NotificationService {
                                         .body(&spec.body)
                                         .show()
                                     {
-                                        log::warn!(
-                                            "[notification] OS notification failed: {e}"
-                                        );
+                                        log::warn!("[notification] OS notification failed: {e}");
                                     }
                                 } else {
-                                    log::info!(
-                                        "[notification] {} — {}",
-                                        spec.title,
-                                        spec.body
-                                    );
+                                    log::info!("[notification] {} — {}", spec.title, spec.body);
                                 }
                             }
                             #[cfg(not(feature = "desktop"))]
                             {
-                                log::info!(
-                                    "[notification] {} — {}",
-                                    spec.title,
-                                    spec.body
-                                );
+                                log::info!("[notification] {} — {}", spec.title, spec.body);
                             }
                         }
                     }

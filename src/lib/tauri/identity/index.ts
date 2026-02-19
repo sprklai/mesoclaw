@@ -1,12 +1,19 @@
 /**
- * Tauri command wrappers for the identity system.
+ * Identity system CRUD operations.
  *
- * ## TODO: migrate to gateway REST API (Phase 3 - identity CRUD endpoints)
- * Currently served via Tauri IPC. When the gateway /api/v1/identity/* routes
- * are implemented, replace `invoke()` calls with `GatewayClient` HTTP calls.
+ * Migrated from Tauri IPC to gateway REST API (Phase 3).
+ * Uses GatewayClient to call /api/v1/identity/* endpoints.
+ *
+ * `getSystemPrompt` remains on Tauri IPC because the gateway does not
+ * expose a dedicated system-prompt assembly endpoint yet.
  */
 
 import { invoke } from "@tauri-apps/api/core";
+
+import {
+  type IdentityFileInfo as GwIdentityFileInfo,
+  getGatewayClient,
+} from "@/lib/gateway-client";
 
 import type { IdentityFileInfo } from "./types";
 
@@ -14,7 +21,17 @@ import type { IdentityFileInfo } from "./types";
  * List all identity files with their metadata.
  */
 export async function listIdentityFiles(): Promise<IdentityFileInfo[]> {
-  return invoke<IdentityFileInfo[]>("list_identity_files_command");
+  const client = getGatewayClient();
+  if (!client) {
+    throw new Error("Gateway client not initialised");
+  }
+  const res = await client.listIdentityFiles();
+  // Map gateway response to the existing IdentityFileInfo shape.
+  return res.files.map((f: GwIdentityFileInfo) => ({
+    name: f.name,
+    fileName: f.fileName,
+    description: f.description,
+  }));
 }
 
 /**
@@ -23,7 +40,12 @@ export async function listIdentityFiles(): Promise<IdentityFileInfo[]> {
  * @param fileName - Canonical file name, e.g. "SOUL.md"
  */
 export async function getIdentityFile(fileName: string): Promise<string> {
-  return invoke<string>("get_identity_file_command", { fileName });
+  const client = getGatewayClient();
+  if (!client) {
+    throw new Error("Gateway client not initialised");
+  }
+  const res = await client.getIdentityFile(fileName);
+  return res.content;
 }
 
 /**
@@ -34,14 +56,20 @@ export async function getIdentityFile(fileName: string): Promise<string> {
  */
 export async function updateIdentityFile(
   fileName: string,
-  content: string
+  content: string,
 ): Promise<void> {
-  return invoke("update_identity_file_command", { fileName, content });
+  const client = getGatewayClient();
+  if (!client) {
+    throw new Error("Gateway client not initialised");
+  }
+  await client.updateIdentityFile(fileName, content);
 }
 
 /**
  * Build and return the assembled system prompt from all identity files.
  * Assembly order: SOUL → AGENTS → USER → TOOLS
+ *
+ * NOTE: Remains on Tauri IPC — no gateway endpoint for prompt assembly yet.
  */
 export async function getSystemPrompt(): Promise<string> {
   return invoke<string>("get_system_prompt_command");
