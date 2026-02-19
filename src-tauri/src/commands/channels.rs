@@ -91,6 +91,23 @@ pub async fn list_channels_command(
         .collect())
 }
 
+/// Send a message through a named channel to a specific recipient.
+///
+/// `channel` — registered channel name (e.g. `"telegram"`).
+/// `recipient` — channel-specific address; for Telegram this is the chat ID as a string.
+///              Pass `None` to broadcast to all peers (channel-dependent).
+#[tauri::command]
+pub async fn send_channel_message_command(
+    channel: String,
+    message: String,
+    recipient: Option<String>,
+    channel_manager: State<'_, Arc<ChannelManager>>,
+) -> Result<(), String> {
+    channel_manager
+        .send(&channel, &message, recipient.as_deref())
+        .await
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -200,5 +217,18 @@ mod tests {
     async fn disconnect_returns_false_for_unknown_channel() {
         let mgr = Arc::new(ChannelManager::new());
         assert!(!mgr.unregister("ghost").await);
+    }
+}
+
+#[cfg(test)]
+mod send_cmd_tests {
+    // Compile-time check: function exists with correct signature.
+    // Real integration test requires a live ChannelManager + registered channel.
+    use super::*;
+    #[test]
+    fn send_channel_message_command_compiles() {
+        // fn(String, String, Option<String>, State<Arc<ChannelManager>>) -> impl Future
+        // Verified by the compiler — if this test file compiles, the command exists.
+        let _ = send_channel_message_command as fn(_, _, _, _) -> _;
     }
 }

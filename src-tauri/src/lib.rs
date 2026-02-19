@@ -372,6 +372,7 @@ pub fn run() {
             commands::channels::disconnect_channel_command,
             commands::channels::test_channel_connection_command,
             commands::channels::list_channels_command,
+            commands::channels::send_channel_message_command,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]
