@@ -190,10 +190,27 @@ pub fn run() {
                     // Register Telegram channel from keyring on startup (if token exists).
                     #[cfg(feature = "channels-telegram")]
                     {
-                        match keyring::Entry::new("mesoclaw", "telegram_bot_token") {
+                        use crate::config::app_identity::KEYCHAIN_SERVICE;
+                        match keyring::Entry::new(KEYCHAIN_SERVICE, "channel:telegram:token") {
                             Ok(entry) => {
                                 if let Ok(token) = entry.get_password() {
-                                    let config = channels::TelegramConfig::new(token);
+                                    let allowed_ids: Vec<i64> =
+                                        keyring::Entry::new(KEYCHAIN_SERVICE, "channel:telegram:allowed_chat_ids")
+                                            .ok()
+                                            .and_then(|e| e.get_password().ok())
+                                            .unwrap_or_default()
+                                            .split(',')
+                                            .filter_map(|s| s.trim().parse().ok())
+                                            .collect();
+                                    let timeout: u32 =
+                                        keyring::Entry::new(KEYCHAIN_SERVICE, "channel:telegram:polling_timeout_secs")
+                                            .ok()
+                                            .and_then(|e| e.get_password().ok())
+                                            .and_then(|s| s.parse().ok())
+                                            .unwrap_or(30);
+                                    let mut config =
+                                        channels::TelegramConfig::with_allowed_ids(token, allowed_ids);
+                                    config.polling_timeout_secs = timeout;
                                     let telegram = Arc::new(channels::TelegramChannel::new(config));
                                     if let Err(e) = channel_mgr_clone.register(telegram).await {
                                         log::warn!("boot: telegram channel registration failed: {e}");

@@ -127,6 +127,23 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
         }),
         isLoading: false,
       }));
+      // Restore saved Telegram config from keyring so the UI pre-fills.
+      const svc = "com.sprklai.mesoclaw";
+      try {
+        const token = await invoke<string>("keychain_get", { service: svc, key: "channel:telegram:token" });
+        const allowedChatIds = await invoke<string>("keychain_get", { service: svc, key: "channel:telegram:allowed_chat_ids" }).catch(() => "");
+        const timeoutStr = await invoke<string>("keychain_get", { service: svc, key: "channel:telegram:polling_timeout_secs" }).catch(() => "30");
+        const pollingTimeoutSecs = Number(timeoutStr) || 30;
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.name === "telegram"
+              ? { ...ch, config: { type: "telegram", telegram: { token, allowedChatIds, pollingTimeoutSecs } } }
+              : ch,
+          ),
+        }));
+      } catch {
+        // No saved config yet — keep defaults.
+      }
     } catch (err) {
       set({ error: String(err), isLoading: false });
     }
@@ -165,14 +182,13 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
   updateTelegramConfig: async (config) => {
     try {
-      // Save bot token to OS keyring if provided.
+      const svc = "com.sprklai.mesoclaw";
+      // Persist all Telegram config fields to the same keyring service as AI providers.
       if (config.token) {
-        await invoke("keychain_set", {
-          service: "mesoclaw",
-          key: "telegram_bot_token",
-          value: config.token,
-        });
+        await invoke("keychain_set", { service: svc, key: "channel:telegram:token", value: config.token });
       }
+      await invoke("keychain_set", { service: svc, key: "channel:telegram:allowed_chat_ids", value: config.allowedChatIds });
+      await invoke("keychain_set", { service: svc, key: "channel:telegram:polling_timeout_secs", value: String(config.pollingTimeoutSecs) });
       // Update local state.
       set((state) => ({
         channels: state.channels.map((ch) =>

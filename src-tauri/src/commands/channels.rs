@@ -6,6 +6,12 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::channels::ChannelManager;
+use crate::config::app_identity::KEYCHAIN_SERVICE;
+
+/// Keyring key names for Telegram channel config (same service as AI providers).
+const TG_KEY_TOKEN: &str = "channel:telegram:token";
+const TG_KEY_ALLOWED_IDS: &str = "channel:telegram:allowed_chat_ids";
+const TG_KEY_TIMEOUT: &str = "channel:telegram:polling_timeout_secs";
 
 /// Status payload returned to the frontend after a connect or health-check.
 #[derive(Debug, Serialize)]
@@ -84,18 +90,32 @@ pub async fn connect_channel_command(
                 error: None,
             });
         }
-        // Load token from OS keyring.
-        let entry = keyring::Entry::new("mesoclaw", "telegram_bot_token")
-            .map_err(|e| format!("keyring error: {e}"))?;
-        let token = entry.get_password().map_err(|_| {
-            "No Telegram bot token saved. Enter your token and click Save first.".to_string()
-        })?;
+        // Load config from OS keyring (same service as AI provider keys).
+        let token = keyring::Entry::new(KEYCHAIN_SERVICE, TG_KEY_TOKEN)
+            .map_err(|e| format!("keyring error: {e}"))?
+            .get_password()
+            .map_err(|_| {
+                "No Telegram bot token saved. Enter your token and click Save first.".to_string()
+            })?;
         if token.is_empty() {
             return Err(
                 "Telegram bot token is empty. Enter your token and click Save first.".to_string(),
             );
         }
-        let config = crate::channels::TelegramConfig::new(token);
+        let allowed_ids: Vec<i64> = keyring::Entry::new(KEYCHAIN_SERVICE, TG_KEY_ALLOWED_IDS)
+            .ok()
+            .and_then(|e| e.get_password().ok())
+            .unwrap_or_default()
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        let timeout: u32 = keyring::Entry::new(KEYCHAIN_SERVICE, TG_KEY_TIMEOUT)
+            .ok()
+            .and_then(|e| e.get_password().ok())
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(30);
+        let mut config = crate::channels::TelegramConfig::with_allowed_ids(token, allowed_ids);
+        config.polling_timeout_secs = timeout;
         let channel = Arc::new(crate::channels::TelegramChannel::new(config));
         _mgr.register(channel).await?;
         return Ok(ChannelStatusPayload {
