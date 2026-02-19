@@ -7,7 +7,7 @@ import type { SidebarItem } from "@/components/ui/sidebar/sidebar-nav-item";
 import { SidebarSkeleton } from "@/components/ui/sidebar/sidebar-skeleton";
 import { SIDEBAR_BOTTOM_ITEMS } from "@/constants/sidebar";
 import { useAsyncAction } from "@/hooks/use-async-action";
-import { Brain, Home, Sparkles } from "@/lib/icons";
+import { Brain, Home, MessageSquare, Sparkles } from "@/lib/icons";
 import { updateSettings } from "@/lib/tauri/settings";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/stores/settings";
@@ -56,6 +56,11 @@ export function Sidebar() {
       icon: Brain,
       label: "Memory",
       href: "/memory",
+    },
+    {
+      icon: MessageSquare,
+      label: "Channels",
+      href: "/channels",
     },
   ] as const;
 

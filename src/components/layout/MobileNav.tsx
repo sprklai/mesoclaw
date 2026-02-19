@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Settings, Sparkles } from "lucide-react";
+import { Home, MessageSquare, Settings, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,7 @@ interface MobileNavItem {
 const MOBILE_NAV_ITEMS: MobileNavItem[] = [
   { icon: Home, label: "Home", href: "/" },
   { icon: Sparkles, label: "AI Chat", href: "/chat" },
+  { icon: MessageSquare, label: "Channels", href: "/channels" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 

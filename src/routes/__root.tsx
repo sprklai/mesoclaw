@@ -4,6 +4,7 @@ import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/ui/sidebar";
 import { APP_IDENTITY } from "@/config/app-identity";
 import { GatewayStatus } from "@/components/ui/gateway-status";
+import { useChannelMessages } from "@/hooks/useChannelMessages";
 import { useMobileSwipe } from "@/hooks/useMobileSwipe";
 import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
 import { useSidebarStore } from "@/stores/sidebarStore";
@@ -25,6 +26,9 @@ function RootLayout() {
   // Track the software keyboard height so the CSS variable `--keyboard-height`
   // is always up-to-date for layout compensation (e.g. chat input area).
   useVirtualKeyboard();
+
+  // Subscribe to Tauri app-event channel_message events for the full app lifetime.
+  useChannelMessages();
 
   return (
     /*
