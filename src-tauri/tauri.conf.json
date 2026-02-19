@@ -9,7 +9,9 @@
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist",
-    "features": ["desktop"]
+    "features": [
+      "desktop"
+    ]
   },
   "app": {
     "windows": [

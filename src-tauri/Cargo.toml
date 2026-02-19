@@ -30,7 +30,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 # Headless CLI interface to the AI agent runtime.
 # Build with: cargo build --bin mesoclaw
 name = "mesoclaw"
-path = "src/bin/cli.rs"
+path = "src/cli.rs"
 required-features = ["cli"]
 
 [[bin]]
