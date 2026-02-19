@@ -108,6 +108,104 @@ See `docs/implementation-plan.md` for the full 49-task execution plan.
 
 ---
 
+## Modes of Interaction
+
+Mesoclaw is **gateway-centric**: the daemon is the product. All clients talk to the same local HTTP API at `127.0.0.1:18790`. No special client is required.
+
+### Desktop GUI (current)
+
+The Tauri window is the primary interface. It connects to the gateway over Tauri IPC and REST, giving you:
+
+- Chat with any configured LLM provider
+- Provider and API key management (Settings → Providers)
+- Identity file editor (Settings → Identity)
+- Tool approval overlay for supervised actions
+- Memory timeline and search
+
+### Gateway REST API (current)
+
+The daemon exposes a full HTTP API. Any HTTP client can interact with Mesoclaw while the desktop app is running. A bearer token is auto-generated at `~/.mesoclaw/daemon.token` on first launch.
+
+```bash
+# Read the token
+TOKEN=$(cat ~/.mesoclaw/daemon.token)
+BASE="http://127.0.0.1:18790"
+
+# Health check (no auth required)
+curl "$BASE/api/v1/health"
+# → {"status":"ok","service":"mesoclaw-daemon"}
+
+# List active providers
+curl -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/providers"
+
+# Create a chat session
+curl -X POST "$BASE/api/v1/sessions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"channel":"user","system_prompt":"You are a helpful assistant."}'
+
+# List sessions
+curl -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/sessions"
+
+# List registered sidecar modules
+curl -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/modules"
+
+# Reload modules from disk (hot-reload)
+curl -X POST -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/modules"
+
+# Start/stop a module
+curl -X POST -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/modules/python-analyst/start"
+
+# Read an identity file
+curl -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/identity/SOUL"
+
+# Update an identity file (hot-reload, no restart needed)
+curl -X PUT "$BASE/api/v1/identity/USER" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"# User\nName: Alice\nPrefers concise answers."}'
+
+# WebSocket event stream
+wscat -H "Authorization: Bearer $TOKEN" -c "ws://127.0.0.1:18790/api/v1/ws"
+```
+
+### CLI REPL (planned — v1.0)
+
+A command-line REPL that connects to the same gateway as the desktop app. You will be able to chat with the agent, inspect sessions, and manage configuration — all from the terminal, without the desktop window. Planned for v1.0.
+
+---
+
+## Autonomy Modes
+
+The security policy controls how freely the agent can execute tools on your behalf. Configure it in `~/.mesoclaw/config.toml`:
+
+```toml
+[security]
+autonomy = "supervised"   # readOnly | supervised | full
+rate_limit = 20           # max actions per hour (applies to "full" only)
+```
+
+| Mode | Shell commands | File writes | Network | Approval required |
+|------|---------------|-------------|---------|-------------------|
+| `readOnly` | Read-only (`ls`, `cat`, `grep`, `git`) | No | No | Medium/High always denied |
+| `supervised` *(default)* | Read-only auto-approved | Requires approval | Requires approval | Medium and High risk |
+| `full` | All (rate-limited) | Yes | Yes | Never — subject to rate limit |
+
+**Risk classification:**
+
+| Risk | Examples | `supervised` behavior |
+|------|----------|----------------------|
+| Low | `ls`, `cat`, `grep`, `git`, `echo` | Auto-approved |
+| Medium | `mkdir`, `cp`, `mv`, `cargo`, `npm`, `pip` | Requires user approval |
+| High | `curl`, `wget`, `chmod`, unknown binaries | Requires user approval |
+| Blocked | `rm`, `sudo`, `dd`, `mkfs`, `shutdown` | Always denied — in all modes |
+
+Shell injection patterns (backticks, `$()`, pipes, redirects, `;`, `&&`, `||`) are always blocked regardless of mode.
+
+The approval UI appears as an overlay in the desktop app. Tool calls via the REST API in `supervised`/`readOnly` mode will receive a `needs_approval` response and block until the user acts in the desktop window.
+
+---
+
 ## Architecture
 
 Mesoclaw is built on a **gateway-centric architecture**: the daemon is the product, and both the desktop GUI and CLI are thin clients connecting to the same local gateway API.

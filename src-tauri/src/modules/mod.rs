@@ -48,7 +48,11 @@ pub use sidecar_tool::SidecarTool;
 #[cfg(feature = "mcp-client")]
 pub use mcp_client::{McpClient, McpTool, McpToolProxy};
 
-use std::{collections::HashMap, path::{Path, PathBuf}, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 
@@ -233,7 +237,10 @@ impl ModuleRegistry {
         // Scan the directory for current manifest ids.
         let on_disk: HashMap<String, PathBuf> = match std::fs::read_dir(&self.modules_dir) {
             Err(e) => {
-                log::warn!("ModuleRegistry::reload: cannot read {:?}: {e}", self.modules_dir);
+                log::warn!(
+                    "ModuleRegistry::reload: cannot read {:?}: {e}",
+                    self.modules_dir
+                );
                 return (0, 0);
             }
             Ok(entries) => entries
@@ -243,7 +250,9 @@ impl ModuleRegistry {
                 .filter_map(|e| {
                     let path = e.path();
                     let manifest_path = path.join("manifest.toml");
-                    load_manifest(&manifest_path).ok().map(|m| (m.module.id, path))
+                    load_manifest(&manifest_path)
+                        .ok()
+                        .map(|m| (m.module.id, path))
                 })
                 .collect(),
         };
@@ -265,7 +274,9 @@ impl ModuleRegistry {
                         self.policy.clone(),
                         self.bus.clone(),
                     ));
-                    log::info!("ModuleRegistry::reload: added module '{id}' (restart to activate in ToolRegistry)");
+                    log::info!(
+                        "ModuleRegistry::reload: added module '{id}' (restart to activate in ToolRegistry)"
+                    );
                     map.insert(id.clone(), tool);
                     added += 1;
                 }
