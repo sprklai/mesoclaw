@@ -290,10 +290,10 @@ impl GatewayClient {
 
 /// Resolve or start the gateway, returning a ready client.
 async fn require_gateway() -> Option<GatewayClient> {
-    if let Some(port) = is_daemon_running() {
-        if let Some(token) = read_token() {
-            return Some(GatewayClient::new(port, token));
-        }
+    if let Some(port) = is_daemon_running()
+        && let Some(token) = read_token()
+    {
+        return Some(GatewayClient::new(port, token));
     }
     eprintln!(
         "Gateway is not running.\n\

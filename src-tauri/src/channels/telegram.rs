@@ -306,7 +306,7 @@ impl TelegramChannel {
         // Strip leading `/`, isolate the command word before any space or `@`.
         let raw = text.trim_start_matches('/');
         let cmd = raw
-            .split_once(|c: char| c == ' ' || c == '@')
+            .split_once([' ', '@'])
             .map(|(c, _)| c)
             .unwrap_or(raw);
 

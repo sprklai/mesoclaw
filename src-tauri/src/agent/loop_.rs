@@ -202,10 +202,10 @@ impl AgentLoop {
 
         loop {
             // ── Cancellation check ─────────────────────────────────────────
-            if let Some(ref flag) = self.cancel_flag {
-                if flag.load(AtomicOrdering::SeqCst) {
-                    return Err("cancelled".to_string());
-                }
+            if let Some(ref flag) = self.cancel_flag
+                && flag.load(AtomicOrdering::SeqCst)
+            {
+                return Err("cancelled".to_string());
             }
 
             // ── Trim history if needed ─────────────────────────────────────

@@ -306,7 +306,7 @@ pub fn run() {
                     agent_commands::{resolve_active_provider, SessionCancelMap},
                     loop_::{AgentConfig, AgentLoop},
                 };
-                use event_bus::{AppEvent, EventBus as _, EventFilter, EventType};
+                use event_bus::{AppEvent, EventFilter, EventType};
 
                 let bridge_bus: Arc<dyn event_bus::EventBus> = app
                     .try_state::<Arc<dyn event_bus::EventBus>>()
