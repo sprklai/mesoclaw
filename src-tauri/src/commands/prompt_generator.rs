@@ -7,7 +7,7 @@ use crate::agent::agent_commands::resolve_active_provider;
 use crate::ai::types::{CompletionRequest, Message};
 use crate::database::DbPool;
 use crate::database::models::generated_prompt::NewGeneratedPrompt;
-use crate::database::schema::generated_prompts;
+use crate::database::schema::{ai_models, ai_providers, generated_prompts, settings};
 
 // ---------------------------------------------------------------------------
 // Meta-prompts
@@ -129,6 +129,32 @@ pub async fn generate_prompt_command(
     // 1. Resolve the active LLM provider.
     let provider = resolve_active_provider(&pool)?;
 
+    // 1b. Resolve the active model_id for use in CompletionRequest.
+    let model_id = {
+        let mut conn = pool.get().map_err(|e| format!("DB pool: {e}"))?;
+        let preferred_provider_id: Option<String> = settings::table
+            .select(settings::default_provider_id)
+            .first::<Option<String>>(&mut conn)
+            .optional()
+            .map_err(|e| format!("Failed to query settings: {e}"))?
+            .flatten();
+        let provider_id = if let Some(pid) = preferred_provider_id {
+            pid
+        } else {
+            ai_providers::table
+                .filter(ai_providers::is_active.eq(1))
+                .select(ai_providers::id)
+                .first::<String>(&mut conn)
+                .map_err(|_| "No active provider".to_string())?
+        };
+        ai_models::table
+            .filter(ai_models::provider_id.eq(&provider_id))
+            .filter(ai_models::is_active.eq(1))
+            .select(ai_models::model_id)
+            .first::<String>(&mut conn)
+            .map_err(|_| format!("No active model for provider '{provider_id}'"))?
+    };
+
     // 2. Select meta-prompt based on artifact_type.
     let meta_prompt = match artifact_type.as_str() {
         "skill" => SKILL_META_PROMPT,
@@ -141,7 +167,7 @@ pub async fn generate_prompt_command(
 
     // 3. Build CompletionRequest.
     let messages = vec![Message::system(meta_prompt), Message::user(&description)];
-    let completion_request = CompletionRequest::new("default", messages).with_max_tokens(4000);
+    let completion_request = CompletionRequest::new(&model_id, messages).with_max_tokens(4000);
 
     // 4. Stream the response, emitting tokens as Tauri events.
     let event_name = format!("prompt-gen-{session_id}");

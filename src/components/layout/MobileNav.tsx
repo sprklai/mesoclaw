@@ -1,21 +1,21 @@
-import type { ComponentType } from "react";
-
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, MessageSquare, Settings, Sparkles } from "lucide-react";
+import { Home, MessageSquare, Settings, Sparkles, Wand2 } from "lucide-react";
+import type { ComponentType } from "react";
 
 import { cn } from "@/lib/utils";
 
 interface MobileNavItem {
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-  label: string;
-  href: string;
+	icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+	label: string;
+	href: string;
 }
 
 const MOBILE_NAV_ITEMS: MobileNavItem[] = [
-  { icon: Home, label: "Home", href: "/" },
-  { icon: Sparkles, label: "AI Chat", href: "/chat" },
-  { icon: MessageSquare, label: "Channels", href: "/channels" },
-  { icon: Settings, label: "Settings", href: "/settings" },
+	{ icon: Home, label: "Home", href: "/" },
+	{ icon: Sparkles, label: "AI Chat", href: "/chat" },
+	{ icon: Wand2, label: "Generate", href: "/prompt-generator" },
+	{ icon: MessageSquare, label: "Channels", href: "/channels" },
+	{ icon: Settings, label: "Settings", href: "/settings" },
 ];
 
 /**
@@ -28,59 +28,59 @@ const MOBILE_NAV_ITEMS: MobileNavItem[] = [
  * Hidden on md and larger screens where the persistent sidebar is shown instead.
  */
 export function MobileNav() {
-  const location = useLocation();
+	const location = useLocation();
 
-  return (
-    <nav
-      className={cn(
-        // Visible only on mobile (< 768px)
-        "fixed bottom-0 left-0 right-0 z-50 md:hidden",
-        // Background and border with blur lift
-        "border-t border-border bg-background/95 backdrop-blur-sm",
-        "shadow-[0_-4px_20px_rgba(0,0,0,0.06)]",
-      )}
-      aria-label="Mobile navigation"
-    >
-      {/* Safe area bottom padding using env() */}
-      <div
-        className="flex items-stretch justify-around"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        {MOBILE_NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.href;
+	return (
+		<nav
+			className={cn(
+				// Visible only on mobile (< 768px)
+				"fixed bottom-0 left-0 right-0 z-50 md:hidden",
+				// Background and border with blur lift
+				"border-t border-border bg-background/95 backdrop-blur-sm",
+				"shadow-[0_-4px_20px_rgba(0,0,0,0.06)]",
+			)}
+			aria-label="Mobile navigation"
+		>
+			{/* Safe area bottom padding using env() */}
+			<div
+				className="flex items-stretch justify-around"
+				style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+			>
+				{MOBILE_NAV_ITEMS.map((item) => {
+					const Icon = item.icon;
+					const isActive = location.pathname === item.href;
 
-          return (
-            <Link
-              key={item.href}
-              to={item.href}
-              className={cn(
-                // Minimum 44x44px touch target
-                "flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 px-1 py-2",
-                // Transition for active state
-                "transition-colors",
-                // Active vs inactive colors
-                isActive
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              aria-label={item.label}
-              aria-current={isActive ? "page" : undefined}
-            >
-              <Icon
-                aria-hidden
-                className={cn(
-                  "size-5 shrink-0",
-                  isActive && "scale-110 transition-transform",
-                )}
-              />
-              <span className="text-[10px] font-medium leading-none">
-                {item.label}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
-  );
+					return (
+						<Link
+							key={item.href}
+							to={item.href}
+							className={cn(
+								// Minimum 44x44px touch target
+								"flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 px-1 py-2",
+								// Transition for active state
+								"transition-colors",
+								// Active vs inactive colors
+								isActive
+									? "text-primary"
+									: "text-muted-foreground hover:text-foreground",
+							)}
+							aria-label={item.label}
+							aria-current={isActive ? "page" : undefined}
+						>
+							<Icon
+								aria-hidden
+								className={cn(
+									"size-5 shrink-0",
+									isActive && "scale-110 transition-transform",
+								)}
+							/>
+							<span className="text-[10px] font-medium leading-none">
+								{item.label}
+							</span>
+						</Link>
+					);
+				})}
+			</div>
+		</nav>
+	);
 }

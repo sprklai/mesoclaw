@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as PromptGeneratorRouteImport } from './routes/prompt-generator'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as ChatRouteImport } from './routes/chat'
@@ -19,6 +20,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PromptGeneratorRoute = PromptGeneratorRouteImport.update({
+  id: '/prompt-generator',
+  path: '/prompt-generator',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof ChatRoute
   '/memory': typeof MemoryRoute
   '/onboarding': typeof OnboardingRoute
+  '/prompt-generator': typeof PromptGeneratorRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/chat': typeof ChatRoute
   '/memory': typeof MemoryRoute
   '/onboarding': typeof OnboardingRoute
+  '/prompt-generator': typeof PromptGeneratorRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/chat': typeof ChatRoute
   '/memory': typeof MemoryRoute
   '/onboarding': typeof OnboardingRoute
+  '/prompt-generator': typeof PromptGeneratorRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
@@ -80,9 +89,17 @@ export interface FileRouteTypes {
     | '/chat'
     | '/memory'
     | '/onboarding'
+    | '/prompt-generator'
     | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/channels' | '/chat' | '/memory' | '/onboarding' | '/settings'
+  to:
+    | '/'
+    | '/channels'
+    | '/chat'
+    | '/memory'
+    | '/onboarding'
+    | '/prompt-generator'
+    | '/settings'
   id:
     | '__root__'
     | '/'
@@ -90,6 +107,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/memory'
     | '/onboarding'
+    | '/prompt-generator'
     | '/settings'
   fileRoutesById: FileRoutesById
 }
@@ -99,6 +117,7 @@ export interface RootRouteChildren {
   ChatRoute: typeof ChatRoute
   MemoryRoute: typeof MemoryRoute
   OnboardingRoute: typeof OnboardingRoute
+  PromptGeneratorRoute: typeof PromptGeneratorRoute
   SettingsRoute: typeof SettingsRoute
 }
 
@@ -109,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prompt-generator': {
+      id: '/prompt-generator'
+      path: '/prompt-generator'
+      fullPath: '/prompt-generator'
+      preLoaderRoute: typeof PromptGeneratorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding': {
@@ -155,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRoute,
   MemoryRoute: MemoryRoute,
   OnboardingRoute: OnboardingRoute,
+  PromptGeneratorRoute: PromptGeneratorRoute,
   SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport
