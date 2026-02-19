@@ -10,7 +10,7 @@ use crate::{
     database::models::ai_provider::AIProviderData,
     database::schema::ai_providers,
     event_bus::EventBus,
-    identity::IdentityLoader,
+    identity::{IdentityLoader, types::IDENTITY_FILES, types::IdentityFileInfo},
     modules::{ModuleRegistry, SidecarModule},
 };
 
@@ -223,4 +223,66 @@ pub async fn reload_modules(State(state): State<GatewayState>) -> impl IntoRespo
         "current_modules": ids,
         "count": ids.len(),
     }))
+}
+
+// ─── Identity endpoints ──────────────────────────────────────────────────────
+
+/// Path parameter for identity file routes.
+#[derive(serde::Deserialize)]
+pub struct IdentityFileParam {
+    pub file: String,
+}
+
+/// Request body for updating an identity file.
+#[derive(Debug, Deserialize)]
+pub struct UpdateIdentityRequest {
+    pub content: String,
+}
+
+/// `GET /api/v1/identity` — list all canonical identity files with metadata.
+pub async fn list_identity_files(State(state): State<GatewayState>) -> impl IntoResponse {
+    // Ensure identity is loaded (trigger a read).
+    let _ = state.identity_loader.get();
+
+    let files: Vec<IdentityFileInfo> = IDENTITY_FILES
+        .iter()
+        .map(|(file_name, description)| IdentityFileInfo {
+            name: file_name.trim_end_matches(".md").to_string(),
+            file_name: file_name.to_string(),
+            description: description.to_string(),
+        })
+        .collect();
+
+    Json(json!({ "files": files, "count": files.len() }))
+}
+
+/// `GET /api/v1/identity/{file}` — return the raw content of one identity file.
+pub async fn get_identity_file(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<IdentityFileParam>,
+) -> impl IntoResponse {
+    match state.identity_loader.get_file(&params.file) {
+        Ok(content) => Json(json!({ "file": params.file, "content": content })).into_response(),
+        Err(e) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "file": params.file, "error": e })),
+        )
+            .into_response(),
+    }
+}
+
+/// `PUT /api/v1/identity/{file}` — overwrite one identity file and hot-reload.
+pub async fn update_identity_file(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<IdentityFileParam>,
+    Json(req): Json<UpdateIdentityRequest>,
+) -> impl IntoResponse {
+    match state.identity_loader.update_file(&params.file, &req.content) {
+        Ok(()) => Json(json!({ "file": params.file, "status": "updated" })).into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "file": params.file, "error": e })),
+        )
+            .into_response(),
+    }
 }

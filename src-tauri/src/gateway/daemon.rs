@@ -2,7 +2,7 @@ use std::{fs, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use axum::{
     Router, middleware,
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
@@ -15,8 +15,9 @@ use crate::{
 use super::{
     auth::{auth_middleware, load_or_create_token},
     routes::{
-        GatewayState, create_session, health, list_modules, list_sessions, module_health,
-        provider_status, reload_modules, start_module, stop_module,
+        GatewayState, create_session, get_identity_file, health, list_identity_files,
+        list_modules, list_sessions, module_health, provider_status, reload_modules, start_module,
+        stop_module, update_identity_file,
     },
     ws::ws_handler,
 };
@@ -65,6 +66,12 @@ pub async fn start_gateway(
         .route("/api/v1/modules/{id}/health", get(module_health))
         .route("/api/v1/modules/{id}/start", post(start_module))
         .route("/api/v1/modules/{id}/stop", post(stop_module))
+        // Identity endpoints
+        .route("/api/v1/identity", get(list_identity_files))
+        .route(
+            "/api/v1/identity/{file}",
+            get(get_identity_file).put(update_identity_file),
+        )
         .layer(middleware::from_fn(auth_middleware))
         .with_state(state.clone());
 
