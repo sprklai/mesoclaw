@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -366,7 +367,8 @@ function ChatPage() {
   }, [availableModels]);
 
   return (
-    <div className="relative flex size-full flex-col divide-y overflow-hidden">
+    <div className="relative flex size-full flex-col overflow-hidden">
+      <PageHeader title="AI Chat" description={selectedModelData.name} className="px-4 pt-4 pb-2" />
       <Conversation>
         <ConversationContent>
           {messages.length === 0 ? (
@@ -408,6 +410,7 @@ function ChatPage() {
         )}
 
         <div className="w-full px-4 pb-4">
+          <div className="rounded-2xl border-2 border-border shadow-sm transition-all focus-within:border-primary/40 focus-within:shadow-md">
           <PromptInput value={input} onChange={setInput} onSubmit={handleSubmit}>
             <PromptInputBody>
               <PromptInputTextarea
@@ -463,6 +466,7 @@ function ChatPage() {
               />
             </PromptInputFooter>
           </PromptInput>
+          </div>
         </div>
       </div>
     </div>
