@@ -168,7 +168,6 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
   connectChannel: async (name) => {
     get().setChannelStatus(name, "reconnecting");
     try {
-      // ## TODO: implement backend command connect_channel_command
       await invoke("connect_channel_command", { name });
       get().setChannelStatus(name, "connected");
     } catch (err) {
@@ -178,7 +177,6 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
   disconnectChannel: async (name) => {
     try {
-      // ## TODO: implement backend command disconnect_channel_command
       await invoke("disconnect_channel_command", { name });
       get().setChannelStatus(name, "disconnected");
     } catch (err) {
@@ -188,7 +186,6 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
   testConnection: async (name) => {
     try {
-      // ## TODO: implement backend command test_channel_connection_command
       await invoke("test_channel_connection_command", { name });
       return true;
     } catch {

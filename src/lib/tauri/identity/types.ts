@@ -1,8 +1,6 @@
 /**
  * Types matching the Rust identity types in src-tauri/src/identity/types.rs.
- *
- * ## TODO: migrate to gateway REST API (Phase 3 - identity endpoints)
- * Currently served via Tauri IPC commands registered in lib.rs.
+ * Identity CRUD is served via gateway REST API (/api/v1/identity/*).
  */
 
 export interface IdentityMeta {
