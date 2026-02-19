@@ -115,6 +115,12 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 ## Completed Items (Archive)
 
 | Date | Category | File | Description |
+| 2026-02-19 | Feature | `src-tauri/src/lib.rs` | channel-bridge: /cancel and /status bot command routing with SessionCancelMap |
+| 2026-02-19 | Feature | `src-tauri/src/cli.rs` | handle_channel(): list/add/set/status/remove via keyring + gateway API |
+| 2026-02-19 | Feature | `src-tauri/src/cli.rs` | handle_config(): list/set-key/get-key/delete-key for provider API keys |
+| 2026-02-19 | Feature | `src-tauri/src/cli.rs` | handle_schedule(): list/add/toggle/remove/history via gateway scheduler API |
+| 2026-02-19 | Feature | `src-tauri/src/lib.rs` | 7.1.5: SessionRouter-backed conversation history in channel-bridge (run_with_history) |
+| 2026-02-19 | Feature | `src-tauri/src/ai/provider.rs` | ProviderFactory::create wired to real create_provider + ReliableProvider |
 |------|----------|------|-------------|
 | 2026-02-18 | Feature | `src-tauri/src/config/loader.rs` | TOML config loader with env overrides (Phase 5.1) |
 | 2026-02-18 | Feature | `src-tauri/src/ai/providers/router.rs` | `ModelRouter` — cost-tier routing and alias resolution (Phase 5.2) |
