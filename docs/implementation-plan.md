@@ -869,7 +869,7 @@ Before proceeding to Phase 1, verify:
 - [x] `Cargo.toml`: `channels-telegram` added to default features — no `--features` flag needed ✅
 - [x] `channelStore.ts`: `loadChannels` calls real `list_channels_command`; restores saved config from keyring on open ✅
 - [x] `channelStore.ts`: `updateTelegramConfig` persists token + allowed_ids + timeout to `com.sprklai.mesoclaw` keyring ✅
-- [ ] 7.1.5: Telegram → Agent Loop routing via `SessionRouter` — deferred (requires per-channel session architecture)
+- [x] 7.1.5: Telegram → Agent Loop routing via `SessionRouter` — channel-bridge resolves structured session keys, loads prior history, calls `run_with_history()`, persists user+assistant turns ✅
 
 ---
 

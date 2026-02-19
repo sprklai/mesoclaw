@@ -365,9 +365,13 @@ pub fn run() {
             {
                 use agent::{
                     agent_commands::{resolve_active_provider, SessionCancelMap},
-                    loop_::{AgentConfig, AgentLoop},
+                    loop_::{AgentConfig, AgentLoop, AgentMessage},
+                    session_router::SessionRouter,
                 };
                 use event_bus::{AppEvent, EventFilter, EventType};
+
+                // Per-channel persistent session history (7.1.5).
+                let bridge_sessions = Arc::new(SessionRouter::new());
 
                 let bridge_bus: Arc<dyn event_bus::EventBus> = app
                     .try_state::<Arc<dyn event_bus::EventBus>>()
@@ -395,6 +399,8 @@ pub fn run() {
                     .map(|s| s.inner().clone())
                     .ok_or("SessionCancelMap not initialised before channel-bridge")?;
 
+                // Move into the subscription loop.
+                let sessions_for_bridge = Arc::clone(&bridge_sessions);
                 tauri::async_runtime::spawn(async move {
                     use tokio::sync::broadcast::error::RecvError;
                     let mut rx = bridge_bus
@@ -491,6 +497,7 @@ pub fn run() {
                                 let pol = Arc::clone(&bridge_policy);
                                 let ident = Arc::clone(&bridge_identity);
                                 let cmap = Arc::clone(&bridge_cancel);
+                                let sessions = Arc::clone(&sessions_for_bridge);
                                 let chan = channel.clone();
                                 let chat_id = from.clone();
 
@@ -505,9 +512,12 @@ pub fn run() {
                                         }
                                     };
 
-                                    // Session ID follows the same pattern as desktop sessions.
-                                    let session_id =
-                                        format!("channel:dm:{chan}:{chat_id}");
+                                    // ── Session routing (7.1.5) ───────────────────────
+                                    // Resolve a structured session key via SessionRouter so
+                                    // Telegram DMs get per-user persistent conversation history.
+                                    let session_key =
+                                        sessions.resolve(&chan, Some(&chat_id));
+                                    let session_id = session_key.as_str();
                                     let flag = Arc::new(
                                         std::sync::atomic::AtomicBool::new(false),
                                     );
@@ -529,8 +539,53 @@ pub fn run() {
                                     )
                                     .with_cancel_flag(Arc::clone(&flag));
 
-                                    match agent.run(&system_prompt, &content).await {
+                                    // Build history from persisted session messages +
+                                    // the new user turn.  Keeps conversation context
+                                    // across multiple messages from the same peer.
+                                    // get_or_create is infallible in practice; on lock
+                                    // poisoning we fall back to an empty message list.
+                                    let prior_messages = sessions
+                                        .get_or_create(session_key.clone())
+                                        .map(|s| s.messages)
+                                        .unwrap_or_default();
+                                    let mut history: Vec<AgentMessage> =
+                                        vec![AgentMessage::System {
+                                            content: system_prompt.clone(),
+                                        }];
+                                    for msg in &prior_messages {
+                                        match msg.role.as_str() {
+                                            "user" => history.push(AgentMessage::User {
+                                                content: msg.content.clone(),
+                                            }),
+                                            "assistant" => {
+                                                history.push(AgentMessage::Assistant {
+                                                    content: msg.content.clone(),
+                                                    tool_calls: vec![],
+                                                })
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                    history.push(AgentMessage::User {
+                                        content: content.clone(),
+                                    });
+
+                                    match agent.run_with_history(&mut history).await {
                                         Ok(response) => {
+                                            // Persist the new user + assistant turns.
+                                            let _ = sessions.push_message(
+                                                &session_key,
+                                                "user",
+                                                &content,
+                                            );
+                                            let _ = sessions.push_message(
+                                                &session_key,
+                                                "assistant",
+                                                &response,
+                                            );
+                                            // Compact to prevent unbounded growth.
+                                            let _ = sessions.compact(&session_key, 50);
+
                                             // Emit AgentComplete so TauriBridge forwards to
                                             // the desktop frontend as well.
                                             let _ = bus.publish(AppEvent::AgentComplete {
