@@ -11,6 +11,7 @@ use crate::scheduler::{
 
 /// List all registered scheduled jobs.
 #[tauri::command]
+#[tracing::instrument(name = "command.scheduler.list_jobs", skip(scheduler))]
 pub async fn list_jobs_command(
     scheduler: State<'_, Arc<TokioScheduler>>,
 ) -> Result<Vec<ScheduledJob>, String> {
@@ -22,6 +23,7 @@ pub async fn list_jobs_command(
 /// `schedule_json` must be a valid [`Schedule`] (e.g. `{"type":"interval","secs":1800}`).
 /// `payload_json` must be a valid [`JobPayload`].
 #[tauri::command]
+#[tracing::instrument(name = "command.scheduler.create_job", skip(scheduler, schedule_json, payload_json), fields(name = %name))]
 pub async fn create_job_command(
     name: String,
     schedule_json: serde_json::Value,
@@ -54,6 +56,7 @@ pub async fn create_job_command(
 /// Implemented as remove + re-add with the updated `enabled` flag because
 /// `Scheduler` does not expose a direct mutation method.
 #[tauri::command]
+#[tracing::instrument(name = "command.scheduler.toggle_job", skip(scheduler), fields(job_id = %job_id, enabled))]
 pub async fn toggle_job_command(
     job_id: String,
     enabled: bool,
@@ -73,6 +76,7 @@ pub async fn toggle_job_command(
 
 /// Delete a scheduled job by id.
 #[tauri::command]
+#[tracing::instrument(name = "command.scheduler.delete_job", skip(scheduler), fields(job_id = %job_id))]
 pub async fn delete_job_command(
     job_id: String,
     scheduler: State<'_, Arc<TokioScheduler>>,
@@ -82,6 +86,7 @@ pub async fn delete_job_command(
 
 /// Retrieve execution history for a job.
 #[tauri::command]
+#[tracing::instrument(name = "command.scheduler.job_history", skip(scheduler), fields(job_id = %job_id))]
 pub async fn job_history_command(
     job_id: String,
     scheduler: State<'_, Arc<TokioScheduler>>,

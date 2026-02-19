@@ -42,6 +42,7 @@ pub struct SessionResponse {
     pub status: String,
 }
 
+#[tracing::instrument(name = "gateway.create_session", skip_all, fields(channel = ?req.channel))]
 pub async fn create_session(
     State(state): State<GatewayState>,
     Json(req): Json<CreateSessionRequest>,
@@ -109,6 +110,7 @@ pub struct ModuleId {
 }
 
 /// Return health status for a single module.
+#[tracing::instrument(name = "gateway.module_health", skip(state), fields(id = %params.id))]
 pub async fn module_health(
     State(state): State<GatewayState>,
     axum::extract::Path(params): axum::extract::Path<ModuleId>,
@@ -127,6 +129,7 @@ pub async fn module_health(
 ///
 /// Full start/stop lifecycle requires `SidecarService` management, which is
 /// wired in Phase 4.4.  Returns 501 until that wiring is complete.
+#[tracing::instrument(name = "gateway.start_module", skip(state), fields(id = %params.id))]
 pub async fn start_module(
     State(state): State<GatewayState>,
     axum::extract::Path(params): axum::extract::Path<ModuleId>,
@@ -146,6 +149,7 @@ pub async fn start_module(
 }
 
 /// Stop a running service-type module.
+#[tracing::instrument(name = "gateway.stop_module", skip(state), fields(id = %params.id))]
 pub async fn stop_module(
     State(state): State<GatewayState>,
     axum::extract::Path(params): axum::extract::Path<ModuleId>,
