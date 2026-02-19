@@ -14,6 +14,11 @@ pub enum AppEvent {
         result: String,
         success: bool,
     },
+    /// Emitted immediately after a session is registered, before the agent
+    /// runs.  Clients should capture `session_id` here to enable cancellation.
+    AgentStarted {
+        session_id: String,
+    },
     AgentComplete {
         session_id: String,
         message: String,
@@ -63,6 +68,7 @@ pub enum AppEvent {
 pub enum EventType {
     AgentToolStart,
     AgentToolResult,
+    AgentStarted,
     AgentComplete,
     ApprovalNeeded,
     ApprovalResponse,
@@ -85,6 +91,7 @@ impl EventType {
             Self::All => true,
             Self::AgentToolStart => matches!(event, AppEvent::AgentToolStart { .. }),
             Self::AgentToolResult => matches!(event, AppEvent::AgentToolResult { .. }),
+            Self::AgentStarted => matches!(event, AppEvent::AgentStarted { .. }),
             Self::AgentComplete => matches!(event, AppEvent::AgentComplete { .. }),
             Self::ApprovalNeeded => matches!(event, AppEvent::ApprovalNeeded { .. }),
             Self::ApprovalResponse => matches!(event, AppEvent::ApprovalResponse { .. }),

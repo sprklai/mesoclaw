@@ -56,6 +56,7 @@ fn is_ui_relevant(event: &AppEvent) -> bool {
         event,
         AppEvent::AgentToolStart { .. }
             | AppEvent::AgentToolResult { .. }
+            | AppEvent::AgentStarted { .. }
             | AppEvent::AgentComplete { .. }
             | AppEvent::ApprovalNeeded { .. }
             | AppEvent::HeartbeatTick { .. }

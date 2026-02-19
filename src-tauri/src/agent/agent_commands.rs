@@ -156,6 +156,12 @@ pub async fn start_agent_session_command(
     // Build system prompt from identity files.
     let system_prompt = identity_loader.build_system_prompt();
 
+    // Emit AgentStarted so clients can capture session_id for cancellation
+    // before the run completes (fixes Finding #1).
+    let _ = bus.publish(AppEvent::AgentStarted {
+        session_id: session_id.clone(),
+    });
+
     // Construct and run the agent loop, wiring the cancellation flag so the
     // loop aborts at the next iteration boundary when cancel is requested.
     let agent = AgentLoop::new(
