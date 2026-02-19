@@ -202,8 +202,10 @@ impl Session {
 /// All sessions are held in memory.  Isolated sessions are stored separately
 /// from main sessions to prevent history pollution.
 ///
-/// ## TODO (4.3.3)
-/// Persist sessions to SQLite `chat_sessions` table.
+/// The `chat_sessions` SQLite table (migration 2026-02-19-100000) stores
+/// session metadata with columns: `session_key`, `agent`, `scope`, `channel`,
+/// `peer`.  In-memory sessions are the source of truth at runtime; persistence
+/// is a future follow-up.
 pub struct SessionRouter {
     sessions: RwLock<HashMap<SessionKey, Session>>,
 }

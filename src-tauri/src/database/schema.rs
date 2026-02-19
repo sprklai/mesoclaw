@@ -26,6 +26,34 @@ diesel::table! {
 }
 
 diesel::table! {
+    chat_sessions (id) {
+        id -> Text,
+        session_key -> Text,
+        agent -> Text,
+        scope -> Text,
+        channel -> Text,
+        peer -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+        compaction_summary -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    scheduled_jobs (id) {
+        id -> Text,
+        name -> Text,
+        schedule_json -> Text,
+        session_target -> Text,
+        payload_json -> Text,
+        enabled -> Integer,
+        error_count -> Integer,
+        next_run -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
     settings (id) {
         id -> Integer,
         theme -> Text,
@@ -55,20 +83,12 @@ diesel::table! {
     }
 }
 
-diesel::table! {
-    scheduled_jobs (id) {
-        id -> Text,
-        name -> Text,
-        schedule_json -> Text,
-        session_target -> Text,
-        payload_json -> Text,
-        enabled -> Integer,
-        error_count -> Integer,
-        next_run -> Nullable<Text>,
-        created_at -> Text,
-    }
-}
-
 diesel::joinable!(ai_models -> ai_providers (provider_id));
 
-diesel::allow_tables_to_appear_in_same_query!(ai_models, ai_providers, scheduled_jobs, settings,);
+diesel::allow_tables_to_appear_in_same_query!(
+    ai_models,
+    ai_providers,
+    chat_sessions,
+    scheduled_jobs,
+    settings,
+);
