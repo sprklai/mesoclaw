@@ -410,6 +410,79 @@ pub fn run() {
                                     continue;
                                 }
 
+                                // ── Bot command short-circuits ──────────────────────────────
+                                // Commands are identified by their raw content (e.g. "/cancel").
+                                // They are handled directly here and never forwarded to the
+                                // agent loop, so they respond instantly regardless of provider
+                                // availability.
+                                let trimmed = content.trim();
+
+                                if trimmed.eq_ignore_ascii_case("/cancel") {
+                                    let session_id =
+                                        format!("channel:dm:{channel}:{from}");
+                                    let cancelled = bridge_cancel
+                                        .lock()
+                                        .ok()
+                                        .and_then(|map| {
+                                            map.get(&session_id).map(|flag| {
+                                                flag.store(
+                                                    true,
+                                                    std::sync::atomic::Ordering::SeqCst,
+                                                );
+                                                true
+                                            })
+                                        })
+                                        .unwrap_or(false);
+                                    let reply = if cancelled {
+                                        "Agent session cancelled.".to_string()
+                                    } else {
+                                        "No active session to cancel.".to_string()
+                                    };
+                                    log::info!(
+                                        "channel-bridge [{channel}]: /cancel from {from} \
+                                         (cancelled={cancelled})"
+                                    );
+                                    if let Err(e) = bridge_mgr
+                                        .send(&channel, &reply, Some(&from))
+                                        .await
+                                    {
+                                        log::warn!(
+                                            "channel-bridge [{channel}]: /cancel reply \
+                                             failed: {e}"
+                                        );
+                                    }
+                                    continue;
+                                }
+
+                                if trimmed.eq_ignore_ascii_case("/status") {
+                                    let session_id =
+                                        format!("channel:dm:{channel}:{from}");
+                                    let active = bridge_cancel
+                                        .lock()
+                                        .ok()
+                                        .map(|map| map.contains_key(&session_id))
+                                        .unwrap_or(false);
+                                    let reply = if active {
+                                        "Agent session is active.".to_string()
+                                    } else {
+                                        "No active agent session.".to_string()
+                                    };
+                                    log::info!(
+                                        "channel-bridge [{channel}]: /status from {from} \
+                                         (active={active})"
+                                    );
+                                    if let Err(e) = bridge_mgr
+                                        .send(&channel, &reply, Some(&from))
+                                        .await
+                                    {
+                                        log::warn!(
+                                            "channel-bridge [{channel}]: /status reply \
+                                             failed: {e}"
+                                        );
+                                    }
+                                    continue;
+                                }
+
                                 // Clone everything needed for the per-message spawned task.
                                 let bus = Arc::clone(&bridge_bus);
                                 let mgr = Arc::clone(&bridge_mgr);

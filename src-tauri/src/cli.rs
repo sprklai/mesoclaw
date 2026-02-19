@@ -109,9 +109,12 @@ struct IdentityArgs {
 
 #[derive(Parser, Debug)]
 struct ConfigArgs {
+    /// Config action: list | set-key | get-key | delete-key
     #[arg(default_value = "list")]
     action: String,
-    key: Option<String>,
+    /// Provider ID (for set-key, get-key, delete-key).
+    provider: Option<String>,
+    /// API key value (for set-key). If omitted, read interactively from stdin.
     value: Option<String>,
 }
 
@@ -124,9 +127,20 @@ struct ScheduleArgs {
 
 #[derive(Parser, Debug)]
 struct ChannelArgs {
+    /// Channel action: list | add | set | status | remove
     #[arg(default_value = "list")]
     action: String,
+    /// Channel type (e.g. "telegram"). Required for add/set/status/remove.
     channel_type: Option<String>,
+    /// Bot token (Telegram only).
+    #[arg(long)]
+    token: Option<String>,
+    /// Allowed chat IDs, comma-separated (Telegram only).
+    #[arg(long)]
+    chat_ids: Option<String>,
+    /// Polling timeout in seconds (Telegram only).
+    #[arg(long, default_value_t = 30u64)]
+    polling_timeout: u64,
 }
 
 #[derive(Parser, Debug)]
@@ -285,6 +299,16 @@ impl GatewayClient {
             .json::<Value>()
             .await
     }
+
+    async fn list_providers(&self) -> reqwest::Result<Value> {
+        self.client
+            .get(format!("{}/api/v1/providers", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
 }
 
 /// Resolve or start the gateway, returning a ready client.
@@ -340,15 +364,11 @@ async fn dispatch(command: &Commands, raw: bool, json_mode: bool) {
         Commands::Agent(args) => handle_agent(args, raw, json_mode).await,
         Commands::Memory(args) => handle_memory(args, raw, json_mode).await,
         Commands::Identity(args) => handle_identity(args, raw, json_mode).await,
-        Commands::Config(args) => {
-            println!("config {}: not yet implemented (Phase 5)", args.action);
-        }
+        Commands::Config(args) => handle_config(args, raw, json_mode).await,
         Commands::Schedule(args) => {
             println!("schedule {}: not yet implemented (Phase 4)", args.action);
         }
-        Commands::Channel(args) => {
-            println!("channel {}: not yet implemented (Phase 7)", args.action);
-        }
+        Commands::Channel(args) => handle_channel(args, raw, json_mode).await,
         Commands::Module(args) => handle_module(args, raw, json_mode).await,
         Commands::Gui => {
             println!("gui: not yet implemented — launch mesoclaw-desktop directly");
@@ -1113,6 +1133,328 @@ fn remove_module(name: &str, force: bool) {
 }
 
 // ---------------------------------------------------------------------------
+// Channel and Config handlers
+// ---------------------------------------------------------------------------
+
+/// Manage communication channels (Telegram, etc.).
+///
+/// Reads and writes channel credentials directly to the OS keyring.
+/// The daemon picks up changes on restart.
+async fn handle_channel(args: &ChannelArgs, raw: bool, json_mode: bool) {
+    const SERVICE: &str = "com.sprklai.mesoclaw";
+
+    match args.action.as_str() {
+        "list" => {
+            // Probe keyring for configured channels.
+            let telegram_configured = keyring::Entry::new(SERVICE, "channel:telegram:token")
+                .ok()
+                .and_then(|e| e.get_password().ok())
+                .map(|t| !t.is_empty())
+                .unwrap_or(false);
+
+            // Try to enrich with live status from gateway.
+            let telegram_status = if let Some(client) = require_gateway().await {
+                match client
+                    .client
+                    .get(format!("{}/api/v1/channels/telegram/health", client.base_url))
+                    .header("Authorization", client.auth_header())
+                    .send()
+                    .await
+                {
+                    Ok(resp) if resp.status().is_success() => resp
+                        .json::<Value>()
+                        .await
+                        .ok()
+                        .and_then(|v| v.get("connected").and_then(|b| b.as_bool()))
+                        .map(|c| if c { "connected" } else { "disconnected" })
+                        .unwrap_or("unknown"),
+                    _ => if telegram_configured { "configured (daemon not running)" } else { "not configured" },
+                }
+            } else {
+                if telegram_configured { "configured (daemon offline)" } else { "not configured" }
+            };
+
+            let channels = json!([
+                {
+                    "name": "tauri-ipc",
+                    "description": "Built-in desktop IPC channel",
+                    "status": "always connected",
+                    "configured": true,
+                },
+                {
+                    "name": "telegram",
+                    "description": "Telegram bot channel",
+                    "status": telegram_status,
+                    "configured": telegram_configured,
+                },
+            ]);
+            print_value(&channels, raw, json_mode);
+        }
+
+        "add" | "set" => match args.channel_type.as_deref() {
+            Some("telegram") => configure_telegram_channel(args, SERVICE),
+            Some(t) => print_err(&format!(
+                "unknown channel type '{t}'. Supported types: telegram"
+            )),
+            None => print_err(
+                "channel add requires a type: mesoclaw channel add telegram [--token <tok>] [--chat-ids <ids>]",
+            ),
+        },
+
+        "status" | "health" => {
+            let Some(name) = &args.channel_type else {
+                print_err("channel status requires a channel name: mesoclaw channel status <name>");
+                return;
+            };
+            let Some(client) = require_gateway().await else {
+                return;
+            };
+            match client
+                .client
+                .get(format!("{}/api/v1/channels/{name}/health", client.base_url))
+                .header("Authorization", client.auth_header())
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    if let Ok(v) = resp.json::<Value>().await {
+                        print_value(&v, raw, json_mode);
+                    }
+                }
+                Ok(_) | Err(_) => {
+                    // Fallback: show keyring config status.
+                    let configured = if name == "telegram" {
+                        keyring::Entry::new(SERVICE, "channel:telegram:token")
+                            .ok()
+                            .and_then(|e| e.get_password().ok())
+                            .map(|t| !t.is_empty())
+                            .unwrap_or(false)
+                    } else {
+                        false
+                    };
+                    let v = json!({ "channel": name, "configured": configured, "gateway": "unavailable" });
+                    print_value(&v, raw, json_mode);
+                }
+            }
+        }
+
+        "remove" => match args.channel_type.as_deref() {
+            Some("telegram") => {
+                let keys = [
+                    "channel:telegram:token",
+                    "channel:telegram:allowed_chat_ids",
+                    "channel:telegram:polling_timeout_secs",
+                ];
+                let mut removed = false;
+                for key in &keys {
+                    if let Ok(entry) = keyring::Entry::new(SERVICE, key) {
+                        let _ = entry.delete_password();
+                        removed = true;
+                    }
+                }
+                if removed {
+                    println!(
+                        "Telegram channel configuration removed.\n\
+                         Restart the daemon to apply: mesoclaw daemon stop && mesoclaw daemon start"
+                    );
+                } else {
+                    println!("No Telegram channel configuration found.");
+                }
+            }
+            Some(t) => print_err(&format!("unknown channel type '{t}'")),
+            None => print_err("channel remove requires a channel name: mesoclaw channel remove telegram"),
+        },
+
+        other => print_err(&format!(
+            "unknown channel action '{other}'. Use: list | add | set | status | remove"
+        )),
+    }
+}
+
+/// Write Telegram channel credentials to the OS keyring.
+///
+/// If `--token` / `--chat-ids` flags are absent, prompts interactively.
+fn configure_telegram_channel(args: &ChannelArgs, service: &str) {
+    let token = if let Some(t) = &args.token {
+        t.clone()
+    } else {
+        eprintln!("Telegram Bot Setup");
+        eprintln!("──────────────────────────────────────────");
+        eprintln!("1. Open Telegram and search for @BotFather");
+        eprintln!("2. Send /newbot and follow the prompts");
+        eprintln!("3. Copy the token BotFather gives you");
+        eprintln!("4. Find your chat ID via @userinfobot");
+        eprintln!("──────────────────────────────────────────");
+        print!("Bot token: ");
+        io::stdout().flush().unwrap_or_default();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap_or_default();
+        input.trim().to_string()
+    };
+
+    if token.is_empty() {
+        print_err("bot token is required");
+        return;
+    }
+
+    let chat_ids = if let Some(ids) = &args.chat_ids {
+        ids.clone()
+    } else {
+        print!("Allowed chat IDs (comma-separated, e.g. 123456789): ");
+        io::stdout().flush().unwrap_or_default();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap_or_default();
+        input.trim().to_string()
+    };
+
+    let timeout_str = args.polling_timeout.to_string();
+
+    let entries = [
+        ("channel:telegram:token", token.as_str()),
+        ("channel:telegram:allowed_chat_ids", chat_ids.as_str()),
+        ("channel:telegram:polling_timeout_secs", timeout_str.as_str()),
+    ];
+
+    for (key, value) in &entries {
+        match keyring::Entry::new(service, key) {
+            Ok(entry) => {
+                if let Err(e) = entry.set_password(value) {
+                    print_err(&format!("failed to save '{key}': {e}"));
+                    return;
+                }
+            }
+            Err(e) => {
+                print_err(&format!("keyring error for '{key}': {e}"));
+                return;
+            }
+        }
+    }
+
+    println!("Telegram channel configured successfully.");
+    println!(
+        "Restart the daemon to connect: mesoclaw daemon stop && mesoclaw daemon start"
+    );
+}
+
+/// View and manage AI provider configuration.
+///
+/// API keys are stored in the OS keyring using the key format `api-key:{provider_id}`.
+async fn handle_config(args: &ConfigArgs, raw: bool, json_mode: bool) {
+    const SERVICE: &str = "com.sprklai.mesoclaw";
+
+    match args.action.as_str() {
+        "list" => {
+            let Some(client) = require_gateway().await else {
+                return;
+            };
+            match client.list_providers().await {
+                Ok(v) => print_value(&v, raw, json_mode),
+                Err(e) => print_err(&format!("config list: {e}")),
+            }
+        }
+
+        "set-key" => {
+            let Some(provider_id) = &args.provider else {
+                print_err(
+                    "config set-key requires a provider ID: mesoclaw config set-key <provider> [<api-key>]",
+                );
+                return;
+            };
+
+            let api_key = if let Some(k) = &args.value {
+                k.clone()
+            } else {
+                print!("API key for '{provider_id}': ");
+                io::stdout().flush().unwrap_or_default();
+                let mut input = String::new();
+                io::stdin().read_line(&mut input).unwrap_or_default();
+                input.trim().to_string()
+            };
+
+            if api_key.is_empty() {
+                print_err("API key cannot be empty");
+                return;
+            }
+
+            let key_name = format!("api-key:{provider_id}");
+            match keyring::Entry::new(SERVICE, &key_name) {
+                Ok(entry) => match entry.set_password(&api_key) {
+                    Ok(()) => println!("API key for '{provider_id}' saved to keyring."),
+                    Err(e) => print_err(&format!("failed to save API key: {e}")),
+                },
+                Err(e) => print_err(&format!("keyring error: {e}")),
+            }
+        }
+
+        "get-key" => {
+            let Some(provider_id) = &args.provider else {
+                print_err(
+                    "config get-key requires a provider ID: mesoclaw config get-key <provider>",
+                );
+                return;
+            };
+
+            let key_name = format!("api-key:{provider_id}");
+            match keyring::Entry::new(SERVICE, &key_name) {
+                Ok(entry) => match entry.get_password() {
+                    Ok(key) => {
+                        // Mask most of the key for security.
+                        let masked = if key.len() > 8 {
+                            format!("{}...{}", &key[..4], &key[key.len() - 4..])
+                        } else {
+                            "****".to_string()
+                        };
+                        if json_mode {
+                            print_value(
+                                &json!({ "provider": provider_id, "hasKey": true, "preview": masked }),
+                                raw,
+                                json_mode,
+                            );
+                        } else {
+                            println!("API key for '{provider_id}': {masked}  (key is set)");
+                        }
+                    }
+                    Err(_) => {
+                        if json_mode {
+                            print_value(
+                                &json!({ "provider": provider_id, "hasKey": false }),
+                                raw,
+                                json_mode,
+                            );
+                        } else {
+                            println!("No API key set for '{provider_id}'.");
+                        }
+                    }
+                },
+                Err(e) => print_err(&format!("keyring error: {e}")),
+            }
+        }
+
+        "delete-key" => {
+            let Some(provider_id) = &args.provider else {
+                print_err(
+                    "config delete-key requires a provider ID: mesoclaw config delete-key <provider>",
+                );
+                return;
+            };
+
+            let key_name = format!("api-key:{provider_id}");
+            match keyring::Entry::new(SERVICE, &key_name) {
+                Ok(entry) => match entry.delete_password() {
+                    Ok(()) => println!("API key for '{provider_id}' removed from keyring."),
+                    Err(e) => print_err(&format!("failed to delete API key: {e}")),
+                },
+                Err(e) => print_err(&format!("keyring error: {e}")),
+            }
+        }
+
+        other => print_err(&format!(
+            "unknown config action '{other}'. Use: list | set-key | get-key | delete-key"
+        )),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Interactive REPL with WebSocket streaming
 // ---------------------------------------------------------------------------
 
@@ -1373,7 +1715,17 @@ async fn run_repl(raw: bool, json_mode: bool) {
 
 fn print_help() {
     println!(
-        "Commands: daemon | agent | memory | identity | config | schedule | channel | module | gui | exit"
+        "Commands: daemon | agent | memory | identity | config | schedule | channel | module | gui | exit\n\
+         \n\
+         config  list                          — list AI providers\n\
+         config  set-key <provider> [<key>]    — save API key to keyring\n\
+         config  get-key <provider>            — check if API key is set\n\
+         config  delete-key <provider>         — remove API key\n\
+         \n\
+         channel list                          — list configured channels\n\
+         channel add telegram [--token <t>] [--chat-ids <ids>]  — configure Telegram\n\
+         channel status <name>                 — get channel connection status\n\
+         channel remove <name>                 — remove channel configuration"
     );
 }
 
