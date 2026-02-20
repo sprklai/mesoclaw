@@ -102,6 +102,8 @@ diesel::table! {
         custom_base_url -> Nullable<Text>,
         default_provider_id -> Nullable<Text>,
         default_model_id -> Nullable<Text>,
+        skill_auto_select -> Integer,
+        skill_enabled_ids -> Text,
     }
 }
 

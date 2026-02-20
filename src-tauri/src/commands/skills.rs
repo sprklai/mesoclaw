@@ -1,20 +1,19 @@
 //! Tauri commands for the prompt template system.
 //!
-//! Replaces the previous complex skill system with lightweight, filesystem-based
-//! prompt templates. All IPC command names are kept stable so the frontend
-//! requires no changes.
-//!
-//! In the template system every template is always available and enabled.
-//! Write commands that previously modified per-skill settings (enable/disable,
-//! auto-select, priority) are not supported and return an explicit error so
-//! callers can gate their UX accordingly instead of receiving a silent no-op.
+//! Provides filesystem-based prompt templates with database-backed user preferences
+//! for enable/disable and auto-select states. All IPC command names are stable so
+//! the frontend requires no changes.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
+use tauri::State;
+
+use crate::database::DbPool;
 use crate::prompts::{
     SkillDefinition, SkillInfo, SkillSettings, SkillSuggestion, SkillUserConfig,
     get_or_init_registry,
 };
+use crate::services::settings;
 
 /// List all available prompt templates as `SkillInfo` objects.
 #[tauri::command]
@@ -33,63 +32,92 @@ pub async fn get_skill_details_command(skill_id: String) -> Result<SkillDefiniti
         .ok_or_else(|| format!("Template not found: {skill_id}"))
 }
 
-/// Get skill settings.
+/// Get skill settings from the database.
 ///
-/// In the template system every template is always enabled, so this returns a
-/// synthetic `SkillSettings` with all templates marked enabled.
+/// Returns `SkillSettings` with each skill's enabled state read from
+/// the database. Skills not in the enabled list are marked as disabled.
 #[tauri::command]
-pub async fn get_skill_settings_command() -> Result<SkillSettings, String> {
+pub async fn get_skill_settings_command(
+    state: State<'_, DbPool>,
+) -> Result<SkillSettings, String> {
+    let mut conn = state
+        .get()
+        .map_err(|e| format!("Failed to get database connection: {e}"))?;
+
+    let app_settings = settings::get_settings(&mut conn)
+        .map_err(|e| format!("Failed to get settings: {e}"))?;
+
     let registry = get_or_init_registry().await;
-    let skills = registry
-        .skill_infos()
-        .await
+    let all_skills = registry.skill_infos().await;
+
+    let enabled_set: HashSet<String> = app_settings.skill_enabled_ids.into_iter().collect();
+
+    let skills: Vec<SkillUserConfig> = all_skills
         .into_iter()
-        .map(|info| SkillUserConfig {
-            skill_id: info.id,
-            enabled: true,
-            priority_override: None,
+        .map(|info| {
+            let skill_id = info.id.clone();
+            SkillUserConfig {
+                skill_id: info.id,
+                enabled: enabled_set.contains(&skill_id),
+                priority_override: None,
+            }
         })
         .collect();
+
     Ok(SkillSettings {
-        auto_select: false,
+        auto_select: app_settings.skill_auto_select,
         skills,
     })
 }
 
 /// Enable or disable a skill.
 ///
-/// Not supported in the filesystem-based template system — all templates are
-/// always available. Returns an explicit error so the caller can gate its UI
-/// rather than silently discarding the write.
+/// Persists the enabled state to the database.
 #[tauri::command]
-pub async fn set_skill_enabled_command(_skill_id: String, _enabled: bool) -> Result<(), String> {
-    Err(
-        "not supported: template system does not persist per-skill enable/disable state"
-            .to_string(),
-    )
+pub async fn set_skill_enabled_command(
+    skill_id: String,
+    enabled: bool,
+    state: State<'_, DbPool>,
+) -> Result<(), String> {
+    let mut conn = state
+        .get()
+        .map_err(|e| format!("Failed to get database connection: {e}"))?;
+
+    settings::update_skill_enabled(&mut conn, &skill_id, enabled)
+        .map_err(|e| format!("Failed to update skill enabled state: {e}"))?;
+
+    Ok(())
 }
 
 /// Update skill configuration.
 ///
-/// Not supported in the filesystem-based template system. Returns an explicit
-/// error so the caller can gate its UI rather than silently discarding the write.
+/// Persists the enabled state to the database. Priority override is not
+/// currently supported.
 #[tauri::command]
 pub async fn update_skill_config_command(
-    _skill_id: String,
-    _enabled: bool,
+    skill_id: String,
+    enabled: bool,
     _priority_override: Option<i32>,
+    state: State<'_, DbPool>,
 ) -> Result<(), String> {
-    Err("not supported: template system does not persist per-skill configuration".to_string())
+    let mut conn = state
+        .get()
+        .map_err(|e| format!("Failed to get database connection: {e}"))?;
+
+    settings::update_skill_enabled(&mut conn, &skill_id, enabled)
+        .map_err(|e| format!("Failed to update skill config: {e}"))?;
+
+    Ok(())
 }
 
 /// Initialise default skill settings.
 ///
-/// Not supported in the filesystem-based template system — defaults are derived
-/// from the template files themselves. Returns an explicit error so the caller
-/// can gate its UI rather than silently discarding the operation.
+/// Not needed - defaults are derived from the template files themselves
+/// and the database defaults. Returns success for backwards compatibility.
 #[tauri::command]
 pub async fn initialize_skill_defaults_command() -> Result<(), String> {
-    Err("not supported: template system does not use persisted skill defaults".to_string())
+    // No-op: defaults are handled by database defaults and template files
+    Ok(())
 }
 
 /// Reload templates from the filesystem.
@@ -109,11 +137,20 @@ pub async fn list_skills_by_category_command() -> Result<HashMap<String, Vec<Ski
 
 /// Toggle auto-select mode.
 ///
-/// Not supported in the filesystem-based template system. Returns an explicit
-/// error so the caller can gate its UI rather than silently discarding the write.
+/// Persists the auto-select state to the database.
 #[tauri::command]
-pub async fn set_skill_auto_select_command(_auto_select: bool) -> Result<(), String> {
-    Err("not supported: template system does not persist auto-select state".to_string())
+pub async fn set_skill_auto_select_command(
+    auto_select: bool,
+    state: State<'_, DbPool>,
+) -> Result<(), String> {
+    let mut conn = state
+        .get()
+        .map_err(|e| format!("Failed to get database connection: {e}"))?;
+
+    settings::update_skill_auto_select(&mut conn, auto_select)
+        .map_err(|e| format!("Failed to update auto-select state: {e}"))?;
+
+    Ok(())
 }
 
 /// Delete a skill template file from disk and reload the registry.

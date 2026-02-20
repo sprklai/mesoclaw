@@ -114,6 +114,8 @@ pub struct SettingsRow {
     pub custom_base_url: Option<String>,
     pub default_provider_id: Option<String>,
     pub default_model_id: Option<String>,
+    pub skill_auto_select: i32,
+    pub skill_enabled_ids: String,
 }
 
 /// Application settings with typed enums
@@ -158,11 +160,18 @@ pub struct Settings {
     pub custom_base_url: Option<String>,
     pub default_provider_id: Option<String>,
     pub default_model_id: Option<String>,
+    /// Whether auto-select for skills is enabled.
+    pub skill_auto_select: bool,
+    /// List of enabled skill IDs.
+    pub skill_enabled_ids: Vec<String>,
 }
 
 impl Settings {
     /// Convert from database row to typed settings
     pub fn from_row(row: SettingsRow) -> Result<Self, DbError> {
+        let skill_enabled_ids: Vec<String> = serde_json::from_str(&row.skill_enabled_ids)
+            .unwrap_or_default();
+
         Ok(Self {
             theme: Theme::from_str(&row.theme)?,
             sidebar_expanded: int_to_bool(row.sidebar_expanded),
@@ -195,6 +204,8 @@ impl Settings {
             custom_base_url: row.custom_base_url,
             default_provider_id: row.default_provider_id,
             default_model_id: row.default_model_id,
+            skill_auto_select: int_to_bool(row.skill_auto_select),
+            skill_enabled_ids,
         })
     }
 }
@@ -234,6 +245,10 @@ pub struct SettingsUpdate {
     pub custom_base_url: Option<Option<String>>,
     pub default_provider_id: Option<Option<String>>,
     pub default_model_id: Option<Option<String>>,
+    /// Whether auto-select for skills is enabled.
+    pub skill_auto_select: Option<bool>,
+    /// List of enabled skill IDs (as JSON string).
+    pub skill_enabled_ids: Option<Vec<String>>,
 }
 
 /// Diesel changeset for updating settings
@@ -272,6 +287,8 @@ pub struct SettingsChangeset {
     pub custom_base_url: Option<Option<String>>,
     pub default_provider_id: Option<Option<String>>,
     pub default_model_id: Option<Option<String>>,
+    pub skill_auto_select: Option<i32>,
+    pub skill_enabled_ids: Option<String>,
 }
 
 impl From<SettingsUpdate> for SettingsChangeset {
@@ -308,6 +325,8 @@ impl From<SettingsUpdate> for SettingsChangeset {
             custom_base_url: update.custom_base_url,
             default_provider_id: update.default_provider_id,
             default_model_id: update.default_model_id,
+            skill_auto_select: update.skill_auto_select.map(bool_to_int),
+            skill_enabled_ids: update.skill_enabled_ids.map(|ids| serde_json::to_string(&ids).unwrap_or_else(|_| "[]".to_string())),
         }
     }
 }
