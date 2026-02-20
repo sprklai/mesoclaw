@@ -4,6 +4,7 @@
 //! sessions. Each subagent runs in an isolated session with a unique
 //! lane ID.
 
+use log::{info, warn};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -258,6 +259,14 @@ impl SubagentSpawner {
     ) -> Result<SubagentResult, String> {
         let started_at = Utc::now();
 
+        // Log spawn start
+        info!(
+            "[agent:spawner] spawning subagent task_id={} parent={} prompt_len={}",
+            task.id,
+            parent_session_key,
+            task.prompt.len()
+        );
+
         // Generate unique lane ID
         let lane_id = format!("lane-{}", Uuid::new_v4().simple());
 
@@ -269,6 +278,10 @@ impl SubagentSpawner {
 
         // Check spawn depth limit
         if spawn_depth > self.max_spawn_depth {
+            warn!(
+                "[agent:spawner] maximum spawn depth exceeded: {} > {}",
+                spawn_depth, self.max_spawn_depth
+            );
             return Err(format!(
                 "Maximum spawn depth ({}) exceeded. Current depth: {}",
                 self.max_spawn_depth, spawn_depth
@@ -304,6 +317,25 @@ impl SubagentSpawner {
         self.untrack_subagent(&lane_id).await;
 
         let completed_at = Utc::now();
+
+        // Log completion
+        match &result {
+            Ok(_) => {
+                info!(
+                    "[agent:spawner] subagent completed lane_id={} duration_ms={} success=true",
+                    lane_id,
+                    (completed_at - started_at).num_milliseconds()
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "[agent:spawner] subagent failed lane_id={} duration_ms={} error={}",
+                    lane_id,
+                    (completed_at - started_at).num_milliseconds(),
+                    e
+                );
+            }
+        }
 
         // Build result
         match result {
