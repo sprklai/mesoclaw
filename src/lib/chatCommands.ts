@@ -1,10 +1,20 @@
-import type { UseChatSessionStore } from "@/stores/chatSessionStore";
+import type { ChatMessage, ChatSession } from "@/stores/chatSessionStore";
+
+/**
+ * Interface for chat session store methods used by commands.
+ */
+interface ChatStoreForCommands {
+  createSession: (providerId: string, modelId: string) => Promise<string>;
+  clearMessages: () => Promise<void>;
+  getCurrentSession: () => ChatSession | null;
+  getMessages: () => ChatMessage[];
+}
 
 export interface ChatCommand {
   name: string;
   description: string;
   usage: string;
-  execute: (args: string, store: UseChatSessionStore) => Promise<void> | void;
+  execute: (args: string, store: ChatStoreForCommands) => Promise<void> | void;
 }
 
 /**
@@ -93,7 +103,7 @@ export const chatCommands: ChatCommand[] = [
  */
 export function tryExecuteCommand(
   message: string,
-  store: UseChatSessionStore,
+  store: ChatStoreForCommands,
 ): boolean {
   const trimmed = message.trim();
   if (!trimmed.startsWith("/")) {

@@ -59,7 +59,7 @@ export function CommandPalette() {
       label: "Go to Settings",
       shortcut: "G S",
       action: () => {
-        navigate({ to: "/settings" });
+        navigate({ to: "/settings", search: { tab: "ai" } });
         setOpen(false);
       },
     },

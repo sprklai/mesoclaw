@@ -99,7 +99,7 @@ export function useGlobalShortcuts(options: GlobalShortcutOptions = {}) {
     "g+s",
     () => {
       handleShortcut("g+s", () => {
-        navigate({ to: "/settings" });
+        navigate({ to: "/settings", search: { tab: "ai" } });
       });
     },
     { enabled, preventDefault: true },

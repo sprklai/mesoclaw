@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Brain, MessageSquare, Settings, Sparkles } from "lucide-react";
 import { GatewayStatus } from "@/components/ui/gateway-status";
+import { ActivityDashboard } from "@/components/dashboard";
 import { APP_IDENTITY } from "@/config/app-identity";
 import { useLLMStore } from "@/stores/llm";
 import { cn } from "@/lib/utils";
@@ -118,6 +119,9 @@ function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ── Activity dashboard ── */}
+      <ActivityDashboard />
     </div>
   );
 }

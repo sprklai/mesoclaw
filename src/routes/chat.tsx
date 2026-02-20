@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { CheckIcon, Sparkles } from "lucide-react";
 
 import { useChatSessionStore } from "@/stores/chatSessionStore";
-import { tryExecuteCommand, getCommandSuggestions, type ChatCommand } from "@/lib/chatCommands";
+import { tryExecuteCommand } from "@/lib/chatCommands";
 import {
   Conversation,
   ConversationContent,
