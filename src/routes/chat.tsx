@@ -291,6 +291,25 @@ function ChatPage() {
     [messages, selectedModel, apiKey, sessionId]
   );
 
+  // Track virtual keyboard height so the chat input can be pushed up when the
+  // soft keyboard appears on mobile (uses the Visual Viewport API).
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const handler = () => {
+      const offset = window.innerHeight - vv.height;
+      document.documentElement.style.setProperty("--keyboard-height", `${offset}px`);
+    };
+
+    vv.addEventListener("resize", handler);
+    return () => {
+      vv.removeEventListener("resize", handler);
+      // Reset when the component unmounts.
+      document.documentElement.style.setProperty("--keyboard-height", "0px");
+    };
+  }, []);
+
   // Listen for streaming events
   useEffect(() => {
     const eventName = `chat-stream-${sessionId}`;
