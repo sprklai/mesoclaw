@@ -5,6 +5,7 @@
 //! strategies (all, first, any N).
 
 use chrono::{DateTime, Utc};
+use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -238,6 +239,13 @@ impl AgentOrchestrator {
         let config = config.unwrap_or_else(|| self.default_config.clone());
         let started_at = Utc::now();
 
+        info!(
+            "[agent:orchestrator] starting orchestration session={} tasks={} mode={:?}",
+            parent_session_key,
+            tasks.len(),
+            config.mode
+        );
+
         if tasks.is_empty() {
             return Ok(ParallelResult {
                 results: vec![],
@@ -276,6 +284,15 @@ impl AgentOrchestrator {
 
         // Determine overall success based on mode and strategy
         let overall_success = self.determine_overall_success(success_count, failure_count, &config);
+
+        info!(
+            "[agent:orchestrator] orchestration completed session={} success_count={} failure_count={} overall_success={} duration_ms={}",
+            parent_session_key,
+            success_count,
+            failure_count,
+            overall_success,
+            total_duration_ms
+        );
 
         Ok(ParallelResult {
             results,
