@@ -75,6 +75,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    chat_messages (id) {
+        id -> Text,
+        session_id -> Text,
+        role -> Text,
+        content -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
     chat_sessions (id) {
         id -> Text,
         session_key -> Text,
@@ -227,6 +237,7 @@ diesel::joinable!(agent_runs -> agents (agent_id));
 diesel::joinable!(agent_sessions -> agents (agent_id));
 diesel::joinable!(agents -> ai_providers (provider_id));
 diesel::joinable!(ai_models -> ai_providers (provider_id));
+diesel::joinable!(chat_messages -> chat_sessions (session_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     agent_runs,
@@ -234,6 +245,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     agents,
     ai_models,
     ai_providers,
+    chat_messages,
     chat_sessions,
     generated_prompts,
     memories,
