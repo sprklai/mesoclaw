@@ -1,220 +1,164 @@
 # Contributing to MesoClaw
 
-Thank you for your interest in contributing! This guide covers setup, conventions, and the review process.
+Thank you for your interest in contributing to MesoClaw! This guide covers everything you need to get started.
 
-## Table of Contents
+## Welcome
 
-1. [Development Setup](#development-setup)
-2. [Running Tests](#running-tests)
-3. [Code Conventions](#code-conventions)
-4. [Contribution Tracks](#contribution-tracks)
-5. [Commit Convention](#commit-convention)
-6. [Pull Request Checklist](#pull-request-checklist)
-7. [Extending MesoClaw](#extending-mesoclaw)
-8. [Pre-push Hook](#pre-push-hook)
+MesoClaw is an AI-powered desktop application built with Tauri 2 (Rust + React). We welcome contributions of all kinds: bug fixes, new features, documentation improvements, and more.
 
----
+Before you start, please read our [Code of Conduct](CODE_OF_CONDUCT.md) and [Security Policy](SECURITY.md).
+
+## Quick Start
+
+```bash
+# Prerequisites
+# - Node.js 20+ and bun
+# - Rust 1.75+ (stable)
+# - Tauri CLI: cargo install tauri-cli
+
+# Clone and set up
+git clone https://github.com/mesoclaw/mesoclaw.git
+cd mesoclaw
+bun install
+
+# Run in development mode
+bun run tauri dev
+```
+
+## Risk-Based Contribution Tracks
+
+We use a risk-based review system to balance velocity and safety.
+
+### Track A — Documentation & Configuration (Low Risk)
+
+**What:** README, docs/, CLAUDE.md, .github/ files, tauri.conf.json, package.json dependency bumps
+
+**Process:** Submit PR → 1 maintainer review → merge
+
+**No special requirements.**
+
+### Track B — Frontend & Tests (Medium Risk)
+
+**What:** `src/` TypeScript/React, `src-tauri/src/commands/`, test files
+
+**Process:** Submit PR with validation evidence → 1 frontend/backend reviewer → merge
+
+**Required:**
+- `bunx ultracite check` must pass
+- New frontend features need a Vitest test
+- New Tauri commands need a `cargo test` test
+
+### Track C — Backend Rust & Security (High Risk)
+
+**What:** `src-tauri/src/security/`, `src-tauri/src/ai/`, cryptographic code, IPC surface changes, database migrations
+
+**Process:** Submit PR with detailed validation → 2 reviewers (including 1 security reviewer) → merge
+
+**Required:**
+- All 420+ unit tests must pass (`cargo test --lib`)
+- New security checks must have unit tests with adversarial inputs
+- Database migrations must be backward-compatible or include migration guide
+- Discuss approach in an issue before starting large changes
 
 ## Development Setup
 
-**Prerequisites**
+### System Prerequisites
 
 | Tool | Version | Install |
 |------|---------|---------|
-| Rust | stable | `rustup install stable` |
-| Bun | latest | https://bun.sh |
-| Tauri CLI | v2 | `cargo install tauri-cli` |
+| Rust | 1.75+ | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
+| bun | latest | `curl -fsSL https://bun.sh/install \| bash` |
+| Tauri CLI | 2.x | `cargo install tauri-cli` |
+| Diesel CLI | latest | `cargo install diesel_cli --no-default-features --features sqlite` |
+
+### Linux Additional Dependencies
 
 ```bash
-# 1. Clone
-git clone https://github.com/rakeshdhote/tauriclaw.git
-cd tauriclaw
-
-# 2. Install frontend dependencies
-bun install
-
-# 3. Start development (hot reload for both frontend and Rust backend)
-bun run tauri dev
-
-# 4. Frontend only (no Rust rebuild)
-bun run dev
+sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 ```
 
----
-
-## Running Tests
+### Running Tests
 
 ```bash
-# Backend — Rust unit tests (367 tests)
-cd src-tauri
-cargo test --lib
+# Backend (Rust)
+cd src-tauri && cargo test --lib
 
-# Backend — specific module
-cargo test --lib channels::telegram
-
-# Frontend — Vitest
+# Frontend (TypeScript)
 bun run test
-bun run test:watch     # watch mode
-bun run test:coverage  # coverage report
 
-# Type check
-bun run check
-
-# Format & lint
-cargo fmt
-bunx ultracite fix
+# Code quality
+bunx ultracite check   # Lint
+bunx ultracite fix     # Auto-fix
+cargo clippy           # Rust lints
 ```
 
----
+## Naming Conventions
 
-## Code Conventions
+### Rust (Backend)
 
-### Rust
+- **Tauri commands:** `*_command` suffix — `get_llm_provider_config_command`
+- **Error handling:** All commands return `Result<T, String>`
+- **Tests:** In same file with `#[cfg(test)]`, descriptive names
 
-- All exported Tauri commands use the `*_command` suffix
-- Commands return `Result<T, String>` for consistent frontend error propagation
-- Use `tokio::sync` types for async synchronisation; never `std::sync::Mutex` in async code
-- Use `async_runtime::spawn` (not `tokio::spawn`) inside Tauri-managed code
-- Sensitive data must be zeroized (`zeroize` crate)
-- No `unwrap()` in production paths — use `?` or proper error handling
+### TypeScript (Frontend)
 
-### TypeScript / React
+- **Components:** PascalCase — `UserProfile.tsx`
+- **Hooks:** camelCase with `use` prefix — `useAuth.ts`
+- **Stores:** camelCase with `Store` suffix — `agentStore.ts`
+- **Constants:** UPPER_SNAKE_CASE — `MAX_RETRIES`
 
-- Function components only (no classes)
-- Zustand stores live in `src/stores/`; keep them focused
-- Custom hooks in `src/hooks/` with `use` prefix
-- Use `cn()` from `@/lib/utils` for conditional Tailwind classes
-- No hardcoded UI strings — use i18n keys from `src/locales/`
+## Commit Message Format
 
-### Naming
-
-| Scope | Convention | Example |
-|-------|-----------|---------|
-| Rust module | `snake_case` | `channel_manager` |
-| Rust type | `PascalCase` | `TelegramChannel` |
-| TS component | `PascalCase` | `ChannelList.tsx` |
-| TS hook | `camelCase` + `use` | `useMobileSwipe` |
-| TS store | `camelCase` | `channelStore.ts` |
-| Constant | `UPPER_SNAKE_CASE` | `MAX_RETRIES` |
-
----
-
-## Contribution Tracks
-
-### Track A — Low Risk (docs, tests, chore, typo fixes)
-
-- Requires: 1 reviewer (maintainer auto-assigned via CODEOWNERS)
-- Process: open PR → CI must pass → merge
-
-### Track B — Medium Risk (providers, channels, memory, frontend features)
-
-- Requires: 1 subsystem reviewer familiar with the area
-- Process: open PR → CI → reviewer approval → merge
-- Labels: `ai`, `channels`, `memory`, `frontend`
-
-### Track C — High Risk (security, runtime, gateway, agent loop)
-
-- Requires: 2-pass review (maintainer + one additional)
-- Process: open draft PR → design discussion → implementation → 2 approvals → merge
-- Labels: `security`, `agent`, `core`
-
----
-
-## Commit Convention
-
-We use [Conventional Commits](https://www.conventionalcommits.org/):
+We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-<type>(<scope>): <short description>
+<type>(<scope>): <description>
 
-<optional body>
+[optional body]
 
-<optional footer>
+[optional footer]
 ```
 
-| Type | When |
-|------|------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `refactor` | Code restructure (no behaviour change) |
-| `docs` | Documentation only |
-| `test` | Adding/fixing tests |
-| `chore` | Dependency bumps, config changes |
-| `security` | Security-related fix |
-| `perf` | Performance improvement |
+**Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `security`
 
-**Examples**
-
+**Examples:**
 ```
-feat(channels): add Telegram MarkdownV2 escaping
-
-fix(agent): prevent feedback loop on AgentComplete event
-
-chore(deps): bump teloxide to 0.14
+feat(scheduler): add cron expression validation
+fix(memory): prevent data loss on app restart
+security(policy): add path traversal protection
+docs(contributing): add risk-based tracks
 ```
 
----
+## Database Migrations
 
-## Pull Request Checklist
-
-Before opening a PR, verify:
-
-- [ ] `cargo fmt --check` passes
-- [ ] `cargo clippy -- -D warnings` passes
-- [ ] `cargo test --lib` passes (all tests green)
-- [ ] `bun run check` passes (no TypeScript errors)
-- [ ] `bun run test` passes (all frontend tests green)
-- [ ] PR description follows the template
-- [ ] New behaviour is covered by at least one test
-- [ ] No secrets, keys, or credentials in the diff
-
----
-
-## Extending MesoClaw
-
-### Adding an AI Provider
-
-1. Create `src-tauri/src/ai/providers/<name>.rs`
-2. Implement the `LLMProvider` trait:
-   ```rust
-   #[async_trait]
-   impl LLMProvider for MyProvider {
-       async fn send(&self, messages: &[Message]) -> Result<Stream, String> { ... }
-       fn name(&self) -> &str { "my-provider" }
-   }
-   ```
-3. Register in `src-tauri/src/ai/llm_provider.rs`
-4. Add frontend config in `src/stores/llm.ts`
-
-### Adding a Channel
-
-1. Create `src-tauri/src/channels/<name>.rs`
-2. Implement the `Channel` async-trait
-3. Register in `src-tauri/src/channels/mod.rs` (consider feature-gating)
-4. Add UI in `src/components/settings/`
-
-### Adding a Tool
-
-1. Create `src-tauri/src/tools/<name>.rs`
-2. Implement the `Tool` trait with `name()`, `description()`, `execute()`
-3. Register in the tool registry
-
----
-
-## Pre-push Hook
-
-Install a pre-push hook to catch issues before CI:
+When adding or changing database schema:
 
 ```bash
-cat > .git/hooks/pre-push << 'EOF'
-#!/bin/sh
-set -e
+# Create migration
 cd src-tauri
-cargo fmt --check
-cargo clippy -- -D warnings
-cargo test --lib
-cd ..
-bun run test
-EOF
-chmod +x .git/hooks/pre-push
+diesel migration generate my_migration_name
+
+# Apply
+diesel migration run
+
+# Verify schema.rs updated
+git diff src/database/schema.rs
 ```
+
+Migration files must be backward-compatible where possible. Include a rollback migration.
+
+## Submitting a Pull Request
+
+1. Fork the repo and create your branch from `main`
+2. Make your changes following the conventions above
+3. Run all relevant tests and paste output in the PR
+4. Fill out all sections of the PR template
+5. Request review from the appropriate team (see CODEOWNERS)
+
+## Getting Help
+
+- **Discussions:** GitHub Discussions for questions
+- **Issues:** Bug reports and feature requests via issue templates
+- **Security:** See [SECURITY.md](SECURITY.md) for vulnerability reporting
+
+We aim to review PRs within 48 hours on business days.

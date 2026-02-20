@@ -1,24 +1,18 @@
 name: Feature Request
-description: Propose a new feature or enhancement
-labels: [enhancement]
+description: Propose a new feature or enhancement for MesoClaw
+labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
-      value: Please search existing issues and the roadmap before filing a new request.
-
-  - type: input
-    id: summary
-    attributes:
-      label: Summary
-      placeholder: "e.g. Support Claude 3.5 Sonnet as a selectable model"
-    validations:
-      required: true
+      value: |
+        Thanks for suggesting a feature! Please describe the problem you're trying to solve.
 
   - type: textarea
     id: problem
     attributes:
       label: Problem Statement
-      description: What problem does this solve? Who is affected?
+      description: What problem does this feature solve? Who is affected?
+      placeholder: As a user who [does X], I often struggle with [Y] because [Z].
     validations:
       required: true
 
@@ -26,7 +20,30 @@ body:
     id: solution
     attributes:
       label: Proposed Solution
-      description: Describe your ideal implementation.
+      description: Describe how you'd like this feature to work.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: How will we know this feature is complete?
+      placeholder: |
+        - [ ] User can ...
+        - [ ] System correctly handles ...
+        - [ ] Documentation is updated
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Nice to Have
+        - Should Have
+        - Must Have
     validations:
       required: true
 
@@ -35,32 +52,5 @@ body:
     attributes:
       label: Alternatives Considered
       description: What other approaches did you consider?
-
-  - type: textarea
-    id: acceptance
-    attributes:
-      label: Acceptance Criteria
-      description: How do we know when this is done?
-      placeholder: |
-        - [ ] User can select Claude 3.5 Sonnet from the model dropdown
-        - [ ] Streaming works correctly
-        - [ ] Token count is displayed
-
-  - type: dropdown
-    id: arch-impact
-    attributes:
-      label: Architecture Impact
-      options:
-        - None — isolated change
-        - Low — touches 1-2 modules
-        - Medium — crosses subsystem boundaries
-        - High — affects core runtime / security
     validations:
-      required: true
-
-  - type: checkboxes
-    id: breaking
-    attributes:
-      label: Breaking Change
-      options:
-        - label: This feature introduces breaking changes to existing behavior or APIs
+      required: false
