@@ -4,7 +4,7 @@
  * Tracks the lifecycle status, configuration, and message counts for each
  * registered channel (Telegram, webhooks, etc.).
  *
- * Channel IPC commands are stubs; they will be wired up once the backend
+ * Channel IPC commands are wired to the real ChannelManager backend
  * Tauri commands are exposed in Phase 7 follow-up work.
  */
 

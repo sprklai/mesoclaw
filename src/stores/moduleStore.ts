@@ -2,7 +2,7 @@
  * Zustand store for the Module Management UI.
  *
  * Mirrors the Rust ModuleManifest / ModuleEntry types and wraps the module
- * IPC commands.  Commands are currently stubbed (Phase 3 follow-up).
+ * IPC commands wired to real Tauri backend commands.
  */
 
 import { invoke } from "@tauri-apps/api/core";

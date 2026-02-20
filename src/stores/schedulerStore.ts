@@ -2,7 +2,7 @@
  * Zustand store for the Scheduler UI.
  *
  * Mirrors the Rust ScheduledJob / JobExecution types and wraps the scheduler
- * IPC commands.  Commands are currently stubbed (Phase 3 follow-up).
+ * IPC commands wired to real Tauri backend commands.
  */
 
 import { invoke } from "@tauri-apps/api/core";

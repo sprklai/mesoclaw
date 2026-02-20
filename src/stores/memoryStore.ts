@@ -4,7 +4,7 @@
  * State: search query, results, loading flag, selected entry,
  * daily date list, selected date, and that day's raw content.
  *
- * Note: memory commands are stubbed in Phase 3 follow-up (see todo.md).
+ * Memory commands wired to real Tauri backend commands (search_memory_command, store_memory_command, etc.)
  * This store handles errors gracefully and shows empty states.
  */
 
