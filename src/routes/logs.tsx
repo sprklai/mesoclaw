@@ -91,6 +91,8 @@ function LogsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [activeLevel, setActiveLevel] = useState<LogLevel>("ALL");
+  const [activeModule, setActiveModule] = useState<LogModule>("ALL");
+  void setActiveModule; // Will be used in UI in next task
   const [search, setSearch] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
 
@@ -142,8 +144,15 @@ function LogsPage() {
 
   const filtered = useMemo(() => {
     return entries.filter((e) => {
+      // Level filter
       if (activeLevel !== "ALL" && e.level.toUpperCase() !== activeLevel)
         return false;
+
+      // Module filter
+      if (!moduleMatches(e, activeModule))
+        return false;
+
+      // Search filter
       if (search.trim()) {
         const q = search.toLowerCase();
         return (
@@ -152,9 +161,10 @@ function LogsPage() {
           e.timestamp.toLowerCase().includes(q)
         );
       }
+
       return true;
     });
-  }, [entries, activeLevel, search]);
+  }, [entries, activeLevel, activeModule, search]);
 
   // Auto-scroll to bottom when filtered list changes — only if already at bottom
   useEffect(() => {
@@ -173,6 +183,19 @@ function LogsPage() {
     }
     return map;
   }, [entries]);
+
+  const moduleCounts = useMemo(() => {
+    const map: Record<string, number> = { ALL: entries.length };
+    for (const e of entries) {
+      for (const [mod] of Object.entries(MODULE_PREFIXES)) {
+        if (moduleMatches(e, mod as LogModule)) {
+          map[mod] = (map[mod] ?? 0) + 1;
+        }
+      }
+    }
+    return map;
+  }, [entries]);
+  void moduleCounts; // Will be used in UI in next task
 
   return (
     <div className="flex h-full flex-col gap-4">
