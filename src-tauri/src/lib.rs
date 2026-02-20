@@ -861,6 +861,17 @@ pub fn run() {
             agent::commands::get_workspace_file_command,
             agent::commands::update_workspace_file_command,
             agent::commands::list_workspace_files_command,
+            // Agent database commands
+            commands::agents::list_db_agents_command,
+            commands::agents::get_db_agent_command,
+            commands::agents::create_db_agent_command,
+            commands::agents::update_db_agent_command,
+            commands::agents::delete_db_agent_command,
+            commands::agents::list_db_agent_sessions_command,
+            commands::agents::list_recent_db_sessions_command,
+            commands::agents::list_active_db_runs_command,
+            commands::agents::get_db_run_details_command,
+            commands::agents::cancel_db_run_command,
             // Channel management commands
             commands::channels::start_channel_command,
             commands::channels::channel_health_command,
