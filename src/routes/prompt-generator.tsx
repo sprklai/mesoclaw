@@ -5,7 +5,14 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, Copy, Loader2, RefreshCw, Trash2 } from "@/lib/icons";
+import {
+	Check,
+	CheckCircle2,
+	Copy,
+	Loader2,
+	RefreshCw,
+	Trash2,
+} from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import {
 	type ArtifactType,
@@ -40,7 +47,9 @@ function PromptGeneratorPage() {
 	const setGeneratedContent = usePromptGeneratorStore(
 		(s) => s.setGeneratedContent,
 	);
+	const isDirty = usePromptGeneratorStore((s) => s.isDirty);
 	const startGeneration = usePromptGeneratorStore((s) => s.startGeneration);
+	const saveContent = usePromptGeneratorStore((s) => s.saveContent);
 	const reset = usePromptGeneratorStore((s) => s.reset);
 	const loadHistory = usePromptGeneratorStore((s) => s.loadHistory);
 	const deleteArtifact = usePromptGeneratorStore((s) => s.deleteArtifact);
@@ -154,6 +163,16 @@ function PromptGeneratorPage() {
 						<div className="flex items-center justify-between">
 							<h2 className="text-sm font-semibold">Generated Prompt</h2>
 							<div className="flex gap-2">
+								{isDirty && (
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => void saveContent()}
+									>
+										<Check aria-hidden />
+										Save
+									</Button>
+								)}
 								<Button
 									variant="ghost"
 									size="sm"

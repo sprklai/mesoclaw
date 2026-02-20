@@ -256,27 +256,45 @@ pub async fn generate_prompt_command(
             .map_err(|e| format!("Failed to write artifact to disk: {e}"))?;
     }
 
-    // 7. Insert into database.
-    let artifact_id = uuid::Uuid::new_v4().to_string();
-    let new_prompt = NewGeneratedPrompt {
-        id: artifact_id.clone(),
-        name: name.clone(),
-        artifact_type: artifact_type.clone(),
-        content: full_content.clone(),
-        disk_path: disk_path.clone(),
-        provider_id: None,
-        model_id: None,
-    };
+    // 7. Upsert: reuse existing row for same name+artifact_type, or insert new.
+    let mut conn = pool
+        .get()
+        .map_err(|e| format!("Database connection failed: {e}"))?;
 
-    {
-        let mut conn = pool
-            .get()
-            .map_err(|e| format!("Database connection failed: {e}"))?;
+    let existing_id: Option<String> = generated_prompts::table
+        .filter(generated_prompts::name.eq(&name))
+        .filter(generated_prompts::artifact_type.eq(&artifact_type))
+        .select(generated_prompts::id)
+        .first::<String>(&mut conn)
+        .optional()
+        .map_err(|e| format!("DB lookup failed: {e}"))?;
+
+    let artifact_id = if let Some(ref eid) = existing_id {
+        diesel::update(generated_prompts::table.filter(generated_prompts::id.eq(eid)))
+            .set((
+                generated_prompts::content.eq(&full_content),
+                generated_prompts::disk_path.eq(&disk_path),
+            ))
+            .execute(&mut conn)
+            .map_err(|e| format!("Failed to update generated prompt: {e}"))?;
+        eid.clone()
+    } else {
+        let new_id = uuid::Uuid::new_v4().to_string();
+        let new_prompt = NewGeneratedPrompt {
+            id: new_id.clone(),
+            name: name.clone(),
+            artifact_type: artifact_type.clone(),
+            content: full_content.clone(),
+            disk_path: disk_path.clone(),
+            provider_id: None,
+            model_id: None,
+        };
         diesel::insert_into(generated_prompts::table)
             .values(&new_prompt)
             .execute(&mut conn)
             .map_err(|e| format!("Failed to insert generated prompt: {e}"))?;
-    }
+        new_id
+    };
 
     // 8. Reload the skill registry if this was a skill artifact.
     if artifact_type == "skill" {
@@ -321,6 +339,42 @@ pub async fn delete_generated_prompt_command(
     diesel::delete(generated_prompts::table.filter(generated_prompts::id.eq(&id)))
         .execute(&mut conn)
         .map_err(|e| format!("Failed to delete generated prompt: {e}"))?;
+
+    Ok(())
+}
+
+/// Update the content of an existing generated prompt (user edits) and rewrite disk file.
+#[tauri::command]
+pub async fn update_generated_prompt_command(
+    pool: tauri::State<'_, DbPool>,
+    id: String,
+    content: String,
+) -> Result<(), String> {
+    let mut conn = pool
+        .get()
+        .map_err(|e| format!("Database connection failed: {e}"))?;
+
+    // Fetch the existing record to get disk_path.
+    let record = generated_prompts::table
+        .filter(generated_prompts::id.eq(&id))
+        .first::<crate::database::models::generated_prompt::GeneratedPrompt>(&mut conn)
+        .map_err(|e| format!("Record not found: {e}"))?;
+
+    // Rewrite disk file if applicable.
+    if let Some(ref path_str) = record.disk_path {
+        let path = std::path::PathBuf::from(path_str);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directories: {e}"))?;
+        }
+        std::fs::write(&path, &content).map_err(|e| format!("Failed to write to disk: {e}"))?;
+    }
+
+    // Update DB record.
+    diesel::update(generated_prompts::table.filter(generated_prompts::id.eq(&id)))
+        .set(generated_prompts::content.eq(&content))
+        .execute(&mut conn)
+        .map_err(|e| format!("Failed to update content: {e}"))?;
 
     Ok(())
 }

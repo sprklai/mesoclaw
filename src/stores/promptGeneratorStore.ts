@@ -43,6 +43,8 @@ interface PromptGeneratorState {
 	status: "idle" | "generating" | "done" | "error";
 	/** Editable output shown to the user (think tags stripped). */
 	generatedContent: string;
+	/** True when the user has edited generatedContent since the last save. */
+	isDirty: boolean;
 	lastSaved: GeneratedArtifact | null;
 	error: string | null;
 	history: GeneratedArtifact[];
@@ -52,6 +54,7 @@ interface PromptGeneratorState {
 	setDescription: (desc: string) => void;
 	setGeneratedContent: (content: string) => void;
 	startGeneration: () => Promise<void>;
+	saveContent: () => Promise<void>;
 	loadHistory: () => Promise<void>;
 	deleteArtifact: (id: string) => Promise<void>;
 	reset: () => void;
@@ -66,6 +69,7 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 		description: "",
 		status: "idle",
 		generatedContent: "",
+		isDirty: false,
 		lastSaved: null,
 		error: null,
 		history: [],
@@ -73,7 +77,8 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 		setArtifactType: (type) => set({ artifactType: type }),
 		setName: (name) => set({ name }),
 		setDescription: (desc) => set({ description: desc }),
-		setGeneratedContent: (content) => set({ generatedContent: content }),
+		setGeneratedContent: (content) =>
+			set({ generatedContent: content, isDirty: true }),
 
 		startGeneration: async () => {
 			const { description, artifactType, name } = get();
@@ -94,10 +99,26 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 				set({
 					status: "done",
 					generatedContent: stripThinking(result.content),
+					isDirty: false,
 					lastSaved: result,
 				});
 			} catch (err) {
 				set({ status: "error", error: String(err) });
+			}
+		},
+
+		saveContent: async () => {
+			const { lastSaved, generatedContent } = get();
+			if (!lastSaved) return;
+			try {
+				await invoke("update_generated_prompt_command", {
+					id: lastSaved.id,
+					content: generatedContent,
+				});
+				set({ isDirty: false });
+				await get().loadHistory();
+			} catch (err) {
+				console.error("[PromptGeneratorStore] Failed to save content:", err);
 			}
 		},
 
@@ -128,6 +149,7 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 				description: "",
 				status: "idle",
 				generatedContent: "",
+				isDirty: false,
 				lastSaved: null,
 				error: null,
 			}),

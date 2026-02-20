@@ -706,6 +706,7 @@ pub fn run() {
             commands::prompt_generator::generate_prompt_command,
             commands::prompt_generator::list_generated_prompts_command,
             commands::prompt_generator::delete_generated_prompt_command,
+            commands::prompt_generator::update_generated_prompt_command,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]
