@@ -1,6 +1,7 @@
 import { Outlet, createRootRoute, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 
+import { CommandPalette } from "@/components/CommandPalette";
 import { ContextPanel } from "@/components/layout/ContextPanel";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/ui/sidebar";
@@ -103,6 +104,12 @@ function RootLayout() {
        * Visible only on xs/sm (< md). Fixed to bottom of viewport.
        */}
       <MobileNav />
+
+      {/*
+       * Global Command Palette.
+       * Triggered by Cmd+K (Mac) or Ctrl+K (Windows/Linux).
+       */}
+      <CommandPalette />
     </div>
   );
 }
