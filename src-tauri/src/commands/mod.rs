@@ -1,3 +1,4 @@
+pub mod agents;
 pub mod ai_providers;
 pub mod approval;
 pub mod channels;
