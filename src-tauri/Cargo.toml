@@ -66,6 +66,12 @@ containers = ["sidecars"]
 mcp-client = ["sidecars"]
 # Telegram channel integration
 channels-telegram = ["teloxide"]
+# Discord channel integration
+channels-discord = ["serenity"]
+# Matrix channel integration
+channels-matrix = ["matrix-sdk"]
+# Slack channel integration
+channels-slack = ["slack-morphism"]
 # Task/trigger scheduler
 scheduler = []
 # Vector-based memory store (embedding similarity search)
@@ -132,6 +138,12 @@ wasmtime = { version = "26", optional = true }
 wat = { version = "1", optional = true }
 # Telegram channel integration (Phase 7.1) — compile-time optional
 teloxide = { version = "0.13", features = ["macros"], optional = true }
+# Discord channel integration (Phase 7.2) — compile-time optional
+serenity = { version = "0.12", features = ["client", "gateway", "model", "http", "rustls_backend"], default-features = false, optional = true }
+# Matrix channel integration (Phase 7.3) — compile-time optional
+matrix-sdk = { version = "0.9", optional = true }
+# Slack channel integration (Phase 7.4) — compile-time optional
+slack-morphism = { version = "2", features = ["hyper"], optional = true }
 # Non-optional: needed by both gateway server and CLI WebSocket client.
 tokio-tungstenite = "0.21"
 

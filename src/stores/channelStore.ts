@@ -1,11 +1,10 @@
 /**
- * Zustand store for the Channel Management UI (Phase 7.2).
+ * Zustand store for the Channel Management UI (Phase 7.2–7.4).
  *
  * Tracks the lifecycle status, configuration, and message counts for each
- * registered channel (Telegram, webhooks, etc.).
+ * registered channel (Telegram, Discord, Matrix, Slack, etc.).
  *
- * Channel IPC commands are wired to the real ChannelManager backend
- * Tauri commands are exposed in Phase 7 follow-up work.
+ * Channel IPC commands are wired to the real ChannelManager backend.
  */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -29,15 +28,50 @@ export interface TelegramChannelConfig {
   pollingTimeoutSecs: number;
 }
 
+/** Discord-specific connection configuration. */
+export interface DiscordChannelConfig {
+  /** Bot token from the Discord Developer Portal. */
+  botToken: string;
+  /** Comma-separated Discord guild (server) IDs. Empty = all guilds allowed. */
+  allowedGuildIds: string;
+  /** Comma-separated Discord channel IDs. Empty = all channels allowed. */
+  allowedChannelIds: string;
+}
+
+/** Matrix-specific connection configuration. */
+export interface MatrixChannelConfig {
+  /** Full homeserver URL (e.g. `https://matrix.org`). */
+  homeserverUrl: string;
+  /** Bot MXID (e.g. `@mybot:matrix.org`). */
+  username: string;
+  /** Access token from the Matrix login API. */
+  accessToken: string;
+  /** Comma-separated room IDs. Empty = all joined rooms allowed. */
+  allowedRoomIds: string;
+}
+
+/** Slack-specific connection configuration. */
+export interface SlackChannelConfig {
+  /** Bot User OAuth Token (`xoxb-…`). */
+  botToken: string;
+  /** App-Level Token for Socket Mode (`xapp-…`). */
+  appToken: string;
+  /** Comma-separated Slack channel IDs. Empty = all channels allowed. */
+  allowedChannelIds: string;
+}
+
 /** Discriminated union for per-channel configuration. */
 export type ChannelConfig =
   | { type: "telegram"; telegram: TelegramChannelConfig }
+  | { type: "discord"; discord: DiscordChannelConfig }
+  | { type: "matrix"; matrix: MatrixChannelConfig }
+  | { type: "slack"; slack: SlackChannelConfig }
   | { type: "webhook" }
   | { type: "tauri-ipc" };
 
 /** Live status and metadata for a registered channel. */
 export interface ChannelEntry {
-  /** Unique channel identifier (e.g. "telegram", "tauri-ipc"). */
+  /** Unique channel identifier (e.g. "telegram", "discord"). */
   name: string;
   /** Human-readable display name. */
   displayName: string;
@@ -77,6 +111,52 @@ const DEFAULT_CHANNELS: ChannelEntry[] = [
       },
     },
   },
+  {
+    name: "discord",
+    displayName: "Discord",
+    status: "disconnected",
+    messageCount: 0,
+    lastError: null,
+    config: {
+      type: "discord",
+      discord: {
+        botToken: "",
+        allowedGuildIds: "",
+        allowedChannelIds: "",
+      },
+    },
+  },
+  {
+    name: "matrix",
+    displayName: "Matrix",
+    status: "disconnected",
+    messageCount: 0,
+    lastError: null,
+    config: {
+      type: "matrix",
+      matrix: {
+        homeserverUrl: "",
+        username: "",
+        accessToken: "",
+        allowedRoomIds: "",
+      },
+    },
+  },
+  {
+    name: "slack",
+    displayName: "Slack",
+    status: "disconnected",
+    messageCount: 0,
+    lastError: null,
+    config: {
+      type: "slack",
+      slack: {
+        botToken: "",
+        appToken: "",
+        allowedChannelIds: "",
+      },
+    },
+  },
 ];
 
 // ─── Message types ────────────────────────────────────────────────────────────
@@ -108,6 +188,12 @@ interface ChannelStore {
   testConnection: (name: string) => Promise<boolean>;
   /** Update the Telegram configuration and persist it. */
   updateTelegramConfig: (config: TelegramChannelConfig) => Promise<void>;
+  /** Update the Discord configuration and persist it. */
+  updateDiscordConfig: (config: DiscordChannelConfig) => Promise<void>;
+  /** Update the Matrix configuration and persist it. */
+  updateMatrixConfig: (config: MatrixChannelConfig) => Promise<void>;
+  /** Update the Slack configuration and persist it. */
+  updateSlackConfig: (config: SlackChannelConfig) => Promise<void>;
   /** Select a channel to show its config panel. */
   selectChannel: (name: string | null) => void;
   /** Internal: update the status of a named channel. */
@@ -143,8 +229,10 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
         }),
         isLoading: false,
       }));
-      // Restore saved Telegram config from keyring so the UI pre-fills.
+
       const svc = "com.sprklai.mesoclaw";
+
+      // Restore Telegram config.
       try {
         const token = await invoke<string>("keychain_get", { service: svc, key: "channel:telegram:token" });
         const allowedChatIds = await invoke<string>("keychain_get", { service: svc, key: "channel:telegram:allowed_chat_ids" }).catch(() => "");
@@ -158,7 +246,56 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
           ),
         }));
       } catch {
-        // No saved config yet — keep defaults.
+        // No saved Telegram config yet — keep defaults.
+      }
+
+      // Restore Discord config.
+      try {
+        const botToken = await invoke<string>("keychain_get", { service: svc, key: "channel:discord:token" });
+        const allowedGuildIds = await invoke<string>("keychain_get", { service: svc, key: "channel:discord:allowed_guild_ids" }).catch(() => "");
+        const allowedChannelIds = await invoke<string>("keychain_get", { service: svc, key: "channel:discord:allowed_channel_ids" }).catch(() => "");
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.name === "discord"
+              ? { ...ch, config: { type: "discord", discord: { botToken, allowedGuildIds, allowedChannelIds } } }
+              : ch,
+          ),
+        }));
+      } catch {
+        // No saved Discord config yet — keep defaults.
+      }
+
+      // Restore Matrix config.
+      try {
+        const homeserverUrl = await invoke<string>("keychain_get", { service: svc, key: "channel:matrix:homeserver_url" });
+        const username = await invoke<string>("keychain_get", { service: svc, key: "channel:matrix:username" }).catch(() => "");
+        const accessToken = await invoke<string>("keychain_get", { service: svc, key: "channel:matrix:access_token" });
+        const allowedRoomIds = await invoke<string>("keychain_get", { service: svc, key: "channel:matrix:allowed_room_ids" }).catch(() => "");
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.name === "matrix"
+              ? { ...ch, config: { type: "matrix", matrix: { homeserverUrl, username, accessToken, allowedRoomIds } } }
+              : ch,
+          ),
+        }));
+      } catch {
+        // No saved Matrix config yet — keep defaults.
+      }
+
+      // Restore Slack config.
+      try {
+        const botToken = await invoke<string>("keychain_get", { service: svc, key: "channel:slack:bot_token" });
+        const appToken = await invoke<string>("keychain_get", { service: svc, key: "channel:slack:app_token" }).catch(() => "");
+        const allowedChannelIds = await invoke<string>("keychain_get", { service: svc, key: "channel:slack:allowed_channel_ids" }).catch(() => "");
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.name === "slack"
+              ? { ...ch, config: { type: "slack", slack: { botToken, appToken, allowedChannelIds } } }
+              : ch,
+          ),
+        }));
+      } catch {
+        // No saved Slack config yet — keep defaults.
       }
     } catch (err) {
       set({ error: String(err), isLoading: false });
@@ -196,17 +333,82 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
   updateTelegramConfig: async (config) => {
     try {
       const svc = "com.sprklai.mesoclaw";
-      // Persist all Telegram config fields to the same keyring service as AI providers.
       if (config.token) {
         await invoke("keychain_set", { service: svc, key: "channel:telegram:token", value: config.token });
       }
       await invoke("keychain_set", { service: svc, key: "channel:telegram:allowed_chat_ids", value: config.allowedChatIds });
       await invoke("keychain_set", { service: svc, key: "channel:telegram:polling_timeout_secs", value: String(config.pollingTimeoutSecs) });
-      // Update local state.
       set((state) => ({
         channels: state.channels.map((ch) =>
           ch.name === "telegram"
             ? { ...ch, config: { type: "telegram", telegram: config } }
+            : ch,
+        ),
+      }));
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
+  updateDiscordConfig: async (config) => {
+    try {
+      const svc = "com.sprklai.mesoclaw";
+      if (config.botToken) {
+        await invoke("keychain_set", { service: svc, key: "channel:discord:token", value: config.botToken });
+      }
+      await invoke("keychain_set", { service: svc, key: "channel:discord:allowed_guild_ids", value: config.allowedGuildIds });
+      await invoke("keychain_set", { service: svc, key: "channel:discord:allowed_channel_ids", value: config.allowedChannelIds });
+      set((state) => ({
+        channels: state.channels.map((ch) =>
+          ch.name === "discord"
+            ? { ...ch, config: { type: "discord", discord: config } }
+            : ch,
+        ),
+      }));
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
+  updateMatrixConfig: async (config) => {
+    try {
+      const svc = "com.sprklai.mesoclaw";
+      if (config.homeserverUrl) {
+        await invoke("keychain_set", { service: svc, key: "channel:matrix:homeserver_url", value: config.homeserverUrl });
+      }
+      if (config.username) {
+        await invoke("keychain_set", { service: svc, key: "channel:matrix:username", value: config.username });
+      }
+      if (config.accessToken) {
+        await invoke("keychain_set", { service: svc, key: "channel:matrix:access_token", value: config.accessToken });
+      }
+      await invoke("keychain_set", { service: svc, key: "channel:matrix:allowed_room_ids", value: config.allowedRoomIds });
+      set((state) => ({
+        channels: state.channels.map((ch) =>
+          ch.name === "matrix"
+            ? { ...ch, config: { type: "matrix", matrix: config } }
+            : ch,
+        ),
+      }));
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
+  updateSlackConfig: async (config) => {
+    try {
+      const svc = "com.sprklai.mesoclaw";
+      if (config.botToken) {
+        await invoke("keychain_set", { service: svc, key: "channel:slack:bot_token", value: config.botToken });
+      }
+      if (config.appToken) {
+        await invoke("keychain_set", { service: svc, key: "channel:slack:app_token", value: config.appToken });
+      }
+      await invoke("keychain_set", { service: svc, key: "channel:slack:allowed_channel_ids", value: config.allowedChannelIds });
+      set((state) => ({
+        channels: state.channels.map((ch) =>
+          ch.name === "slack"
+            ? { ...ch, config: { type: "slack", slack: config } }
             : ch,
         ),
       }));

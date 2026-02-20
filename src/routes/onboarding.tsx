@@ -241,14 +241,22 @@ function AIProviderStep({ onNext, onBack }: AIProviderStepProps) {
     setIsSaving(true);
     try {
       if (requiresApiKey && apiKey.trim()) {
-        await saveApiKeyForProvider(selectedProviderId, apiKey.trim());
+        try {
+          await saveApiKeyForProvider(selectedProviderId, apiKey.trim());
+        } catch (err) {
+          console.error("[Onboarding] Failed to save API key:", err);
+        }
       }
       // Use first available model for selected provider, or empty string
       const providerWithModels = providersWithModels.find(
         (p) => p.id === selectedProviderId
       );
       const modelId = providerWithModels?.models?.[0]?.id ?? "";
-      await saveProviderConfig(selectedProviderId, modelId);
+      try {
+        await saveProviderConfig(selectedProviderId, modelId);
+      } catch (err) {
+        console.error("[Onboarding] Failed to save provider config:", err);
+      }
       onNext();
     } finally {
       setIsSaving(false);
@@ -278,7 +286,7 @@ function AIProviderStep({ onNext, onBack }: AIProviderStepProps) {
                 setApiKey("");
               }}
               className={cn(
-                "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
+                "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 "disabled:cursor-not-allowed disabled:opacity-50"
               )}

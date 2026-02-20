@@ -54,7 +54,7 @@ export function ThemeToggle({ compact = false }: ThemeToggleProps) {
             aria-label={label}
             aria-pressed={theme === value}
             className={cn(
-              "flex flex-1 items-center justify-center rounded-md py-1.5 text-xs transition-colors",
+              "flex flex-1 items-center justify-center rounded-md px-2 py-1.5 text-xs transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               theme === value
                 ? "bg-background text-foreground shadow-sm"

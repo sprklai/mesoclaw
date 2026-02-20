@@ -10,7 +10,7 @@
  *
  * Clicking a card expands an inline config panel for that channel.
  *
- * Phase 7.2 implementation.
+ * Phase 7.2–7.4 implementation.
  */
 
 import { memo, useEffect } from "react";
@@ -24,6 +24,9 @@ import {
   useChannelStore,
 } from "@/stores/channelStore";
 
+import { DiscordConfig } from "./DiscordConfig";
+import { MatrixConfig } from "./MatrixConfig";
+import { SlackConfig } from "./SlackConfig";
 import { TelegramConfig } from "./TelegramConfig";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -58,6 +61,12 @@ function channelIcon(name: string): string {
   switch (name) {
     case "telegram":
       return "✈";
+    case "discord":
+      return "🎮";
+    case "matrix":
+      return "🔷";
+    case "slack":
+      return "💬";
     case "tauri-ipc":
       return "🖥";
     case "webhook":
@@ -153,6 +162,15 @@ const ChannelCard = memo(function ChannelCard({ entry, isSelected, onSelect }: C
         <div className="rounded-b-lg border border-t-0 border-border bg-background px-4 pb-4 pt-4">
           {entry.config.type === "telegram" && (
             <TelegramConfig config={entry.config.telegram} />
+          )}
+          {entry.config.type === "discord" && (
+            <DiscordConfig config={entry.config.discord} />
+          )}
+          {entry.config.type === "matrix" && (
+            <MatrixConfig config={entry.config.matrix} />
+          )}
+          {entry.config.type === "slack" && (
+            <SlackConfig config={entry.config.slack} />
           )}
           {entry.config.type === "webhook" && (
             <p className="text-sm text-muted-foreground">

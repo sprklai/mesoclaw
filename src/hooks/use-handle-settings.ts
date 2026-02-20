@@ -29,17 +29,20 @@ export function useHandleSettings() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const [loadedSettings, autostart] = await Promise.all([
-          getSettings(),
-          isAutostartEnabled(),
-        ]);
+        const loadedSettings = await getSettings();
         setSettings(loadedSettings);
-        setAutostartEnabled(autostart);
       } catch (error) {
         console.error("Failed to load settings:", error);
-      } finally {
-        setIsLoading(false);
       }
+
+      try {
+        const autostart = await isAutostartEnabled();
+        setAutostartEnabled(autostart);
+      } catch (error) {
+        console.warn("Failed to check autostart status:", error);
+      }
+
+      setIsLoading(false);
     };
 
     loadSettings();

@@ -207,6 +207,135 @@ pub fn run() {
                             Err(e) => log::warn!("boot: keyring access failed for telegram: {e}"),
                         }
                     }
+                    // Register Discord channel from keyring on startup (if token exists).
+                    #[cfg(feature = "channels-discord")]
+                    {
+                        use crate::config::app_identity::KEYCHAIN_SERVICE;
+                        match keyring::Entry::new(KEYCHAIN_SERVICE, "channel:discord:token") {
+                            Ok(entry) => {
+                                if let Ok(token) = entry.get_password() {
+                                    if !token.is_empty() {
+                                        let allowed_guild_ids: Vec<u64> =
+                                            keyring::Entry::new(KEYCHAIN_SERVICE, "channel:discord:allowed_guild_ids")
+                                                .ok()
+                                                .and_then(|e| e.get_password().ok())
+                                                .unwrap_or_default()
+                                                .split(',')
+                                                .filter_map(|s| s.trim().parse().ok())
+                                                .collect();
+                                        let allowed_channel_ids: Vec<u64> =
+                                            keyring::Entry::new(KEYCHAIN_SERVICE, "channel:discord:allowed_channel_ids")
+                                                .ok()
+                                                .and_then(|e| e.get_password().ok())
+                                                .unwrap_or_default()
+                                                .split(',')
+                                                .filter_map(|s| s.trim().parse().ok())
+                                                .collect();
+                                        let config = channels::DiscordConfig::with_allowlists(
+                                            token,
+                                            allowed_guild_ids,
+                                            allowed_channel_ids,
+                                        );
+                                        let discord = Arc::new(channels::DiscordChannel::new(config));
+                                        if let Err(e) = channel_mgr_clone.register(discord).await {
+                                            log::warn!("boot: discord channel registration failed: {e}");
+                                        } else {
+                                            log::info!("boot: discord channel registered from keyring");
+                                        }
+                                    } else {
+                                        log::info!("boot: no discord bot token in keyring, channel not started");
+                                    }
+                                } else {
+                                    log::info!("boot: no discord bot token in keyring, channel not started");
+                                }
+                            }
+                            Err(e) => log::warn!("boot: keyring access failed for discord: {e}"),
+                        }
+                    }
+
+                    // Register Matrix channel from keyring on startup (if credentials exist).
+                    #[cfg(feature = "channels-matrix")]
+                    {
+                        use crate::config::app_identity::KEYCHAIN_SERVICE;
+                        let homeserver = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:matrix:homeserver_url")
+                            .ok()
+                            .and_then(|e| e.get_password().ok())
+                            .unwrap_or_default();
+                        let username = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:matrix:username")
+                            .ok()
+                            .and_then(|e| e.get_password().ok())
+                            .unwrap_or_default();
+                        let access_token = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:matrix:access_token")
+                            .ok()
+                            .and_then(|e| e.get_password().ok())
+                            .unwrap_or_default();
+                        if !access_token.is_empty() && !homeserver.is_empty() {
+                            let allowed_room_ids: Vec<String> =
+                                keyring::Entry::new(KEYCHAIN_SERVICE, "channel:matrix:allowed_room_ids")
+                                    .ok()
+                                    .and_then(|e| e.get_password().ok())
+                                    .unwrap_or_default()
+                                    .split(',')
+                                    .map(str::trim)
+                                    .filter(|s| !s.is_empty())
+                                    .map(String::from)
+                                    .collect();
+                            let config = channels::MatrixConfig::with_allowed_rooms(
+                                homeserver,
+                                username,
+                                access_token,
+                                allowed_room_ids,
+                            );
+                            let matrix = Arc::new(channels::MatrixChannel::new(config));
+                            if let Err(e) = channel_mgr_clone.register(matrix).await {
+                                log::warn!("boot: matrix channel registration failed: {e}");
+                            } else {
+                                log::info!("boot: matrix channel registered from keyring");
+                            }
+                        } else {
+                            log::info!("boot: no matrix credentials in keyring, channel not started");
+                        }
+                    }
+
+                    // Register Slack channel from keyring on startup (if tokens exist).
+                    #[cfg(feature = "channels-slack")]
+                    {
+                        use crate::config::app_identity::KEYCHAIN_SERVICE;
+                        let bot_token = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:slack:bot_token")
+                            .ok()
+                            .and_then(|e| e.get_password().ok())
+                            .unwrap_or_default();
+                        let app_token = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:slack:app_token")
+                            .ok()
+                            .and_then(|e| e.get_password().ok())
+                            .unwrap_or_default();
+                        if !bot_token.is_empty() && !app_token.is_empty() {
+                            let allowed_channel_ids: Vec<String> =
+                                keyring::Entry::new(KEYCHAIN_SERVICE, "channel:slack:allowed_channel_ids")
+                                    .ok()
+                                    .and_then(|e| e.get_password().ok())
+                                    .unwrap_or_default()
+                                    .split(',')
+                                    .map(str::trim)
+                                    .filter(|s| !s.is_empty())
+                                    .map(String::from)
+                                    .collect();
+                            let config = channels::SlackConfig::with_allowed_channels(
+                                bot_token,
+                                app_token,
+                                allowed_channel_ids,
+                            );
+                            let slack = Arc::new(channels::SlackChannel::new(config));
+                            if let Err(e) = channel_mgr_clone.register(slack).await {
+                                log::warn!("boot: slack channel registration failed: {e}");
+                            } else {
+                                log::info!("boot: slack channel registered from keyring");
+                            }
+                        } else {
+                            log::info!("boot: no slack tokens in keyring, channel not started");
+                        }
+                    }
+
                     match services::boot::BootSequence::new(bus_boot_clone, channel_mgr_clone) {
                         Ok(seq) => match seq.run().await {
                             Ok(ctx) => {

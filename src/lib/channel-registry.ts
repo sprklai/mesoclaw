@@ -29,18 +29,24 @@ export const CHANNEL_REGISTRY: ChannelTypeInfo[] = [
   {
     id: "discord",
     displayName: "Discord",
-    description: "Connect via a Discord bot",
+    description: "Connect via a Discord bot to receive and send messages",
     iconEmoji: "🎮",
-    available: false,
-    comingSoonLabel: "Coming soon",
+    available: true,
+  },
+  {
+    id: "matrix",
+    displayName: "Matrix",
+    description:
+      "Connect via Matrix — bridges WhatsApp, Slack, IRC, Signal, and more through the Matrix protocol",
+    iconEmoji: "🔷",
+    available: true,
   },
   {
     id: "slack",
     displayName: "Slack",
-    description: "Integrate with a Slack workspace",
+    description: "Integrate with a Slack workspace via Socket Mode",
     iconEmoji: "💬",
-    available: false,
-    comingSoonLabel: "Coming soon",
+    available: true,
   },
   {
     id: "whatsapp",
@@ -48,6 +54,6 @@ export const CHANNEL_REGISTRY: ChannelTypeInfo[] = [
     description: "Connect via WhatsApp Business API",
     iconEmoji: "📱",
     available: false,
-    comingSoonLabel: "Coming soon",
+    comingSoonLabel: "Use Matrix bridge",
   },
 ];

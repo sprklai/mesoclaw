@@ -42,9 +42,27 @@ pub mod tauri_ipc;
 pub mod telegram;
 pub mod traits;
 
+#[cfg(feature = "channels-discord")]
+pub mod discord;
+
+#[cfg(feature = "channels-matrix")]
+pub mod matrix_;
+
+#[cfg(feature = "channels-slack")]
+pub mod slack;
+
 pub use manager::ChannelManager;
 pub use tauri_ipc::TauriIpcChannel;
 pub use traits::{Channel, ChannelEvent, ChannelMessage};
 
 #[cfg(feature = "channels-telegram")]
 pub use telegram::{BotCommand, TelegramChannel, TelegramConfig};
+
+#[cfg(feature = "channels-discord")]
+pub use discord::{DiscordChannel, DiscordConfig};
+
+#[cfg(feature = "channels-matrix")]
+pub use matrix_::{MatrixChannel, MatrixConfig};
+
+#[cfg(feature = "channels-slack")]
+pub use slack::{SlackChannel, SlackConfig};
