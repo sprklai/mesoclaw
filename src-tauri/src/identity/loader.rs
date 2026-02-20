@@ -128,6 +128,19 @@ impl IdentityLoader {
         self.reload()
     }
 
+    /// Parse and return unchecked items from `HEARTBEAT.md`.
+    ///
+    /// These items are passed to the heartbeat agent as its action list.
+    pub fn heartbeat_items(&self) -> Vec<String> {
+        use crate::scheduler::heartbeat::parse_heartbeat_items;
+        parse_heartbeat_items(&self.get().heartbeat)
+    }
+
+    /// Return the full content of `BOOT.md` for boot checklist execution.
+    pub fn boot_checklist(&self) -> String {
+        self.get().boot
+    }
+
     /// Build the complete system prompt from all identity files, in the
     /// canonical assembly order: SOUL → AGENTS → USER → TOOLS → placeholders.
     pub fn build_system_prompt(&self) -> String {

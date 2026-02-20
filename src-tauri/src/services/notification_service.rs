@@ -19,6 +19,7 @@
 
 use std::sync::{Arc, RwLock};
 
+use chrono::Timelike as _;
 use serde::{Deserialize, Serialize};
 
 use crate::event_bus::{AppEvent, EventBus};
@@ -53,26 +54,99 @@ pub struct NotificationSpec {
 
 // ─── NotificationConfig ──────────────────────────────────────────────────────
 
-/// Per-category preferences and global Do Not Disturb flag.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+/// Per-category preferences, DND time window, and global Do Not Disturb flag.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotificationConfig {
     /// When `true`, all notifications are suppressed regardless of category.
     pub do_not_disturb: bool,
+    /// When `true`, the DND time-window ([`dnd_start_hour`]..[`dnd_end_hour`])
+    /// is enforced.  Default `false` so the schedule is opt-in.
+    pub dnd_schedule_enabled: bool,
+    /// DND window start hour (0–23), inclusive. Default 22 (10 pm).
+    pub dnd_start_hour: u8,
+    /// DND window end hour (0–23), exclusive. Default 7 (7 am).
+    pub dnd_end_hour: u8,
     /// Per-category enable flag.  Missing keys default to `true` (enabled).
     pub categories: std::collections::HashMap<String, bool>,
+    /// Notify on heartbeat ticks.
+    pub notify_heartbeat: bool,
+    /// Notify when a cron job fires.
+    pub notify_cron_reminder: bool,
+    /// Notify when an agent task completes.
+    pub notify_agent_complete: bool,
+    /// Notify when an approval is requested.
+    pub notify_approval_request: bool,
+}
+
+impl Default for NotificationConfig {
+    fn default() -> Self {
+        Self {
+            do_not_disturb: false,
+            dnd_schedule_enabled: false,
+            dnd_start_hour: 22,
+            dnd_end_hour: 7,
+            categories: std::collections::HashMap::new(),
+            notify_heartbeat: true,
+            notify_cron_reminder: true,
+            notify_agent_complete: true,
+            notify_approval_request: true,
+        }
+    }
 }
 
 impl NotificationConfig {
-    /// Return `true` if notifications for `category` should be displayed.
-    pub fn is_enabled_for(&self, category: NotificationCategory) -> bool {
+    /// Return `true` if quiet-mode is in effect right now.
+    ///
+    /// Quiet mode is active when:
+    /// - `do_not_disturb` is `true` (immediate global suppress), OR
+    /// - `dnd_schedule_enabled` is `true` AND the current local hour falls
+    ///   within `[dnd_start_hour, dnd_end_hour)`.
+    ///   The window wraps midnight when `start > end` (e.g. 22–7).
+    pub fn is_dnd_active(&self) -> bool {
         if self.do_not_disturb {
+            return true;
+        }
+        if !self.dnd_schedule_enabled {
             return false;
         }
+        let hour = chrono::Local::now().hour() as u8;
+        let start = self.dnd_start_hour;
+        let end = self.dnd_end_hour;
+        if start <= end {
+            hour >= start && hour < end
+        } else {
+            // Wraps midnight: e.g. 22–7 → active from 22:00 to 06:59
+            hour >= start || hour < end
+        }
+    }
+
+    /// Return `true` if notifications for `category` should be displayed,
+    /// taking into account DND quiet mode and per-category preferences.
+    pub fn is_enabled_for(&self, category: NotificationCategory) -> bool {
+        if self.is_dnd_active() {
+            return false;
+        }
+        // Check the typed per-category flags.
+        let category_enabled = match category {
+            NotificationCategory::Heartbeat => self.notify_heartbeat,
+            NotificationCategory::Cron => self.notify_cron_reminder,
+            NotificationCategory::Agent => self.notify_agent_complete,
+            NotificationCategory::Approval => self.notify_approval_request,
+            // System errors always use the legacy `categories` map.
+            NotificationCategory::System => {
+                let key = format!("{category:?}").to_lowercase();
+                *self.categories.get(&key).unwrap_or(&true)
+            }
+        };
+        if !category_enabled {
+            return false;
+        }
+        // Also honour the legacy freeform `categories` map for any overrides.
         let key = format!("{category:?}").to_lowercase();
         *self.categories.get(&key).unwrap_or(&true)
     }
 
-    /// Set the enabled state for a category.
+    /// Set the enabled state for a category via the legacy freeform map.
     pub fn set_enabled(&mut self, category: NotificationCategory, enabled: bool) {
         let key = format!("{category:?}").to_lowercase();
         self.categories.insert(key, enabled);

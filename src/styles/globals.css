@@ -55,6 +55,15 @@
 :root {
   --accent-hue: 85; /* 85 = warm amber. Try 145 (sage), 250 (indigo), 0 (red) */
   --radius: 0.625rem;
+
+  /* Safe area insets for notched/punch-hole displays (iOS, Android) */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+
+  /* Virtual keyboard height (updated dynamically via JS) */
+  --keyboard-height: 0px;
   --background:                 oklch(0.995 0.005 var(--accent-hue));
   --foreground:                 oklch(0.2 0.02 var(--accent-hue));
   --card:                       oklch(1 0 0);
@@ -131,6 +140,10 @@
   body {
     @apply bg-background text-foreground;
     position: relative;
+    padding-top: var(--safe-area-top);
+    padding-bottom: var(--safe-area-bottom);
+    padding-left: var(--safe-area-left);
+    padding-right: var(--safe-area-right);
   }
 
   /* ============================================

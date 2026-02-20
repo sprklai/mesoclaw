@@ -1,0 +1,37 @@
+# MesoClaw Code Owners
+# These owners are automatically requested for review on pull requests.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global fallback — all unmatched paths
+* @mesoclaw/maintainers
+
+# Security-critical paths — require security team review
+src-tauri/src/security/ @mesoclaw/security-team @mesoclaw/maintainers
+src-tauri/src/services/credential_store.rs @mesoclaw/security-team
+
+# AI provider integrations
+src-tauri/src/ai/ @mesoclaw/ai-team
+
+# Memory system
+src-tauri/src/memory/ @mesoclaw/ai-team @mesoclaw/maintainers
+
+# Gateway and API surface
+src-tauri/src/gateway/ @mesoclaw/maintainers
+
+# Agent loop — security-sensitive
+src-tauri/src/agent/ @mesoclaw/security-team @mesoclaw/maintainers
+
+# Database schema changes
+src-tauri/migrations/ @mesoclaw/maintainers
+
+# CI/CD and release pipelines
+.github/ @mesoclaw/devops
+scripts/ @mesoclaw/devops
+
+# Frontend
+src/ @mesoclaw/frontend-team
+
+# Documentation
+docs/ @mesoclaw/docs-team
+*.md @mesoclaw/docs-team
+CLAUDE.md @mesoclaw/maintainers

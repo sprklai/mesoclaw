@@ -33,6 +33,7 @@ use crate::{
         types::{CompletionRequest, Message, MessageRole},
     },
     event_bus::{AppEvent, EventBus},
+    memory::traits::Memory,
     security::{SecurityPolicy, ValidationResult},
     tools::ToolRegistry,
 };
@@ -144,6 +145,8 @@ pub struct AgentLoop {
     /// Optional cancellation flag.  When set to `true` the loop aborts at the
     /// next iteration boundary and returns `Err("cancelled")`.
     cancel_flag: Option<Arc<AtomicBool>>,
+    /// Optional memory store for automatic context injection at session start.
+    memory: Option<Arc<dyn Memory>>,
 }
 
 impl AgentLoop {
@@ -162,6 +165,7 @@ impl AgentLoop {
             bus,
             config,
             cancel_flag: None,
+            memory: None,
         }
     }
 
@@ -169,6 +173,15 @@ impl AgentLoop {
     /// aborts at the next iteration boundary with `Err("cancelled")`.
     pub fn with_cancel_flag(mut self, flag: Arc<AtomicBool>) -> Self {
         self.cancel_flag = Some(flag);
+        self
+    }
+
+    /// Attach a memory store for automatic context injection at session start.
+    ///
+    /// When set, the `run()` entry point will recall up to 5 relevant memories
+    /// and prepend them as a system context message before the first LLM call.
+    pub fn with_memory(mut self, memory: Arc<dyn Memory>) -> Self {
+        self.memory = Some(memory);
         self
     }
 
@@ -186,15 +199,50 @@ impl AgentLoop {
         )
     )]
     pub async fn run(&self, system_prompt: &str, user_message: &str) -> Result<String, String> {
-        let mut history = vec![
-            AgentMessage::System {
-                content: system_prompt.to_string(),
-            },
-            AgentMessage::User {
-                content: user_message.to_string(),
-            },
-        ];
-        self.run_with_history(&mut history).await
+        let mut history = vec![AgentMessage::System {
+            content: system_prompt.to_string(),
+        }];
+
+        // Inject relevant memories as a system context message (FR-2.7).
+        if let Some(ref mem) = self.memory {
+            if let Ok(entries) = mem.recall(user_message, 5).await {
+                if !entries.is_empty() {
+                    let context = entries
+                        .iter()
+                        .map(|e| format!("- {}: {}", e.key, e.content))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    history.push(AgentMessage::System {
+                        content: format!("Relevant context from memory:\n{context}"),
+                    });
+                }
+            }
+        }
+
+        history.push(AgentMessage::User {
+            content: user_message.to_string(),
+        });
+
+        let result = self.run_with_history(&mut history).await;
+
+        // After completion, store a brief session record in memory (FR-2.7).
+        if let (Ok(response), Some(mem)) = (&result, &self.memory) {
+            let summary = if response.len() > 200 {
+                format!("{}…", &response[..200])
+            } else {
+                response.clone()
+            };
+            let key = format!("session:{}", chrono::Utc::now().format("%Y%m%dT%H%M%S"));
+            let _ = mem
+                .store(
+                    &key,
+                    &format!("User: {user_message}\nAgent: {summary}"),
+                    crate::memory::traits::MemoryCategory::Conversation,
+                )
+                .await;
+        }
+
+        result
     }
 
     /// Run the agent loop against an existing conversation `history`.
@@ -225,8 +273,8 @@ impl AgentLoop {
                 return Err("cancelled".to_string());
             }
 
-            // ── Trim history if needed ─────────────────────────────────────
-            self.trim_history(history);
+            // ── Compact history if needed (FR-10.4) ────────────────────────
+            self.compact_history(history).await;
 
             // ── Build LLM messages ─────────────────────────────────────────
             let messages: Vec<Message> = history.iter().map(AgentMessage::to_llm_message).collect();
@@ -294,8 +342,16 @@ impl AgentLoop {
     )]
     async fn execute_tool_call(&self, call: &ParsedToolCall) -> AgentMessage {
         // Validate the tool name as if it were a command.
+        let risk = self.security_policy.classify_command_risk(&call.name);
         match self.security_policy.validate_command(&call.name) {
             ValidationResult::Denied(reason) => {
+                self.security_policy.log_action(
+                    &call.name,
+                    call.arguments.clone(),
+                    risk,
+                    "denied",
+                    None,
+                );
                 self.emit_tool_result(&call.name, &reason, false);
                 return AgentMessage::ToolResult {
                     tool_name: call.name.clone(),
@@ -335,6 +391,13 @@ impl AgentLoop {
                     if !approved {
                         let msg =
                             "Tool execution denied by user (or approval timed out after 30 s)";
+                        self.security_policy.log_action(
+                            &call.name,
+                            call.arguments.clone(),
+                            risk.clone(),
+                            "denied",
+                            Some(msg),
+                        );
                         self.emit_tool_result(&call.name, msg, false);
                         return AgentMessage::ToolResult {
                             tool_name: call.name.clone(),
@@ -385,6 +448,15 @@ impl AgentLoop {
             Err(e) => (e, false),
         };
 
+        // Audit-log every tool execution.
+        self.security_policy.log_action(
+            &call.name,
+            call.arguments.clone(),
+            risk,
+            if success { "allowed" } else { "failed" },
+            Some(&result_str),
+        );
+
         self.emit_tool_result(&call.name, &result_str, success);
 
         AgentMessage::ToolResult {
@@ -405,22 +477,87 @@ impl AgentLoop {
         }
     }
 
-    /// Trim history to `max_history` messages.
+    /// Compact history when it exceeds `max_history` messages (FR-10.4).
     ///
-    /// Keeps: `history[0]` (system prompt) + `history[1]` (first user message)
-    /// + the *most recent* `(max_history - 2)` messages.
-    fn trim_history(&self, history: &mut Vec<AgentMessage>) {
-        if history.len() <= self.config.max_history {
+    /// Preserves:
+    /// - `history[0]` — the persona/system prompt
+    /// - A generated summary of the dropped messages (as a `System` message)
+    /// - The most recent `max_history / 2` messages (active working context)
+    ///
+    /// Falls back to simple truncation if the summarization LLM call fails.
+    async fn compact_history(&self, history: &mut Vec<AgentMessage>) {
+        let threshold = self.config.max_history;
+        if history.len() <= threshold {
             return;
         }
-        let keep_tail = self.config.max_history.saturating_sub(2);
-        let tail_start = history.len() - keep_tail;
-        // Rebuild: first two + recent tail.
-        let head: Vec<AgentMessage> = history.drain(..2).collect();
-        history.drain(..tail_start.saturating_sub(2));
-        let mut new_history = head;
-        new_history.append(history);
-        *history = new_history;
+
+        // Always keep the first system message (agent persona).
+        let keep_tail = threshold / 2;
+        let drop_end = history.len().saturating_sub(keep_tail);
+
+        // Collect the messages to be summarised (skip the system prompt).
+        let to_summarise: Vec<&AgentMessage> = history[1..drop_end].iter().collect();
+        if to_summarise.is_empty() {
+            return;
+        }
+
+        // Build a compact text representation for the summariser.
+        let excerpt: String = to_summarise
+            .iter()
+            .filter_map(|m| match m {
+                AgentMessage::User { content } => Some(format!("User: {content}")),
+                AgentMessage::Assistant { content, .. } if !content.is_empty() => {
+                    Some(format!("Assistant: {content}"))
+                }
+                AgentMessage::ToolResult {
+                    tool_name, result, ..
+                } => Some(format!("Tool({tool_name}): {result}")),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let summary_prompt = format!(
+            "Summarise the following conversation excerpt in 3-5 concise sentences, \
+             focusing on what was accomplished and any important context:\n\n{excerpt}"
+        );
+
+        let summary = self
+            .provider
+            .complete(CompletionRequest::new(
+                self.config.model.clone(),
+                vec![Message {
+                    role: MessageRole::User,
+                    content: summary_prompt,
+                }],
+            ))
+            .await
+            .map(|r| r.content)
+            .unwrap_or_else(|_| format!("[{} messages compacted]", to_summarise.len()));
+
+        // Persist the compaction summary to memory if available.
+        if let Some(ref mem) = self.memory {
+            let key = format!("compact:{}", chrono::Utc::now().format("%Y%m%dT%H%M%S"));
+            let _ = mem
+                .store(
+                    &key,
+                    &summary,
+                    crate::memory::traits::MemoryCategory::Conversation,
+                )
+                .await;
+        }
+
+        // Rebuild history: system prompt + summary + recent tail.
+        let system_msg = history.remove(0);
+        let tail: Vec<AgentMessage> = history.drain(drop_end - 1..).collect();
+
+        *history = vec![
+            system_msg,
+            AgentMessage::System {
+                content: format!("Earlier conversation summary: {summary}"),
+            },
+        ];
+        history.extend(tail);
     }
 }
 
@@ -649,41 +786,45 @@ mod tests {
         assert_eq!(result, "The tool was denied, I'll work another way.");
     }
 
-    #[test]
-    fn trim_history_removes_middle_messages() {
+    #[tokio::test]
+    async fn compact_history_removes_middle_messages() {
+        // MockProvider returns a summary string for the summarization call.
         let loop_ = AgentLoop::new(
-            MockProvider::new(vec![]),
+            MockProvider::new(vec!["summary of old messages"]),
             Arc::new(ToolRegistry::new()),
             supervised_policy(),
             None,
             AgentConfig {
-                max_history: 5,
+                max_history: 6,
                 ..Default::default()
             },
         );
 
-        // Build a history of 8 messages (more than max_history=5).
-        let mut history: Vec<AgentMessage> = (0..8)
+        // Build a history of 10 messages (more than max_history=6).
+        let mut history: Vec<AgentMessage> = (0..10)
             .map(|i| AgentMessage::User {
                 content: format!("msg {i}"),
             })
             .collect();
 
-        loop_.trim_history(&mut history);
+        loop_.compact_history(&mut history).await;
 
-        // After trimming: 5 messages total (system + first + last 3).
-        assert_eq!(history.len(), 5);
-        // First two and last three are preserved.
+        // After compaction: system prompt + summary + recent tail (≤ max_history/2 = 3)
+        // Resulting history length should be ≤ max_history.
+        assert!(
+            history.len() <= loop_.config.max_history,
+            "compacted history ({}) should fit within max_history ({})",
+            history.len(),
+            loop_.config.max_history
+        );
+        // First message should be the original system prompt.
         if let AgentMessage::User { content } = &history[0] {
             assert_eq!(content, "msg 0");
         }
-        if let AgentMessage::User { content } = &history[1] {
-            assert_eq!(content, "msg 1");
-        }
     }
 
-    #[test]
-    fn trim_history_no_op_when_under_limit() {
+    #[tokio::test]
+    async fn compact_history_no_op_when_under_limit() {
         let loop_ = AgentLoop::new(
             MockProvider::new(vec![]),
             Arc::new(ToolRegistry::new()),
@@ -701,7 +842,7 @@ mod tests {
             })
             .collect();
 
-        loop_.trim_history(&mut history);
+        loop_.compact_history(&mut history).await;
         assert_eq!(history.len(), 10);
     }
 

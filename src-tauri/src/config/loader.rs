@@ -64,6 +64,8 @@ pub fn load_default_config() -> AppConfig {
 /// - `MESOCLAW_MEMORY_ENABLED`        → `memory.enabled` (1/0)
 /// - `MESOCLAW_NOTIFICATIONS_ENABLED` → `notifications.enabled` (1/0)
 /// - `MESOCLAW_DO_NOT_DISTURB`        → `notifications.do_not_disturb` (1/0)
+/// - `MESOCLAW_DND_START_HOUR`        → `notifications.dnd_start_hour` (0–23)
+/// - `MESOCLAW_DND_END_HOUR`          → `notifications.dnd_end_hour` (0–23)
 fn apply_env_overrides(config: &mut AppConfig) {
     if let Ok(v) = env::var("MESOCLAW_PROVIDER_ID") {
         config.provider.default_id = v;
@@ -90,6 +92,16 @@ fn apply_env_overrides(config: &mut AppConfig) {
     }
     if let Ok(v) = env::var("MESOCLAW_DO_NOT_DISTURB") {
         config.notifications.do_not_disturb = v == "1" || v.eq_ignore_ascii_case("true");
+    }
+    if let Ok(v) = env::var("MESOCLAW_DND_START_HOUR")
+        && let Ok(h) = v.parse::<u8>()
+    {
+        config.notifications.dnd_start_hour = h;
+    }
+    if let Ok(v) = env::var("MESOCLAW_DND_END_HOUR")
+        && let Ok(h) = v.parse::<u8>()
+    {
+        config.notifications.dnd_end_hour = h;
     }
 }
 

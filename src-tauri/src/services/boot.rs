@@ -165,30 +165,46 @@ impl BootSequence {
     }
 
     fn run_boot_checklist(&self) {
-        let boot_md = self.base_dir.join("BOOT.md");
-        if !boot_md.exists() {
-            log::debug!("[boot] no BOOT.md found, skipping checklist");
-            return;
-        }
-        match std::fs::read_to_string(&boot_md) {
-            Ok(content) => {
-                let items: Vec<&str> = content
-                    .lines()
-                    .filter(|l| l.trim_start().starts_with("- [ ]"))
-                    .collect();
+        // Try the identity directory first; fall back to base dir (FR-5.6).
+        let boot_md_paths = [
+            self.base_dir.join("identity").join("BOOT.md"),
+            self.base_dir.join("BOOT.md"),
+        ];
+        let content = boot_md_paths
+            .iter()
+            .find_map(|p| std::fs::read_to_string(p).ok());
+
+        match content {
+            None => log::debug!("[boot] no BOOT.md found, skipping checklist"),
+            Some(content) => {
+                use crate::scheduler::heartbeat::parse_heartbeat_items;
+                let items = parse_heartbeat_items(&content);
                 if items.is_empty() {
                     log::debug!("[boot] BOOT.md has no unchecked items");
                 } else {
                     log::info!(
-                        "[boot] BOOT.md has {} unchecked item(s) (manual review needed)",
+                        "[boot] BOOT.md has {} unchecked item(s); \
+                         dispatching AgentTurn via event bus",
                         items.len()
                     );
-                    for item in items {
-                        log::info!("[boot]   {}", item.trim());
+                    let checklist = items
+                        .iter()
+                        .map(|i| format!("- {i}"))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    let prompt =
+                        format!("Boot checklist — run each item and report results:\n{checklist}");
+                    // Emit as AgentTurn so the scheduler or any listener can pick it up.
+                    if let Err(e) = self.bus.publish(crate::event_bus::AppEvent::CronFired {
+                        job_id: "boot_checklist".to_string(),
+                        schedule: format!("boot@startup: {}", items.len()),
+                    }) {
+                        log::warn!("[boot] failed to publish boot checklist event: {e}");
+                    } else {
+                        log::info!("[boot] boot checklist prompt: {prompt}");
                     }
                 }
             }
-            Err(e) => log::warn!("[boot] could not read BOOT.md: {e}"),
         }
     }
 }

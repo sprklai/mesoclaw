@@ -1,82 +1,84 @@
 # Security Policy
 
-## Reporting a Vulnerability
-
-**Do not report security vulnerabilities via public GitHub Issues.**
-
-Instead, use [GitHub Security Advisories](https://github.com/rakeshdhote/tauriclaw/security/advisories/new) to report vulnerabilities privately.
-
-Include as much detail as possible:
-
-- Affected component (agent, channels, security/, credentials, etc.)
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact / attack scenario
-- Suggested fix (optional)
-
-### Response SLA
-
-| Stage | Target |
-|-------|--------|
-| Acknowledge receipt | 48 hours |
-| Initial severity assessment | 1 week |
-| Fix for critical / high severity | 2 weeks |
-| Fix for medium / low severity | 4 weeks |
-| Public disclosure | After fix is released |
-
-We will credit you in the release notes unless you prefer to remain anonymous.
-
----
-
 ## Supported Versions
 
-| Version | Status |
-|---------|--------|
-| `0.x.x` (current) | Active |
+| Version | Supported |
+|---------|-----------|
+| 0.x.x (current) | ✅ Active |
+| < 0.1.0 | ❌ End of life |
 
----
+## Reporting a Vulnerability
 
-## Security Architecture
+**Please do NOT open a public GitHub issue for security vulnerabilities.**
 
-MesoClaw is a local-first desktop application. The main attack surfaces are:
+Use [GitHub Security Advisories](../../security/advisories/new) to report vulnerabilities privately. This ensures the issue can be assessed and a fix prepared before public disclosure.
 
-### Agent Tool Execution
+### What to Include
 
-- All shell commands are subject to policy checks in `src-tauri/src/security/`
-- Injection attacks (`&&`, `||`, `;`, backticks, newlines) are blocked
-- Env-variable assignments (`VAR=value`) are not treated as executables
-- Autonomy levels limit what the agent can do without human approval
+- **Description:** Clear explanation of the vulnerability
+- **Impact:** What an attacker can achieve
+- **Reproduction:** Step-by-step instructions
+- **Version:** MesoClaw version affected
+- **Environment:** OS, configuration details
+- **Suggested fix:** (optional) Your proposed remediation
 
-### Credential Storage
+### Proof of Concept
 
-- API keys are stored in the OS keyring (never on disk in plaintext)
-- The `zeroize` crate ensures keys are wiped from memory after use
-- Credentials are never logged at any log level
+Including a minimal proof-of-concept helps us understand and reproduce the issue faster. We ask that you:
+- Limit testing to your own systems
+- Not exploit the vulnerability beyond what is needed to demonstrate it
+- Not access or modify data that does not belong to you
 
-### IPC (Frontend ↔ Backend)
+## Response SLAs
 
-- Tauri capability system restricts which commands the frontend can invoke
-- All command inputs are validated at the Rust boundary
-- No dynamic command dispatch from untrusted sources
+| Milestone | Timeline |
+|-----------|----------|
+| Acknowledgment | 48 hours |
+| Initial assessment | 1 week |
+| Fix — Critical | 2 weeks |
+| Fix — High | 30 days |
+| Fix — Medium | 90 days |
+| Fix — Low | Next release cycle |
 
-### Channels (Telegram, IPC)
+## Disclosure Policy
 
-- Telegram allow-lists (`allowed_chat_ids`) restrict which senders are processed
-- Messages from unknown chat IDs are silently discarded
-- MarkdownV2 output is escaped to prevent entity injection
+We follow **coordinated disclosure**:
 
-### Extension System (WASM, feature-gated)
+1. Reporter submits via GitHub Security Advisories
+2. We acknowledge within 48 hours
+3. We investigate and develop a fix
+4. We coordinate a release date with the reporter
+5. We publish a security advisory with the fix
+6. We credit the reporter in the advisory (unless they prefer anonymity)
 
-- WASM extensions run in a sandboxed `wasmtime` instance
-- Host functions are explicitly allow-listed
-- Memory access is bounded
+We ask reporters to keep the vulnerability confidential until a fix is released.
 
----
+## Security Scope
 
-## Security Best Practices for Contributors
+### In Scope
 
-- Never `unwrap()` on untrusted input
-- Validate and sanitise all data arriving from external sources (Telegram messages, webhook payloads, user input)
-- Use parameterised queries — never string concatenation in SQL
-- Prefer `spawn_blocking` for CPU-bound work rather than blocking the async runtime
-- Add `// ## SECURITY` comments when a code path has non-obvious security implications
+- Authentication and authorization bypasses
+- Data exposure (API keys, credentials, memory content)
+- Remote code execution via agent tool execution
+- Path traversal in file system operations
+- Injection attacks in shell command execution
+- Security policy bypass in the agent loop
+- Privilege escalation
+
+### Out of Scope
+
+- Vulnerabilities in third-party AI providers (report to them directly)
+- Issues requiring physical access to the device
+- Social engineering attacks
+- Denial-of-service via rate limiting (expected behavior)
+- Issues in dependencies (report to the dependency maintainer)
+
+## Security Contacts
+
+Security advisories: Use [GitHub Security Advisories](../../security/advisories/new)
+
+For questions about the security policy itself, open a regular GitHub issue with the `question` label.
+
+## Hall of Fame
+
+We maintain a list of security researchers who have responsibly disclosed vulnerabilities. Reporters will be credited in security advisories unless they request anonymity.

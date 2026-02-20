@@ -138,15 +138,47 @@ pub struct IdentityConfig {
 
 // ─── NotificationsConfig ──────────────────────────────────────────────────────
 
+fn default_dnd_start() -> u8 {
+    22 // 10 pm
+}
+
+fn default_dnd_end() -> u8 {
+    7 // 7 am
+}
+
+fn bool_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct NotificationsConfig {
     /// Whether desktop notifications are enabled globally.
     pub enabled: bool,
-    /// Global Do Not Disturb mode.
+    /// Global Do Not Disturb mode (boolean toggle, env-var controlled).
     pub do_not_disturb: bool,
+    /// When `true`, the DND time-window is enforced.  Default `false` (opt-in).
+    pub dnd_schedule_enabled: bool,
+    /// DND window start hour (0–23), inclusive. Default 22 (10 pm).
+    #[serde(default = "default_dnd_start")]
+    pub dnd_start_hour: u8,
+    /// DND window end hour (0–23), exclusive. Default 7 (7 am).
+    #[serde(default = "default_dnd_end")]
+    pub dnd_end_hour: u8,
     /// Per-category enable flags (category name → enabled).
     pub categories: std::collections::HashMap<String, bool>,
+    /// Notify on heartbeat ticks.
+    #[serde(default = "bool_true")]
+    pub notify_heartbeat: bool,
+    /// Notify when a cron job fires.
+    #[serde(default = "bool_true")]
+    pub notify_cron_reminder: bool,
+    /// Notify when an agent task completes.
+    #[serde(default = "bool_true")]
+    pub notify_agent_complete: bool,
+    /// Notify when an approval is requested.
+    #[serde(default = "bool_true")]
+    pub notify_approval_request: bool,
 }
 
 impl Default for NotificationsConfig {
@@ -154,7 +186,14 @@ impl Default for NotificationsConfig {
         Self {
             enabled: true,
             do_not_disturb: false,
+            dnd_schedule_enabled: false,
+            dnd_start_hour: default_dnd_start(),
+            dnd_end_hour: default_dnd_end(),
             categories: std::collections::HashMap::new(),
+            notify_heartbeat: true,
+            notify_cron_reminder: true,
+            notify_agent_complete: true,
+            notify_approval_request: true,
         }
     }
 }

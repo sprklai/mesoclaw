@@ -94,6 +94,7 @@ tauri-plugin-deep-link = "2"
 diesel = { version = "2", features = ["sqlite", "r2d2"] }
 diesel_migrations = "2"
 libsqlite3-sys = { version = "0.30", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["bundled-full"] }
 thiserror = "2"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
@@ -125,7 +126,7 @@ which = "7"
 cron = "0.12"
 # Gateway (Phase 2.5)
 axum = { version = "0.7", features = ["ws", "macros"], optional = true }
-tower-http = { version = "0.5", features = ["cors", "trace"], optional = true }
+tower-http = { version = "0.5", features = ["cors", "set-header", "trace"], optional = true }
 # WASM extension system spike (Phase 6.8) — compile-time optional
 wasmtime = { version = "26", optional = true }
 wat = { version = "1", optional = true }

@@ -1,50 +1,46 @@
 ## Summary
 
-<!-- 2–5 bullet points describing what this PR does -->
+<!-- What changed and why? Use bullet points. -->
 -
 -
 
-## Change Type
+## Type of Change
 
-- [ ] Bug fix (non-breaking, fixes an issue)
-- [ ] New feature (non-breaking, adds functionality)
-- [ ] Refactor (non-breaking, code quality improvement)
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to change)
 - [ ] Documentation update
+- [ ] Refactor (no functional change)
+- [ ] Test improvement
 - [ ] Security fix
-- [ ] Chore / dependency update
-- [ ] Breaking change (requires migration guide)
-
-## Linked Issue
-
-Closes #<!-- issue number -->
 
 ## Validation Evidence
 
-<!-- Commands you ran and their output confirming the change works -->
+<!-- Required: show proof this works. Paste command output or test results. -->
 
 ```
-# Rust
-cargo fmt --check  ✅
-cargo clippy -- -D warnings  ✅
-cargo test --lib  ✅ (N tests passing)
+# Command run:
 
-# Frontend
-bun run check  ✅
-bun run test   ✅ (N tests passing)
+# Output:
 ```
 
 ## Security Impact
 
-- [ ] This PR touches security-sensitive code (security/, agent/, credentials)
-- [ ] New IPC commands are added (verify permissions in capabilities/)
-- [ ] User-facing input is sanitised / validated
-- [ ] No secrets, API keys, or credentials are included in this diff
+- [ ] No security impact
+- [ ] Changes security policy (please describe below)
+- [ ] Adds new permissions or capabilities
+- [ ] Updates dependencies with known CVEs (list them below)
 
-## Compatibility & Migration
-
-<!-- Describe any breaking changes and the migration path, or write "N/A" -->
+<!-- If any boxes above are checked (except the first), explain: -->
 
 ## Rollback Plan
 
-<!-- How would we revert this if it causes issues in production? -->
-<!-- e.g. "Revert commit X; no DB migrations to undo" -->
+<!-- How do we revert this if it causes a production issue? -->
+
+## Checklist
+
+- [ ] `cd src-tauri && cargo test --lib` passes (420+ tests)
+- [ ] `bunx ultracite check` passes (no lint errors)
+- [ ] No new `## TODO` or `## MOCK` markers without tracking in `todo.md`
+- [ ] Documentation updated if this changes behavior
+- [ ] Commit messages follow conventional commit format

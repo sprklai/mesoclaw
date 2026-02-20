@@ -6,6 +6,7 @@ use axum::{
 };
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
+use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::{
     agent::{agent_commands::SessionCancelMap, session_router::SessionRouter},
@@ -116,7 +117,11 @@ pub async fn start_gateway(
     let app = Router::new()
         .merge(public)
         .merge(protected)
-        .layer(CorsLayer::permissive()); // Restrict to localhost in production (Phase 2.8+)
+        .layer(CorsLayer::permissive()) // Restrict to localhost in production (Phase 2.8+)
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::HeaderName::from_static("x-api-version"),
+            axum::http::header::HeaderValue::from_static("v1"),
+        ));
 
     // Try ports starting at DEFAULT_PORT.
     let listener = bind_with_fallback(DEFAULT_PORT).await?;
