@@ -25,6 +25,7 @@
 //! `TokioScheduler`.  A typical job would use a `cron` schedule of `0 3 * * *`
 //! (03:00 every night) to minimise interference with interactive sessions.
 
+use log::info;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -190,7 +191,7 @@ impl MemoryHygiene {
             match fs::rename(&path, &dest) {
                 Ok(()) => {
                     report.archived.push(file_date.to_string());
-                    log::debug!("hygiene: archived {:?} → {:?}", path, dest);
+                    info!("hygiene: archived {:?} → {:?}", path, dest);
                 }
                 Err(e) => {
                     report.push_error(format!("failed to archive '{file_date}': {e}"));
@@ -240,7 +241,7 @@ impl MemoryHygiene {
             match fs::remove_file(&path) {
                 Ok(()) => {
                     report.purged.push(file_date.to_string());
-                    log::debug!("hygiene: purged {:?}", path);
+                    info!("hygiene: purged {:?}", path);
                 }
                 Err(e) => {
                     report.push_error(format!("failed to purge archive '{file_date}': {e}"));
