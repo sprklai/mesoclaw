@@ -1,4 +1,5 @@
 pub mod ai_providers;
+pub mod logs;
 pub mod approval;
 pub mod channels;
 pub mod chat;

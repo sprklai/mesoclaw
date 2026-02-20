@@ -846,6 +846,8 @@ pub fn run() {
             commands::channels::test_channel_connection_command,
             commands::channels::list_channels_command,
             commands::channels::send_channel_message_command,
+            // Log viewer commands
+            commands::logs::get_logs_command,
             // Prompt generator commands
             commands::prompt_generator::generate_prompt_command,
             commands::prompt_generator::list_generated_prompts_command,

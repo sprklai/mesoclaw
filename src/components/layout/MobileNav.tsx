@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, MessageSquare, Settings, Sparkles, Wand2 } from "lucide-react";
+import { Home, MessageSquare, ScrollText, Settings, Sparkles, Wand2 } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ const MOBILE_NAV_ITEMS: MobileNavItem[] = [
 	{ icon: Sparkles, label: "AI Chat", href: "/chat" },
 	{ icon: Wand2, label: "Generate", href: "/prompt-generator" },
 	{ icon: MessageSquare, label: "Channels", href: "/channels" },
+	{ icon: ScrollText, label: "Logs", href: "/logs" },
 	{ icon: Settings, label: "Settings", href: "/settings" },
 ];
 

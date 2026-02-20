@@ -127,6 +127,7 @@ export {
 	RefreshCw,
 	RotateCcw,
 	RotateCw,
+	ScrollText,
 	Search,
 	Send,
 	Server,
