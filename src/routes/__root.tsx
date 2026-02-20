@@ -6,6 +6,7 @@ import { ContextPanel } from "@/components/layout/ContextPanel";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/ui/sidebar";
 import { useChannelMessages } from "@/hooks/useChannelMessages";
+import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { useMobileSwipe } from "@/hooks/useMobileSwipe";
 import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
 import { useAppSettingsStore } from "@/stores/appSettingsStore";
@@ -21,6 +22,9 @@ function RootLayout() {
   const onboardingCompleted = useAppSettingsStore((s) => s.onboardingCompleted);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
+
+  // Enable global keyboard shortcuts
+  useGlobalShortcuts({ enabled: onboardingCompleted });
 
   useEffect(() => {
     if (!onboardingCompleted && pathname !== "/onboarding") {
