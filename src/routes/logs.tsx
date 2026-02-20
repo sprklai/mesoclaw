@@ -203,82 +203,89 @@ function LogsPage() {
       />
 
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Level filter buttons */}
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by log level">
-          {LEVELS.map((lvl) => (
-            <button
-              key={lvl}
-              type="button"
-              onClick={() => setActiveLevel(lvl)}
-              className={cn(
-                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                activeLevel === lvl
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-              )}
-              aria-pressed={activeLevel === lvl}
-            >
-              {lvl}
-              {lvl !== "ALL" && counts[lvl] != null && (
-                <span className="ml-1.5 opacity-70">
-                  {counts[lvl]}
-                </span>
-              )}
-            </button>
-          ))}
+      <div className="flex flex-col gap-2">
+        {/* Level filter buttons row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Level:</span>
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by log level">
+            {LEVELS.map((lvl) => (
+              <button
+                key={lvl}
+                type="button"
+                onClick={() => setActiveLevel(lvl)}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  activeLevel === lvl
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                )}
+                aria-pressed={activeLevel === lvl}
+              >
+                {lvl}
+                {lvl !== "ALL" && counts[lvl] != null && (
+                  <span className="ml-1.5 opacity-70">
+                    {counts[lvl]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Module filter buttons */}
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by module">
-          {MODULES.map((mod) => (
-            <button
-              key={mod}
-              type="button"
-              onClick={() => setActiveModule(mod)}
-              className={cn(
-                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                activeModule === mod
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-              )}
-              aria-pressed={activeModule === mod}
-            >
-              {mod}
-              {mod !== "ALL" && moduleCounts[mod] != null && (
-                <span className="ml-1.5 opacity-70">
-                  {moduleCounts[mod]}
-                </span>
-              )}
-            </button>
-          ))}
+        {/* Module filter buttons row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Module:</span>
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by module">
+            {MODULES.map((mod) => (
+              <button
+                key={mod}
+                type="button"
+                onClick={() => setActiveModule(mod)}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  activeModule === mod
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                )}
+                aria-pressed={activeModule === mod}
+              >
+                {mod}
+                {mod !== "ALL" && moduleCounts[mod] != null && (
+                  <span className="ml-1.5 opacity-70">
+                    {moduleCounts[mod]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Search */}
-        <div className="relative ml-auto min-w-[180px] max-w-xs flex-1">
-          <Search
-            aria-hidden
-            className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-          />
-          <Input
-            className="h-8 pl-8 pr-8 text-xs"
-            placeholder="Search messages…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label="Clear search"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+        {/* Search and actions row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[180px] max-w-xs flex-1">
+            <Search
+              aria-hidden
+              className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              className="h-8 pl-8 pr-8 text-xs"
+              placeholder="Search messages…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
 
         {/* Clear */}
         <Button
@@ -323,6 +330,7 @@ function LogsPage() {
             aria-hidden
           />
         </Button>
+        </div>
       </div>
 
       {/* ── Log table ────────────────────────────────────────────────────────── */}
