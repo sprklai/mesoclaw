@@ -273,8 +273,8 @@ impl AgentLoop {
                 return Err("cancelled".to_string());
             }
 
-            // ── Trim history if needed ─────────────────────────────────────
-            self.trim_history(history);
+            // ── Compact history if needed (FR-10.4) ────────────────────────
+            self.compact_history(history).await;
 
             // ── Build LLM messages ─────────────────────────────────────────
             let messages: Vec<Message> = history.iter().map(AgentMessage::to_llm_message).collect();
@@ -477,22 +477,87 @@ impl AgentLoop {
         }
     }
 
-    /// Trim history to `max_history` messages.
+    /// Compact history when it exceeds `max_history` messages (FR-10.4).
     ///
-    /// Keeps: `history[0]` (system prompt) + `history[1]` (first user message)
-    /// + the *most recent* `(max_history - 2)` messages.
-    fn trim_history(&self, history: &mut Vec<AgentMessage>) {
-        if history.len() <= self.config.max_history {
+    /// Preserves:
+    /// - `history[0]` — the persona/system prompt
+    /// - A generated summary of the dropped messages (as a `System` message)
+    /// - The most recent `max_history / 2` messages (active working context)
+    ///
+    /// Falls back to simple truncation if the summarization LLM call fails.
+    async fn compact_history(&self, history: &mut Vec<AgentMessage>) {
+        let threshold = self.config.max_history;
+        if history.len() <= threshold {
             return;
         }
-        let keep_tail = self.config.max_history.saturating_sub(2);
-        let tail_start = history.len() - keep_tail;
-        // Rebuild: first two + recent tail.
-        let head: Vec<AgentMessage> = history.drain(..2).collect();
-        history.drain(..tail_start.saturating_sub(2));
-        let mut new_history = head;
-        new_history.append(history);
-        *history = new_history;
+
+        // Always keep the first system message (agent persona).
+        let keep_tail = threshold / 2;
+        let drop_end = history.len().saturating_sub(keep_tail);
+
+        // Collect the messages to be summarised (skip the system prompt).
+        let to_summarise: Vec<&AgentMessage> = history[1..drop_end].iter().collect();
+        if to_summarise.is_empty() {
+            return;
+        }
+
+        // Build a compact text representation for the summariser.
+        let excerpt: String = to_summarise
+            .iter()
+            .filter_map(|m| match m {
+                AgentMessage::User { content } => Some(format!("User: {content}")),
+                AgentMessage::Assistant { content, .. } if !content.is_empty() => {
+                    Some(format!("Assistant: {content}"))
+                }
+                AgentMessage::ToolResult {
+                    tool_name, result, ..
+                } => Some(format!("Tool({tool_name}): {result}")),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let summary_prompt = format!(
+            "Summarise the following conversation excerpt in 3-5 concise sentences, \
+             focusing on what was accomplished and any important context:\n\n{excerpt}"
+        );
+
+        let summary = self
+            .provider
+            .complete(CompletionRequest::new(
+                self.config.model.clone(),
+                vec![Message {
+                    role: MessageRole::User,
+                    content: summary_prompt,
+                }],
+            ))
+            .await
+            .map(|r| r.content)
+            .unwrap_or_else(|_| format!("[{} messages compacted]", to_summarise.len()));
+
+        // Persist the compaction summary to memory if available.
+        if let Some(ref mem) = self.memory {
+            let key = format!("compact:{}", chrono::Utc::now().format("%Y%m%dT%H%M%S"));
+            let _ = mem
+                .store(
+                    &key,
+                    &summary,
+                    crate::memory::traits::MemoryCategory::Conversation,
+                )
+                .await;
+        }
+
+        // Rebuild history: system prompt + summary + recent tail.
+        let system_msg = history.remove(0);
+        let tail: Vec<AgentMessage> = history.drain(drop_end - 1..).collect();
+
+        *history = vec![
+            system_msg,
+            AgentMessage::System {
+                content: format!("Earlier conversation summary: {summary}"),
+            },
+        ];
+        history.extend(tail);
     }
 }
 
@@ -721,41 +786,42 @@ mod tests {
         assert_eq!(result, "The tool was denied, I'll work another way.");
     }
 
-    #[test]
-    fn trim_history_removes_middle_messages() {
+    #[tokio::test]
+    async fn compact_history_removes_middle_messages() {
+        // MockProvider returns a summary string for the summarization call.
         let loop_ = AgentLoop::new(
-            MockProvider::new(vec![]),
+            MockProvider::new(vec!["summary of old messages"]),
             Arc::new(ToolRegistry::new()),
             supervised_policy(),
             None,
             AgentConfig {
-                max_history: 5,
+                max_history: 6,
                 ..Default::default()
             },
         );
 
-        // Build a history of 8 messages (more than max_history=5).
-        let mut history: Vec<AgentMessage> = (0..8)
+        // Build a history of 10 messages (more than max_history=6).
+        let mut history: Vec<AgentMessage> = (0..10)
             .map(|i| AgentMessage::User {
                 content: format!("msg {i}"),
             })
             .collect();
 
-        loop_.trim_history(&mut history);
+        loop_.compact_history(&mut history).await;
 
-        // After trimming: 5 messages total (system + first + last 3).
-        assert_eq!(history.len(), 5);
-        // First two and last three are preserved.
+        // After compaction: system prompt + summary + recent tail (≤ max_history/2 = 3)
+        // Resulting history length should be ≤ max_history.
+        assert!(history.len() <= loop_.config.max_history,
+            "compacted history ({}) should fit within max_history ({})",
+            history.len(), loop_.config.max_history);
+        // First message should be the original system prompt.
         if let AgentMessage::User { content } = &history[0] {
             assert_eq!(content, "msg 0");
         }
-        if let AgentMessage::User { content } = &history[1] {
-            assert_eq!(content, "msg 1");
-        }
     }
 
-    #[test]
-    fn trim_history_no_op_when_under_limit() {
+    #[tokio::test]
+    async fn compact_history_no_op_when_under_limit() {
         let loop_ = AgentLoop::new(
             MockProvider::new(vec![]),
             Arc::new(ToolRegistry::new()),
@@ -773,7 +839,7 @@ mod tests {
             })
             .collect();
 
-        loop_.trim_history(&mut history);
+        loop_.compact_history(&mut history).await;
         assert_eq!(history.len(), 10);
     }
 
