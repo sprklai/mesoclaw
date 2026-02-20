@@ -10,6 +10,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 
+/** Keychain service identifier for all channel secrets. */
+const CHANNEL_KEYCHAIN_SVC = "com.sprklai.mesoclaw";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ChannelStatus =
@@ -230,13 +233,11 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
         isLoading: false,
       }));
 
-      const svc = "com.sprklai.mesoclaw";
-
       // Restore Telegram config.
       try {
-        const token = await invoke<string>("keychain_get", { service: svc, key: "channel:telegram:token" });
-        const allowedChatIds = await invoke<string>("keychain_get", { service: svc, key: "channel:telegram:allowed_chat_ids" }).catch(() => "");
-        const timeoutStr = await invoke<string>("keychain_get", { service: svc, key: "channel:telegram:polling_timeout_secs" }).catch(() => "30");
+        const token = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:telegram:token" });
+        const allowedChatIds = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:telegram:allowed_chat_ids" }).catch(() => "");
+        const timeoutStr = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:telegram:polling_timeout_secs" }).catch(() => "30");
         const pollingTimeoutSecs = Number(timeoutStr) || 30;
         set((state) => ({
           channels: state.channels.map((ch) =>
@@ -251,9 +252,9 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
       // Restore Discord config.
       try {
-        const botToken = await invoke<string>("keychain_get", { service: svc, key: "channel:discord:token" });
-        const allowedGuildIds = await invoke<string>("keychain_get", { service: svc, key: "channel:discord:allowed_guild_ids" }).catch(() => "");
-        const allowedChannelIds = await invoke<string>("keychain_get", { service: svc, key: "channel:discord:allowed_channel_ids" }).catch(() => "");
+        const botToken = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:discord:token" });
+        const allowedGuildIds = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:discord:allowed_guild_ids" }).catch(() => "");
+        const allowedChannelIds = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:discord:allowed_channel_ids" }).catch(() => "");
         set((state) => ({
           channels: state.channels.map((ch) =>
             ch.name === "discord"
@@ -267,10 +268,10 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
       // Restore Matrix config.
       try {
-        const homeserverUrl = await invoke<string>("keychain_get", { service: svc, key: "channel:matrix:homeserver_url" });
-        const username = await invoke<string>("keychain_get", { service: svc, key: "channel:matrix:username" }).catch(() => "");
-        const accessToken = await invoke<string>("keychain_get", { service: svc, key: "channel:matrix:access_token" });
-        const allowedRoomIds = await invoke<string>("keychain_get", { service: svc, key: "channel:matrix:allowed_room_ids" }).catch(() => "");
+        const homeserverUrl = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:matrix:homeserver_url" });
+        const username = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:matrix:username" }).catch(() => "");
+        const accessToken = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:matrix:access_token" });
+        const allowedRoomIds = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:matrix:allowed_room_ids" }).catch(() => "");
         set((state) => ({
           channels: state.channels.map((ch) =>
             ch.name === "matrix"
@@ -284,9 +285,9 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
       // Restore Slack config.
       try {
-        const botToken = await invoke<string>("keychain_get", { service: svc, key: "channel:slack:bot_token" });
-        const appToken = await invoke<string>("keychain_get", { service: svc, key: "channel:slack:app_token" }).catch(() => "");
-        const allowedChannelIds = await invoke<string>("keychain_get", { service: svc, key: "channel:slack:allowed_channel_ids" }).catch(() => "");
+        const botToken = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:slack:bot_token" });
+        const appToken = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:slack:app_token" }).catch(() => "");
+        const allowedChannelIds = await invoke<string>("keychain_get", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:slack:allowed_channel_ids" }).catch(() => "");
         set((state) => ({
           channels: state.channels.map((ch) =>
             ch.name === "slack"
@@ -332,12 +333,11 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
   updateTelegramConfig: async (config) => {
     try {
-      const svc = "com.sprklai.mesoclaw";
       if (config.token) {
-        await invoke("keychain_set", { service: svc, key: "channel:telegram:token", value: config.token });
+        await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:telegram:token", value: config.token });
       }
-      await invoke("keychain_set", { service: svc, key: "channel:telegram:allowed_chat_ids", value: config.allowedChatIds });
-      await invoke("keychain_set", { service: svc, key: "channel:telegram:polling_timeout_secs", value: String(config.pollingTimeoutSecs) });
+      await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:telegram:allowed_chat_ids", value: config.allowedChatIds });
+      await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:telegram:polling_timeout_secs", value: String(config.pollingTimeoutSecs) });
       set((state) => ({
         channels: state.channels.map((ch) =>
           ch.name === "telegram"
@@ -352,12 +352,11 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
   updateDiscordConfig: async (config) => {
     try {
-      const svc = "com.sprklai.mesoclaw";
       if (config.botToken) {
-        await invoke("keychain_set", { service: svc, key: "channel:discord:token", value: config.botToken });
+        await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:discord:token", value: config.botToken });
       }
-      await invoke("keychain_set", { service: svc, key: "channel:discord:allowed_guild_ids", value: config.allowedGuildIds });
-      await invoke("keychain_set", { service: svc, key: "channel:discord:allowed_channel_ids", value: config.allowedChannelIds });
+      await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:discord:allowed_guild_ids", value: config.allowedGuildIds });
+      await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:discord:allowed_channel_ids", value: config.allowedChannelIds });
       set((state) => ({
         channels: state.channels.map((ch) =>
           ch.name === "discord"
@@ -372,17 +371,16 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
   updateMatrixConfig: async (config) => {
     try {
-      const svc = "com.sprklai.mesoclaw";
       if (config.homeserverUrl) {
-        await invoke("keychain_set", { service: svc, key: "channel:matrix:homeserver_url", value: config.homeserverUrl });
+        await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:matrix:homeserver_url", value: config.homeserverUrl });
       }
       if (config.username) {
-        await invoke("keychain_set", { service: svc, key: "channel:matrix:username", value: config.username });
+        await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:matrix:username", value: config.username });
       }
       if (config.accessToken) {
-        await invoke("keychain_set", { service: svc, key: "channel:matrix:access_token", value: config.accessToken });
+        await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:matrix:access_token", value: config.accessToken });
       }
-      await invoke("keychain_set", { service: svc, key: "channel:matrix:allowed_room_ids", value: config.allowedRoomIds });
+      await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:matrix:allowed_room_ids", value: config.allowedRoomIds });
       set((state) => ({
         channels: state.channels.map((ch) =>
           ch.name === "matrix"
@@ -397,14 +395,13 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
   updateSlackConfig: async (config) => {
     try {
-      const svc = "com.sprklai.mesoclaw";
       if (config.botToken) {
-        await invoke("keychain_set", { service: svc, key: "channel:slack:bot_token", value: config.botToken });
+        await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:slack:bot_token", value: config.botToken });
       }
       if (config.appToken) {
-        await invoke("keychain_set", { service: svc, key: "channel:slack:app_token", value: config.appToken });
+        await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:slack:app_token", value: config.appToken });
       }
-      await invoke("keychain_set", { service: svc, key: "channel:slack:allowed_channel_ids", value: config.allowedChannelIds });
+      await invoke("keychain_set", { service: CHANNEL_KEYCHAIN_SVC, key: "channel:slack:allowed_channel_ids", value: config.allowedChannelIds });
       set((state) => ({
         channels: state.channels.map((ch) =>
           ch.name === "slack"

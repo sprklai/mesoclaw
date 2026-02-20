@@ -6,9 +6,11 @@ use serde::{Deserialize, Serialize};
 use tauri::{Manager as _, State};
 
 use super::{
-    SidecarModule as _,
-    manifest::{ModuleInfo, ModuleManifest, ModuleType, ParametersConfig, RuntimeConfig, RuntimeType, SecurityConfig, ServiceConfig},
-    ModuleRegistry,
+    ModuleRegistry, SidecarModule as _,
+    manifest::{
+        ModuleInfo, ModuleManifest, ModuleType, ParametersConfig, RuntimeConfig, RuntimeType,
+        SecurityConfig, ServiceConfig,
+    },
 };
 
 // ─── Response types ───────────────────────────────────────────────────────────
@@ -129,15 +131,13 @@ pub async fn create_module_command(
         .app_local_data_dir()
         .map_err(|e| format!("cannot resolve app data dir: {e}"))?
         .join("modules");
-    std::fs::create_dir_all(&modules_dir)
-        .map_err(|e| format!("cannot create modules dir: {e}"))?;
+    std::fs::create_dir_all(&modules_dir).map_err(|e| format!("cannot create modules dir: {e}"))?;
 
     let module_dir = modules_dir.join(&id);
     if module_dir.exists() {
         return Err(format!("Module '{id}' already exists"));
     }
-    std::fs::create_dir_all(&module_dir)
-        .map_err(|e| format!("cannot create module dir: {e}"))?;
+    std::fs::create_dir_all(&module_dir).map_err(|e| format!("cannot create module dir: {e}"))?;
 
     std::fs::write(module_dir.join("manifest.toml"), toml_content)
         .map_err(|e| format!("cannot write manifest.toml: {e}"))?;

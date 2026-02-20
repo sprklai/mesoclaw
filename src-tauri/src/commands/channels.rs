@@ -5,7 +5,7 @@ use std::sync::Arc;
 use serde::Serialize;
 use tauri::State;
 
-use crate::channels::ChannelManager;
+use crate::channels::{Channel, ChannelManager};
 
 // ─── ChannelStatusPayload ─────────────────────────────────────────────────────
 
@@ -59,16 +59,81 @@ pub async fn disconnect_channel_command(
 }
 
 /// Return `true` if the named channel's health check passes.
+///
+/// If the channel is already registered in the manager its `health_check()` is
+/// used.  Otherwise an ad-hoc probe is performed using the supplied credentials
+/// (`token` + optional `extra`) so the UI can verify settings before the
+/// channel has ever been started.
+///
+/// | Channel  | `token`       | `extra`            |
+/// |----------|---------------|--------------------|
+/// | discord  | bot token     | —                  |
+/// | matrix   | access token  | homeserver URL     |
+/// | slack    | bot token     | —                  |
+/// | telegram | bot token     | —                  |
 #[tauri::command]
 pub async fn test_channel_connection_command(
     name: String,
+    token: Option<String>,
+    extra: Option<String>,
     mgr: State<'_, Arc<ChannelManager>>,
 ) -> Result<bool, String> {
+    // Fast path: channel is already running in the manager.
     let health = mgr.health_all().await;
-    health
-        .get(&name)
-        .copied()
-        .ok_or_else(|| format!("Channel '{name}' not found"))
+    if let Some(&healthy) = health.get(&name) {
+        return Ok(healthy);
+    }
+
+    // Slow path: ad-hoc probe from supplied credentials.
+    // Suppress unused-variable warnings when no channel features are compiled.
+    let _ = (&token, &extra);
+
+    #[cfg(feature = "channels-discord")]
+    if name == "discord" {
+        let tok = token
+            .filter(|t| !t.is_empty())
+            .ok_or("discord probe: bot token is required")?;
+        let ch = crate::channels::DiscordChannel::new(crate::channels::DiscordConfig::new(tok));
+        return Ok(ch.health_check().await);
+    }
+
+    #[cfg(feature = "channels-matrix")]
+    if name == "matrix" {
+        let access_token = token
+            .filter(|t| !t.is_empty())
+            .ok_or("matrix probe: access token is required")?;
+        let homeserver = extra
+            .filter(|u| !u.is_empty())
+            .ok_or("matrix probe: homeserver URL is required")?;
+        let ch = crate::channels::MatrixChannel::new(crate::channels::MatrixConfig::new(
+            homeserver,
+            "",
+            access_token,
+        ));
+        return Ok(ch.health_check().await);
+    }
+
+    #[cfg(feature = "channels-slack")]
+    if name == "slack" {
+        let tok = token
+            .filter(|t| !t.is_empty())
+            .ok_or("slack probe: bot token is required")?;
+        let ch = crate::channels::SlackChannel::new(crate::channels::SlackConfig::new(tok, ""));
+        return Ok(ch.health_check().await);
+    }
+
+    #[cfg(feature = "channels-telegram")]
+    if name == "telegram" {
+        let tok = token
+            .filter(|t| !t.is_empty())
+            .ok_or("telegram probe: bot token is required")?;
+        let ch = crate::channels::TelegramChannel::new(crate::channels::TelegramConfig::new(tok));
+        return Ok(ch.health_check().await);
+    }
+
+    Err(format!(
+        "Channel '{name}' is not registered and no ad-hoc probe is available for it"
+    ))
 }
 
 /// List all registered channels with their connection status.

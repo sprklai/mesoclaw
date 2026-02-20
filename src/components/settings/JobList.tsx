@@ -122,7 +122,7 @@ function CreateJobForm() {
               payloadType: e.target.value as "heartbeat" | "agent_turn" | "notify",
             })
           }
-          className="rounded-md border bg-background px-2 py-1 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-ring w-fit"
+          className="rounded-md border bg-background text-foreground px-2 py-1 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-ring w-fit"
         >
           <option value="heartbeat">Run Heartbeat checklist</option>
           <option value="agent_turn">Agent Turn (custom prompt)</option>

@@ -20,6 +20,8 @@ import {
   reloadSkills,
   getSkillDetails,
 } from "@/lib/tauri/skills";
+import { extractErrorMessage } from "@/lib/error-utils";
+import { withStoreLoading } from "@/lib/store-utils";
 
 interface SkillStore {
   // State
@@ -67,44 +69,28 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
 
   // Actions
   loadSkills: async () => {
-    set({ isLoading: true, error: null });
-    try {
+    await withStoreLoading(set, async () => {
       const skillsByCategory = await listSkillsByCategory();
-      set({ skillsByCategory, isLoading: false });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to load skills";
-      set({ error: message, isLoading: false });
-    }
+      set({ skillsByCategory });
+      return skillsByCategory;
+    });
   },
 
   loadSettings: async () => {
-    set({ isLoading: true, error: null });
-    try {
+    await withStoreLoading(set, async () => {
       const settings = await getSkillSettings();
-      set({ settings, isLoading: false });
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to load skill settings";
-      set({ error: message, isLoading: false });
-    }
+      set({ settings });
+      return settings;
+    });
   },
 
   initializeDefaults: async () => {
-    set({ isLoading: true, error: null });
-    try {
+    await withStoreLoading(set, async () => {
       await initializeSkillDefaults();
       const settings = await getSkillSettings();
-      set({ settings, isLoading: false });
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to initialize skill defaults";
-      set({ error: message, isLoading: false });
-    }
+      set({ settings });
+      return settings;
+    });
   },
 
   toggleSkill: async (skillId: string, enabled: boolean) => {
@@ -137,9 +123,7 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     } catch (error) {
       // Rollback on error
       set({ settings: previousSettings });
-      const message =
-        error instanceof Error ? error.message : "Failed to update skill";
-      set({ error: message });
+      set({ error: extractErrorMessage(error) });
     }
   },
 
@@ -164,9 +148,7 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
     } catch (error) {
       // Rollback on error
       set({ settings: previousSettings });
-      const message =
-        error instanceof Error ? error.message : "Failed to update auto-select";
-      set({ error: message });
+      set({ error: extractErrorMessage(error) });
     }
   },
 
@@ -193,19 +175,15 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
   },
 
   refresh: async () => {
-    set({ isLoading: true, error: null });
-    try {
+    await withStoreLoading(set, async () => {
       await reloadSkills();
       const [skillsByCategory, settings] = await Promise.all([
         listSkillsByCategory(),
         getSkillSettings(),
       ]);
-      set({ skillsByCategory, settings, isLoading: false });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to refresh skills";
-      set({ error: message, isLoading: false });
-    }
+      set({ skillsByCategory, settings });
+      return skillsByCategory;
+    });
   },
 
   getSkillDetails: async (skillId: string) => {
@@ -224,9 +202,7 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
       set({ skillDetailsCache: newCache });
       return details;
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to load skill details";
-      set({ error: message });
+      set({ error: extractErrorMessage(error) });
       return null;
     }
   },

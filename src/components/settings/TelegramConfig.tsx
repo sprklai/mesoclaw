@@ -9,8 +9,6 @@
  * Phase 7.2 implementation.
  */
 
-import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +16,8 @@ import {
   type TelegramChannelConfig,
   useChannelStore,
 } from "@/stores/channelStore";
+
+import { useChannelConfigForm } from "./channel-config/useChannelConfigForm";
 
 // ─── TelegramConfig ───────────────────────────────────────────────────────────
 
@@ -27,34 +27,14 @@ interface TelegramConfigProps {
 }
 
 export function TelegramConfig({ config }: TelegramConfigProps) {
-  const { updateTelegramConfig, testConnection } = useChannelStore();
-  const [draft, setDraft] = useState<TelegramChannelConfig>(config);
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<"ok" | "fail" | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleChange =
-    (field: keyof TelegramChannelConfig) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value =
-        field === "pollingTimeoutSecs" ? Number(e.target.value) : e.target.value;
-      setDraft((prev) => ({ ...prev, [field]: value }));
-      setTestResult(null);
-    };
-
-  const handleTest = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-    const ok = await testConnection("telegram");
-    setTestResult(ok ? "ok" : "fail");
-    setIsTesting(false);
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    await updateTelegramConfig(draft);
-    setIsSaving(false);
-  };
+  const { updateTelegramConfig } = useChannelStore();
+  const { draft, isTesting, testResult, isSaving, handleChange, handleTest, handleSave } =
+    useChannelConfigForm({
+      config,
+      channelType: "telegram",
+      updateFn: updateTelegramConfig,
+      fieldTransforms: { pollingTimeoutSecs: (v) => Number(v) },
+    });
 
   return (
     <div className="space-y-6">

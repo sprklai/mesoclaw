@@ -17,6 +17,8 @@ import {
   listIdentityFiles,
   updateIdentityFile,
 } from "@/lib/tauri/identity";
+import { extractErrorMessage } from "@/lib/error-utils";
+import { withStoreLoading } from "@/lib/store-utils";
 
 interface IdentityState {
   /** Metadata for all identity files */
@@ -44,16 +46,11 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
   error: null,
 
   loadFiles: async () => {
-    set({ isLoading: true, error: null });
-    try {
+    await withStoreLoading(set, async () => {
       const files = await listIdentityFiles();
-      set({ files, isLoading: false });
-    } catch (err) {
-      set({
-        error: err instanceof Error ? err.message : String(err),
-        isLoading: false,
-      });
-    }
+      set({ files });
+      return files;
+    });
   },
 
   getFileContent: async (fileName: string) => {
@@ -82,7 +79,7 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
       const systemPrompt = await getSystemPrompt();
       set({ systemPrompt });
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) });
+      set({ error: extractErrorMessage(err) });
     }
   },
 

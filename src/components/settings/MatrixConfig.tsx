@@ -14,7 +14,7 @@
  * Phase 7.3 implementation.
  */
 
-import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,8 @@ import {
   useChannelStore,
 } from "@/stores/channelStore";
 
+import { useChannelConfigForm } from "./channel-config/useChannelConfigForm";
+
 // ─── MatrixConfig ─────────────────────────────────────────────────────────────
 
 interface MatrixConfigProps {
@@ -32,32 +34,21 @@ interface MatrixConfigProps {
 }
 
 export function MatrixConfig({ config }: MatrixConfigProps) {
-  const { updateMatrixConfig, testConnection } = useChannelStore();
-  const [draft, setDraft] = useState<MatrixChannelConfig>(config);
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<"ok" | "fail" | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleChange =
-    (field: keyof MatrixChannelConfig) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setDraft((prev) => ({ ...prev, [field]: e.target.value }));
-      setTestResult(null);
-    };
-
-  const handleTest = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-    const ok = await testConnection("matrix");
-    setTestResult(ok ? "ok" : "fail");
-    setIsTesting(false);
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    await updateMatrixConfig(draft);
-    setIsSaving(false);
-  };
+  const { updateMatrixConfig } = useChannelStore();
+  const { draft, isTesting, testResult, isSaving, handleChange, handleTest, handleSave } =
+    useChannelConfigForm({
+      config,
+      channelType: "matrix",
+      updateFn: updateMatrixConfig,
+      testFn: async (d) => {
+        const ok = await invoke<boolean>("test_channel_connection_command", {
+          name: "matrix",
+          token: d.accessToken,
+          extra: d.homeserverUrl,
+        });
+        return ok;
+      },
+    });
 
   return (
     <div className="space-y-6">

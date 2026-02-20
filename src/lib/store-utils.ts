@@ -5,6 +5,8 @@
  * particularly for async operations with loading/error state management.
  */
 
+import { extractErrorMessage } from "@/lib/error-utils";
+
 /**
  * Standard loading state fields used by most stores.
  */
@@ -23,10 +25,8 @@ export interface RefreshableLoadingState extends LoadingState {
 /**
  * Type for Zustand's set function.
  */
-export type StoreSetFn<T> = (
-  partial: T | Partial<T> | ((state: T) => T | Partial<T>),
-  replace?: boolean
-) => void;
+// biome-ignore lint/suspicious/noExplicitAny: Zustand set accepts broad partial types
+export type StoreSetFn = (...args: any[]) => void;
 
 /**
  * Options for withStoreLoading helper.
@@ -40,9 +40,11 @@ export interface WithStoreLoadingOptions<TResult> {
   rethrow?: boolean;
   /** Use isRefreshing instead of isLoading (for refresh actions) */
   isRefresh?: boolean;
+  /** Custom name for the loading field (default: "isLoading"). */
+  loadingKey?: string;
   /** Custom loading state to merge before action */
   beforeState?: Record<string, unknown>;
-  /** Custom success state to merge after action (in addition to isLoading: false) */
+  /** Custom success state to merge after action (in addition to loading: false) */
   afterState?: Record<string, unknown>;
 }
 
@@ -50,8 +52,8 @@ export interface WithStoreLoadingOptions<TResult> {
  * Wraps an async store action with standard loading/error state management.
  *
  * This reduces boilerplate by automatically:
- * - Setting isLoading: true, error: null before the action
- * - Setting isLoading: false on success or failure
+ * - Setting the loading key to true, error: null before the action
+ * - Setting the loading key to false on success or failure
  * - Setting error message on failure
  *
  * @example
@@ -78,10 +80,19 @@ export interface WithStoreLoadingOptions<TResult> {
  *     return result;
  *   });
  * }
+ *
+ * // With custom loading key (e.g. "loading" instead of "isLoading")
+ * fetchData: async () => {
+ *   await withStoreLoading(set, async () => {
+ *     const result = await invoke<Data>("get_data");
+ *     set({ data: result });
+ *     return result;
+ *   }, { loadingKey: "loading" });
+ * }
  * ```
  */
-export async function withStoreLoading<TState extends LoadingState, TResult>(
-  set: StoreSetFn<TState>,
+export async function withStoreLoading<TResult>(
+  set: StoreSetFn,
   action: () => Promise<TResult>,
   options: WithStoreLoadingOptions<TResult> = {}
 ): Promise<TResult | undefined> {
@@ -90,17 +101,18 @@ export async function withStoreLoading<TState extends LoadingState, TResult>(
     onError,
     rethrow = false,
     isRefresh = false,
+    loadingKey: customLoadingKey,
     beforeState = {},
     afterState = {},
   } = options;
 
   // Set loading state
-  const loadingKey = isRefresh ? "isRefreshing" : "isLoading";
+  const loadingKey = customLoadingKey ?? (isRefresh ? "isRefreshing" : "isLoading");
   set({
     [loadingKey]: true,
     error: null,
     ...beforeState,
-  } as Partial<TState>);
+  });
 
   try {
     const result = await action();
@@ -109,18 +121,18 @@ export async function withStoreLoading<TState extends LoadingState, TResult>(
     set({
       [loadingKey]: false,
       ...afterState,
-    } as Partial<TState>);
+    });
 
     onSuccess?.(result);
     return result;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = extractErrorMessage(error);
 
     // Set error state
     set({
       error: errorMessage,
       [loadingKey]: false,
-    } as Partial<TState>);
+    });
 
     onError?.(error instanceof Error ? error : new Error(errorMessage));
 
@@ -130,19 +142,6 @@ export async function withStoreLoading<TState extends LoadingState, TResult>(
 
     return undefined;
   }
-}
-
-/**
- * Extract a standardized error message from an unknown error.
- *
- * @param error - The error to extract message from
- * @returns A string error message
- */
-export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
 }
 
 /**

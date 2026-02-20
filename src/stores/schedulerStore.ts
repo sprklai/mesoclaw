@@ -8,6 +8,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 
+import { extractErrorMessage } from "@/lib/error-utils";
+import { withStoreLoading } from "@/lib/store-utils";
+
 // ─── Types (mirror Rust serde output) ────────────────────────────────────────
 
 export type ScheduleKind =
@@ -96,17 +99,18 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   submitting: false,
 
   loadJobs: async () => {
-    set({ loading: true, error: null });
-    try {
-      const jobs = await invoke<ScheduledJob[]>("list_jobs_command");
-      set({ jobs, loading: false });
-    } catch (err) {
-      set({
-        jobs: [],
-        loading: false,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    await withStoreLoading(
+      set,
+      async () => {
+        const jobs = await invoke<ScheduledJob[]>("list_jobs_command");
+        set({ jobs });
+        return jobs;
+      },
+      {
+        loadingKey: "loading",
+        onError: () => set({ jobs: [] }),
+      }
+    );
   },
 
   loadHistory: async (jobId) => {
@@ -133,7 +137,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         ),
       }));
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) });
+      set({ error: extractErrorMessage(err) });
     }
   },
 
@@ -142,13 +146,12 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       await invoke("delete_job_command", { jobId });
       set((s) => ({ jobs: s.jobs.filter((j) => j.id !== jobId) }));
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) });
+      set({ error: extractErrorMessage(err) });
     }
   },
 
   submitForm: async () => {
     const { form } = get();
-    set({ submitting: true, error: null });
 
     const schedule: ScheduleKind =
       form.scheduleType === "interval"
@@ -162,20 +165,19 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
           ? { type: "agent_turn", prompt: form.prompt }
           : { type: "notify", message: form.notifyMessage };
 
-    try {
-      await invoke("create_job_command", {
-        name: form.name,
-        schedule,
-        payload,
-      });
-      await get().loadJobs();
-      set({ formOpen: false, form: { ...DEFAULT_FORM }, submitting: false });
-    } catch (err) {
-      set({
-        error: err instanceof Error ? err.message : String(err),
-        submitting: false,
-      });
-    }
+    await withStoreLoading(
+      set,
+      async () => {
+        await invoke("create_job_command", {
+          name: form.name,
+          schedule,
+          payload,
+        });
+        await get().loadJobs();
+        set({ formOpen: false, form: { ...DEFAULT_FORM } });
+      },
+      { loadingKey: "submitting" }
+    );
   },
 
   updateForm: (patch) =>

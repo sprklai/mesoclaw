@@ -2,6 +2,11 @@ import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import type { InitialModelSpec } from "@/lib/models";
+import {
+  PROVIDER_ID_MAX,
+  PROVIDER_ID_MIN,
+  PROVIDER_ID_PATTERN,
+} from "@/lib/provider-validation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -52,10 +57,10 @@ export function AddProviderDialog({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validateProviderId = (id: string): string | null => {
-    if (id.length < 3 || id.length > 50) {
-      return "Provider ID must be 3-50 characters";
+    if (id.length < PROVIDER_ID_MIN || id.length > PROVIDER_ID_MAX) {
+      return `Provider ID must be ${PROVIDER_ID_MIN}-${PROVIDER_ID_MAX} characters`;
     }
-    if (!/^[a-z0-9-]+$/.test(id)) {
+    if (!PROVIDER_ID_PATTERN.test(id)) {
       return "Provider ID must be lowercase alphanumeric with hyphens only";
     }
     return null;
@@ -197,7 +202,7 @@ export function AddProviderDialog({
                 <p className="text-xs text-destructive">{errors.providerId}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Lowercase alphanumeric with hyphens, 3-50 characters.
+                Lowercase alphanumeric with hyphens, {PROVIDER_ID_MIN}-{PROVIDER_ID_MAX} characters.
               </p>
             </div>
 

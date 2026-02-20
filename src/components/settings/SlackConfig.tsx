@@ -11,7 +11,7 @@
  * Phase 7.4 implementation.
  */
 
-import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ import {
   useChannelStore,
 } from "@/stores/channelStore";
 
+import { useChannelConfigForm } from "./channel-config/useChannelConfigForm";
+
 // ─── SlackConfig ──────────────────────────────────────────────────────────────
 
 interface SlackConfigProps {
@@ -29,32 +31,21 @@ interface SlackConfigProps {
 }
 
 export function SlackConfig({ config }: SlackConfigProps) {
-  const { updateSlackConfig, testConnection } = useChannelStore();
-  const [draft, setDraft] = useState<SlackChannelConfig>(config);
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<"ok" | "fail" | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleChange =
-    (field: keyof SlackChannelConfig) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setDraft((prev) => ({ ...prev, [field]: e.target.value }));
-      setTestResult(null);
-    };
-
-  const handleTest = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-    const ok = await testConnection("slack");
-    setTestResult(ok ? "ok" : "fail");
-    setIsTesting(false);
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    await updateSlackConfig(draft);
-    setIsSaving(false);
-  };
+  const { updateSlackConfig } = useChannelStore();
+  const { draft, isTesting, testResult, isSaving, handleChange, handleTest, handleSave } =
+    useChannelConfigForm({
+      config,
+      channelType: "slack",
+      updateFn: updateSlackConfig,
+      testFn: async (d) => {
+        const ok = await invoke<boolean>("test_channel_connection_command", {
+          name: "slack",
+          token: d.botToken,
+          extra: null,
+        });
+        return ok;
+      },
+    });
 
   return (
     <div className="space-y-6">

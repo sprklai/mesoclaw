@@ -8,6 +8,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 
+import { extractErrorMessage } from "@/lib/error-utils";
+import { withStoreLoading } from "@/lib/store-utils";
+
 // ─── Types (mirror Rust serde output) ────────────────────────────────────────
 
 export type ModuleType = "tool" | "service" | "mcp";
@@ -106,17 +109,18 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
   scaffolding: false,
 
   loadModules: async () => {
-    set({ loading: true, error: null });
-    try {
-      const modules = await invoke<ModuleEntry[]>("list_modules_command");
-      set({ modules, loading: false });
-    } catch (err) {
-      set({
-        modules: [],
-        loading: false,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    await withStoreLoading(
+      set,
+      async () => {
+        const modules = await invoke<ModuleEntry[]>("list_modules_command");
+        set({ modules });
+        return modules;
+      },
+      {
+        loadingKey: "loading",
+        onError: () => set({ modules: [] }),
+      }
+    );
   },
 
   startModule: async (moduleId) => {
@@ -130,7 +134,7 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
         ),
       }));
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) });
+      set({ error: extractErrorMessage(err) });
     }
   },
 
@@ -145,7 +149,7 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
         ),
       }));
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) });
+      set({ error: extractErrorMessage(err) });
     }
   },
 
@@ -159,26 +163,23 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
 
   submitScaffold: async () => {
     const { scaffoldForm } = get();
-    set({ scaffolding: true, error: null });
-    try {
-      await invoke("create_module_command", {
-        name: scaffoldForm.name,
-        moduleType: scaffoldForm.moduleType,
-        runtimeType: scaffoldForm.runtimeType,
-        command: scaffoldForm.command,
-        description: scaffoldForm.description,
-      });
-      await get().loadModules();
-      set({
-        scaffoldOpen: false,
-        scaffoldForm: { ...DEFAULT_SCAFFOLD },
-        scaffolding: false,
-      });
-    } catch (err) {
-      set({
-        error: err instanceof Error ? err.message : String(err),
-        scaffolding: false,
-      });
-    }
+    await withStoreLoading(
+      set,
+      async () => {
+        await invoke("create_module_command", {
+          name: scaffoldForm.name,
+          moduleType: scaffoldForm.moduleType,
+          runtimeType: scaffoldForm.runtimeType,
+          command: scaffoldForm.command,
+          description: scaffoldForm.description,
+        });
+        await get().loadModules();
+        set({
+          scaffoldOpen: false,
+          scaffoldForm: { ...DEFAULT_SCAFFOLD },
+        });
+      },
+      { loadingKey: "scaffolding" }
+    );
   },
 }));

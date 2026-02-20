@@ -9,7 +9,7 @@
  * Phase 7.2 implementation.
  */
 
-import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ import {
   useChannelStore,
 } from "@/stores/channelStore";
 
+import { useChannelConfigForm } from "./channel-config/useChannelConfigForm";
+
 // ─── DiscordConfig ────────────────────────────────────────────────────────────
 
 interface DiscordConfigProps {
@@ -27,32 +29,21 @@ interface DiscordConfigProps {
 }
 
 export function DiscordConfig({ config }: DiscordConfigProps) {
-  const { updateDiscordConfig, testConnection } = useChannelStore();
-  const [draft, setDraft] = useState<DiscordChannelConfig>(config);
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<"ok" | "fail" | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleChange =
-    (field: keyof DiscordChannelConfig) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setDraft((prev) => ({ ...prev, [field]: e.target.value }));
-      setTestResult(null);
-    };
-
-  const handleTest = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-    const ok = await testConnection("discord");
-    setTestResult(ok ? "ok" : "fail");
-    setIsTesting(false);
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    await updateDiscordConfig(draft);
-    setIsSaving(false);
-  };
+  const { updateDiscordConfig } = useChannelStore();
+  const { draft, isTesting, testResult, isSaving, handleChange, handleTest, handleSave } =
+    useChannelConfigForm({
+      config,
+      channelType: "discord",
+      updateFn: updateDiscordConfig,
+      testFn: async (d) => {
+        const ok = await invoke<boolean>("test_channel_connection_command", {
+          name: "discord",
+          token: d.botToken,
+          extra: null,
+        });
+        return ok;
+      },
+    });
 
   return (
     <div className="space-y-6">

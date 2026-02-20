@@ -5,6 +5,7 @@ use tauri::State;
 use crate::ai::provider::LLMProvider;
 use crate::ai::providers::openai_compatible::{OpenAICompatibleConfig, OpenAICompatibleProvider};
 use crate::ai::types::{CompletionRequest, Message};
+use crate::commands::utils::db_conn;
 use crate::config::app_identity::KEYCHAIN_SERVICE;
 use crate::database::DbPool;
 use crate::database::models::ai_provider::{
@@ -40,7 +41,7 @@ pub struct ProviderTestResult {
 pub fn list_ai_providers_command(
     pool: State<'_, DbPool>,
 ) -> Result<Vec<ProviderWithModels>, String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Get all active providers
     let providers = ai_providers::table
@@ -75,7 +76,7 @@ pub fn list_ai_providers_command(
 pub async fn list_providers_with_key_status_command(
     pool: State<'_, DbPool>,
 ) -> Result<Vec<ProviderWithKeyStatusResponse>, String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Get all active providers
     let providers = ai_providers::table
@@ -114,7 +115,7 @@ pub fn get_provider_by_id_command(
     pool: State<'_, DbPool>,
     provider_id: String,
 ) -> Result<ProviderWithModels, String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Get the provider
     let provider = ai_providers::table
@@ -147,7 +148,7 @@ pub async fn test_provider_connection_command(
     provider_id: String,
     api_key: String,
 ) -> Result<ProviderTestResult, String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Get the provider from database (to verify it exists)
     let provider = ai_providers::table
@@ -232,7 +233,7 @@ pub fn add_custom_model_command(
     model_id: String,
     display_name: String,
 ) -> Result<(), String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Verify the provider exists
     let provider_exists = ai_providers::table
@@ -286,7 +287,7 @@ pub fn add_custom_model_command(
 /// Built-in models cannot be deleted.
 #[tauri::command]
 pub fn delete_model_command(pool: State<'_, DbPool>, model_id: String) -> Result<(), String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Find the model
     let model = ai_models::table
@@ -322,7 +323,7 @@ pub fn reactivate_provider_command(
     pool: State<'_, DbPool>,
     provider_id: String,
 ) -> Result<String, String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Reactivate the provider
     let updated = diesel::update(ai_providers::table.filter(ai_providers::id.eq(&provider_id)))
@@ -357,7 +358,7 @@ pub fn update_provider_command(
     provider_id: String,
     base_url: String,
 ) -> Result<(), String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Update the provider
     let updated = diesel::update(ai_providers::table.filter(ai_providers::id.eq(&provider_id)))
@@ -421,7 +422,7 @@ pub fn add_user_provider_command(
     requires_api_key: bool,
     initial_models: Vec<InitialModelSpec>,
 ) -> Result<(), String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Validate provider ID format (lowercase, alphanumeric with hyphens)
     if !id
@@ -485,7 +486,7 @@ pub async fn delete_user_provider_command(
     pool: State<'_, DbPool>,
     provider_id: String,
 ) -> Result<(), String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Check if provider exists and is user-defined
     let provider = ai_providers::table
@@ -529,7 +530,7 @@ pub async fn delete_user_provider_command(
 pub fn get_global_default_model_command(
     pool: State<'_, DbPool>,
 ) -> Result<Option<GlobalDefaultModel>, String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     let result: (Option<String>, Option<String>) = settings::table
         .select((settings::default_provider_id, settings::default_model_id))
@@ -554,7 +555,7 @@ pub fn set_global_default_model_command(
     provider_id: String,
     model_id: String,
 ) -> Result<(), String> {
-    let mut conn = pool.get().map_err(|e| format!("Database error: {}", e))?;
+    let mut conn = db_conn(&pool)?;
 
     // Verify provider exists
     let provider_exists = ai_providers::table
