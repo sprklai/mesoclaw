@@ -35,6 +35,8 @@
 export {
 	AlertCircle,
 	AlertTriangle,
+	Bell,
+	BellOff,
 	ArrowDown,
 	ArrowRight,
 	ArrowUpDown,
@@ -47,6 +49,7 @@ export {
 	Cable,
 	Calendar,
 	Check,
+	CheckCheck,
 	CheckCircle2,
 	ChevronDown,
 	ChevronLeft,

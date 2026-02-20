@@ -6,6 +6,7 @@ import { ContextPanel } from "@/components/layout/ContextPanel";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/ui/sidebar";
 import { useChannelMessages } from "@/hooks/useChannelMessages";
+import { useDeepLinks } from "@/hooks/useDeepLinks";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { useMobileSwipe } from "@/hooks/useMobileSwipe";
 import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
@@ -25,6 +26,9 @@ function RootLayout() {
 
   // Enable global keyboard shortcuts
   useGlobalShortcuts({ enabled: onboardingCompleted });
+
+  // Enable deep link handling
+  useDeepLinks();
 
   useEffect(() => {
     if (!onboardingCompleted && pathname !== "/onboarding") {

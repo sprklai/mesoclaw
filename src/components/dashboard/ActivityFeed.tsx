@@ -74,13 +74,15 @@ export function RealtimeFeed({
   maxItems = 5,
 }: RealtimeFeedProps) {
   const visible = activities.slice(0, maxItems);
+  // Only show green dot when there are active running tasks
+  const dotColor = visible.length > 0 ? "bg-green-500" : "bg-muted-foreground";
 
   return (
     <div>
       <SectionHeader
         title="Now"
         count={visible.length}
-        dotColor="bg-green-500"
+        dotColor={dotColor}
       />
       {visible.length === 0 ? (
         <div className="py-4 text-center text-sm text-muted-foreground">

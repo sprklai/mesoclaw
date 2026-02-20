@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { NotificationCenter } from "@/components/layout/NotificationCenter";
 import { GatewayStatus } from "@/components/ui/gateway-status";
 import { SidebarHeader } from "@/components/ui/sidebar/sidebar-header";
 import { SidebarMobile } from "@/components/ui/sidebar/sidebar-mobile";
@@ -103,6 +104,7 @@ export function Sidebar() {
 						<>
 							<ThemeToggle compact={false} />
 							<GatewayStatus />
+							<NotificationCenter />
 						</>
 					) : (
 						<div className="flex justify-center">

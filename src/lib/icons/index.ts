@@ -47,6 +47,8 @@ export {
 	// Status & Feedback
 	AlertCircle,
 	AlertTriangle,
+	Bell,
+	BellOff,
 	// Navigation & Chrome
 	ArrowDown,
 	ArrowRight,
@@ -65,6 +67,7 @@ export {
 	Cable,
 	Calendar,
 	Check,
+	CheckCheck,
 	CheckCircle2,
 	ChevronDown,
 	ChevronLeft,

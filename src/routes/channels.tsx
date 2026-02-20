@@ -15,6 +15,7 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements";
+import { ChannelStatusBadge, ChannelStatusDot } from "@/components/channels/ChannelStatusBadge";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -151,7 +152,10 @@ function ChannelsPage() {
                         : "text-foreground hover:bg-accent hover:text-accent-foreground",
                     )}
                   >
-                    <span className="truncate">{ch.name}</span>
+                    <div className="flex items-center gap-2 truncate">
+                      <ChannelStatusDot status={ch.status} />
+                      <span className="truncate">{ch.displayName || ch.name}</span>
+                    </div>
                     {count > 0 && (
                       <Badge variant="destructive" className="ml-2 shrink-0 text-xs">
                         {count}
@@ -177,8 +181,14 @@ function ChannelsPage() {
         <div className="mt-2 flex min-w-0 flex-1 flex-col rounded-xl border border-border md:ml-4 md:mt-0">
           {selectedChannel ? (
             <>
-              <header className="shrink-0 border-b border-border px-4 py-3">
+              <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
                 <span className="text-sm font-semibold">#{selectedChannel}</span>
+                {(() => {
+                  const channel = channels.find((c) => c.name === selectedChannel);
+                  return channel ? (
+                    <ChannelStatusBadge status={channel.status} />
+                  ) : null;
+                })()}
               </header>
 
               <Conversation>

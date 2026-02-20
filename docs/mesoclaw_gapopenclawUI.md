@@ -1,6 +1,6 @@
 # MesoClaw vs OpenClaw UI/UX Gap Analysis
 
-> **Analysis Date:** 2026-02-20
+> **Analysis Date:** 2026-02-20 (Last Updated: 2026-02-20 - Phase 2 complete)
 > **Purpose:** Identify UI/UX gaps between OpenClaw and MesoClaw to guide design improvements and feature prioritization.
 > **Scope:** Visual design, interaction patterns, user flows, and experience quality—not backend functionality gaps (see `docs/gap_analysis.md` for those).
 
@@ -16,12 +16,15 @@ This analysis compares the UI/UX capabilities of MesoClaw (a Tauri 2.x desktop a
 
 2. **OpenClaw provides superior multi-channel orchestration** with real-time channel status, Live Canvas for visual artifacts, and companion mobile apps that provide seamless cross-device experiences.
 
-3. **Priority gaps to address:**
-   - **P0:** Agent system UI uses mock data—backend integration needed
-   - **P1:** Session persistence and history management in chat
-   - **P1:** Command palette for power-user navigation
-   - **P2:** Notification center for system events
-   - **P2:** Chat commands (/status, /new, /compact) for enhanced interaction
+3. **Priority gaps status (updated 2026-02-20):**
+   - ✅ **P1:** Session persistence and history management in chat — **DONE** (`src-tauri/src/commands/chat_sessions.rs`)
+   - ✅ **P1:** Command palette for power-user navigation — **DONE** (`src/components/CommandPalette.tsx`)
+   - ✅ **P1:** Deep links for notification actions — **DONE** (`src/hooks/useDeepLinks.ts`, `mesoclaw://` scheme)
+   - ✅ **P2:** Chat commands (/status, /new, /clear, /export) — **DONE** (`src/lib/chatCommands.ts`)
+   - ✅ **P2:** Keyboard shortcuts system — **DONE** (`src/hooks/useGlobalShortcuts.ts`)
+   - ✅ **P2:** Notification center for system events — **DONE** (`src/components/layout/NotificationCenter.tsx`)
+   - ✅ **P2:** Real-time channel status indicators — **DONE** (`src/components/channels/ChannelStatusBadge.tsx`)
+   - ⚠️ **P0:** Agent system — Default agent works, multi-agent CRUD pending
 
 ---
 
@@ -37,19 +40,19 @@ This analysis compares the UI/UX capabilities of MesoClaw (a Tauri 2.x desktop a
 | Responsive Design | ✅ 5 breakpoints | ⚠️ 3 breakpoints | Low | Mobile-first work in progress |
 | **Chat Interface** |
 | Streaming Responses | ✅ SSE | ✅ Tauri Events | — | Both support streaming |
-| Session Persistence | ✅ Full | ❌ In-memory only | **High** | Critical for UX |
-| Chat History Browser | ✅ | ❌ | **High** | Users lose context on reload |
-| Chat Commands (/, /new) | ✅ Full set | ❌ None | Medium | Power user feature |
+| Session Persistence | ✅ Full | ✅ SQLite backend | ~~High~~ ✅ DONE | `src-tauri/src/commands/chat_sessions.rs` |
+| Chat History Browser | ✅ | ✅ ChatSessionStore | ~~High~~ ✅ DONE | Session resumption works |
+| Chat Commands (/, /new) | ✅ Full set | ✅ /new, /clear, /status, /help, /export | ~~Medium~~ ✅ DONE | `src/lib/chatCommands.ts` |
 | Model Selection | ✅ | ✅ Model Selector | — | Good implementation |
 | Context Panel | ✅ | ✅ | — | Similar patterns |
 | **Agent System** |
-| Agent Configuration UI | ✅ Full CRUD | ⚠️ Mock data | **Critical** | UI exists, no backend |
-| Agent Workspace Editor | ✅ SOUL.md/AGENTS.md | ⚠️ UI exists, no backend | **Critical** |
-| Session History Viewer | ✅ | ⚠️ UI exists, no backend | **Critical** |
-| Execution Monitor | ✅ Real-time | ⚠️ UI exists, no backend | **Critical** |
+| Agent Configuration UI | ✅ Full CRUD | ⚠️ Default only | Medium | Multi-agent pending |
+| Agent Workspace Editor | ✅ SOUL.md/AGENTS.md | ✅ Workspace files work | ~~Critical~~ ✅ DONE | `src-tauri/src/agent/commands.rs` |
+| Session History Viewer | ✅ | ✅ list_sessions_command | ~~Critical~~ ✅ DONE | |
+| Execution Monitor | ✅ Real-time | ✅ run_agent_command | ~~Critical~~ ✅ DONE | |
 | **Multi-Channel** |
-| Channel Configuration | ✅ Full | ⚠️ Config only | High | No message routing |
-| Real-time Channel Status | ✅ WebSocket | ❌ | Medium | Need status indicators |
+| Channel Configuration | ✅ Full | ✅ Telegram working | ~~High~~ ✅ DONE | `src-tauri/src/channels/` |
+| Real-time Channel Status | ✅ WebSocket | ✅ StatusBadge component | ~~Medium~~ ✅ DONE | `src/components/channels/ChannelStatusBadge.tsx` |
 | Channel Message History | ✅ Per-channel | ❌ | Medium | |
 | **Visual Workspace** |
 | Live Canvas (A2UI) | ✅ Artifact rendering | ❌ | Medium | Consider for Phase 2 |
@@ -59,14 +62,14 @@ This analysis compares the UI/UX capabilities of MesoClaw (a Tauri 2.x desktop a
 | Voice Wake Mode | ✅ "Hey Claw" | ❌ | Low | Platform-specific |
 | Talk Mode (Push-to-talk) | ✅ | ❌ | Low | |
 | **Navigation & Discovery** |
-| Command Palette (Cmd+K) | ✅ | ❌ | **High** | Critical for power users |
+| Command Palette (Cmd+K) | ✅ | ✅ cmdk implementation | ~~High~~ ✅ DONE | `src/components/CommandPalette.tsx` |
 | Global Search | ✅ | ❌ | Medium | Search across all content |
-| Keyboard Shortcuts | ✅ | ⚠️ Limited | Medium | |
+| Keyboard Shortcuts | ✅ | ✅ G+* navigation, mod+N, mod+K | ~~Medium~~ ✅ DONE | `src/hooks/useGlobalShortcuts.ts` |
 | **System Integration** |
 | System Tray | ✅ | ⚠️ Basic | Low | Tauri plugin available |
-| Deep Links | ✅ | ❌ | Medium | For notification actions |
-| Notifications | ✅ Platform-native | ⚠️ Basic | Medium | Need action URLs |
-| Notification Center | ✅ | ❌ | Medium | System event tracking |
+| Deep Links | ✅ | ✅ mesoclaw:// scheme | ~~Medium~~ ✅ DONE | `src/hooks/useDeepLinks.ts` |
+| Notifications | ✅ Platform-native | ✅ tauri-plugin-notification | ~~Medium~~ ✅ DONE | |
+| Notification Center | ✅ | ✅ Bell + unread badge + panel | ~~Medium~~ ✅ DONE | `src/components/layout/NotificationCenter.tsx` |
 | **Security & Auth** |
 | Device Pairing | ✅ QR code | ❌ | Low | Different model |
 | Tailscale Integration | ✅ | ❌ | Low | Enterprise feature |
@@ -83,13 +86,17 @@ This analysis compares the UI/UX capabilities of MesoClaw (a Tauri 2.x desktop a
 
 ### P0: Critical (Blocks Core Functionality)
 
-#### 1. Agent System Backend Integration
+#### 1. ~~Agent System Backend Integration~~ ✅ DONE
 
-**Current State:**
-- UI components exist in `src/components/agents/`
-- Store at `src/stores/agentConfigStore.ts` has comprehensive interface
-- All CRUD operations marked with `## TODO: Wire to backend command`
-- Currently returns empty arrays (mock data)
+**Status:** Default agent working. Multi-agent CRUD pending.
+
+**Implementation:**
+- `src-tauri/src/agent/commands.rs` - Full agent and session commands
+- `src-tauri/src/agent/agent_commands.rs` - Agent loop execution
+- `src/stores/agentConfigStore.ts` - Frontend store with IPC calls
+
+**Remaining:**
+- Multi-agent configuration UI (currently only default agent)
 
 **Target State:**
 - Full CRUD with SQLite persistence via Diesel ORM
@@ -132,141 +139,37 @@ pub async fn list_agents_command(
 
 ---
 
-#### 2. Session Persistence & Chat History
+#### 2. ~~Session Persistence & Chat History~~ ✅ DONE
 
-**Current State:**
-- `src/routes/chat.tsx` uses React state: `useState<MessageType[]>([])`
-- Messages lost on page refresh or navigation
-- No session ID stored, no resumption capability
+**Status:** Fully implemented with SQLite backend.
 
-**Target State:**
-- Automatic session save to SQLite
-- Session list in UI (Recent Chats sidebar)
-- Session resumption with full message history
-- Optional: Cross-device sync via gateway
-
-**Implementation Approach:**
-
-1. **Database Schema:**
-```sql
-CREATE TABLE chat_sessions (
-    id TEXT PRIMARY KEY,
-    title TEXT,
-    provider_id TEXT NOT NULL,
-    model_id TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-);
-
-CREATE TABLE chat_messages (
-    id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL REFERENCES chat_sessions(id),
-    role TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at INTEGER NOT NULL
-);
-
-CREATE INDEX idx_messages_session ON chat_messages(session_id);
-```
-
-2. **Frontend Store:**
-```typescript
-// src/stores/chatSessionStore.ts
-interface ChatSessionState {
-  sessions: ChatSession[];
-  activeSessionId: string | null;
-  messages: Map<string, MessageType[]>;
-
-  loadSessions: () => Promise<void>;
-  createSession: (providerId: string, modelId: string) => Promise<string>;
-  loadSession: (sessionId: string) => Promise<void>;
-  saveMessage: (sessionId: string, message: MessageType) => Promise<void>;
-}
-```
-
-3. **Auto-save Pattern:**
-```typescript
-// Debounced save on every message
-useEffect(() => {
-  const timeout = setTimeout(() => {
-    if (messages.length > 0 && sessionId) {
-      invoke("save_session_messages_command", { sessionId, messages });
-    }
-  }, 1000);
-  return () => clearTimeout(timeout);
-}, [messages, sessionId]);
-```
-
-**Effort:** 2-3 days
-**Dependencies:** None (can run in parallel)
+**Implementation:**
+- `src-tauri/src/commands/chat_sessions.rs` - Full CRUD commands
+- `src/stores/chatSessionStore.ts` - Zustand store with IPC
+- Database schema in `src-tauri/migrations/`
 
 ---
 
 ### P1: High (Core User Experience)
 
-#### 3. Command Palette (Cmd+K / Ctrl+K)
+#### 3. ~~Command Palette (Cmd+K / Ctrl+K)~~ ✅ DONE
 
-**Current State:**
-- No global command palette
-- Navigation requires mouse clicks
-- No keyboard-first workflow
+**Status:** Fully implemented with `cmdk` library.
 
-**Target State:**
-- `cmdk`-style command palette
-- Quick navigation to any route
-- Quick actions (New Chat, New Agent, Settings)
-- Recent items section
-- Fuzzy search across all commands
+**Implementation:**
+- `src/components/CommandPalette.tsx` - Full command palette
+- `src/components/ui/command.tsx` - shadcn-style command components
+- Navigation + chat actions integrated
 
-**Implementation Pattern:**
-```tsx
-// src/components/ui/command-palette.tsx
-import { Command } from "cmdk";
+---
 
-export function CommandPalette() {
-  const [open, setOpen] = useState(false);
+#### 4. ~~Chat Commands System~~ ✅ DONE
 
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setOpen((open) => !open);
-      }
-    };
-    document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
-  }, []);
+**Status:** Implemented with 5 commands.
 
-  return (
-    <Command.Dialog open={open} onOpenChange={setOpen}>
-      <Command.Input placeholder="Search commands..." />
-      <Command.List>
-        <Command.Group heading="Navigation">
-          <Command.Item onSelect={() => navigate("/chat")}>
-            <MessageSquare className="mr-2 h-4 w-4" />
-            Chat
-          </Command.Item>
-          <Command.Item onSelect={() => navigate("/agents")}>
-            <Bot className="mr-2 h-4 w-4" />
-            Agents
-          </Command.Item>
-        </Command.Group>
-        <Command.Group heading="Actions">
-          <Command.Item onSelect={handleNewChat}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Chat
-          </Command.Item>
-        </Command.Group>
-      </Command.List>
-    </Command.Dialog>
-  );
-}
-```
-
-**Recommended Library:** `cmdk` (Radix-based, accessible, well-maintained)
-
-**Effort:** 1-2 days
-**Dependencies:** None
+**Implementation:**
+- `src/lib/chatCommands.ts` - Command parser and registry
+- Commands: `/new`, `/clear`, `/status`, `/help`, `/export`
 
 ---
 
@@ -458,32 +361,19 @@ function ChannelStatusBadge({ channel }: { channel: Channel }) {
 
 ---
 
-#### 8. Keyboard Shortcuts System
+#### 8. ~~Keyboard Shortcuts System~~ ✅ DONE
 
-**Current State:**
-- Limited keyboard support
-- No shortcuts overlay
-
-**Target State:**
-- Comprehensive shortcuts
-- `?` or `Cmd+/` to show shortcuts modal
-- Context-aware shortcuts
-
-**Recommended Shortcuts:**
-| Action | Mac | Windows/Linux |
-|--------|-----|---------------|
-| Command Palette | `Cmd+K` | `Ctrl+K` |
-| New Chat | `Cmd+N` | `Ctrl+N` |
-| Search | `Cmd+/` | `Ctrl+/` |
-| Settings | `Cmd+,` | `Ctrl+,` |
-| Show Shortcuts | `Cmd+?` | `Ctrl+?` |
-| Navigate Back | `Cmd+[` | `Alt+←` |
-| Navigate Forward | `Cmd+]` | `Alt+→` |
+**Status:** Fully implemented with `react-hotkeys-hook`.
 
 **Implementation:**
-```typescript
-// src/hooks/useKeyboardShortcuts.ts
-import { useHotkeys } from "react-hotkeys-hook";
+- `src/hooks/useGlobalShortcuts.ts` - Global shortcuts hook
+- Shortcuts: mod+K (command palette), mod+N (new chat), mod+shift+C (clear)
+- G+* navigation sequences (G+C, G+A, G+S, G+H, G+M, G+L)
+
+**Remaining:**
+- Add shortcuts overlay modal (Cmd+?)
+
+---
 
 export function useKeyboardShortcuts() {
   const navigate = useNavigate();
@@ -815,23 +705,23 @@ const unlisten = await listen<StreamEvent>(
 
 ## Actionable Roadmap
 
-### Phase 1: Core Stability (Week 1-2)
+### Phase 1: Core Stability (Week 1-2) - ✅ COMPLETE
 
-| Task | Priority | Effort | Dependencies |
-|------|----------|--------|--------------|
-| Agent system backend integration | P0 | 3-5 days | DB migration |
-| Session persistence | P0 | 2-3 days | None |
-| Command palette | P1 | 1-2 days | None |
-| Chat commands (/status, /new) | P1 | 1 day | None |
+| Task | Priority | Effort | Status |
+|------|----------|--------|--------|
+| ~~Agent system backend integration~~ | P0 | 3-5 days | ✅ Default agent working |
+| ~~Session persistence~~ | P0 | 2-3 days | ✅ SQLite backend |
+| ~~Command palette~~ | P1 | 1-2 days | ✅ cmdk implementation |
+| ~~Chat commands (/status, /new)~~ | P1 | 1 day | ✅ 5 commands |
 
-### Phase 2: Enhanced UX (Week 3-4)
+### Phase 2: Enhanced UX (Week 3-4) - ✅ COMPLETE
 
-| Task | Priority | Effort | Dependencies |
-|------|----------|--------|--------------|
-| Notification center | P2 | 2 days | Notification store |
-| Keyboard shortcuts | P2 | 1 day | None |
-| Deep link actions | P1 | 1 day | tauri-plugin-deep-link |
-| Channel status indicators | P2 | 1-2 days | WebSocket |
+| Task | Priority | Effort | Status |
+|------|----------|--------|--------|
+| ~~Notification center~~ | P2 | 2 days | ✅ Bell + unread badge + panel |
+| ~~Keyboard shortcuts~~ | P2 | 1 day | ✅ react-hotkeys-hook |
+| ~~Deep link actions~~ | P1 | 1 day | ✅ mesoclaw:// scheme wired |
+| ~~Channel status indicators~~ | P2 | 1-2 days | ✅ StatusBadge component |
 
 ### Phase 3: Platform Expansion (Month 2)
 
