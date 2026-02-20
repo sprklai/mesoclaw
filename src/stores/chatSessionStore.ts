@@ -35,7 +35,13 @@ interface ChatSessionState {
   loadMessages: (sessionId: string) => Promise<void>;
   saveMessage: (role: "user" | "assistant" | "system", content: string) => Promise<void>;
   clearMessages: () => Promise<void>;
+
+  // Helper methods for commands
+  getCurrentSession: () => ChatSession | null;
+  getMessages: () => ChatMessage[];
 }
+
+export type UseChatSessionStore = ReturnType<typeof useChatSessionStore>;
 
 export const useChatSessionStore = create<ChatSessionState>((set, get) => ({
   sessions: [],
@@ -143,5 +149,17 @@ export const useChatSessionStore = create<ChatSessionState>((set, get) => ({
     } catch (error) {
       set({ error: String(error) });
     }
+  },
+
+  getCurrentSession: () => {
+    const { sessions, activeSessionId } = get();
+    if (!activeSessionId) return null;
+    return sessions.find((s) => s.id === activeSessionId) || null;
+  },
+
+  getMessages: () => {
+    const { activeSessionId, messages } = get();
+    if (!activeSessionId) return [];
+    return messages.get(activeSessionId) || [];
   },
 }));
