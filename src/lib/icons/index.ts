@@ -48,6 +48,7 @@ export {
 	AlertCircle,
 	AlertTriangle,
 	// Navigation & Chrome
+	ArrowDown,
 	ArrowRight,
 	ArrowUpDown,
 	// Analysis & Comparison
@@ -118,6 +119,7 @@ export {
 	Network,
 	PanelLeft,
 	PanelLeftClose,
+	Pause,
 	Pencil,
 	PenLine,
 	Percent,

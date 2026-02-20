@@ -35,6 +35,7 @@
 export {
 	AlertCircle,
 	AlertTriangle,
+	ArrowDown,
 	ArrowRight,
 	ArrowUpDown,
 	BarChart3,
@@ -99,6 +100,7 @@ export {
 	Network,
 	PanelLeft,
 	PanelLeftClose,
+	Pause,
 	Pencil,
 	PenLine,
 	Percent,

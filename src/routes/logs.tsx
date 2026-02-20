@@ -6,8 +6,10 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RefreshCw, Search, X } from "@/lib/icons";
+import { ArrowDown, Pause, Play, RefreshCw, Search, X } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+
+const AUTO_REFRESH_INTERVAL_MS = 2000;
 
 export const Route = createFileRoute("/logs")({
   component: LogsPage,
@@ -67,8 +69,24 @@ function LogsPage() {
 
   const [activeLevel, setActiveLevel] = useState<LogLevel>("ALL");
   const [search, setSearch] = useState("");
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    bottomRef.current?.scrollIntoView({ behavior });
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    isAtBottomRef.current = atBottom;
+    setShowScrollBtn(!atBottom);
+  }, []);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -77,7 +95,7 @@ function LogsPage() {
       const data = await invoke<LogEntry[]>("get_logs_command", {
         maxLines: 5000,
       });
-      setEntries(data);
+      setEntries(data.slice().reverse());
     } catch (e) {
       setError(String(e));
     } finally {
@@ -85,9 +103,17 @@ function LogsPage() {
     }
   }, []);
 
+  // Initial load — scroll to bottom immediately
   useEffect(() => {
-    void fetchLogs();
-  }, [fetchLogs]);
+    void fetchLogs().then(() => scrollToBottom("instant"));
+  }, [fetchLogs, scrollToBottom]);
+
+  // Auto-refresh polling
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = setInterval(() => void fetchLogs(), AUTO_REFRESH_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [autoRefresh, fetchLogs]);
 
   // ── Filtering ────────────────────────────────────────────────────────────────
 
@@ -106,6 +132,13 @@ function LogsPage() {
       return true;
     });
   }, [entries, activeLevel, search]);
+
+  // Auto-scroll to bottom when filtered list changes — only if already at bottom
+  useEffect(() => {
+    if (isAtBottomRef.current) {
+      scrollToBottom("smooth");
+    }
+  }, [filtered, scrollToBottom]);
 
   // ── Level counts ─────────────────────────────────────────────────────────────
 
@@ -177,7 +210,23 @@ function LogsPage() {
           )}
         </div>
 
-        {/* Refresh */}
+        {/* Auto-refresh toggle */}
+        <Button
+          variant={autoRefresh ? "default" : "ghost"}
+          size="icon"
+          className="size-8"
+          onClick={() => setAutoRefresh((v) => !v)}
+          aria-label={autoRefresh ? "Pause auto-refresh" : "Resume auto-refresh"}
+          title={autoRefresh ? "Pause auto-refresh" : "Resume auto-refresh"}
+        >
+          {autoRefresh ? (
+            <Pause className="size-4" aria-hidden />
+          ) : (
+            <Play className="size-4" aria-hidden />
+          )}
+        </Button>
+
+        {/* Manual refresh */}
         <Button
           variant="ghost"
           size="icon"
@@ -199,8 +248,29 @@ function LogsPage() {
           {error}
         </div>
       ) : (
-        <div className="flex-1 overflow-hidden rounded-xl border border-border">
-          <div className="h-full overflow-y-auto font-mono text-xs">
+        <div className="relative flex-1 overflow-hidden rounded-xl border border-border">
+          {showScrollBtn && (
+            <button
+              type="button"
+              onClick={() => scrollToBottom("smooth")}
+              aria-label="Scroll to latest logs"
+              className={cn(
+                "absolute bottom-3 right-3 z-20",
+                "flex size-8 items-center justify-center rounded-full",
+                "bg-background/70 backdrop-blur-sm",
+                "border border-border shadow-md",
+                "text-muted-foreground transition-opacity hover:text-foreground",
+                "hover:bg-background/90",
+              )}
+            >
+              <ArrowDown className="size-4" aria-hidden />
+            </button>
+          )}
+          <div
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="h-full overflow-y-auto font-mono text-xs"
+          >
             {filtered.length === 0 ? (
               <p className="p-6 text-center text-sm text-muted-foreground">
                 {loading ? "Loading…" : "No log entries match the current filter."}
@@ -278,6 +348,9 @@ function LogsPage() {
       {/* ── Footer stats ────────────────────────────────────────────────────── */}
       <p className="text-right text-xs text-muted-foreground">
         {filtered.length} / {entries.length} entries
+        {autoRefresh && (
+          <span className="ml-2 opacity-60">· live</span>
+        )}
       </p>
     </div>
   );
