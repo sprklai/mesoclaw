@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { CheckIcon, Sparkles } from "lucide-react";
 
+import { useChatSessionStore } from "@/stores/chatSessionStore";
 import {
   Conversation,
   ConversationContent,
@@ -155,12 +156,31 @@ function ChatContextPanel({
 function ChatPage() {
   const settings = useSettings((state) => state.settings);
 
+  // Session store integration
+  const {
+    sessions,
+    activeSessionId,
+    isLoading: isLoadingSessions,
+    loadSessions,
+    createSession,
+    loadSession,
+    saveMessage,
+    clearMessages,
+  } = useChatSessionStore();
+
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [sessionId] = useState(() => nanoid());
+  const [sessionId, setSessionId] = useState(() => nanoid());
   const [apiKey, setApiKey] = useState("");
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+
+  // Track if we've initialized session loading
+  const sessionInitialized = useRef(false);
+  // Track saved message count to avoid re-saving
+  const savedMessageCount = useRef(0);
+  // Track streaming session ID for event listener
+  const streamingSessionRef = useRef(sessionId);
 
   // Available models
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
@@ -228,6 +248,61 @@ function ChatPage() {
     loadModels();
   }, []);
 
+  // Load sessions on mount
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  // Load or create session on mount
+  useEffect(() => {
+    if (sessionInitialized.current || isLoadingSessions) return;
+    sessionInitialized.current = true;
+
+    async function initSession() {
+      // If sessions exist but none is active, load the most recent one
+      if (sessions.length > 0 && !activeSessionId) {
+        const lastSession = sessions[0];
+        await loadSession(lastSession.id);
+        setSessionId(lastSession.id);
+
+        // Load messages from the session
+        const sessionMessages = useChatSessionStore.getState().messages.get(lastSession.id);
+        if (sessionMessages) {
+          setMessages(sessionMessages.map((m) => ({
+            id: m.id,
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            isStreaming: false,
+          })));
+          savedMessageCount.current = sessionMessages.length;
+        }
+      }
+    }
+    initSession();
+  }, [sessions, activeSessionId, isLoadingSessions, loadSession]);
+
+  // Auto-save messages with debounce
+  useEffect(() => {
+    if (messages.length === 0 || !activeSessionId || isStreaming) return;
+
+    // Only save if there are new messages to save
+    if (messages.length <= savedMessageCount.current) return;
+
+    const timeout = setTimeout(async () => {
+      // Find messages that haven't been saved yet
+      const newMessages = messages.slice(savedMessageCount.current);
+      for (const msg of newMessages) {
+        // Skip streaming messages
+        if (!msg.isStreaming) {
+          await saveMessage(msg.role, msg.content);
+        }
+      }
+      savedMessageCount.current = messages.length;
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+  }, [messages, activeSessionId, isStreaming, saveMessage]);
+
   // Update selected model when settings change
   useEffect(() => {
     if (settings?.llmModel) {
@@ -276,11 +351,15 @@ function ChatPage() {
         messages={messages}
         selectedModelData={selectedModelData}
         isStreaming={isStreaming}
-        onClear={() => setMessages([])}
+        onClear={() => {
+          setMessages([]);
+          savedMessageCount.current = 0;
+          clearMessages();
+        }}
       />,
     );
     return () => useContextPanelStore.getState().clearContent();
-  }, [messages, selectedModelData, isStreaming]);
+  }, [messages, selectedModelData, isStreaming, clearMessages]);
 
   const handleModelSelect = useCallback((modelId: string) => {
     const parts = modelId.split("/");
@@ -313,6 +392,21 @@ function ChatPage() {
           description: "Please add an API key in Settings → AI Providers",
         });
         return;
+      }
+
+      // Create session if one doesn't exist
+      let currentSessionId = activeSessionId;
+      if (!currentSessionId) {
+        try {
+          currentSessionId = await createSession(selectedModel.providerId, selectedModel.modelId);
+          setSessionId(currentSessionId);
+          streamingSessionRef.current = currentSessionId;
+          console.log("Created new session:", currentSessionId);
+        } catch (error) {
+          console.error("Failed to create session:", error);
+          toast.error("Failed to create chat session");
+          return;
+        }
       }
 
       // Add user message
@@ -351,7 +445,7 @@ function ChatPage() {
             modelId: selectedModel.modelId,
             apiKey: apiKey,
             messages: chatMessages,
-            sessionId,
+            sessionId: currentSessionId,
           },
         });
 
@@ -367,7 +461,7 @@ function ChatPage() {
         setMessages((prev) => prev.filter((m) => m.id !== assistantMessageId));
       }
     },
-    [messages, selectedModel, apiKey, sessionId]
+    [messages, selectedModel, apiKey, activeSessionId, createSession]
   );
 
   // Track virtual keyboard height so the chat input can be pushed up when the
@@ -389,9 +483,10 @@ function ChatPage() {
     };
   }, []);
 
-  // Listen for streaming events
+  // Listen for streaming events - use ref to track current streaming session
   useEffect(() => {
-    const eventName = `chat-stream-${sessionId}`;
+    const currentStreamingId = streamingSessionRef.current;
+    const eventName = `chat-stream-${currentStreamingId}`;
     console.log("Setting up listener for:", eventName);
 
     const unlistenPromise = listen<{
