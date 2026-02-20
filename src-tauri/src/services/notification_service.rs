@@ -59,6 +59,9 @@ pub struct NotificationSpec {
 pub struct NotificationConfig {
     /// When `true`, all notifications are suppressed regardless of category.
     pub do_not_disturb: bool,
+    /// When `true`, the DND time-window ([`dnd_start_hour`]..[`dnd_end_hour`])
+    /// is enforced.  Default `false` so the schedule is opt-in.
+    pub dnd_schedule_enabled: bool,
     /// DND window start hour (0–23), inclusive. Default 22 (10 pm).
     pub dnd_start_hour: u8,
     /// DND window end hour (0–23), exclusive. Default 7 (7 am).
@@ -79,6 +82,7 @@ impl Default for NotificationConfig {
     fn default() -> Self {
         Self {
             do_not_disturb: false,
+            dnd_schedule_enabled: false,
             dnd_start_hour: 22,
             dnd_end_hour: 7,
             categories: std::collections::HashMap::new(),
@@ -91,14 +95,19 @@ impl Default for NotificationConfig {
 }
 
 impl NotificationConfig {
-    /// Return `true` if the DND time-window is currently active.
+    /// Return `true` if quiet-mode is in effect right now.
     ///
-    /// If `do_not_disturb` is set, returns `true` immediately.
-    /// Otherwise checks the current local hour against `dnd_start_hour`..`dnd_end_hour`.
-    /// The window wraps midnight when `start > end` (e.g. 22–7).
+    /// Quiet mode is active when:
+    /// - `do_not_disturb` is `true` (immediate global suppress), OR
+    /// - `dnd_schedule_enabled` is `true` AND the current local hour falls
+    ///   within `[dnd_start_hour, dnd_end_hour)`.
+    ///   The window wraps midnight when `start > end` (e.g. 22–7).
     pub fn is_dnd_active(&self) -> bool {
         if self.do_not_disturb {
             return true;
+        }
+        if !self.dnd_schedule_enabled {
+            return false;
         }
         let hour = chrono::Local::now().hour() as u8;
         let start = self.dnd_start_hour;
@@ -112,12 +121,12 @@ impl NotificationConfig {
     }
 
     /// Return `true` if notifications for `category` should be displayed,
-    /// taking into account DND time window and per-category preferences.
+    /// taking into account DND quiet mode and per-category preferences.
     pub fn is_enabled_for(&self, category: NotificationCategory) -> bool {
         if self.is_dnd_active() {
             return false;
         }
-        // Check the typed per-category flags first.
+        // Check the typed per-category flags.
         let category_enabled = match category {
             NotificationCategory::Heartbeat => self.notify_heartbeat,
             NotificationCategory::Cron => self.notify_cron_reminder,

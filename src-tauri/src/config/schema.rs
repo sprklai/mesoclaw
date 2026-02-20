@@ -157,6 +157,8 @@ pub struct NotificationsConfig {
     pub enabled: bool,
     /// Global Do Not Disturb mode (boolean toggle, env-var controlled).
     pub do_not_disturb: bool,
+    /// When `true`, the DND time-window is enforced.  Default `false` (opt-in).
+    pub dnd_schedule_enabled: bool,
     /// DND window start hour (0–23), inclusive. Default 22 (10 pm).
     #[serde(default = "default_dnd_start")]
     pub dnd_start_hour: u8,
@@ -184,6 +186,7 @@ impl Default for NotificationsConfig {
         Self {
             enabled: true,
             do_not_disturb: false,
+            dnd_schedule_enabled: false,
             dnd_start_hour: default_dnd_start(),
             dnd_end_hour: default_dnd_end(),
             categories: std::collections::HashMap::new(),

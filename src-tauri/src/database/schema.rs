@@ -83,6 +83,7 @@ diesel::table! {
         notify_updates -> Integer,
         notify_alerts -> Integer,
         notify_activity -> Integer,
+        dnd_schedule_enabled -> Integer,
         dnd_start_hour -> Integer,
         dnd_end_hour -> Integer,
         notify_heartbeat -> Integer,

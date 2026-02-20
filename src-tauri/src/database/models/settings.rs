@@ -95,6 +95,7 @@ pub struct SettingsRow {
     pub notify_updates: i32,
     pub notify_alerts: i32,
     pub notify_activity: i32,
+    pub dnd_schedule_enabled: i32,
     pub dnd_start_hour: i32,
     pub dnd_end_hour: i32,
     pub notify_heartbeat: i32,
@@ -131,6 +132,8 @@ pub struct Settings {
     pub notify_updates: bool,
     pub notify_alerts: bool,
     pub notify_activity: bool,
+    /// When true, the DND time-window is enforced.
+    pub dnd_schedule_enabled: bool,
     /// DND schedule start hour (0–23). Default 22 (10 pm).
     pub dnd_start_hour: i32,
     /// DND schedule end hour (0–23). Default 7 (7 am).
@@ -173,6 +176,7 @@ impl Settings {
             notify_updates: int_to_bool(row.notify_updates),
             notify_alerts: int_to_bool(row.notify_alerts),
             notify_activity: int_to_bool(row.notify_activity),
+            dnd_schedule_enabled: int_to_bool(row.dnd_schedule_enabled),
             dnd_start_hour: row.dnd_start_hour,
             dnd_end_hour: row.dnd_end_hour,
             notify_heartbeat: int_to_bool(row.notify_heartbeat),
@@ -211,6 +215,7 @@ pub struct SettingsUpdate {
     pub notify_updates: Option<bool>,
     pub notify_alerts: Option<bool>,
     pub notify_activity: Option<bool>,
+    pub dnd_schedule_enabled: Option<bool>,
     pub dnd_start_hour: Option<i32>,
     pub dnd_end_hour: Option<i32>,
     pub notify_heartbeat: Option<bool>,
@@ -251,6 +256,7 @@ pub struct SettingsChangeset {
     pub notify_updates: Option<i32>,
     pub notify_alerts: Option<i32>,
     pub notify_activity: Option<i32>,
+    pub dnd_schedule_enabled: Option<i32>,
     pub dnd_start_hour: Option<i32>,
     pub dnd_end_hour: Option<i32>,
     pub notify_heartbeat: Option<i32>,
@@ -283,6 +289,7 @@ impl From<SettingsUpdate> for SettingsChangeset {
             notify_updates: update.notify_updates.map(bool_to_int),
             notify_alerts: update.notify_alerts.map(bool_to_int),
             notify_activity: update.notify_activity.map(bool_to_int),
+            dnd_schedule_enabled: update.dnd_schedule_enabled.map(bool_to_int),
             dnd_start_hour: update.dnd_start_hour,
             dnd_end_hour: update.dnd_end_hour,
             notify_heartbeat: update.notify_heartbeat.map(bool_to_int),
