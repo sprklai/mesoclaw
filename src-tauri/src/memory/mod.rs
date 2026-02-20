@@ -28,6 +28,7 @@ pub mod commands;
 pub mod daily;
 pub mod embeddings;
 pub mod hygiene;
+pub mod sqlite_store;
 pub mod store;
 pub mod tools;
 pub mod traits;
@@ -45,6 +46,7 @@ pub use embeddings::{
     EmbeddingProvider, LruEmbeddingCache, MockEmbeddingProvider, cosine_similarity,
 };
 pub use hygiene::{HygieneConfig, HygieneReport, MemoryHygiene};
+pub use sqlite_store::SqliteMemoryStore;
 pub use store::InMemoryStore;
 pub use tools::{MemoryForgetTool, MemoryRecallTool, MemoryStoreTool};
 pub use traits::{Memory, MemoryCategory, MemoryEntry};

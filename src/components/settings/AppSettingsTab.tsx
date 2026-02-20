@@ -148,6 +148,124 @@ export function AppSettingsTab({
             disabled={isSaving}
           />
         </SettingRow>
+
+        {/* DND schedule */}
+        <SettingRow
+          label={t("settings:notifications.dndStartHour.label", "DND start hour")}
+          description={t(
+            "settings:notifications.dndStartHour.description",
+            "Hour (0–23) when Do Not Disturb begins. Default: 22 (10 pm)."
+          )}
+          htmlFor="dnd-start-hour"
+        >
+          <input
+            id="dnd-start-hour"
+            type="number"
+            min={0}
+            max={23}
+            value={settings.dndStartHour}
+            onChange={(e) =>
+              onUpdateSetting("dndStartHour", Number(e.target.value))
+            }
+            disabled={isSaving || !settings.enableNotifications}
+            className="w-20 rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+          />
+        </SettingRow>
+
+        <SettingRow
+          label={t("settings:notifications.dndEndHour.label", "DND end hour")}
+          description={t(
+            "settings:notifications.dndEndHour.description",
+            "Hour (0–23) when Do Not Disturb ends. Default: 7 (7 am)."
+          )}
+          htmlFor="dnd-end-hour"
+        >
+          <input
+            id="dnd-end-hour"
+            type="number"
+            min={0}
+            max={23}
+            value={settings.dndEndHour}
+            onChange={(e) =>
+              onUpdateSetting("dndEndHour", Number(e.target.value))
+            }
+            disabled={isSaving || !settings.enableNotifications}
+            className="w-20 rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+          />
+        </SettingRow>
+
+        {/* Per-category toggles */}
+        <SettingRow
+          label={t("settings:notifications.notifyHeartbeat.label", "Heartbeat")}
+          description={t(
+            "settings:notifications.notifyHeartbeat.description",
+            "Show a notification on each heartbeat tick."
+          )}
+          htmlFor="notify-heartbeat"
+        >
+          <Switch
+            id="notify-heartbeat"
+            checked={settings.notifyHeartbeat}
+            onCheckedChange={(checked) =>
+              onUpdateSetting("notifyHeartbeat", checked)
+            }
+            disabled={isSaving || !settings.enableNotifications}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label={t("settings:notifications.notifyCronReminder.label", "Cron reminders")}
+          description={t(
+            "settings:notifications.notifyCronReminder.description",
+            "Show a notification when a scheduled job fires."
+          )}
+          htmlFor="notify-cron-reminder"
+        >
+          <Switch
+            id="notify-cron-reminder"
+            checked={settings.notifyCronReminder}
+            onCheckedChange={(checked) =>
+              onUpdateSetting("notifyCronReminder", checked)
+            }
+            disabled={isSaving || !settings.enableNotifications}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label={t("settings:notifications.notifyAgentComplete.label", "Agent complete")}
+          description={t(
+            "settings:notifications.notifyAgentComplete.description",
+            "Show a notification when an agent task finishes."
+          )}
+          htmlFor="notify-agent-complete"
+        >
+          <Switch
+            id="notify-agent-complete"
+            checked={settings.notifyAgentComplete}
+            onCheckedChange={(checked) =>
+              onUpdateSetting("notifyAgentComplete", checked)
+            }
+            disabled={isSaving || !settings.enableNotifications}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label={t("settings:notifications.notifyApprovalRequest.label", "Approval requests")}
+          description={t(
+            "settings:notifications.notifyApprovalRequest.description",
+            "Show a notification when an action requires your approval."
+          )}
+          htmlFor="notify-approval-request"
+        >
+          <Switch
+            id="notify-approval-request"
+            checked={settings.notifyApprovalRequest}
+            onCheckedChange={(checked) =>
+              onUpdateSetting("notifyApprovalRequest", checked)
+            }
+            disabled={isSaving || !settings.enableNotifications}
+          />
+        </SettingRow>
       </SettingsSection>
 
       {/* Developer Section */}

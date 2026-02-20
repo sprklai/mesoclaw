@@ -19,6 +19,18 @@ export interface Settings {
   notifyUpdates: boolean;
   notifyAlerts: boolean;
   notifyActivity: boolean;
+  /** DND schedule start hour (0–23). Default 22 (10 pm). */
+  dndStartHour: number;
+  /** DND schedule end hour (0–23). Default 7 (7 am). */
+  dndEndHour: number;
+  /** Notify on heartbeat ticks. */
+  notifyHeartbeat: boolean;
+  /** Notify when a cron job fires. */
+  notifyCronReminder: boolean;
+  /** Notify when an agent task completes. */
+  notifyAgentComplete: boolean;
+  /** Notify when an approval is requested. */
+  notifyApprovalRequest: boolean;
   llmModel: string;
   useCloudLLM: boolean;
   explanationVerbosity: string;
