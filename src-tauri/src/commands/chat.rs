@@ -1,3 +1,4 @@
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
 /// Available LLM models for chat
@@ -11,7 +12,8 @@ pub struct AvailableModel {
 /// Get available LLM models
 #[tauri::command]
 pub fn get_available_models_command() -> Vec<AvailableModel> {
-    vec![
+    info!("[chat] fetching available models");
+    let result = vec![
         AvailableModel {
             id: "openai/gpt-4o".to_string(),
             name: "GPT-4o".to_string(),
@@ -57,7 +59,9 @@ pub fn get_available_models_command() -> Vec<AvailableModel> {
             name: "Grok Code Fast".to_string(),
             provider: "xAI".to_string(),
         },
-    ]
+    ];
+    debug!("[chat] returning {} models", result.len());
+    result
 }
 
 /*
