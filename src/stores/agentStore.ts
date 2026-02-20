@@ -4,11 +4,17 @@
  * Tracks the current session, per-tool execution status, the approval queue,
  * and iteration count.  Subscribes to Tauri `app-event` events emitted by the
  * Rust backend's TauriBridge.
+ *
+ * Session creation and listing (GAP-2) go through the gateway REST API so the
+ * GUI and CLI share the same data path.  Approval responses and session
+ * cancellation continue to use Tauri IPC because they route through the
+ * in-process EventBus (desktop-specific).
  */
 
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { gateway } from "@/lib/gateway";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,6 +109,23 @@ interface AgentState {
 
   /** Begin a new session (resets execution log). */
   startSession: (sessionId: string) => void;
+
+  /**
+   * Create a new agent session via the gateway REST API
+   * (`POST /api/v1/sessions`) and start tracking it locally.
+   * Returns the session ID string on success, or null on failure.
+   */
+  createGatewaySession: (opts?: {
+    systemPrompt?: string;
+    providerID?: string;
+    channel?: string;
+  }) => Promise<string | null>;
+
+  /**
+   * List all active sessions from the gateway REST API
+   * (`GET /api/v1/sessions`).
+   */
+  listGatewaySessions: () => Promise<string[]>;
 
   /** Cancel the current session via Tauri command. */
   cancelSession: () => Promise<void>;
@@ -237,6 +260,42 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       executions: [],
       approvalQueue: [],
     });
+  },
+
+  createGatewaySession: async (opts = {}) => {
+    try {
+      const resp = await gateway.createSession({
+        system_prompt: opts.systemPrompt,
+        provider_id: opts.providerID,
+        channel: opts.channel,
+      });
+      const sessionId = resp.session_id;
+      set({
+        session: {
+          sessionId,
+          status: "running",
+          iterationCount: 0,
+          startedAt: Date.now(),
+          completedAt: null,
+          finalMessage: null,
+        },
+        executions: [],
+        approvalQueue: [],
+      });
+      return sessionId;
+    } catch {
+      // Gateway not reachable — caller can fall back to Tauri IPC.
+      return null;
+    }
+  },
+
+  listGatewaySessions: async () => {
+    try {
+      const resp = await gateway.listSessions();
+      return resp.sessions;
+    } catch {
+      return [];
+    }
   },
 
   cancelSession: async () => {
