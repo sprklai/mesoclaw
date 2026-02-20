@@ -529,12 +529,18 @@ cargo fmt                     # Rust format
 
 | Document                          | Description                                                    |
 | --------------------------------- | -------------------------------------------------------------- |
+| **User Guides**                   |                                                                |
+| `docs/app_usage.md`               | Comprehensive user guide — step-by-step instructions for every feature |
+| `docs/user_testing.md`            | QA testing guide — 117 test cases covering all functionality  |
+| **Project Docs**                  |                                                                |
 | `docs/product-requirements.md`    | Full PRD — requirements, personas, release plan                |
 | `docs/architecture-diagram.md`    | Detailed system architecture with data flow diagrams           |
 | `docs/implementation-plan.md`     | 49-task execution plan across 8 phases                         |
 | `docs/claw-ecosystem-analysis.md` | Comparative analysis of OpenClaw, PicoClaw, IronClaw, ZeroClaw |
 | `docs/mesoclaw-gap-analysis.md`   | Gap analysis between current state and target architecture     |
 | `docs/plans/`                     | Detailed design documents for each subsystem                   |
+| **Code Standards**                |                                                                |
+| `CLAUDE.md`                       | Project-level coding standards and conventions                 |
 | `src/CLAUDE.md`                   | Frontend code standards (React/TypeScript)                     |
 | `src-tauri/CLAUDE.md`             | Backend code standards (Rust)                                  |
 
