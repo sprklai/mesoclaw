@@ -4,8 +4,8 @@
 //! sessions. Each subagent runs in an isolated session with a unique
 //! lane ID.
 
-use log::{info, warn};
 use chrono::{DateTime, Utc};
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

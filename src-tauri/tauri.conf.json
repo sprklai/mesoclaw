@@ -73,5 +73,14 @@
       "developmentTeam": "6BQSGY2B74",
       "minimumSystemVersion": "13.0"
     }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "mesoclaw"
+        ]
+      }
+    }
   }
 }

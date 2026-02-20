@@ -104,7 +104,8 @@ impl ActivityBuffer {
 
     /// Subscribe to the event bus and process events into activities.
     pub fn subscribe_to_bus(self: Arc<Self>, bus: Arc<dyn EventBus>) {
-        tokio::spawn(async move {
+        // Use tauri::async_runtime to spawn from synchronous context (setup closure)
+        tauri::async_runtime::spawn(async move {
             let mut rx = bus.subscribe_filtered(EventFilter::new(vec![
                 EventType::AgentToolStart,
                 EventType::AgentToolResult,

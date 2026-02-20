@@ -18,7 +18,12 @@ pub async fn store_memory_command(
     category: Option<String>,
     store: State<'_, Arc<InMemoryStore>>,
 ) -> Result<(), String> {
-    info!("[memory] store key={} category={:?} content_len={}", key, category, content.len());
+    info!(
+        "[memory] store key={} category={:?} content_len={}",
+        key,
+        category,
+        content.len()
+    );
     let cat = match category.as_deref() {
         Some("daily") => MemoryCategory::Daily,
         Some("conversation") => MemoryCategory::Conversation,
@@ -35,7 +40,11 @@ pub async fn search_memory_command(
     limit: Option<u32>,
     store: State<'_, Arc<InMemoryStore>>,
 ) -> Result<Vec<MemoryEntry>, String> {
-    info!("[memory] search query='{}' limit={}", query, limit.unwrap_or(10));
+    info!(
+        "[memory] search query='{}' limit={}",
+        query,
+        limit.unwrap_or(10)
+    );
     let results = store.recall(&query, limit.unwrap_or(10) as usize).await?;
     info!("[memory] search found {} results", results.len());
     Ok(results)

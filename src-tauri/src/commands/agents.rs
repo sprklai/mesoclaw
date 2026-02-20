@@ -7,12 +7,12 @@
 //! Note: These are distinct from the agent runtime commands in
 //! `src-tauri/src/agent/commands.rs` which handle agent execution.
 
-use crate::database::models::agent::{
-    Agent, AgentRun, AgentSession, CreateAgentRequest, UpdateAgentRequest, NewAgent, UpdateAgent,
-};
-use crate::database::schema::{agents, agent_sessions, agent_runs};
-use crate::database::utils::bool_to_int;
 use crate::database::DbPool;
+use crate::database::models::agent::{
+    Agent, AgentRun, AgentSession, CreateAgentRequest, NewAgent, UpdateAgent, UpdateAgentRequest,
+};
+use crate::database::schema::{agent_runs, agent_sessions, agents};
+use crate::database::utils::bool_to_int;
 use diesel::prelude::*;
 use tauri::State;
 
@@ -172,7 +172,10 @@ pub fn list_active_db_runs_command(pool: State<'_, DbPool>) -> Result<Vec<AgentR
 
 /// Get detailed information about a specific run from the database
 #[tauri::command]
-pub fn get_db_run_details_command(run_id: String, pool: State<'_, DbPool>) -> Result<AgentRun, String> {
+pub fn get_db_run_details_command(
+    run_id: String,
+    pool: State<'_, DbPool>,
+) -> Result<AgentRun, String> {
     let mut conn = pool.get().map_err(|e| e.to_string())?;
     agent_runs::table
         .find(run_id)

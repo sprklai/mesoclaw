@@ -59,7 +59,8 @@ pub mod prelude {
 }
 
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+use tauri_plugin_deep_link::DeepLinkExt;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -108,8 +109,32 @@ pub fn run() {
 
             // Initialize deep-link handler for OAuth callback URIs
             // (e.g. mesoclaw://oauth/callback?code=...).
+            // Also handles app navigation: mesoclaw://session/{id}, mesoclaw://channel/{id}, etc.
             #[cfg(desktop)]
-            app.handle().plugin(tauri_plugin_deep_link::init())?;
+            {
+                let app_handle = app.handle().clone();
+                app.handle().plugin(tauri_plugin_deep_link::init())?;
+
+                // Register URL schemes for Linux and Windows (required for those platforms)
+                #[cfg(any(target_os = "linux", target_os = "windows"))]
+                app.deep_link().register_all()?;
+
+                // Set up the on_open_url handler
+                app.deep_link().on_open_url(move |event| {
+                    if let Some(url) = event.urls().first() {
+                        log::info!("deep-link: received URL: {}", url);
+
+                        // Parse the URL and emit appropriate event to frontend
+                        // URL format: mesoclaw://<resource>/<id>
+                        let url_str = url.to_string();
+
+                        // Emit deep-link event to frontend for navigation
+                        if let Err(e) = app_handle.emit("deep-link", &url_str) {
+                            log::error!("deep-link: failed to emit event: {}", e);
+                        }
+                    }
+                });
+            }
 
             // Initialize autostart plugin
             #[cfg(desktop)]

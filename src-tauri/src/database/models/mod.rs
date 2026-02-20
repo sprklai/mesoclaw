@@ -10,7 +10,5 @@ pub use agent::{
     NewAgent, NewAgentRun, NewAgentSession, RunStatus, SessionStatus, UpdateAgent,
     UpdateAgentRequest,
 };
-pub use chat_message::{
-    ChatMessage, CreateSessionRequest, NewChatMessage, SaveMessageRequest,
-};
+pub use chat_message::{ChatMessage, CreateSessionRequest, NewChatMessage, SaveMessageRequest};
 pub use chat_session::{ChatSession, ChatSessionUpdate, NewChatSession};

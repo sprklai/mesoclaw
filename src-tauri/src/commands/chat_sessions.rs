@@ -2,12 +2,12 @@
 //!
 //! Provides CRUD operations for chat sessions and messages backed by SQLite.
 
+use crate::database::DbPool;
 use crate::database::models::chat_message::{
     ChatMessage, CreateSessionRequest, NewChatMessage, SaveMessageRequest,
 };
 use crate::database::models::chat_session::ChatSession;
 use crate::database::schema::{chat_messages, chat_sessions};
-use crate::database::DbPool;
 use diesel::prelude::*;
 use log::{debug, info};
 use tauri::State;
@@ -29,7 +29,10 @@ pub fn list_chat_sessions_command(pool: State<'_, DbPool>) -> Result<Vec<ChatSes
 
 /// Get a single chat session by ID.
 #[tauri::command]
-pub fn get_chat_session_command(id: String, pool: State<'_, DbPool>) -> Result<ChatSession, String> {
+pub fn get_chat_session_command(
+    id: String,
+    pool: State<'_, DbPool>,
+) -> Result<ChatSession, String> {
     info!("[chat_sessions] getting session {}", id);
     let mut conn = pool.get().map_err(|e| e.to_string())?;
     chat_sessions::table
@@ -93,7 +96,10 @@ pub fn load_messages_command(
     session_id: String,
     pool: State<'_, DbPool>,
 ) -> Result<Vec<ChatMessage>, String> {
-    info!("[chat_sessions] loading messages for session {}", session_id);
+    info!(
+        "[chat_sessions] loading messages for session {}",
+        session_id
+    );
     let mut conn = pool.get().map_err(|e| e.to_string())?;
     let messages = chat_messages::table
         .filter(chat_messages::session_id.eq(&session_id))
@@ -122,11 +128,7 @@ pub fn save_message_command(
     let mut conn = pool.get().map_err(|e| e.to_string())?;
     let created_at = chrono::Utc::now().to_rfc3339();
 
-    let new_message = NewChatMessage::new(
-        &request.session_id,
-        &request.role,
-        &request.content,
-    );
+    let new_message = NewChatMessage::new(&request.session_id, &request.role, &request.content);
 
     diesel::insert_into(chat_messages::table)
         .values(&new_message)
@@ -160,6 +162,9 @@ pub fn clear_session_messages_command(
     diesel::delete(chat_messages::table.filter(chat_messages::session_id.eq(&session_id)))
         .execute(&mut conn)
         .map_err(|e| e.to_string())?;
-    debug!("[chat_sessions] cleared messages for session {}", session_id);
+    debug!(
+        "[chat_sessions] cleared messages for session {}",
+        session_id
+    );
     Ok(())
 }

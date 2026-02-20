@@ -287,11 +287,7 @@ impl AgentOrchestrator {
 
         info!(
             "[agent:orchestrator] orchestration completed session={} success_count={} failure_count={} overall_success={} duration_ms={}",
-            parent_session_key,
-            success_count,
-            failure_count,
-            overall_success,
-            total_duration_ms
+            parent_session_key, success_count, failure_count, overall_success, total_duration_ms
         );
 
         Ok(ParallelResult {
