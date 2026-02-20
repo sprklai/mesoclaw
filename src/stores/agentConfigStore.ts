@@ -10,6 +10,7 @@
  * Uses Tauri IPC commands for persistence.
  */
 import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
 
 import { extractErrorMessage } from "@/lib/error-utils";
 import type {
@@ -21,7 +22,152 @@ import type {
   WorkspaceFile,
   WorkspaceFileType,
 } from "@/lib/agent-config";
-import { DEFAULT_AGENT_CONFIG } from "@/lib/agent-config";
+
+// ─── Backend Types (snake_case from Rust) ─────────────────────────────────────
+
+interface BackendAgent {
+  id: string;
+  name: string;
+  description: string | null;
+  system_prompt: string;
+  model_id: string;
+  provider_id: string;
+  temperature: number;
+  max_tokens: number | null;
+  tools_enabled: number;
+  memory_enabled: number;
+  workspace_path: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface BackendCreateAgentRequest {
+  name: string;
+  description?: string | null;
+  system_prompt: string;
+  model_id: string;
+  provider_id: string;
+  temperature?: number;
+  max_tokens?: number | null;
+  tools_enabled?: boolean;
+  memory_enabled?: boolean;
+}
+
+interface BackendUpdateAgentRequest {
+  id: string;
+  name?: string;
+  description?: string | null;
+  system_prompt?: string;
+  model_id?: string;
+  provider_id?: string;
+  temperature?: number;
+  max_tokens?: number | null;
+  tools_enabled?: boolean;
+  memory_enabled?: boolean;
+  workspace_path?: string | null;
+  is_active?: boolean;
+}
+
+interface BackendSession {
+  id: string;
+  agent_id: string;
+  name: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+interface BackendRun {
+  id: string;
+  session_id: string;
+  agent_id: string;
+  parent_run_id: string | null;
+  status: string;
+  input_message: string;
+  output_message: string | null;
+  error_message: string | null;
+  tokens_used: number | null;
+  duration_ms: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+// ─── Type Conversion Utilities ────────────────────────────────────────────────
+
+function backendAgentToFrontend(agent: BackendAgent): AgentConfig {
+  return {
+    id: agent.id,
+    name: agent.name,
+    role: agent.description ?? "",
+    systemPrompt: agent.system_prompt,
+    providerId: agent.provider_id,
+    modelId: agent.model_id,
+    temperature: agent.temperature,
+    maxTokens: agent.max_tokens ?? 4096,
+    maxIterations: 20, // Default, not stored in backend
+    maxHistory: 50, // Default, not stored in backend
+    isEnabled: agent.is_active === 1,
+    createdAt: new Date(agent.created_at).getTime(),
+    updatedAt: new Date(agent.updated_at).getTime(),
+  };
+}
+
+function frontendCreateToBackend(request: CreateAgentRequest): BackendCreateAgentRequest {
+  return {
+    name: request.name,
+    description: request.role,
+    system_prompt: request.systemPrompt,
+    model_id: request.modelId,
+    provider_id: request.providerId,
+    temperature: request.temperature,
+    max_tokens: request.maxTokens,
+    tools_enabled: true,
+    memory_enabled: true,
+  };
+}
+
+function frontendUpdateToBackend(request: UpdateAgentRequest): BackendUpdateAgentRequest {
+  return {
+    id: request.id,
+    name: request.name,
+    description: request.role,
+    system_prompt: request.systemPrompt,
+    model_id: request.modelId,
+    provider_id: request.providerId,
+    temperature: request.temperature,
+    max_tokens: request.maxTokens,
+    is_active: request.isEnabled,
+  };
+}
+
+function backendSessionToFrontend(session: BackendSession): AgentSessionSummary {
+  return {
+    id: session.id,
+    agentId: session.agent_id,
+    agentName: session.name,
+    status: session.status as AgentSessionSummary["status"],
+    startedAt: new Date(session.created_at).getTime(),
+    completedAt: session.completed_at ? new Date(session.completed_at).getTime() : undefined,
+    messageCount: 0, // Not tracked in backend model
+  };
+}
+
+function backendRunToFrontend(run: BackendRun): AgentRun {
+  return {
+    id: run.id,
+    sessionId: run.session_id,
+    agentId: run.agent_id,
+    agentName: "", // Not in backend model
+    status: run.status as AgentRun["status"],
+    startedAt: run.started_at ? new Date(run.started_at).getTime() : Date.now(),
+    completedAt: run.completed_at ? new Date(run.completed_at).getTime() : undefined,
+    iterations: 0, // Not tracked in backend model
+    toolCalls: [], // Not tracked in backend model
+  };
+}
 
 // ─── Store State Types ─────────────────────────────────────────────────────
 
@@ -144,10 +290,8 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
   loadAgents: async () => {
     set({ isLoadingAgents: true, agentsError: null });
     try {
-      // ## TODO: Wire to backend command when available
-      // const agents = await invoke<AgentConfig[]>("list_agents_command");
-      // For now, use mock data
-      const agents: AgentConfig[] = [];
+      const backendAgents = await invoke<BackendAgent[]>("list_db_agents_command");
+      const agents = backendAgents.map(backendAgentToFrontend);
       set({ agents, isLoadingAgents: false });
     } catch (error) {
       const message = extractErrorMessage(error);
@@ -162,25 +306,11 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
   createAgent: async (request: CreateAgentRequest) => {
     set({ agentsError: null });
     try {
-      const now = Date.now();
-      // ## TODO: Wire to backend command when available
-      // const agent = await invoke<AgentConfig>("create_agent_command", { request });
-      // For now, create locally
-      const agent: AgentConfig = {
-        id: crypto.randomUUID(),
-        name: request.name,
-        role: request.role,
-        systemPrompt: request.systemPrompt,
-        providerId: request.providerId,
-        modelId: request.modelId,
-        temperature: request.temperature ?? DEFAULT_AGENT_CONFIG.temperature ?? 0.7,
-        maxTokens: request.maxTokens ?? DEFAULT_AGENT_CONFIG.maxTokens ?? 4096,
-        maxIterations: request.maxIterations ?? DEFAULT_AGENT_CONFIG.maxIterations ?? 20,
-        maxHistory: request.maxHistory ?? DEFAULT_AGENT_CONFIG.maxHistory ?? 50,
-        isEnabled: true,
-        createdAt: now,
-        updatedAt: now,
-      };
+      const backendRequest = frontendCreateToBackend(request);
+      const backendAgent = await invoke<BackendAgent>("create_db_agent_command", {
+        request: backendRequest,
+      });
+      const agent = backendAgentToFrontend(backendAgent);
 
       set((state) => ({
         agents: [...state.agents, agent],
@@ -197,19 +327,14 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
   updateAgent: async (request: UpdateAgentRequest) => {
     set({ agentsError: null });
     try {
-      // ## TODO: Wire to backend command when available
-      // await invoke("update_agent_command", { request });
-      // For now, update locally
+      const backendRequest = frontendUpdateToBackend(request);
+      const backendAgent = await invoke<BackendAgent>("update_db_agent_command", {
+        request: backendRequest,
+      });
+      const updatedAgent = backendAgentToFrontend(backendAgent);
+
       set((state) => ({
-        agents: state.agents.map((a) =>
-          a.id === request.id
-            ? {
-                ...a,
-                ...request,
-                updatedAt: Date.now(),
-              }
-            : a
-        ),
+        agents: state.agents.map((a) => (a.id === request.id ? updatedAgent : a)),
       }));
     } catch (error) {
       const message = extractErrorMessage(error);
@@ -221,9 +346,7 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
   deleteAgent: async (id: string) => {
     set({ agentsError: null });
     try {
-      // ## TODO: Wire to backend command when available
-      // await invoke("delete_agent_command", { id });
-      // For now, delete locally
+      await invoke("delete_db_agent_command", { id });
       set((state) => ({
         agents: state.agents.filter((a) => a.id !== id),
         selectedAgentId: state.selectedAgentId === id ? null : state.selectedAgentId,
@@ -241,18 +364,18 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
       throw new Error("Agent not found");
     }
 
-    const now = Date.now();
-    const newAgent: AgentConfig = {
-      ...agent,
-      id: crypto.randomUUID(),
+    // Create a new agent based on the existing one
+    const newAgent = await get().createAgent({
       name: `${agent.name} (Copy)`,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    set((state) => ({
-      agents: [...state.agents, newAgent],
-    }));
+      role: agent.role,
+      systemPrompt: agent.systemPrompt,
+      providerId: agent.providerId,
+      modelId: agent.modelId,
+      temperature: agent.temperature,
+      maxTokens: agent.maxTokens,
+      maxIterations: agent.maxIterations,
+      maxHistory: agent.maxHistory,
+    });
 
     return newAgent;
   },
@@ -329,9 +452,10 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
   loadSessionHistory: async (agentId: string) => {
     set({ isLoadingSessions: true, sessionsError: null });
     try {
-      // ## TODO: Wire to backend command when available
-      // const sessions = await invoke<AgentSessionSummary[]>("list_agent_sessions_command", { agentId });
-      const sessions: AgentSessionSummary[] = [];
+      const backendSessions = await invoke<BackendSession[]>("list_db_agent_sessions_command", {
+        agentId: agentId,
+      });
+      const sessions = backendSessions.map(backendSessionToFrontend);
       set((state) => ({
         sessions: [...state.sessions.filter((s) => s.agentId !== agentId), ...sessions],
         isLoadingSessions: false,
@@ -345,9 +469,18 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
   loadRecentSessions: async (_agentId?: string) => {
     set({ isLoadingSessions: true, sessionsError: null });
     try {
-      // ## TODO: Wire to backend command when available
-      // const sessions = await invoke<AgentSessionSummary[]>("list_recent_sessions_command", { agentId: _agentId, limit: 50 });
-      const sessions: AgentSessionSummary[] = [];
+      // Note: The backend command doesn't support filtering by agentId currently
+      // If agentId is provided, we filter client-side after fetching
+      const backendSessions = await invoke<BackendSession[]>("list_recent_db_sessions_command", {
+        limit: 50,
+      });
+      let sessions = backendSessions.map(backendSessionToFrontend);
+
+      // Filter by agentId if provided
+      if (_agentId) {
+        sessions = sessions.filter((s) => s.agentId === _agentId);
+      }
+
       set({ sessions, isLoadingSessions: false });
     } catch (error) {
       const message = extractErrorMessage(error);
@@ -375,9 +508,8 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
   loadActiveRuns: async () => {
     set({ runsError: null });
     try {
-      // ## TODO: Wire to backend command when available
-      // const runs = await invoke<AgentRun[]>("list_active_runs_command");
-      const runs: AgentRun[] = [];
+      const backendRuns = await invoke<BackendRun[]>("list_active_db_runs_command");
+      const runs = backendRuns.map(backendRunToFrontend);
       set({ activeRuns: runs });
     } catch (error) {
       const message = extractErrorMessage(error);
@@ -386,20 +518,14 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
   },
 
   getRunDetails: async (runId: string) => {
-    // ## TODO: Wire to backend command when available
-    // return invoke<AgentRun>("get_run_details_command", { runId });
-    const run = get().activeRuns.find((r) => r.id === runId);
-    if (!run) {
-      throw new Error("Run not found");
-    }
-    return run;
+    const backendRun = await invoke<BackendRun>("get_db_run_details_command", { runId: runId });
+    return backendRunToFrontend(backendRun);
   },
 
   cancelRun: async (runId: string) => {
     set({ runsError: null });
     try {
-      // ## TODO: Wire to backend command when available
-      // await invoke("cancel_agent_run_command", { runId });
+      await invoke("cancel_db_run_command", { runId: runId });
       set((state) => ({
         activeRuns: state.activeRuns.filter((r) => r.id !== runId),
       }));
