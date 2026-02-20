@@ -28,6 +28,22 @@ type LogLevel = "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR" | "ALL";
 
 const LEVELS: LogLevel[] = ["ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR"];
 
+type LogModule = "ALL" | "AGENTS" | "CHANNELS" | "MEMORY" | "CHAT" | "SCHEDULER" | "GATEWAY" | "SYSTEM";
+
+export const MODULES: LogModule[] = ["ALL", "AGENTS", "CHANNELS", "MEMORY", "CHAT", "SCHEDULER", "GATEWAY", "SYSTEM"];
+
+// Target prefixes for each module category
+const MODULE_PREFIXES: Record<LogModule, string[]> = {
+  ALL: [],
+  AGENTS: ["agent::", "agents::", "spawner", "orchestrator"],
+  CHANNELS: ["channels::", "telegram", "discord", "slack", "matrix"],
+  MEMORY: ["memory::"],
+  CHAT: ["chat::"],
+  SCHEDULER: ["scheduler::"],
+  GATEWAY: ["gateway::", "event_bus::"],
+  SYSTEM: ["boot::", "lib::", "cli::"],
+};
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function levelColor(level: string): string {
@@ -58,6 +74,13 @@ function levelBadgeVariant(
     default:
       return "secondary";
   }
+}
+
+export function moduleMatches(entry: LogEntry, activeModule: LogModule): boolean {
+  if (activeModule === "ALL") return true;
+  const prefixes = MODULE_PREFIXES[activeModule] ?? [];
+  const target = entry.target.toLowerCase();
+  return prefixes.some(prefix => target.startsWith(prefix));
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
