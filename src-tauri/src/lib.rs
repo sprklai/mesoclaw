@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod agent;
+pub mod agents;
 pub mod ai;
 pub mod channels;
 mod commands;
@@ -137,6 +138,10 @@ pub fn run() {
             let cancel_map: agent::agent_commands::SessionCancelMap =
                 Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
             app.manage(cancel_map);
+
+            // Initialize session router for agent session management.
+            let session_router = Arc::new(agent::session_router::SessionRouter::new());
+            app.manage(session_router);
 
             // Initialize and manage the in-memory store so IPC commands can reach it.
             app.manage(Arc::new(memory::store::InMemoryStore::new_mock()));
@@ -844,6 +849,18 @@ pub fn run() {
             // Agent session commands
             agent::agent_commands::start_agent_session_command,
             agent::agent_commands::cancel_agent_session_command,
+            // Agent management commands
+            agent::commands::list_agents_command,
+            agent::commands::create_agent_command,
+            agent::commands::get_agent_command,
+            agent::commands::update_agent_command,
+            agent::commands::delete_agent_command,
+            agent::commands::run_agent_command,
+            agent::commands::list_sessions_command,
+            agent::commands::get_session_command,
+            agent::commands::get_workspace_file_command,
+            agent::commands::update_workspace_file_command,
+            agent::commands::list_workspace_files_command,
             // Channel management commands
             commands::channels::start_channel_command,
             commands::channels::channel_health_command,

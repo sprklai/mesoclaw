@@ -37,15 +37,13 @@ pub async fn get_skill_details_command(skill_id: String) -> Result<SkillDefiniti
 /// Returns `SkillSettings` with each skill's enabled state read from
 /// the database. Skills not in the enabled list are marked as disabled.
 #[tauri::command]
-pub async fn get_skill_settings_command(
-    state: State<'_, DbPool>,
-) -> Result<SkillSettings, String> {
+pub async fn get_skill_settings_command(state: State<'_, DbPool>) -> Result<SkillSettings, String> {
     let mut conn = state
         .get()
         .map_err(|e| format!("Failed to get database connection: {e}"))?;
 
-    let app_settings = settings::get_settings(&mut conn)
-        .map_err(|e| format!("Failed to get settings: {e}"))?;
+    let app_settings =
+        settings::get_settings(&mut conn).map_err(|e| format!("Failed to get settings: {e}"))?;
 
     let registry = get_or_init_registry().await;
     let all_skills = registry.skill_infos().await;

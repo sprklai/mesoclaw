@@ -69,8 +69,7 @@ pub fn update_skill_enabled(
     }
 
     // Serialize back to JSON and update
-    let json_ids = serde_json::to_string(&enabled_ids)
-        .unwrap_or_else(|_| "[]".to_string());
+    let json_ids = serde_json::to_string(&enabled_ids).unwrap_or_else(|_| "[]".to_string());
 
     diesel::update(settings.find(1))
         .set(skill_enabled_ids.eq(json_ids))

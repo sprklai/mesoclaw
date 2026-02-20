@@ -31,7 +31,25 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungsten
     about = "MesoClaw AI agent runtime CLI",
     version,
     long_about = "Headless interface to the MesoClaw AI agent daemon.\n\
-                  Run without a subcommand to enter the interactive REPL."
+                  \n\
+                  Run without a subcommand to enter the interactive REPL.\n\
+                  \n\
+                  AGENT MANAGEMENT:\n\
+                    mesoclaw agent list                                    List active sessions\n\
+                    mesoclaw agent start --system-prompt \"You are...\"      Start new agent\n\
+                    mesoclaw agent stop <session_id>                       Cancel session\n\
+                    mesoclaw agent show <session_id>                       Inspect session\n\
+                  \n\
+                  SESSION MANAGEMENT:\n\
+                    mesoclaw sessions list                                 List all sessions\n\
+                    mesoclaw sessions show <session_id> --limit 50         View history\n\
+                    mesoclaw sessions reset <session_id>                   Clear history\n\
+                    mesoclaw sessions delete <session_id>                  Remove session\n\
+                  \n\
+                  BATCH MODE:\n\
+                    mesoclaw agent start --channel cron --context nightly  Start with context\n\
+                    echo \"Analyze this\" | mesoclaw                         Pipe to agent\n\
+                    mesoclaw --json agent list                              JSON output"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -62,8 +80,10 @@ struct Cli {
 enum Commands {
     /// Start or manage the background daemon process.
     Daemon(DaemonArgs),
-    /// Manage AI agents (list, start, stop, inspect).
+    /// Manage AI agents (list, start, stop, inspect, show).
     Agent(AgentArgs),
+    /// Manage agent sessions (list, show, reset, delete).
+    Sessions(SessionArgs),
     /// Manage persistent agent memory stores.
     Memory(MemoryArgs),
     /// Manage agent identities and persona files.
@@ -98,10 +118,38 @@ struct DaemonArgs {
 
 #[derive(Parser, Debug)]
 struct AgentArgs {
-    /// Agent action: list | start | stop | inspect.
+    /// Agent action: list | start | stop | inspect | show.
     #[arg(default_value = "list")]
     action: String,
+    /// Agent identifier (for start, stop, inspect, show).
     name: Option<String>,
+    /// System prompt for agent startup (for start).
+    #[arg(long, short = 's')]
+    system_prompt: Option<String>,
+    /// Channel context (for start). Default: "user" (desktop IPC).
+    #[arg(long, default_value = "user")]
+    channel: String,
+    /// Session context identifier (for start).
+    #[arg(long)]
+    context: Option<String>,
+    /// Provider ID to use (for start). Uses default if omitted.
+    #[arg(long, short = 'p')]
+    provider: Option<String>,
+    /// Enable thinking/chain-of-thought mode (for start).
+    #[arg(long)]
+    thinking: bool,
+}
+
+#[derive(Parser, Debug)]
+struct SessionArgs {
+    /// Session action: list | show | reset | delete.
+    #[arg(default_value = "list")]
+    action: String,
+    /// Session ID (for show, reset, delete).
+    session_id: Option<String>,
+    /// Number of messages to show (for show).
+    #[arg(long, default_value = "20")]
+    limit: usize,
 }
 
 #[derive(Parser, Debug)]
@@ -491,6 +539,7 @@ async fn dispatch(command: &Commands, raw: bool, json_mode: bool) {
     match command {
         Commands::Daemon(args) => handle_daemon(args).await,
         Commands::Agent(args) => handle_agent(args, raw, json_mode).await,
+        Commands::Sessions(args) => handle_sessions(args, raw, json_mode).await,
         Commands::Memory(args) => handle_memory(args, raw, json_mode).await,
         Commands::Identity(args) => handle_identity(args, raw, json_mode).await,
         Commands::Config(args) => handle_config(args, raw, json_mode).await,
@@ -646,20 +695,325 @@ async fn handle_daemon(args: &DaemonArgs) {
     }
 }
 
+/// Manage AI agents (list, start, stop, inspect, show).
+///
+/// Actions:
+///   list              — list all active agent sessions
+///   start             — start a new agent session
+///   stop <session_id> — stop/cancel a running agent session
+///   inspect <id>      — inspect agent configuration
+///   show <id>         — show agent session details
 async fn handle_agent(args: &AgentArgs, raw: bool, json_mode: bool) {
     let Some(client) = require_gateway().await else {
         return;
     };
+
     match args.action.as_str() {
         "list" => match client.list_sessions().await {
-            Ok(v) => print_value(&v, raw, json_mode),
+            Ok(v) => {
+                if json_mode || raw {
+                    print_value(&v, raw, json_mode);
+                    return;
+                }
+                // Human-friendly table format
+                let sessions = v
+                    .get("sessions")
+                    .and_then(|s| s.as_array())
+                    .cloned()
+                    .unwrap_or_default();
+                if sessions.is_empty() {
+                    println!("No active agent sessions.");
+                    return;
+                }
+                println!("{:<60} Status", "Session ID");
+                println!("{}", "-".repeat(80));
+                for session_id in &sessions {
+                    let id = session_id.as_str().unwrap_or("-");
+                    println!("{id:<60} active");
+                }
+                println!("\nTotal: {} session(s)", sessions.len());
+            }
             Err(e) => print_err(&format!("agent list: {e}")),
         },
-        "start" => match client.create_session(None).await {
-            Ok(v) => print_value(&v, raw, json_mode),
-            Err(e) => print_err(&format!("agent start: {e}")),
+
+        "start" => {
+            let body = json!({
+                "system_prompt": args.system_prompt,
+                "provider_id": args.provider,
+                "channel": args.channel,
+                "context": args.context,
+            });
+            match client
+                .client
+                .post(format!("{}/api/v1/sessions", client.base_url))
+                .header("Authorization", client.auth_header())
+                .json(&body)
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => match resp.json::<Value>().await {
+                    Ok(v) => {
+                        if json_mode {
+                            print_value(&v, raw, json_mode);
+                        } else {
+                            let session_id = v
+                                .get("session_id")
+                                .and_then(|s| s.as_str())
+                                .unwrap_or("unknown");
+                            println!("Agent session started: {session_id}");
+                            if args.thinking {
+                                println!("  Thinking mode: enabled");
+                            }
+                            if let Some(ctx) = &args.context {
+                                println!("  Context: {ctx}");
+                            }
+                            println!("  Channel: {}", args.channel);
+                        }
+                    }
+                    Err(e) => print_err(&format!("agent start: failed to parse response: {e}")),
+                },
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("agent start failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("agent start: {e}")),
+            }
+        }
+
+        "stop" => {
+            let Some(session_id) = &args.name else {
+                print_err("agent stop requires a session ID: mesoclaw agent stop <session_id>");
+                return;
+            };
+
+            // POST to cancel endpoint via gateway
+            match client
+                .client
+                .post(format!(
+                    "{}/api/v1/sessions/{session_id}/cancel",
+                    client.base_url
+                ))
+                .header("Authorization", client.auth_header())
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    println!("Agent session '{session_id}' cancelled.");
+                }
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("agent stop failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("agent stop: {e}")),
+            }
+        }
+
+        "inspect" | "show" => {
+            let Some(session_id) = &args.name else {
+                print_err(&format!(
+                    "agent {} requires a session ID: mesoclaw agent {} <session_id>",
+                    args.action, args.action
+                ));
+                return;
+            };
+
+            // GET session details
+            match client
+                .client
+                .get(format!("{}/api/v1/sessions/{session_id}", client.base_url))
+                .header("Authorization", client.auth_header())
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => match resp.json::<Value>().await {
+                    Ok(v) => print_value(&v, raw, json_mode),
+                    Err(e) => print_err(&format!(
+                        "agent {}: failed to parse response: {e}",
+                        args.action
+                    )),
+                },
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status == axum::http::StatusCode::NOT_FOUND {
+                        print_err(&format!("Session '{session_id}' not found."));
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        print_err(&format!("agent {} failed ({status}): {body}", args.action));
+                    }
+                }
+                Err(e) => print_err(&format!("agent {}: {e}", args.action)),
+            }
+        }
+
+        other => print_err(&format!(
+            "agent: unknown action '{other}'. Use: list | start | stop | inspect | show"
+        )),
+    }
+}
+
+/// Manage agent sessions (list, show, reset, delete).
+///
+/// Actions:
+///   list               — list all sessions with details
+///   show <session_id>  — show session message history
+///   reset <session_id> — clear session message history
+///   delete <session_id> — delete a session
+async fn handle_sessions(args: &SessionArgs, raw: bool, json_mode: bool) {
+    let Some(client) = require_gateway().await else {
+        return;
+    };
+
+    match args.action.as_str() {
+        "list" => match client.list_sessions().await {
+            Ok(v) => {
+                if json_mode || raw {
+                    print_value(&v, raw, json_mode);
+                    return;
+                }
+                // Human-friendly format
+                let sessions = v
+                    .get("sessions")
+                    .and_then(|s| s.as_array())
+                    .cloned()
+                    .unwrap_or_default();
+                if sessions.is_empty() {
+                    println!("No sessions found.");
+                    return;
+                }
+                println!("{:<60} {:<10}", "Session ID", "Messages");
+                println!("{}", "-".repeat(80));
+                for session in &sessions {
+                    let id = session.as_str().unwrap_or("-");
+                    println!("{id:<60} {:<10}", "-");
+                }
+                println!("\nTotal: {} session(s)", sessions.len());
+            }
+            Err(e) => print_err(&format!("sessions list: {e}")),
         },
-        other => println!("agent: unknown action '{other}'. Use list | start | stop | inspect"),
+
+        "show" => {
+            let Some(session_id) = &args.session_id else {
+                print_err(
+                    "sessions show requires a session ID: mesoclaw sessions show <session_id>",
+                );
+                return;
+            };
+
+            match client
+                .client
+                .get(format!("{}/api/v1/sessions/{session_id}", client.base_url))
+                .header("Authorization", client.auth_header())
+                .query(&[("limit", &args.limit.to_string())])
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => match resp.json::<Value>().await {
+                    Ok(v) => {
+                        if json_mode || raw {
+                            print_value(&v, raw, json_mode);
+                            return;
+                        }
+                        // Human-friendly message history
+                        let messages = v
+                            .get("messages")
+                            .and_then(|m| m.as_array())
+                            .cloned()
+                            .unwrap_or_default();
+                        if messages.is_empty() {
+                            println!("Session '{session_id}' has no messages.");
+                            return;
+                        }
+                        println!("Session: {session_id}");
+                        println!("{}", "=".repeat(80));
+                        for msg in &messages {
+                            let role = msg
+                                .get("role")
+                                .and_then(|r| r.as_str())
+                                .unwrap_or("unknown");
+                            let content = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
+                            let timestamp =
+                                msg.get("created_at").and_then(|t| t.as_str()).unwrap_or("");
+                            println!("\n[{timestamp}] {role}:");
+                            println!("  {}", content.lines().collect::<Vec<_>>().join("\n  "));
+                        }
+                    }
+                    Err(e) => print_err(&format!("sessions show: failed to parse response: {e}")),
+                },
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status == axum::http::StatusCode::NOT_FOUND {
+                        print_err(&format!("Session '{session_id}' not found."));
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        print_err(&format!("sessions show failed ({status}): {body}"));
+                    }
+                }
+                Err(e) => print_err(&format!("sessions show: {e}")),
+            }
+        }
+
+        "reset" => {
+            let Some(session_id) = &args.session_id else {
+                print_err(
+                    "sessions reset requires a session ID: mesoclaw sessions reset <session_id>",
+                );
+                return;
+            };
+
+            match client
+                .client
+                .post(format!(
+                    "{}/api/v1/sessions/{session_id}/reset",
+                    client.base_url
+                ))
+                .header("Authorization", client.auth_header())
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    println!("Session '{session_id}' reset successfully.");
+                }
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("sessions reset failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("sessions reset: {e}")),
+            }
+        }
+
+        "delete" => {
+            let Some(session_id) = &args.session_id else {
+                print_err(
+                    "sessions delete requires a session ID: mesoclaw sessions delete <session_id>",
+                );
+                return;
+            };
+
+            match client
+                .client
+                .delete(format!("{}/api/v1/sessions/{session_id}", client.base_url))
+                .header("Authorization", client.auth_header())
+                .send()
+                .await
+            {
+                Ok(resp) if resp.status().is_success() => {
+                    println!("Session '{session_id}' deleted.");
+                }
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    print_err(&format!("sessions delete failed ({status}): {body}"));
+                }
+                Err(e) => print_err(&format!("sessions delete: {e}")),
+            }
+        }
+
+        other => print_err(&format!(
+            "sessions: unknown action '{other}'. Use: list | show | reset | delete"
+        )),
     }
 }
 
@@ -2025,17 +2379,41 @@ async fn run_repl(raw: bool, json_mode: bool) {
 
 fn print_help() {
     println!(
-        "Commands: daemon | agent | memory | identity | config | schedule | channel | module | generate | gui | exit\n\
+        "Commands: daemon | agent | sessions | memory | identity | config | schedule | channel | module | generate | gui | exit\n\
          \n\
+         AGENTS & SESSIONS:\n\
+         agent   list                          — list active agent sessions\n\
+         agent   start [--system-prompt <s>]   — start new agent session\n\
+         agent   stop <session_id>             — cancel running session\n\
+         agent   show <session_id>             — show session details\n\
+         \n\
+         sessions list                         — list all sessions\n\
+         sessions show <session_id> [--limit N]— show session history (last N messages)\n\
+         sessions reset <session_id>           — clear session history\n\
+         sessions delete <session_id>          — delete session\n\
+         \n\
+         CONFIGURATION:\n\
          config  list                          — list AI providers\n\
          config  set-key <provider> [<key>]    — save API key to keyring\n\
          config  get-key <provider>            — check if API key is set\n\
          config  delete-key <provider>         — remove API key\n\
          \n\
+         CHANNELS:\n\
          channel list                          — list configured channels\n\
          channel add telegram [--token <t>] [--chat-ids <ids>]  — configure Telegram\n\
          channel status <name>                 — get channel connection status\n\
-         channel remove <name>                 — remove channel configuration"
+         channel remove <name>                 — remove channel configuration\n\
+         \n\
+         MODULES & SCHEDULE:\n\
+         module list                           — list installed modules\n\
+         schedule list                         — list scheduled jobs\n\
+         schedule add --name <n> --cron <expr> — add scheduled job\n\
+         \n\
+         GLOBAL FLAGS:\n\
+         --json                                — output as JSON\n\
+         --raw                                 — output raw text\n\
+         --auto                                — full-autonomy mode (no approvals)\n\
+         --resume <session_id>                 — resume existing session"
     );
 }
 

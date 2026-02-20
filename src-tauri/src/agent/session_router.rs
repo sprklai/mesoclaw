@@ -125,6 +125,48 @@ impl SessionKey {
             peer: chat_id.to_string(),
         }
     }
+
+    /// Session key for a subagent running under a parent agent.
+    ///
+    /// Format: `agent:<agentId>:subagent:<laneId>`
+    ///
+    /// Subagents run in isolated sessions with parent-child relationships
+    /// for multi-agent coordination.
+    pub fn subagent(agent_id: &str, lane_id: &str) -> Self {
+        Self {
+            agent: agent_id.to_owned(),
+            scope: "subagent".to_owned(),
+            channel: "agent".to_owned(),
+            peer: lane_id.to_owned(),
+        }
+    }
+
+    /// Check if this session is a subagent session.
+    pub fn is_subagent(&self) -> bool {
+        self.scope == "subagent"
+    }
+
+    /// Extract the parent agent ID from a subagent session key.
+    ///
+    /// Returns `None` if this is not a subagent session.
+    pub fn parent_agent_id(&self) -> Option<&str> {
+        if self.is_subagent() {
+            Some(&self.agent)
+        } else {
+            None
+        }
+    }
+
+    /// Extract the lane ID from a subagent session key.
+    ///
+    /// Returns `None` if this is not a subagent session.
+    pub fn lane_id(&self) -> Option<&str> {
+        if self.is_subagent() {
+            Some(&self.peer)
+        } else {
+            None
+        }
+    }
 }
 
 impl std::fmt::Display for SessionKey {
@@ -159,6 +201,21 @@ impl SessionMessage {
 
 // ─── Session ─────────────────────────────────────────────────────────────────
 
+/// Thinking level for agent execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ThinkingLevel {
+    /// Low thinking - fast responses.
+    Low,
+    /// Medium thinking - balanced.
+    #[default]
+    Medium,
+    /// High thinking - thorough analysis.
+    High,
+    /// Extra high thinking - deep reasoning.
+    Xhigh,
+}
+
 /// A conversation session with structured key and message history.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -168,6 +225,14 @@ pub struct Session {
     pub created_at: DateTime<Utc>,
     /// Optional summary of compacted messages.
     pub compaction_summary: Option<String>,
+    /// Parent session key for subagent sessions.
+    pub parent_session_key: Option<String>,
+    /// Spawn depth (0 for root sessions, 1+ for subagents).
+    pub spawn_depth: u32,
+    /// Thinking level for this session.
+    pub thinking_level: ThinkingLevel,
+    /// Model override for this session.
+    pub model_override: Option<String>,
 }
 
 impl Session {
@@ -177,6 +242,24 @@ impl Session {
             messages: Vec::new(),
             created_at: Utc::now(),
             compaction_summary: None,
+            parent_session_key: None,
+            spawn_depth: 0,
+            thinking_level: ThinkingLevel::default(),
+            model_override: None,
+        }
+    }
+
+    /// Create a subagent session with parent relationship.
+    fn new_subagent(key: SessionKey, parent_key: &str, spawn_depth: u32) -> Self {
+        Self {
+            key,
+            messages: Vec::new(),
+            created_at: Utc::now(),
+            compaction_summary: None,
+            parent_session_key: Some(parent_key.to_string()),
+            spawn_depth,
+            thinking_level: ThinkingLevel::High, // Subagents think deeply by default
+            model_override: None,
         }
     }
 
@@ -555,5 +638,101 @@ mod tests {
         assert_eq!(alice_session.messages[0].content, "alice msg");
         assert_eq!(bob_session.messages[0].content, "bob msg");
         assert_eq!(r.session_count(), 2);
+    }
+
+    // ── Subagent session tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn subagent_session_key_format() {
+        let key = SessionKey::subagent("default", "lane-42");
+        assert_eq!(key.agent, "default");
+        assert_eq!(key.scope, "subagent");
+        assert_eq!(key.channel, "agent");
+        assert_eq!(key.peer, "lane-42");
+        assert!(key.is_subagent());
+    }
+
+    #[test]
+    fn subagent_key_is_not_isolated() {
+        let key = SessionKey::subagent("default", "lane-1");
+        // Subagent sessions use agent ID, not "isolated"
+        assert!(!key.is_isolated(), "subagent should not be isolated");
+    }
+
+    #[test]
+    fn subagent_parent_agent_extraction() {
+        let key = SessionKey::subagent("research-agent", "lane-99");
+        let parent = key.parent_agent_id();
+        assert_eq!(parent, Some("research-agent"));
+
+        let main_key = SessionKey::main_user();
+        assert_eq!(main_key.parent_agent_id(), None);
+    }
+
+    #[test]
+    fn subagent_lane_id_extraction() {
+        let key = SessionKey::subagent("default", "lane-123");
+        let lane = key.lane_id();
+        assert_eq!(lane, Some("lane-123"));
+
+        let main_key = SessionKey::main_user();
+        assert_eq!(main_key.lane_id(), None);
+    }
+
+    #[test]
+    fn subagent_session_key_round_trip() {
+        let key = SessionKey::subagent("my-agent", "lane-xyz");
+        let str = key.as_str();
+        let parsed = SessionKey::parse(&str).unwrap();
+        assert_eq!(parsed, key);
+        assert!(parsed.is_subagent());
+    }
+
+    #[test]
+    fn session_default_spawn_depth() {
+        let key = SessionKey::main_user();
+        let session = Session::new(key);
+        assert_eq!(session.spawn_depth, 0);
+        assert!(session.parent_session_key.is_none());
+    }
+
+    #[test]
+    fn thinking_level_default() {
+        let level = ThinkingLevel::default();
+        assert_eq!(level, ThinkingLevel::Medium);
+    }
+
+    #[test]
+    fn thinking_level_serialization() {
+        let level = ThinkingLevel::High;
+        let json = serde_json::to_string(&level).unwrap();
+        assert_eq!(json, "\"high\"");
+
+        let parsed: ThinkingLevel = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, ThinkingLevel::High);
+    }
+
+    #[test]
+    fn isolated_subagent_sessions_do_not_pollute_main() {
+        let r = router();
+        let main_key = SessionKey::main_user();
+        let subagent_key = SessionKey::subagent("default", "lane-1");
+
+        r.push_message(&main_key, "user", "Main chat").unwrap();
+        r.push_message(&subagent_key, "user", "Subagent task")
+            .unwrap();
+
+        assert_eq!(r.session_count(), 2);
+        let main = r.get_session(&main_key).unwrap();
+        let subagent = r.get_session(&subagent_key).unwrap();
+
+        assert_eq!(main.messages.len(), 1);
+        assert_eq!(main.messages[0].content, "Main chat");
+        assert_eq!(subagent.messages.len(), 1);
+        assert_eq!(subagent.messages[0].content, "Subagent task");
+
+        // Subagent session should be identified as such
+        assert!(subagent.key.is_subagent());
+        assert_eq!(subagent.key.parent_agent_id(), Some("default"));
     }
 }

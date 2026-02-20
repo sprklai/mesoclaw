@@ -169,8 +169,8 @@ pub struct Settings {
 impl Settings {
     /// Convert from database row to typed settings
     pub fn from_row(row: SettingsRow) -> Result<Self, DbError> {
-        let skill_enabled_ids: Vec<String> = serde_json::from_str(&row.skill_enabled_ids)
-            .unwrap_or_default();
+        let skill_enabled_ids: Vec<String> =
+            serde_json::from_str(&row.skill_enabled_ids).unwrap_or_default();
 
         Ok(Self {
             theme: Theme::from_str(&row.theme)?,
@@ -326,7 +326,9 @@ impl From<SettingsUpdate> for SettingsChangeset {
             default_provider_id: update.default_provider_id,
             default_model_id: update.default_model_id,
             skill_auto_select: update.skill_auto_select.map(bool_to_int),
-            skill_enabled_ids: update.skill_enabled_ids.map(|ids| serde_json::to_string(&ids).unwrap_or_else(|_| "[]".to_string())),
+            skill_enabled_ids: update
+                .skill_enabled_ids
+                .map(|ids| serde_json::to_string(&ids).unwrap_or_else(|_| "[]".to_string())),
         }
     }
 }
