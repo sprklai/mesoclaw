@@ -457,6 +457,7 @@ mod tests {
     fn mcp_tool_proxy_name_follows_convention() {
         use crate::modules::manifest::{
             ModuleInfo, ModuleType, ParametersConfig, RuntimeConfig, RuntimeType, SecurityConfig,
+            ServiceConfig,
         };
         use std::collections::HashMap;
 
@@ -477,6 +478,7 @@ mod tests {
             },
             security: SecurityConfig::default(),
             parameters: ParametersConfig::default(),
+            service: ServiceConfig::default(),
         };
 
         let client = Arc::new(McpClient::new(manifest));
