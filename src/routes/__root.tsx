@@ -83,7 +83,7 @@ function RootLayout() {
          * pb-20 on mobile to avoid content being obscured by the MobileNav bar.
          * md:pb-0 removes that padding on desktop where MobileNav is hidden.
          */}
-        <div className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">
+        <div className="flex-1 overflow-auto px-4 pt-14 pb-20 md:p-6 md:pb-6">
           <Outlet />
         </div>
       </main>

@@ -39,6 +39,7 @@ import {
 } from "@/components/ai-elements/model-selector";
 import { APP_IDENTITY } from "@/config/app-identity";
 import { useSettings } from "@/stores/settings";
+import { useContextPanelStore } from "@/stores/contextPanelStore";
 
 export const Route = createFileRoute("/chat")({
   component: ChatPage,
@@ -85,6 +86,71 @@ const suggestions = [
   "Best practices for state management in React",
   "Explain the concept of hooks in React",
 ];
+
+function ChatContextPanel({
+  messages,
+  selectedModelData,
+  isStreaming,
+  onClear,
+}: {
+  messages: MessageType[];
+  selectedModelData: AvailableModel;
+  isStreaming: boolean;
+  onClear: () => void;
+}) {
+  const userCount = messages.filter((m) => m.role === "user").length;
+  const assistantCount = messages.filter((m) => m.role === "assistant").length;
+
+  return (
+    <div className="space-y-4 p-4">
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Active Model
+        </p>
+        <div className="flex items-center gap-2">
+          <ModelSelectorLogo provider={selectedModelData.providerId} />
+          <div>
+            <p className="text-sm font-medium">{selectedModelData.name}</p>
+            <p className="text-xs text-muted-foreground">{selectedModelData.provider}</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Session
+        </p>
+        <div className="space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">You</span>
+            <span>{userCount}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">AI</span>
+            <span>{assistantCount}</span>
+          </div>
+        </div>
+      </div>
+
+      {isStreaming && (
+        <div className="flex items-center gap-2 text-xs text-primary">
+          <span className="size-2 animate-pulse rounded-full bg-primary" />
+          Streaming…
+        </div>
+      )}
+
+      {messages.length > 0 && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="w-full rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+        >
+          Clear conversation
+        </button>
+      )}
+    </div>
+  );
+}
 
 function ChatPage() {
   const settings = useSettings((state) => state.settings);
@@ -202,6 +268,19 @@ function ChatPage() {
       modelId: selectedModel.modelId,
     };
   }, [selectedModel, availableModels]);
+
+  // Inject context panel content
+  useEffect(() => {
+    useContextPanelStore.getState().setContent(
+      <ChatContextPanel
+        messages={messages}
+        selectedModelData={selectedModelData}
+        isStreaming={isStreaming}
+        onClear={() => setMessages([])}
+      />,
+    );
+    return () => useContextPanelStore.getState().clearContent();
+  }, [messages, selectedModelData, isStreaming]);
 
   const handleModelSelect = useCallback((modelId: string) => {
     const parts = modelId.split("/");
@@ -396,7 +475,7 @@ function ChatPage() {
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="grid shrink-0 gap-4 pt-4">
+      <div className="grid shrink-0 gap-2 pt-2">
         {messages.length === 0 && (
           <Suggestions className="px-4">
             {suggestions.map((suggestion) => (
@@ -409,7 +488,7 @@ function ChatPage() {
           </Suggestions>
         )}
 
-        <div className="w-full px-4 pb-4">
+        <div className="w-full px-4 pb-2">
           <div className="rounded-2xl border-2 border-border shadow-sm transition-all focus-within:border-primary/40 focus-within:shadow-md">
           <PromptInput value={input} onChange={setInput} onSubmit={handleSubmit}>
             <PromptInputBody>

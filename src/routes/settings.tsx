@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AdvancedSettingsTab } from "@/components/settings/AdvancedSettingsTab";
 import { AISettingsTab } from "@/components/settings/AISettingsTab";
@@ -13,6 +13,7 @@ import { SettingsNav, type SettingsSection } from "@/components/settings/Setting
 import { SkillsSettingsTab } from "@/components/settings/SkillsSettingsTab";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useHandleSettings } from "@/hooks/use-handle-settings";
+import { useContextPanelStore } from "@/stores/contextPanelStore";
 
 export const Route = createFileRoute("/settings")({
   validateSearch: (search) => ({
@@ -33,9 +34,42 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "advanced", label: "Advanced", description: "Developer and advanced options" },
 ];
 
+function SettingsContextPanel({ activeSection }: { activeSection: string }) {
+  const section = SETTINGS_SECTIONS.find((s) => s.id === activeSection);
+
+  return (
+    <div className="space-y-4 p-4">
+      {section && (
+        <>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Current Section
+            </p>
+            <p className="text-sm font-medium">{section.label}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{section.description}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/50 p-3">
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Tip:</span> Changes auto-save as
+              you update settings.
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function SettingsPage() {
   const { tab } = Route.useSearch();
   const [activeSection, setActiveSection] = useState(tab ?? "ai");
+
+  useEffect(() => {
+    useContextPanelStore.getState().setContent(
+      <SettingsContextPanel activeSection={activeSection} />,
+    );
+    return () => useContextPanelStore.getState().clearContent();
+  }, [activeSection]);
 
   const {
     theme,
@@ -72,7 +106,7 @@ function SettingsPage() {
     <div className="mx-auto w-full max-w-5xl">
       <PageHeader title="Settings" description="Configure your AI providers and application" />
 
-      <div className="flex gap-8">
+      <div className="flex gap-6">
         {/* Left nav */}
         <div className="w-full shrink-0 md:w-48">
           <SettingsNav

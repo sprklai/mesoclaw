@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Conversation,
@@ -19,10 +19,67 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useChannelStore } from "../stores/channelStore";
+import { useContextPanelStore } from "@/stores/contextPanelStore";
 
 export const Route = createFileRoute("/channels")({
   component: ChannelsPage,
 });
+
+function ChannelsContextPanel({
+  selectedChannel,
+  channelMessages,
+  replyRecipient,
+}: {
+  selectedChannel: string | null;
+  channelMessages: { from: string; content: string; timestamp: string }[];
+  replyRecipient: string;
+}) {
+  const senders = [...new Set(channelMessages.map((m) => m.from))];
+
+  return (
+    <div className="space-y-4 p-4">
+      {selectedChannel ? (
+        <>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Channel
+            </p>
+            <p className="text-sm font-medium">#{selectedChannel}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {channelMessages.length} message{channelMessages.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+
+          {senders.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Senders
+              </p>
+              <div className="space-y-1">
+                {senders.slice(0, 5).map((sender) => (
+                  <p key={sender} className="text-xs text-foreground">
+                    {sender}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {replyRecipient && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Replying To
+              </p>
+              <p className="text-xs text-primary">{replyRecipient}</p>
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">Select a channel to see details.</p>
+      )}
+    </div>
+  );
+}
 
 function ChannelsPage() {
   const { t } = useTranslation("channels");
@@ -37,6 +94,17 @@ function ChannelsPage() {
   const [sendError, setSendError] = useState<string | null>(null);
 
   const channelMessages = selectedChannel ? (messages[selectedChannel] ?? []) : [];
+
+  useEffect(() => {
+    useContextPanelStore.getState().setContent(
+      <ChannelsContextPanel
+        selectedChannel={selectedChannel}
+        channelMessages={channelMessages}
+        replyRecipient={replyRecipient}
+      />,
+    );
+    return () => useContextPanelStore.getState().clearContent();
+  }, [selectedChannel, channelMessages, replyRecipient]);
 
   async function handleSend(text: string) {
     if (!selectedChannel || !text.trim()) return;
@@ -60,9 +128,9 @@ function ChannelsPage() {
     <div className="flex h-full flex-col">
       <PageHeader title={t("title")} description={t("description")} />
 
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Channel list */}
-        <aside className="flex w-48 shrink-0 flex-col rounded-xl border border-border bg-sidebar">
+        <aside className="flex shrink-0 flex-col rounded-xl border border-border bg-sidebar md:w-48">
           <h2 className="px-3 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t("sidebar.heading")}
           </h2>
@@ -106,7 +174,7 @@ function ChannelsPage() {
         </aside>
 
         {/* Message area */}
-        <div className="ml-4 flex min-w-0 flex-1 flex-col rounded-xl border border-border">
+        <div className="mt-2 flex min-w-0 flex-1 flex-col rounded-xl border border-border md:ml-4 md:mt-0">
           {selectedChannel ? (
             <>
               <header className="shrink-0 border-b border-border px-4 py-3">

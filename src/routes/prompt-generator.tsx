@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useContextPanelStore } from "@/stores/contextPanelStore";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -56,6 +57,67 @@ const ARTIFACT_TYPES: { value: ArtifactType; label: string }[] = [
 ];
 
 type LibraryTab = ArtifactType | "all";
+
+function PromptContextPanel({
+  artifactType,
+  artifactCount,
+  status,
+  lastSaved,
+}: {
+  artifactType: ArtifactType;
+  artifactCount: number;
+  status: "idle" | "generating" | "done" | "error";
+  lastSaved: GeneratedArtifact | null;
+}) {
+  const typeLabel = ARTIFACT_TYPES.find((t) => t.value === artifactType)?.label ?? artifactType;
+  const typeDescriptions: Record<ArtifactType, string> = {
+    skill: "Reusable prompt template for skills.",
+    agent: "Autonomous agent system prompt.",
+    soul: "Character and personality definition.",
+    "claude-skill": "Claude Code skill file.",
+    generic: "General-purpose prompt template.",
+  };
+
+  return (
+    <div className="space-y-4 p-4">
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Type
+        </p>
+        <p className="text-sm font-medium">{typeLabel}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{typeDescriptions[artifactType]}</p>
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Library
+        </p>
+        <p className="text-sm">
+          {artifactCount} artifact{artifactCount !== 1 ? "s" : ""}
+        </p>
+      </div>
+
+      {status === "generating" && (
+        <div className="flex items-center gap-2 text-xs text-primary">
+          <span className="size-2 animate-pulse rounded-full bg-primary" />
+          Generating…
+        </div>
+      )}
+
+      {lastSaved && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Last Generated
+          </p>
+          <p className="truncate text-xs text-foreground">{lastSaved.name}</p>
+          {lastSaved.disk_path && (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{lastSaved.disk_path}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function PromptGeneratorPage() {
 	const artifactType = usePromptGeneratorStore((s) => s.artifactType);
@@ -112,6 +174,18 @@ function PromptGeneratorPage() {
 		void loadHistory();
 		void loadSkills();
 	}, [loadHistory, loadSkills]);
+
+	useEffect(() => {
+		useContextPanelStore.getState().setContent(
+			<PromptContextPanel
+				artifactType={artifactType}
+				artifactCount={history.length}
+				status={status}
+				lastSaved={lastSaved}
+			/>,
+		);
+		return () => useContextPanelStore.getState().clearContent();
+	}, [artifactType, history.length, status, lastSaved]);
 
 	const isGenerating = status === "generating";
 	const hasOutput = status === "done" || status === "error";
@@ -213,7 +287,7 @@ function PromptGeneratorPage() {
 	const showLibrary = allFsSkills.length > 0 || history.length > 0;
 
 	return (
-		<div className="flex h-full flex-col gap-4 overflow-hidden p-4">
+		<div className="flex h-full flex-col gap-4 overflow-hidden">
 			<PageHeader
 				title="Generate Prompt"
 				description="Generate AI prompt templates for skills, agents, souls, and more."
