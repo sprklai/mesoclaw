@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use crate::database::schema::chat_sessions;
 
 /// A chat session with structured routing metadata.
-#[derive(Debug, Clone, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = chat_sessions)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatSession {
     pub id: String,

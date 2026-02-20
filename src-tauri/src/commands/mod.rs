@@ -3,6 +3,7 @@ pub mod ai_providers;
 pub mod approval;
 pub mod channels;
 pub mod chat;
+pub mod chat_sessions;
 pub mod file_browser;
 pub mod keychain;
 pub mod llm;

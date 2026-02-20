@@ -1,3 +1,4 @@
+pub mod activity;
 pub mod adapters;
 pub mod agent;
 pub mod agents;
@@ -124,7 +125,12 @@ pub fn run() {
             let bus: Arc<dyn event_bus::EventBus> =
                 Arc::new(event_bus::TokioBroadcastBus::new());
             event_bus::TauriBridge::new(bus.clone(), app.handle().clone()).start();
-            app.manage(bus);
+            app.manage(bus.clone());
+
+            // Initialize activity buffer and subscribe to event bus.
+            let activity_buffer = Arc::new(activity::ActivityBuffer::with_default_size());
+            activity::ActivityBuffer::subscribe_to_bus(Arc::clone(&activity_buffer), bus);
+            app.manage(activity_buffer);
 
             // Initialize security policy and tool registry.
             let policy = Arc::new(security::SecurityPolicy::default_policy());
@@ -820,6 +826,14 @@ pub fn run() {
             commands::ollama::discover_ollama_models_command,
             // Generic AI chat commands (database-specific chat removed)
             commands::chat::get_available_models_command,
+            // Chat session persistence commands
+            commands::chat_sessions::list_chat_sessions_command,
+            commands::chat_sessions::get_chat_session_command,
+            commands::chat_sessions::create_chat_session_command,
+            commands::chat_sessions::delete_chat_session_command,
+            commands::chat_sessions::load_messages_command,
+            commands::chat_sessions::save_message_command,
+            commands::chat_sessions::clear_session_messages_command,
             // Streaming chat command
             commands::streaming_chat::stream_chat_command,
             // Skill system commands
@@ -902,6 +916,8 @@ pub fn run() {
             memory::commands::search_memory_command,
             memory::commands::forget_memory_command,
             memory::commands::get_daily_memory_command,
+            // Activity commands
+            activity::commands::get_recent_activity_command,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]
