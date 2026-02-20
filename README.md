@@ -1,6 +1,10 @@
 # Mesoclaw
 
 <p align="center">
+  <img src="public/mesoclaw.png" alt="Mesoclaw" width="100%" />
+</p>
+
+<p align="center">
   <strong>A lightweight, privacy-first desktop AI agent. Runs on your machine. Works for you.</strong>
 </p>
 
@@ -23,13 +27,13 @@ Unlike browser-based AI tools, Mesoclaw is a real native application: 3–15 MB 
 
 Mesoclaw draws architectural lessons from the broader "claw" family of AI agents:
 
-| Project | Language | Target | RAM | Binary |
-|---------|----------|--------|-----|--------|
-| [OpenClaw](https://github.com/openclaw/openclaw) | TypeScript | Server/Desktop | >1 GB | ~28 MB + Node.js |
-| [PicoClaw](https://github.com/sipeed/picoclaw) | Go | Edge ($10 SBCs) | <10 MB | ~8 MB |
-| [IronClaw](https://github.com/nearai/ironclaw) | Rust | NEAR AI agents | Moderate | Single binary |
-| [ZeroClaw](https://github.com/openagen/zeroclaw) | Rust | Resource-constrained | <5 MB | ~3.4 MB |
-| **Mesoclaw** | **Rust + React** | **Native desktop** | **<50 MB idle** | **<15 MB** |
+| Project                                          | Language         | Target               | RAM             | Binary           |
+| ------------------------------------------------ | ---------------- | -------------------- | --------------- | ---------------- |
+| [OpenClaw](https://github.com/openclaw/openclaw) | TypeScript       | Server/Desktop       | >1 GB           | ~28 MB + Node.js |
+| [PicoClaw](https://github.com/sipeed/picoclaw)   | Go               | Edge ($10 SBCs)      | <10 MB          | ~8 MB            |
+| [IronClaw](https://github.com/nearai/ironclaw)   | Rust             | NEAR AI agents       | Moderate        | Single binary    |
+| [ZeroClaw](https://github.com/openagen/zeroclaw) | Rust             | Resource-constrained | <5 MB           | ~3.4 MB          |
+| **Mesoclaw**                                     | **Rust + React** | **Native desktop**   | **<50 MB idle** | **<15 MB**       |
 
 Mesoclaw combines **ZeroClaw's trait-based security architecture**, **PicoClaw's minimalism**, and **OpenClaw's feature breadth** — wrapped in a native Tauri desktop shell for macOS, Windows, and Linux.
 
@@ -94,15 +98,15 @@ bun run tauri build      # Production bundle (macOS/Windows/Linux)
 
 ### Roadmap
 
-| Version | Milestone | Key Features |
-|---------|-----------|--------------|
-| v0.6 | Foundation | `ReliableProvider` retry/fallback, release profile optimization |
-| v0.7 | Core Agent | Tool system, security policy, event bus, identity system, sidecar modules |
-| v0.8 | Intelligence | Multi-turn agent loop, memory system (vector + BM25), MCP client, container runtime |
-| v0.9 | Proactive | Scheduler, native notifications, system tray, session management |
-| v1.0 | Complete | Config system, channel management UI, boot sequence, CLI REPL |
-| v1.1 | Channels+ | Telegram polish, WhatsApp (TBD), channel management UX |
-| v1.2 | Mobile | Tauri Mobile (iOS + Android), push notifications, TestFlight |
+| Version | Milestone    | Key Features                                                                        |
+| ------- | ------------ | ----------------------------------------------------------------------------------- |
+| v0.6    | Foundation   | `ReliableProvider` retry/fallback, release profile optimization                     |
+| v0.7    | Core Agent   | Tool system, security policy, event bus, identity system, sidecar modules           |
+| v0.8    | Intelligence | Multi-turn agent loop, memory system (vector + BM25), MCP client, container runtime |
+| v0.9    | Proactive    | Scheduler, native notifications, system tray, session management                    |
+| v1.0    | Complete     | Config system, channel management UI, boot sequence, CLI REPL                       |
+| v1.1    | Channels+    | Telegram polish, WhatsApp (TBD), channel management UX                              |
+| v1.2    | Mobile       | Tauri Mobile (iOS + Android), push notifications, TestFlight                        |
 
 See `docs/implementation-plan.md` for the full 49-task execution plan.
 
@@ -185,20 +189,20 @@ autonomy = "supervised"   # readOnly | supervised | full
 rate_limit = 20           # max actions per hour (applies to "full" only)
 ```
 
-| Mode | Shell commands | File writes | Network | Approval required |
-|------|---------------|-------------|---------|-------------------|
-| `readOnly` | Read-only (`ls`, `cat`, `grep`, `git`) | No | No | Medium/High always denied |
-| `supervised` *(default)* | Read-only auto-approved | Requires approval | Requires approval | Medium and High risk |
-| `full` | All (rate-limited) | Yes | Yes | Never — subject to rate limit |
+| Mode                     | Shell commands                         | File writes       | Network           | Approval required             |
+| ------------------------ | -------------------------------------- | ----------------- | ----------------- | ----------------------------- |
+| `readOnly`               | Read-only (`ls`, `cat`, `grep`, `git`) | No                | No                | Medium/High always denied     |
+| `supervised` _(default)_ | Read-only auto-approved                | Requires approval | Requires approval | Medium and High risk          |
+| `full`                   | All (rate-limited)                     | Yes               | Yes               | Never — subject to rate limit |
 
 **Risk classification:**
 
-| Risk | Examples | `supervised` behavior |
-|------|----------|----------------------|
-| Low | `ls`, `cat`, `grep`, `git`, `echo` | Auto-approved |
-| Medium | `mkdir`, `cp`, `mv`, `cargo`, `npm`, `pip` | Requires user approval |
-| High | `curl`, `wget`, `chmod`, unknown binaries | Requires user approval |
-| Blocked | `rm`, `sudo`, `dd`, `mkfs`, `shutdown` | Always denied — in all modes |
+| Risk    | Examples                                   | `supervised` behavior        |
+| ------- | ------------------------------------------ | ---------------------------- |
+| Low     | `ls`, `cat`, `grep`, `git`, `echo`         | Auto-approved                |
+| Medium  | `mkdir`, `cp`, `mv`, `cargo`, `npm`, `pip` | Requires user approval       |
+| High    | `curl`, `wget`, `chmod`, unknown binaries  | Requires user approval       |
+| Blocked | `rm`, `sudo`, `dd`, `mkfs`, `shutdown`     | Always denied — in all modes |
 
 Shell injection patterns (backticks, `$()`, pipes, redirects, `;`, `&&`, `||`) are always blocked regardless of mode.
 
@@ -274,16 +278,17 @@ src/
 
 Mesoclaw adopts a layered security model inspired by ZeroClaw's 6-layer defense, adapted for the desktop context:
 
-| Layer | Scope | Implementation |
-|-------|-------|----------------|
-| **1. Credentials** | API keys | OS keyring only. Never written to disk. Zeroized in memory after use. |
-| **2. Autonomy** | Agent actions | Three levels: `ReadOnly` (query-only), `Supervised` (approve medium/high risk), `Full` (rate-limited) |
-| **3. Filesystem** | File access | Workspace-restricted. Blocks `/etc`, `/root`, `~/.ssh`, `~/.aws`, `~/.gnupg`. Path traversal prevention. |
-| **4. Injection** | Command strings | Blocks backticks, `$()`, `${}`, `>`, `>>`, pipe splitting from LLM-provided inputs |
-| **5. Rate Limiting** | Tool execution | Sliding window, 20 actions/hour default, configurable per autonomy level |
-| **6. Audit Trail** | Logging | All tool executions logged with timestamp, args, and result in `~/.mesoclaw/logs/audit.jsonl` |
+| Layer                | Scope           | Implementation                                                                                           |
+| -------------------- | --------------- | -------------------------------------------------------------------------------------------------------- |
+| **1. Credentials**   | API keys        | OS keyring only. Never written to disk. Zeroized in memory after use.                                    |
+| **2. Autonomy**      | Agent actions   | Three levels: `ReadOnly` (query-only), `Supervised` (approve medium/high risk), `Full` (rate-limited)    |
+| **3. Filesystem**    | File access     | Workspace-restricted. Blocks `/etc`, `/root`, `~/.ssh`, `~/.aws`, `~/.gnupg`. Path traversal prevention. |
+| **4. Injection**     | Command strings | Blocks backticks, `$()`, `${}`, `>`, `>>`, pipe splitting from LLM-provided inputs                       |
+| **5. Rate Limiting** | Tool execution  | Sliding window, 20 actions/hour default, configurable per autonomy level                                 |
+| **6. Audit Trail**   | Logging         | All tool executions logged with timestamp, args, and result in `~/.mesoclaw/logs/audit.jsonl`            |
 
 **Privacy guarantees:**
+
 - No telemetry or analytics. No phone-home behavior.
 - All data stored locally in `~/.mesoclaw/` or the OS app data directory.
 - API keys never logged, never written to config files, zeroized from memory after use.
@@ -295,11 +300,11 @@ Mesoclaw adopts a layered security model inspired by ZeroClaw's 6-layer defense,
 
 Mesoclaw extends its capabilities through sidecar modules — external processes that the agent can invoke as tools:
 
-| Module Type | Protocol | Use Case |
-|-------------|----------|----------|
-| `SidecarTool` | stdin/stdout JSON | On-demand scripts (Python, Node, shell) |
-| `SidecarService` | HTTP REST | Long-lived background services |
-| `McpServer` | JSON-RPC (MCP) | Any MCP-compatible tool server |
+| Module Type      | Protocol          | Use Case                                |
+| ---------------- | ----------------- | --------------------------------------- |
+| `SidecarTool`    | stdin/stdout JSON | On-demand scripts (Python, Node, shell) |
+| `SidecarService` | HTTP REST         | Long-lived background services          |
+| `McpServer`      | JSON-RPC (MCP)    | Any MCP-compatible tool server          |
 
 Modules are defined with TOML manifests and discovered automatically at startup:
 
@@ -350,13 +355,13 @@ The agent assembles these into its system prompt in order: SOUL → AGENTS → U
 
 Mesoclaw supports multiple inbound channels beyond the desktop UI:
 
-| Channel | Status | Notes |
-|---------|--------|-------|
-| Desktop (Tauri IPC) | Done | Default channel, always available |
-| Telegram Bot | v1.1 | Long-polling, MarkdownV2, file/photo support, `allowed_chat_ids` security |
-| HTTP Webhook | v1.0 | axum listener for GitHub, Zapier, and other integrations |
-| WhatsApp | Future | Post-v1.1 |
-| Discord | Future | Post-v1.1 |
+| Channel             | Status | Notes                                                                     |
+| ------------------- | ------ | ------------------------------------------------------------------------- |
+| Desktop (Tauri IPC) | Done   | Default channel, always available                                         |
+| Telegram Bot        | v1.1   | Long-polling, MarkdownV2, file/photo support, `allowed_chat_ids` security |
+| HTTP Webhook        | v1.0   | axum listener for GitHub, Zapier, and other integrations                  |
+| WhatsApp            | Future | Post-v1.1                                                                 |
+| Discord             | Future | Post-v1.1                                                                 |
 
 Security note: tool approvals always route to the desktop app. They are never granted through external messaging channels.
 
@@ -364,42 +369,42 @@ Security note: tool approvals always route to the desktop app. They are never gr
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| Desktop shell | Tauri 2 | Native window, system tray, notifications, IPC |
-| Frontend | React 19 + TypeScript | UI rendering |
-| Build tool | Vite | Frontend bundling, HMR |
-| Routing | TanStack Router | File-based client-side routing |
-| State | Zustand | Lightweight stores |
-| Styling | Tailwind CSS 4 | Utility-first CSS |
-| Backend | Rust 2024 | Performance, memory safety |
-| Async | Tokio | Async I/O, background tasks, scheduling |
-| LLM client | async-openai | OpenAI-compatible API calls |
-| Database | SQLite (rusqlite) | App data, vector storage, FTS5 full-text search |
-| Secrets | OS Keyring + zeroize | Secure credential storage |
-| Templates | Tera | Prompt template rendering |
-| HTTP server | axum | Gateway/control plane, webhook listener |
-| Sidecar protocol | stdin/stdout JSON + MCP | Module communication |
-| Container runtime | bollard (Docker/Podman API) | Container-based module isolation |
-| Logging | tracing | Structured async logging |
-| Package manager | Bun | Frontend dependency management |
+| Layer             | Technology                  | Purpose                                         |
+| ----------------- | --------------------------- | ----------------------------------------------- |
+| Desktop shell     | Tauri 2                     | Native window, system tray, notifications, IPC  |
+| Frontend          | React 19 + TypeScript       | UI rendering                                    |
+| Build tool        | Vite                        | Frontend bundling, HMR                          |
+| Routing           | TanStack Router             | File-based client-side routing                  |
+| State             | Zustand                     | Lightweight stores                              |
+| Styling           | Tailwind CSS 4              | Utility-first CSS                               |
+| Backend           | Rust 2024                   | Performance, memory safety                      |
+| Async             | Tokio                       | Async I/O, background tasks, scheduling         |
+| LLM client        | async-openai                | OpenAI-compatible API calls                     |
+| Database          | SQLite (rusqlite)           | App data, vector storage, FTS5 full-text search |
+| Secrets           | OS Keyring + zeroize        | Secure credential storage                       |
+| Templates         | Tera                        | Prompt template rendering                       |
+| HTTP server       | axum                        | Gateway/control plane, webhook listener         |
+| Sidecar protocol  | stdin/stdout JSON + MCP     | Module communication                            |
+| Container runtime | bollard (Docker/Podman API) | Container-based module isolation                |
+| Logging           | tracing                     | Structured async logging                        |
+| Package manager   | Bun                         | Frontend dependency management                  |
 
 ---
 
 ## Platform Support
 
-| OS | Architecture | Installer | Code Signing |
-|----|-------------|-----------|-------------|
-| macOS | Apple Silicon (aarch64) | DMG, APP | Apple notarization |
-| macOS | Intel (x86_64) | DMG, APP | Apple notarization |
-| macOS | Universal binary | DMG | Apple notarization |
-| Windows | x64 | MSI, NSIS EXE | Azure Trusted Signing |
-| Windows | ARM64 | MSI, NSIS EXE | Azure Trusted Signing |
-| Linux | x64 (Ubuntu 22.04+) | .deb | — |
-| Linux | x64 (Ubuntu 24.04+) | AppImage, .rpm | — |
-| Linux | ARM64 | .deb, AppImage | — |
-| iOS | arm64 | IPA (TestFlight) | Apple distribution cert |
-| Android | arm64-v8a, armeabi-v7a, x86_64 | AAB, APK | Keystore |
+| OS      | Architecture                   | Installer        | Code Signing            |
+| ------- | ------------------------------ | ---------------- | ----------------------- |
+| macOS   | Apple Silicon (aarch64)        | DMG, APP         | Apple notarization      |
+| macOS   | Intel (x86_64)                 | DMG, APP         | Apple notarization      |
+| macOS   | Universal binary               | DMG              | Apple notarization      |
+| Windows | x64                            | MSI, NSIS EXE    | Azure Trusted Signing   |
+| Windows | ARM64                          | MSI, NSIS EXE    | Azure Trusted Signing   |
+| Linux   | x64 (Ubuntu 22.04+)            | .deb             | —                       |
+| Linux   | x64 (Ubuntu 24.04+)            | AppImage, .rpm   | —                       |
+| Linux   | ARM64                          | .deb, AppImage   | —                       |
+| iOS     | arm64                          | IPA (TestFlight) | Apple distribution cert |
+| Android | arm64-v8a, armeabi-v7a, x86_64 | AAB, APK         | Keystore                |
 
 32-bit x86 is not supported on any platform.
 
@@ -522,16 +527,16 @@ cargo fmt                     # Rust format
 
 ## Documentation Index
 
-| Document | Description |
-|----------|-------------|
-| `docs/product-requirements.md` | Full PRD — requirements, personas, release plan |
-| `docs/architecture-diagram.md` | Detailed system architecture with data flow diagrams |
-| `docs/implementation-plan.md` | 49-task execution plan across 8 phases |
+| Document                          | Description                                                    |
+| --------------------------------- | -------------------------------------------------------------- |
+| `docs/product-requirements.md`    | Full PRD — requirements, personas, release plan                |
+| `docs/architecture-diagram.md`    | Detailed system architecture with data flow diagrams           |
+| `docs/implementation-plan.md`     | 49-task execution plan across 8 phases                         |
 | `docs/claw-ecosystem-analysis.md` | Comparative analysis of OpenClaw, PicoClaw, IronClaw, ZeroClaw |
-| `docs/mesoclaw-gap-analysis.md` | Gap analysis between current state and target architecture |
-| `docs/plans/` | Detailed design documents for each subsystem |
-| `src/CLAUDE.md` | Frontend code standards (React/TypeScript) |
-| `src-tauri/CLAUDE.md` | Backend code standards (Rust) |
+| `docs/mesoclaw-gap-analysis.md`   | Gap analysis between current state and target architecture     |
+| `docs/plans/`                     | Detailed design documents for each subsystem                   |
+| `src/CLAUDE.md`                   | Frontend code standards (React/TypeScript)                     |
+| `src-tauri/CLAUDE.md`             | Backend code standards (Rust)                                  |
 
 ---
 

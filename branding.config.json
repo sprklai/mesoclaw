@@ -10,7 +10,7 @@
   "htmlTitle": "MesoClaw",
   "splashTitle": "MesoClaw",
   "splashSubtitle": "MesoClaw",
-  "iconAssetPath": "/mesoclaw-icon.png",
+  "iconAssetPath": "/mesoclaw-lobster.png",
   "keychainService": "com.sprklai.mesoclaw",
   "credentialsService": "com.mesoclaw.credentials",
   "strongholdClientName": "mesoclaw-secrets",

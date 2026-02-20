@@ -125,7 +125,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
 
   body {
@@ -506,11 +506,11 @@
   }
 
   .scrollbar-responsive::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-muted-foreground/30;
+    @apply rounded-full bg-muted-foreground/65;
   }
 
   .scrollbar-responsive::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/50;
+    @apply bg-muted-foreground/85;
   }
 
   /* Responsive truncate */

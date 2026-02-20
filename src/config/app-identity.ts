@@ -5,7 +5,7 @@ export const APP_IDENTITY = {
   "slug": "mesoclaw",
   "reverseDomain": "com.sprklai",
   "bundleIdentifier": "com.sprklai.mesoclaw",
-  "iconAssetPath": "/mesoclaw-icon.png",
+  "iconAssetPath": "/mesoclaw-lobster.png",
   "keychainService": "com.sprklai.mesoclaw",
   "credentialsService": "com.mesoclaw.credentials",
   "strongholdClientName": "mesoclaw-secrets",
