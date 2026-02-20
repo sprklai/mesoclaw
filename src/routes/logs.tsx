@@ -92,7 +92,6 @@ function LogsPage() {
 
   const [activeLevel, setActiveLevel] = useState<LogLevel>("ALL");
   const [activeModule, setActiveModule] = useState<LogModule>("ALL");
-  void setActiveModule; // Will be used in UI in next task
   const [search, setSearch] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
 
@@ -195,7 +194,6 @@ function LogsPage() {
     }
     return map;
   }, [entries]);
-  void moduleCounts; // Will be used in UI in next task
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -226,6 +224,32 @@ function LogsPage() {
               {lvl !== "ALL" && counts[lvl] != null && (
                 <span className="ml-1.5 opacity-70">
                   {counts[lvl]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Module filter buttons */}
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by module">
+          {MODULES.map((mod) => (
+            <button
+              key={mod}
+              type="button"
+              onClick={() => setActiveModule(mod)}
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                activeModule === mod
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+              )}
+              aria-pressed={activeModule === mod}
+            >
+              {mod}
+              {mod !== "ALL" && moduleCounts[mod] != null && (
+                <span className="ml-1.5 opacity-70">
+                  {moduleCounts[mod]}
                 </span>
               )}
             </button>
