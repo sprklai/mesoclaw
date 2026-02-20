@@ -120,6 +120,84 @@ impl NewAgent {
     }
 }
 
+/// Agent update struct (AsChangeset)
+#[derive(Debug, Clone, AsChangeset, Serialize, Deserialize)]
+#[diesel(table_name = agents)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAgent {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub system_prompt: Option<String>,
+    pub model_id: Option<String>,
+    pub provider_id: Option<String>,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<i32>,
+    pub tools_enabled: Option<i32>,
+    pub memory_enabled: Option<i32>,
+    pub workspace_path: Option<String>,
+    pub is_active: Option<i32>,
+    pub updated_at: String,
+}
+
+impl UpdateAgent {
+    /// Create an update struct with the updated timestamp
+    pub fn new() -> Self {
+        Self {
+            name: None,
+            description: None,
+            system_prompt: None,
+            model_id: None,
+            provider_id: None,
+            temperature: None,
+            max_tokens: None,
+            tools_enabled: None,
+            memory_enabled: None,
+            workspace_path: None,
+            is_active: None,
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+}
+
+impl Default for UpdateAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Request type for creating a new agent (IPC)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAgentRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub system_prompt: String,
+    pub model_id: String,
+    pub provider_id: String,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<i32>,
+    pub tools_enabled: Option<bool>,
+    pub memory_enabled: Option<bool>,
+}
+
+/// Request type for updating an agent (IPC)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAgentRequest {
+    pub id: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub system_prompt: Option<String>,
+    pub model_id: Option<String>,
+    pub provider_id: Option<String>,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<i32>,
+    pub tools_enabled: Option<bool>,
+    pub memory_enabled: Option<bool>,
+    pub workspace_path: Option<String>,
+    pub is_active: Option<bool>,
+}
+
 /// Agent Session database model (Queryable)
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = agent_sessions)]
