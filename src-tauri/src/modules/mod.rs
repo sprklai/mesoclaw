@@ -28,6 +28,7 @@
 //! `tokio::process::Command` directly and are **not** managed by the Tauri
 //! shell plugin.
 
+pub mod commands;
 pub mod manifest;
 pub mod protocol;
 pub mod sidecar_service;
@@ -307,6 +308,11 @@ impl ModuleRegistry {
 
     pub fn is_empty(&self) -> bool {
         self.modules.read().unwrap().is_empty()
+    }
+
+    /// All registered modules as a `Vec`.
+    pub fn list(&self) -> Vec<Arc<SidecarTool>> {
+        self.modules.read().unwrap().values().cloned().collect()
     }
 
     pub fn get(&self, id: &str) -> Option<Arc<SidecarTool>> {

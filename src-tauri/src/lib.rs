@@ -446,6 +446,18 @@ pub fn run() {
             };
             app.manage(Arc::clone(&sched));
 
+            // Initialize module registry — discover user-installed sidecar modules.
+            let modules_dir = app_local_data_dir.join("modules");
+            std::fs::create_dir_all(&modules_dir).ok();
+            let mut scratch_tool_registry = tools::ToolRegistry::new();
+            let module_registry = Arc::new(modules::ModuleRegistry::discover(
+                &modules_dir,
+                &mut scratch_tool_registry,
+                Arc::new(security::SecurityPolicy::default_policy()),
+                None,
+            ));
+            app.manage(Arc::clone(&module_registry));
+
             // Start the HTTP gateway daemon (deferred until DB + identity are ready).
             #[cfg(feature = "gateway")]
             {
@@ -454,7 +466,7 @@ pub fn run() {
                     .map(|s| s.inner().clone())
                     .ok_or("EventBus not initialised before gateway")?;
                 let sessions_for_gateway = Arc::new(agent::session_router::SessionRouter::new());
-                let modules_for_gateway = Arc::new(modules::ModuleRegistry::empty());
+                let modules_for_gateway = Arc::clone(&module_registry);
                 let pool_for_gateway = pool.clone();
                 let identity_for_gateway: Arc<identity::IdentityLoader> = app
                     .try_state::<Arc<identity::IdentityLoader>>()
@@ -838,6 +850,17 @@ pub fn run() {
             commands::prompt_generator::list_generated_prompts_command,
             commands::prompt_generator::delete_generated_prompt_command,
             commands::prompt_generator::update_generated_prompt_command,
+            // Scheduler commands
+            scheduler::commands::list_jobs_command,
+            scheduler::commands::create_job_command,
+            scheduler::commands::toggle_job_command,
+            scheduler::commands::delete_job_command,
+            scheduler::commands::job_history_command,
+            // Module management commands
+            modules::commands::list_modules_command,
+            modules::commands::start_module_command,
+            modules::commands::stop_module_command,
+            modules::commands::create_module_command,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]

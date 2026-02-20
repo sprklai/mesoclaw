@@ -51,6 +51,10 @@ impl SidecarTool {
         }
     }
 
+    pub fn manifest(&self) -> &ModuleManifest {
+        &self.manifest
+    }
+
     pub fn module_type(&self) -> &ModuleType {
         &self.manifest.module.module_type
     }
