@@ -526,7 +526,25 @@ async fn execute_job(
                 );
             };
             let system_prompt = agent.identity_loader.build_system_prompt();
-            let prompt = "Run your heartbeat checklist. Review any pending tasks, check system status, and report anything that needs attention. If nothing needs attention, reply with HEARTBEAT_OK and nothing else.";
+            // Build prompt from HEARTBEAT.md checklist items (FR-5.5).
+            let items = agent.identity_loader.heartbeat_items();
+            let prompt = if items.is_empty() {
+                "Run your heartbeat checklist. Review any pending tasks, check system \
+                 status, and report anything that needs attention. If nothing needs \
+                 attention, reply with HEARTBEAT_OK and nothing else."
+                    .to_string()
+            } else {
+                format!(
+                    "Run your heartbeat checklist. Check each item and report any issues.\n\
+                     If all items pass, reply with HEARTBEAT_OK and nothing else.\n\n\
+                     Checklist:\n{}",
+                    items
+                        .iter()
+                        .map(|i| format!("- {i}"))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
+            };
             let loop_ = AgentLoop::new(
                 agent.provider.clone(),
                 agent.tool_registry.clone(),
@@ -534,7 +552,7 @@ async fn execute_job(
                 Some(bus.clone()),
                 AgentConfig::default(),
             );
-            match loop_.run(&system_prompt, prompt).await {
+            match loop_.run(&system_prompt, &prompt).await {
                 Ok(response) => {
                     let trimmed = response.trim();
                     // Detect HEARTBEAT_OK sentinel: suppress alert when the response
