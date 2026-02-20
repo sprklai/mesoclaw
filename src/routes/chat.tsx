@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { CheckIcon, Sparkles } from "lucide-react";
 
 import { useChatSessionStore } from "@/stores/chatSessionStore";
+import { tryExecuteCommand, getCommandSuggestions, type ChatCommand } from "@/lib/chatCommands";
 import {
   Conversation,
   ConversationContent,
@@ -378,6 +379,12 @@ function ChatPage() {
       const text = message.text?.trim();
       if (!text) {
         console.log("Empty message, skipping");
+        return;
+      }
+
+      // Check if message is a command (starts with /)
+      if (tryExecuteCommand(text, useChatSessionStore.getState())) {
+        setInput("");
         return;
       }
 
