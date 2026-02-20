@@ -162,6 +162,7 @@ fn parse_template(content: &str, path: &Path) -> Option<PromptTemplate> {
             }
         }
 
+        let path_str = path.to_string_lossy().to_string();
         return Some(PromptTemplate {
             id,
             name,
@@ -169,6 +170,7 @@ fn parse_template(content: &str, path: &Path) -> Option<PromptTemplate> {
             category,
             template: body,
             parameters: vec![],
+            file_path: path_str,
         });
     }
 
@@ -180,5 +182,6 @@ fn parse_template(content: &str, path: &Path) -> Option<PromptTemplate> {
         category: "general".to_string(),
         template: content.to_string(),
         parameters: vec![],
+        file_path: path.to_string_lossy().to_string(),
     })
 }

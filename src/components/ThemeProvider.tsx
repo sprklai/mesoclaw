@@ -24,6 +24,15 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const resolvedTheme = useTheme((state) => state.resolvedTheme);
   const applyTheme = useTheme((state) => state.applyTheme);
 
+  // Apply system theme immediately on first mount, before settings are available.
+  // This runs once and covers the window between React rendering and settings loading.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!settings?.theme) {
+      applyTheme("system");
+    }
+  }, []); // intentionally empty — only runs on mount
+
   // Apply theme to DOM when theme setting changes
   useEffect(() => {
     if (settings?.theme) {

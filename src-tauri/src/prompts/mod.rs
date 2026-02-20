@@ -25,6 +25,11 @@ pub struct PromptTemplate {
     pub category: String,
     pub template: String,
     pub parameters: Vec<TemplateParameter>,
+    /// Absolute path to the source file on disk. Skipped during serialisation
+    /// so it is never sent to the frontend (it is only used by delete/update
+    /// commands that need to locate the file).
+    #[serde(skip)]
+    pub file_path: String,
 }
 
 /// A single parameter accepted by a template.

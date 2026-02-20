@@ -36,9 +36,20 @@ function applyThemeToDOM(theme: Theme): "light" | "dark" {
   return resolved;
 }
 
+// Apply system theme immediately at module load time to prevent a flash of the
+// wrong theme before React has rendered and settings have been fetched.
+if (typeof window !== "undefined") {
+  const resolved = window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+  if (resolved === "dark") {
+    document.documentElement.classList.add("dark");
+  }
+}
+
 export const useTheme = create<ThemeStore>((set) => ({
   theme: "system",
-  resolvedTheme: "light",
+  resolvedTheme: getSystemTheme(),
 
   applyTheme: (theme: Theme) => {
     const resolved = applyThemeToDOM(theme);

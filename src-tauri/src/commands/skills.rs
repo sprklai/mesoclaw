@@ -116,6 +116,40 @@ pub async fn set_skill_auto_select_command(_auto_select: bool) -> Result<(), Str
     Err("not supported: template system does not persist auto-select state".to_string())
 }
 
+/// Delete a skill template file from disk and reload the registry.
+#[tauri::command]
+pub async fn delete_skill_command(skill_id: String) -> Result<(), String> {
+    let registry = get_or_init_registry().await;
+    let template = registry
+        .get(&skill_id)
+        .await
+        .ok_or_else(|| format!("Skill not found: {skill_id}"))?;
+    if template.file_path.is_empty() {
+        return Err(format!("No file path for skill: {skill_id}"));
+    }
+    std::fs::remove_file(&template.file_path)
+        .map_err(|e| format!("Failed to delete skill file: {e}"))?;
+    registry.load().await;
+    Ok(())
+}
+
+/// Update the content of a skill template file on disk and reload the registry.
+#[tauri::command]
+pub async fn update_skill_command(skill_id: String, content: String) -> Result<(), String> {
+    let registry = get_or_init_registry().await;
+    let template = registry
+        .get(&skill_id)
+        .await
+        .ok_or_else(|| format!("Skill not found: {skill_id}"))?;
+    if template.file_path.is_empty() {
+        return Err(format!("No file path for skill: {skill_id}"));
+    }
+    std::fs::write(&template.file_path, content.as_bytes())
+        .map_err(|e| format!("Failed to write skill file: {e}"))?;
+    registry.load().await;
+    Ok(())
+}
+
 /// Suggest skills relevant to a given request using keyword matching.
 ///
 /// Scores each template by the fraction of request words that appear in its

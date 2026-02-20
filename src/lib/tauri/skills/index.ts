@@ -116,6 +116,23 @@ export async function suggestSkills(
   });
 }
 
+/**
+ * Delete a skill template file from disk.
+ */
+export async function deleteSkill(skillId: string): Promise<void> {
+  return invoke("delete_skill_command", { skillId });
+}
+
+/**
+ * Update the raw content of a skill template file on disk.
+ */
+export async function updateSkill(
+  skillId: string,
+  content: string
+): Promise<void> {
+  return invoke("update_skill_command", { skillId, content });
+}
+
 // Re-export types
 export type {
   SkillDefinition,
