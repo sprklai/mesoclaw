@@ -9,4 +9,3 @@ pub fn db_conn(
 ) -> Result<PooledConnection<ConnectionManager<SqliteConnection>>, String> {
     pool.get().map_err(|e| format!("Database error: {e}"))
 }
-

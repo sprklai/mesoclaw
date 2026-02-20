@@ -49,3 +49,5 @@ target
 target
 dockertests
 worktrees/*
+
+COPY_settings.local.json

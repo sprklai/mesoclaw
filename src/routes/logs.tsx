@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowDown, Pause, Play, RefreshCw, Search, X } from "@/lib/icons";
+import { ArrowDown, Pause, Play, RefreshCw, Search, Trash2, X } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 const AUTO_REFRESH_INTERVAL_MS = 2000;
@@ -209,6 +209,19 @@ function LogsPage() {
             </button>
           )}
         </div>
+
+        {/* Clear */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          onClick={() => setEntries([])}
+          disabled={entries.length === 0}
+          aria-label="Clear logs"
+          title="Clear logs"
+        >
+          <Trash2 className="size-4" aria-hidden />
+        </Button>
 
         {/* Auto-refresh toggle */}
         <Button

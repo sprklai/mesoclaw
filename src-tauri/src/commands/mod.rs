@@ -1,11 +1,11 @@
 pub mod ai_providers;
-pub mod logs;
 pub mod approval;
 pub mod channels;
 pub mod chat;
 pub mod file_browser;
 pub mod keychain;
 pub mod llm;
+pub mod logs;
 pub mod notifications;
 pub mod ollama;
 pub mod prompt_generator;

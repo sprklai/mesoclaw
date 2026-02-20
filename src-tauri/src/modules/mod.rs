@@ -307,21 +307,38 @@ impl ModuleRegistry {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.modules.read().unwrap_or_else(|e| e.into_inner()).is_empty()
+        self.modules
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_empty()
     }
 
     /// All registered modules as a `Vec`.
     pub fn list(&self) -> Vec<Arc<SidecarTool>> {
-        self.modules.read().unwrap_or_else(|e| e.into_inner()).values().cloned().collect()
+        self.modules
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+            .cloned()
+            .collect()
     }
 
     pub fn get(&self, id: &str) -> Option<Arc<SidecarTool>> {
-        self.modules.read().unwrap_or_else(|e| e.into_inner()).get(id).cloned()
+        self.modules
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(id)
+            .cloned()
     }
 
     /// Ids of all registered modules.
     pub fn ids(&self) -> Vec<String> {
-        self.modules.read().unwrap_or_else(|e| e.into_inner()).keys().cloned().collect()
+        self.modules
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .keys()
+            .cloned()
+            .collect()
     }
 }
 
