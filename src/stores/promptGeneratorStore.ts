@@ -9,6 +9,32 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Split raw LLM output into thinking (inside <think>…</think>) and the final
+ * output (everything outside those tags). Handles an unclosed <think> block
+ * that is still being streamed.
+ */
+function splitContent(raw: string): { thinking: string; output: string } {
+	const thinkingParts: string[] = [];
+	// Extract all completed <think>…</think> blocks.
+	let outputRaw = raw.replace(/<think>([\s\S]*?)<\/think>/g, (_, t: string) => {
+		thinkingParts.push(t);
+		return "";
+	});
+	// Handle an unclosed <think> block that is still streaming.
+	const openIdx = outputRaw.lastIndexOf("<think>");
+	if (openIdx !== -1) {
+		thinkingParts.push(outputRaw.slice(openIdx + 7));
+		outputRaw = outputRaw.slice(0, openIdx);
+	}
+	return {
+		thinking: thinkingParts.join("\n").trim(),
+		output: outputRaw.trim(),
+	};
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ArtifactType =
@@ -31,6 +57,11 @@ interface PromptGeneratorState {
 	name: string;
 	description: string;
 	status: "idle" | "generating" | "done" | "error";
+	/** Raw accumulated stream (used to derive the two fields below). */
+	rawContent: string;
+	/** Thinking/reasoning text (content inside <think>…</think> blocks). */
+	thinkingContent: string;
+	/** Final output text (everything outside <think> blocks). */
 	generatedContent: string;
 	sessionId: string | null;
 	lastSaved: GeneratedArtifact | null;
@@ -54,6 +85,8 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 		name: "",
 		description: "",
 		status: "idle",
+		rawContent: "",
+		thinkingContent: "",
 		generatedContent: "",
 		sessionId: null,
 		lastSaved: null,
@@ -71,6 +104,8 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 			set({
 				sessionId,
 				status: "generating",
+				rawContent: "",
+				thinkingContent: "",
 				generatedContent: "",
 				error: null,
 				lastSaved: null,
@@ -82,9 +117,15 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 				(event) => {
 					const payload = event.payload;
 					if (payload.type === "token" && payload.content) {
-						set((s) => ({
-							generatedContent: s.generatedContent + payload.content,
-						}));
+						set((s) => {
+							const raw = s.rawContent + payload.content;
+							const { thinking, output } = splitContent(raw);
+							return {
+								rawContent: raw,
+								thinkingContent: thinking,
+								generatedContent: output,
+							};
+						});
 					} else if (payload.type === "done") {
 						set({ status: "done" });
 						unlisten();
@@ -135,6 +176,8 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 				name: "",
 				description: "",
 				status: "idle",
+				rawContent: "",
+				thinkingContent: "",
 				generatedContent: "",
 				sessionId: null,
 				lastSaved: null,
