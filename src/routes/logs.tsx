@@ -80,7 +80,7 @@ export function moduleMatches(entry: LogEntry, activeModule: LogModule): boolean
   if (activeModule === "ALL") return true;
   const prefixes = MODULE_PREFIXES[activeModule] ?? [];
   const target = entry.target.toLowerCase();
-  return prefixes.some(prefix => target.startsWith(prefix));
+  return prefixes.some(prefix => target.includes(prefix));
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
