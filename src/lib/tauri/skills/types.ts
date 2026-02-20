@@ -12,7 +12,7 @@ export interface SkillInfo {
   source: string;
 }
 
-/** Full skill definition */
+/** Full skill definition with enhanced metadata */
 export interface SkillDefinition {
   id: string;
   name: string;
@@ -20,7 +20,37 @@ export interface SkillDefinition {
   category: string;
   template: string;
   parameters: TemplateParameter[];
+  metadata: SkillMetadata;
+  enabled: boolean;
+  source: SkillSource;
+  filePath?: string;
 }
+
+/** Extended skill metadata */
+export interface SkillMetadata {
+  emoji?: string;
+  requires?: SkillRequirements;
+  toolSchemas?: ToolSchema[];
+  [key: string]: unknown; // Extra metadata fields
+}
+
+/** Skill requirements */
+export interface SkillRequirements {
+  anyBins?: string[];
+  allBins?: string[];
+  apiKeys?: string[];
+  env?: string[];
+}
+
+/** Tool schema definition */
+export interface ToolSchema {
+  name: string;
+  description: string;
+  parameters: unknown; // JSON Schema
+}
+
+/** Skill source location */
+export type SkillSource = "workspace" | "global" | "bundled";
 
 /** A single parameter accepted by a template */
 export interface TemplateParameter {
