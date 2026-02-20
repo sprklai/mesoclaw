@@ -1,38 +1,22 @@
 /**
  * Zustand store for the Prompt Generator UI.
  *
- * Manages artifact generation lifecycle: form state, streaming token events
- * from the Rust backend, and CRUD for previously generated artifacts.
+ * Manages artifact generation lifecycle: form state, a single invoke call
+ * to the Rust backend (no streaming), and CRUD for previously generated
+ * artifacts.
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Split raw LLM output into thinking (inside <think>…</think>) and the final
- * output (everything outside those tags). Handles an unclosed <think> block
- * that is still being streamed.
- */
-function splitContent(raw: string): { thinking: string; output: string } {
-	const thinkingParts: string[] = [];
-	// Extract all completed <think>…</think> blocks.
-	let outputRaw = raw.replace(/<think>([\s\S]*?)<\/think>/g, (_, t: string) => {
-		thinkingParts.push(t);
-		return "";
-	});
-	// Handle an unclosed <think> block that is still streaming.
-	const openIdx = outputRaw.lastIndexOf("<think>");
-	if (openIdx !== -1) {
-		thinkingParts.push(outputRaw.slice(openIdx + 7));
-		outputRaw = outputRaw.slice(0, openIdx);
-	}
-	return {
-		thinking: thinkingParts.join("\n").trim(),
-		output: outputRaw.trim(),
-	};
+/** Strip <think>…</think> reasoning blocks from raw LLM output. */
+function stripThinking(raw: string): string {
+	return raw
+		.replace(/<think>[\s\S]*?<\/think>/g, "")
+		.replace(/<think>[\s\S]*$/, "") // unclosed block
+		.trim();
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -57,13 +41,8 @@ interface PromptGeneratorState {
 	name: string;
 	description: string;
 	status: "idle" | "generating" | "done" | "error";
-	/** Raw accumulated stream (used to derive the two fields below). */
-	rawContent: string;
-	/** Thinking/reasoning text (content inside <think>…</think> blocks). */
-	thinkingContent: string;
-	/** Final output text (everything outside <think> blocks). */
+	/** Editable output shown to the user (think tags stripped). */
 	generatedContent: string;
-	sessionId: string | null;
 	lastSaved: GeneratedArtifact | null;
 	error: string | null;
 	history: GeneratedArtifact[];
@@ -71,6 +50,7 @@ interface PromptGeneratorState {
 	setArtifactType: (type: ArtifactType) => void;
 	setName: (name: string) => void;
 	setDescription: (desc: string) => void;
+	setGeneratedContent: (content: string) => void;
 	startGeneration: () => Promise<void>;
 	loadHistory: () => Promise<void>;
 	deleteArtifact: (id: string) => Promise<void>;
@@ -85,10 +65,7 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 		name: "",
 		description: "",
 		status: "idle",
-		rawContent: "",
-		thinkingContent: "",
 		generatedContent: "",
-		sessionId: null,
 		lastSaved: null,
 		error: null,
 		history: [],
@@ -96,57 +73,31 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 		setArtifactType: (type) => set({ artifactType: type }),
 		setName: (name) => set({ name }),
 		setDescription: (desc) => set({ description: desc }),
+		setGeneratedContent: (content) => set({ generatedContent: content }),
 
 		startGeneration: async () => {
 			const { description, artifactType, name } = get();
 			const sessionId = crypto.randomUUID();
 
 			set({
-				sessionId,
 				status: "generating",
-				rawContent: "",
-				thinkingContent: "",
 				generatedContent: "",
 				error: null,
 				lastSaved: null,
 			});
 
-			// Listen for streaming token events from the backend.
-			const unlisten = await listen<{ type: string; content?: string }>(
-				`prompt-gen-${sessionId}`,
-				(event) => {
-					const payload = event.payload;
-					if (payload.type === "token" && payload.content) {
-						set((s) => {
-							const raw = s.rawContent + payload.content;
-							const { thinking, output } = splitContent(raw);
-							return {
-								rawContent: raw,
-								thinkingContent: thinking,
-								generatedContent: output,
-							};
-						});
-					} else if (payload.type === "done") {
-						set({ status: "done" });
-						unlisten();
-					}
-				},
-			);
-
 			try {
 				const result = await invoke<GeneratedArtifact>(
 					"generate_prompt_command",
-					{
-						description,
-						artifactType,
-						name,
-						sessionId,
-					},
+					{ description, artifactType, name, sessionId },
 				);
-				set({ lastSaved: result });
+				set({
+					status: "done",
+					generatedContent: stripThinking(result.content),
+					lastSaved: result,
+				});
 			} catch (err) {
 				set({ status: "error", error: String(err) });
-				unlisten();
 			}
 		},
 
@@ -176,10 +127,7 @@ export const usePromptGeneratorStore = create<PromptGeneratorState>(
 				name: "",
 				description: "",
 				status: "idle",
-				rawContent: "",
-				thinkingContent: "",
 				generatedContent: "",
-				sessionId: null,
 				lastSaved: null,
 				error: null,
 			}),
