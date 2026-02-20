@@ -125,6 +125,7 @@ The Tauri window is the primary interface. It connects to the gateway over Tauri
 - Identity file editor (Settings → Identity)
 - Tool approval overlay for supervised actions
 - Memory timeline and search
+- **Log viewer with filtering** — Real-time logs with level (TRACE/DEBUG/INFO/WARN/ERROR) and module (Agents/Channels/Memory/Chat/Scheduler/Gateway/System) filters
 
 ### Gateway REST API (current)
 
