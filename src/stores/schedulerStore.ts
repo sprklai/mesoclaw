@@ -170,8 +170,8 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       async () => {
         await invoke("create_job_command", {
           name: form.name,
-          schedule,
-          payload,
+          scheduleJson: schedule,
+          payloadJson: payload,
         });
         await get().loadJobs();
         set({ formOpen: false, form: { ...DEFAULT_FORM } });

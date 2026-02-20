@@ -840,6 +840,7 @@ pub fn run() {
             agent::agent_commands::start_agent_session_command,
             agent::agent_commands::cancel_agent_session_command,
             // Channel management commands
+            commands::channels::start_channel_command,
             commands::channels::channel_health_command,
             commands::channels::disconnect_channel_command,
             commands::channels::test_channel_connection_command,

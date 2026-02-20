@@ -49,7 +49,7 @@ required-features = ["desktop"]
 #   cargo build --all-features               (full build)
 
 [features]
-default = ["core", "cli", "desktop", "gateway", "channels-telegram"]
+default = ["core", "cli", "desktop", "gateway", "channels-telegram", "channels-discord", "channels-slack"]
 # Core library modules — always compiled when the library is used
 core = []
 # Headless CLI binary

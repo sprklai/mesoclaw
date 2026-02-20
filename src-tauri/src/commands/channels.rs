@@ -23,6 +23,181 @@ pub struct ChannelStatusPayload {
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
+/// Read credentials for `name` from the OS keyring, create the channel
+/// instance, and register it in the manager so it starts receiving messages.
+///
+/// If the channel is already registered it is first unregistered (allowing a
+/// re-connect with fresh credentials).  Returns an error if no credentials are
+/// saved for the requested channel.
+#[tauri::command]
+pub async fn start_channel_command(
+    name: String,
+    mgr: State<'_, Arc<ChannelManager>>,
+) -> Result<ChannelStatusPayload, String> {
+    use crate::config::app_identity::KEYCHAIN_SERVICE;
+
+    // Unregister the existing instance so we can re-register fresh.
+    mgr.unregister(&name).await;
+
+    #[cfg(feature = "channels-discord")]
+    if name == "discord" {
+        let token = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:discord:token")
+            .map_err(|e| e.to_string())?
+            .get_password()
+            .map_err(|_| "discord: no bot token saved — configure and save first".to_string())?;
+        if token.is_empty() {
+            return Err("discord: bot token is empty — save your credentials first".to_string());
+        }
+        let allowed_guild_ids: Vec<u64> =
+            keyring::Entry::new(KEYCHAIN_SERVICE, "channel:discord:allowed_guild_ids")
+                .ok()
+                .and_then(|e| e.get_password().ok())
+                .unwrap_or_default()
+                .split(',')
+                .filter_map(|s| s.trim().parse().ok())
+                .collect();
+        let allowed_channel_ids: Vec<u64> =
+            keyring::Entry::new(KEYCHAIN_SERVICE, "channel:discord:allowed_channel_ids")
+                .ok()
+                .and_then(|e| e.get_password().ok())
+                .unwrap_or_default()
+                .split(',')
+                .filter_map(|s| s.trim().parse().ok())
+                .collect();
+        let config = crate::channels::DiscordConfig::with_allowlists(
+            token,
+            allowed_guild_ids,
+            allowed_channel_ids,
+        );
+        let ch = Arc::new(crate::channels::DiscordChannel::new(config));
+        let healthy = ch.health_check().await;
+        mgr.register(ch).await?;
+        return Ok(ChannelStatusPayload {
+            name,
+            connected: healthy,
+            error: None,
+        });
+    }
+
+    #[cfg(feature = "channels-slack")]
+    if name == "slack" {
+        let bot_token = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:slack:bot_token")
+            .map_err(|e| e.to_string())?
+            .get_password()
+            .map_err(|_| "slack: no bot token saved — configure and save first".to_string())?;
+        if bot_token.is_empty() {
+            return Err("slack: bot token is empty — save your credentials first".to_string());
+        }
+        let app_token = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:slack:app_token")
+            .ok()
+            .and_then(|e| e.get_password().ok())
+            .unwrap_or_default();
+        let allowed_channel_ids: Vec<String> =
+            keyring::Entry::new(KEYCHAIN_SERVICE, "channel:slack:allowed_channel_ids")
+                .ok()
+                .and_then(|e| e.get_password().ok())
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+                .collect();
+        let config = crate::channels::SlackConfig::with_allowed_channels(
+            bot_token,
+            app_token,
+            allowed_channel_ids,
+        );
+        let ch = Arc::new(crate::channels::SlackChannel::new(config));
+        let healthy = ch.health_check().await;
+        mgr.register(ch).await?;
+        return Ok(ChannelStatusPayload {
+            name,
+            connected: healthy,
+            error: None,
+        });
+    }
+
+    #[cfg(feature = "channels-matrix")]
+    if name == "matrix" {
+        let access_token = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:matrix:access_token")
+            .map_err(|e| e.to_string())?
+            .get_password()
+            .map_err(|_| "matrix: no access token saved — configure and save first".to_string())?;
+        if access_token.is_empty() {
+            return Err("matrix: access token is empty — save your credentials first".to_string());
+        }
+        let homeserver = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:matrix:homeserver_url")
+            .ok()
+            .and_then(|e| e.get_password().ok())
+            .unwrap_or_default();
+        let username = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:matrix:username")
+            .ok()
+            .and_then(|e| e.get_password().ok())
+            .unwrap_or_default();
+        let allowed_room_ids: Vec<String> =
+            keyring::Entry::new(KEYCHAIN_SERVICE, "channel:matrix:allowed_room_ids")
+                .ok()
+                .and_then(|e| e.get_password().ok())
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+                .collect();
+        let config = crate::channels::MatrixConfig::with_allowed_rooms(
+            homeserver,
+            username,
+            access_token,
+            allowed_room_ids,
+        );
+        let ch = Arc::new(crate::channels::MatrixChannel::new(config));
+        let healthy = ch.health_check().await;
+        mgr.register(ch).await?;
+        return Ok(ChannelStatusPayload {
+            name,
+            connected: healthy,
+            error: None,
+        });
+    }
+
+    #[cfg(feature = "channels-telegram")]
+    if name == "telegram" {
+        let token = keyring::Entry::new(KEYCHAIN_SERVICE, "channel:telegram:token")
+            .map_err(|e| e.to_string())?
+            .get_password()
+            .map_err(|_| "telegram: no bot token saved — configure and save first".to_string())?;
+        if token.is_empty() {
+            return Err("telegram: bot token is empty — save your credentials first".to_string());
+        }
+        let allowed_ids: Vec<i64> =
+            keyring::Entry::new(KEYCHAIN_SERVICE, "channel:telegram:allowed_chat_ids")
+                .ok()
+                .and_then(|e| e.get_password().ok())
+                .unwrap_or_default()
+                .split(',')
+                .filter_map(|s| s.trim().parse().ok())
+                .collect();
+        let timeout: u32 =
+            keyring::Entry::new(KEYCHAIN_SERVICE, "channel:telegram:polling_timeout_secs")
+                .ok()
+                .and_then(|e| e.get_password().ok())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(30);
+        let mut config = crate::channels::TelegramConfig::with_allowed_ids(token, allowed_ids);
+        config.polling_timeout_secs = timeout;
+        let ch = Arc::new(crate::channels::TelegramChannel::new(config));
+        let healthy = ch.health_check().await;
+        mgr.register(ch).await?;
+        return Ok(ChannelStatusPayload {
+            name,
+            connected: healthy,
+            error: None,
+        });
+    }
+
+    Err(format!("Channel '{name}' is not supported"))
+}
+
 /// Return the current health status for the named channel.
 ///
 /// This is a health/probe command, not a full connect flow.  For a full

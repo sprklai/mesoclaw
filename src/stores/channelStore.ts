@@ -306,8 +306,15 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
   connectChannel: async (name) => {
     get().setChannelStatus(name, "reconnecting");
     try {
-      await invoke("channel_health_command", { name });
-      get().setChannelStatus(name, "connected");
+      const result = await invoke<{ name: string; connected: boolean; error: string | null }>(
+        "start_channel_command",
+        { name },
+      );
+      get().setChannelStatus(
+        name,
+        result.connected ? "connected" : "error",
+        result.connected ? null : "health check failed after connecting",
+      );
     } catch (err) {
       get().setChannelStatus(name, "error", String(err));
     }
