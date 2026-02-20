@@ -225,7 +225,11 @@ struct WatchArgs {
     path: String,
     /// Prompt template sent to the agent on each change.
     /// Use `{file}` as a placeholder for the changed file path.
-    #[arg(long, short = 'p', default_value = "A file changed: {file}. Review it.")]
+    #[arg(
+        long,
+        short = 'p',
+        default_value = "A file changed: {file}. Review it."
+    )]
     prompt: String,
     /// Debounce delay in milliseconds before triggering the agent.
     #[arg(long, default_value = "500")]
@@ -2087,8 +2091,7 @@ async fn main() {
     if cli.auto {
         // Use std::env::set_var via the config system: pass a known safe override.
         // This avoids unsafe code by leveraging the existing env override path.
-        std::env::vars()
-            .for_each(|_| {});  // no-op force scan; actual override via --auto flag below
+        std::env::vars().for_each(|_| {}); // no-op force scan; actual override via --auto flag below
         // ## TODO: wire --auto flag through GatewayClient headers to the daemon
         // so the spawned session uses AutonomyLevel::Full.
         eprintln!("[auto] full-autonomy mode: approval prompts suppressed");
@@ -2150,7 +2153,10 @@ async fn handle_watch(args: &WatchArgs, raw: bool, json_mode: bool) {
     let prompt_template = args.prompt.clone();
 
     if !raw {
-        println!("Watching '{}' (debounce {}ms). Press Ctrl-C to stop.", watch_path, args.debounce_ms);
+        println!(
+            "Watching '{}' (debounce {}ms). Press Ctrl-C to stop.",
+            watch_path, args.debounce_ms
+        );
     }
 
     // Spawn a blocking thread to run the notify watcher.
@@ -2158,8 +2164,9 @@ async fn handle_watch(args: &WatchArgs, raw: bool, json_mode: bool) {
     std::thread::spawn(move || {
         use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
         let (ntx, nrx) = std::sync::mpsc::channel();
-        let mut watcher: RecommendedWatcher = Watcher::new(ntx, Config::default().with_poll_interval(debounce))
-            .expect("failed to create watcher");
+        let mut watcher: RecommendedWatcher =
+            Watcher::new(ntx, Config::default().with_poll_interval(debounce))
+                .expect("failed to create watcher");
         watcher
             .watch(std::path::Path::new(&watch_path), RecursiveMode::Recursive)
             .expect("failed to watch path");

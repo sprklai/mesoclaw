@@ -811,9 +811,12 @@ mod tests {
 
         // After compaction: system prompt + summary + recent tail (≤ max_history/2 = 3)
         // Resulting history length should be ≤ max_history.
-        assert!(history.len() <= loop_.config.max_history,
+        assert!(
+            history.len() <= loop_.config.max_history,
             "compacted history ({}) should fit within max_history ({})",
-            history.len(), loop_.config.max_history);
+            history.len(),
+            loop_.config.max_history
+        );
         // First message should be the original system prompt.
         if let AgentMessage::User { content } = &history[0] {
             assert_eq!(content, "msg 0");

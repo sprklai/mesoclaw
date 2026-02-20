@@ -192,17 +192,13 @@ impl BootSequence {
                         .map(|i| format!("- {i}"))
                         .collect::<Vec<_>>()
                         .join("\n");
-                    let prompt = format!(
-                        "Boot checklist — run each item and report results:\n{checklist}"
-                    );
+                    let prompt =
+                        format!("Boot checklist — run each item and report results:\n{checklist}");
                     // Emit as AgentTurn so the scheduler or any listener can pick it up.
-                    if let Err(e) =
-                        self.bus
-                            .publish(crate::event_bus::AppEvent::CronFired {
-                                job_id: "boot_checklist".to_string(),
-                                schedule: format!("boot@startup: {}", items.len()),
-                            })
-                    {
+                    if let Err(e) = self.bus.publish(crate::event_bus::AppEvent::CronFired {
+                        job_id: "boot_checklist".to_string(),
+                        schedule: format!("boot@startup: {}", items.len()),
+                    }) {
                         log::warn!("[boot] failed to publish boot checklist event: {e}");
                     } else {
                         log::info!("[boot] boot checklist prompt: {prompt}");
