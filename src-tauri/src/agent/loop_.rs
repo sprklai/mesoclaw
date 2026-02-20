@@ -33,6 +33,7 @@ use crate::{
         types::{CompletionRequest, Message, MessageRole},
     },
     event_bus::{AppEvent, EventBus},
+    memory::traits::Memory,
     security::{SecurityPolicy, ValidationResult},
     tools::ToolRegistry,
 };
@@ -144,6 +145,8 @@ pub struct AgentLoop {
     /// Optional cancellation flag.  When set to `true` the loop aborts at the
     /// next iteration boundary and returns `Err("cancelled")`.
     cancel_flag: Option<Arc<AtomicBool>>,
+    /// Optional memory store for automatic context injection at session start.
+    memory: Option<Arc<dyn Memory>>,
 }
 
 impl AgentLoop {
@@ -162,6 +165,7 @@ impl AgentLoop {
             bus,
             config,
             cancel_flag: None,
+            memory: None,
         }
     }
 
@@ -169,6 +173,15 @@ impl AgentLoop {
     /// aborts at the next iteration boundary with `Err("cancelled")`.
     pub fn with_cancel_flag(mut self, flag: Arc<AtomicBool>) -> Self {
         self.cancel_flag = Some(flag);
+        self
+    }
+
+    /// Attach a memory store for automatic context injection at session start.
+    ///
+    /// When set, the `run()` entry point will recall up to 5 relevant memories
+    /// and prepend them as a system context message before the first LLM call.
+    pub fn with_memory(mut self, memory: Arc<dyn Memory>) -> Self {
+        self.memory = Some(memory);
         self
     }
 
@@ -186,15 +199,50 @@ impl AgentLoop {
         )
     )]
     pub async fn run(&self, system_prompt: &str, user_message: &str) -> Result<String, String> {
-        let mut history = vec![
-            AgentMessage::System {
-                content: system_prompt.to_string(),
-            },
-            AgentMessage::User {
-                content: user_message.to_string(),
-            },
-        ];
-        self.run_with_history(&mut history).await
+        let mut history = vec![AgentMessage::System {
+            content: system_prompt.to_string(),
+        }];
+
+        // Inject relevant memories as a system context message (FR-2.7).
+        if let Some(ref mem) = self.memory {
+            if let Ok(entries) = mem.recall(user_message, 5).await {
+                if !entries.is_empty() {
+                    let context = entries
+                        .iter()
+                        .map(|e| format!("- {}: {}", e.key, e.content))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    history.push(AgentMessage::System {
+                        content: format!("Relevant context from memory:\n{context}"),
+                    });
+                }
+            }
+        }
+
+        history.push(AgentMessage::User {
+            content: user_message.to_string(),
+        });
+
+        let result = self.run_with_history(&mut history).await;
+
+        // After completion, store a brief session record in memory (FR-2.7).
+        if let (Ok(response), Some(mem)) = (&result, &self.memory) {
+            let summary = if response.len() > 200 {
+                format!("{}…", &response[..200])
+            } else {
+                response.clone()
+            };
+            let key = format!("session:{}", chrono::Utc::now().format("%Y%m%dT%H%M%S"));
+            let _ = mem
+                .store(
+                    &key,
+                    &format!("User: {user_message}\nAgent: {summary}"),
+                    crate::memory::traits::MemoryCategory::Conversation,
+                )
+                .await;
+        }
+
+        result
     }
 
     /// Run the agent loop against an existing conversation `history`.
@@ -294,8 +342,16 @@ impl AgentLoop {
     )]
     async fn execute_tool_call(&self, call: &ParsedToolCall) -> AgentMessage {
         // Validate the tool name as if it were a command.
+        let risk = self.security_policy.classify_command_risk(&call.name);
         match self.security_policy.validate_command(&call.name) {
             ValidationResult::Denied(reason) => {
+                self.security_policy.log_action(
+                    &call.name,
+                    call.arguments.clone(),
+                    risk,
+                    "denied",
+                    None,
+                );
                 self.emit_tool_result(&call.name, &reason, false);
                 return AgentMessage::ToolResult {
                     tool_name: call.name.clone(),
@@ -335,6 +391,13 @@ impl AgentLoop {
                     if !approved {
                         let msg =
                             "Tool execution denied by user (or approval timed out after 30 s)";
+                        self.security_policy.log_action(
+                            &call.name,
+                            call.arguments.clone(),
+                            risk.clone(),
+                            "denied",
+                            Some(msg),
+                        );
                         self.emit_tool_result(&call.name, msg, false);
                         return AgentMessage::ToolResult {
                             tool_name: call.name.clone(),
@@ -384,6 +447,15 @@ impl AgentLoop {
             Ok(tr) => (tr.output, tr.success),
             Err(e) => (e, false),
         };
+
+        // Audit-log every tool execution.
+        self.security_policy.log_action(
+            &call.name,
+            call.arguments.clone(),
+            risk,
+            if success { "allowed" } else { "failed" },
+            Some(&result_str),
+        );
 
         self.emit_tool_result(&call.name, &result_str, success);
 
