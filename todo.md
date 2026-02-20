@@ -40,8 +40,8 @@ This file tracks incomplete features, mocks, and technical debt across the codeb
 | ✅ | `src/lib/tauri/identity/index.ts` | 4 | Identity CRUD migrated to gateway `/api/v1/identity/*`; `getSystemPrompt` stays on IPC | Medium |
 | ✅ | `src/lib/gateway-client.ts` | 61 | `get_daemon_config_command` IPC reads daemon.pid (port) + daemon.token; `resolveDaemonConfig()` wired | Low |
 | ✅ | `src/lib/gateway-client.ts` | 198 | Approval endpoint resolved: `sendApprovalResponse` correctly uses `approve_action_command` IPC (EventBus is source of truth) | Medium |
-| 🔄 | `src-tauri/` | — | Phase 7.4.1–7.4.6, 7.4.8: `tauri ios init` + `tauri android init`, code signing, TestFlight / Google Play distribution — **blocked: requires macOS + Xcode + Android SDK** | High |
-| 🔄 | `src/components/settings/MobileSettings.tsx` | — | Wire push notifications to `tauri-plugin-notification` once APNs/FCM signing is configured (Phase 7.4.4) — **blocked: depends on mobile signing above** | Medium |
+| ⏳ | `src-tauri/` | — | Phase 7.4.1–7.4.6, 7.4.8: `tauri ios init` + `tauri android init`, code signing, TestFlight / Google Play distribution — **future: requires macOS + Xcode + Android SDK** | Low |
+| ⏳ | `src/components/settings/MobileSettings.tsx` | — | Wire push notifications to `tauri-plugin-notification` once APNs/FCM signing is configured (Phase 7.4.4) — **future: depends on mobile platform setup** | Low |
 
 ---
 

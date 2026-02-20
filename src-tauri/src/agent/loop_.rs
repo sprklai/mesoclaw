@@ -204,19 +204,18 @@ impl AgentLoop {
         }];
 
         // Inject relevant memories as a system context message (FR-2.7).
-        if let Some(ref mem) = self.memory {
-            if let Ok(entries) = mem.recall(user_message, 5).await {
-                if !entries.is_empty() {
-                    let context = entries
-                        .iter()
-                        .map(|e| format!("- {}: {}", e.key, e.content))
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    history.push(AgentMessage::System {
-                        content: format!("Relevant context from memory:\n{context}"),
-                    });
-                }
-            }
+        if let Some(ref mem) = self.memory
+            && let Ok(entries) = mem.recall(user_message, 5).await
+            && !entries.is_empty()
+        {
+            let context = entries
+                .iter()
+                .map(|e| format!("- {}: {}", e.key, e.content))
+                .collect::<Vec<_>>()
+                .join("\n");
+            history.push(AgentMessage::System {
+                content: format!("Relevant context from memory:\n{context}"),
+            });
         }
 
         history.push(AgentMessage::User {

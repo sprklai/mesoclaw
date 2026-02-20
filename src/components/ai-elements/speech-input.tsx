@@ -1,5 +1,6 @@
 import { Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { ComponentProps } from "react";
 
 export interface SpeechInputProps extends Omit<ComponentProps<typeof Button>, "onClick"> {
@@ -11,20 +12,18 @@ export function SpeechInput({
   className,
   ...props
 }: SpeechInputProps) {
-  // Placeholder implementation - speech recognition not implemented yet
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className={className}
-      {...props}
-      onClick={() => {
-        // TODO: Implement speech recognition
-        console.log("Speech input not implemented yet");
-      }}
-    >
-      <Mic className="size-4" />
-    </Button>
+    <Tooltip content="Speech input coming soon" side="top">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className={className}
+        disabled
+        {...props}
+      >
+        <Mic className="size-4" />
+      </Button>
+    </Tooltip>
   );
 }

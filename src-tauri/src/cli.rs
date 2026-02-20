@@ -585,7 +585,7 @@ async fn handle_daemon(args: &DaemonArgs) {
 
                 // Identity loader (no watcher in CLI mode).
                 let identity_loader = match local_ts_lib::identity::default_identity_dir()
-                    .and_then(|dir| IdentityLoader::new(dir))
+                    .and_then(IdentityLoader::new)
                 {
                     Ok(loader) => loader,
                     Err(e) => {
@@ -1294,10 +1294,7 @@ async fn handle_schedule(args: &ScheduleArgs, raw: bool, _json_mode: bool) {
                     println!("No scheduled jobs.");
                     return;
                 }
-                println!(
-                    "{:<38} {:<24} {:<12} {}",
-                    "ID", "Name", "Enabled", "Schedule"
-                );
+                println!("{:<38} {:<24} {:<12} Schedule", "ID", "Name", "Enabled");
                 println!("{}", "-".repeat(90));
                 for job in &jobs {
                     let id = job.get("id").and_then(|v| v.as_str()).unwrap_or("-");
@@ -1412,7 +1409,7 @@ async fn handle_schedule(args: &ScheduleArgs, raw: bool, _json_mode: bool) {
                         println!("No history for job {id}.");
                         return;
                     }
-                    println!("{:<28} {:<10} {}", "Run At", "Status", "Output");
+                    println!("{:<28} {:<10} Output", "Run At", "Status");
                     println!("{}", "-".repeat(72));
                     for entry in &entries {
                         let ran_at = entry.get("ran_at").and_then(|v| v.as_str()).unwrap_or("-");
@@ -1478,12 +1475,10 @@ async fn handle_channel(args: &ChannelArgs, raw: bool, json_mode: bool) {
                         }
                     }
                 }
+            } else if telegram_configured {
+                "configured (daemon offline)"
             } else {
-                if telegram_configured {
-                    "configured (daemon offline)"
-                } else {
-                    "not configured"
-                }
+                "not configured"
             };
 
             let channels = json!([
@@ -2082,6 +2077,9 @@ async fn handle_generate(args: &GenerateArgs, _raw: bool, _json_mode: bool) {
 
 #[tokio::main]
 async fn main() {
+    // Install ring crypto provider for rustls before any network I/O.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let cli = Cli::parse();
 
     // --auto: signal full-autonomy mode to run_repl via a sentinel value in the env.
@@ -2162,14 +2160,21 @@ async fn handle_watch(args: &WatchArgs, raw: bool, json_mode: bool) {
     // Spawn a blocking thread to run the notify watcher.
     let tx2 = tx.clone();
     std::thread::spawn(move || {
-        use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+        use notify::{Config, RecursiveMode, Watcher};
         let (ntx, nrx) = std::sync::mpsc::channel();
-        let mut watcher: RecommendedWatcher =
-            Watcher::new(ntx, Config::default().with_poll_interval(debounce))
-                .expect("failed to create watcher");
-        watcher
+        let Ok(mut watcher) =
+            notify::RecommendedWatcher::new(ntx, Config::default().with_poll_interval(debounce))
+        else {
+            eprintln!("failed to create watcher");
+            return;
+        };
+        if watcher
             .watch(std::path::Path::new(&watch_path), RecursiveMode::Recursive)
-            .expect("failed to watch path");
+            .is_err()
+        {
+            eprintln!("failed to watch path");
+            return;
+        }
         for event in nrx {
             match event {
                 Ok(ev) => {

@@ -332,23 +332,23 @@ impl Scheduler for TokioScheduler {
                             // ── Active-hours gate ──────────────────────────
                             // For Heartbeat jobs with an active_hours window,
                             // skip when local hour is outside and reschedule.
-                            if matches!(job.payload, JobPayload::Heartbeat) {
-                                if let Some(ref hours) = job.active_hours {
-                                    use chrono::Timelike as _;
-                                    let local_hour = chrono::Local::now().hour() as u8;
-                                    if local_hour < hours.start_hour
-                                        || local_hour >= hours.end_hour
+                            if matches!(job.payload, JobPayload::Heartbeat)
+                                && let Some(ref hours) = job.active_hours
+                            {
+                                use chrono::Timelike as _;
+                                let local_hour = chrono::Local::now().hour() as u8;
+                                if local_hour < hours.start_hour
+                                    || local_hour >= hours.end_hour
+                                {
+                                    if let Ok(mut map) = jobs.write()
+                                        && let Some(j) = map.get_mut(&job.id)
                                     {
-                                        if let Ok(mut map) = jobs.write()
-                                            && let Some(j) = map.get_mut(&job.id)
-                                        {
-                                            j.next_run = Self::compute_next_run(&j.schedule);
-                                            if let Some(ref pool) = pool {
-                                                Self::persist_job_with_pool(pool, j);
-                                            }
+                                        j.next_run = Self::compute_next_run(&j.schedule);
+                                        if let Some(ref pool) = pool {
+                                            Self::persist_job_with_pool(pool, j);
                                         }
-                                        continue;
                                     }
+                                    continue;
                                 }
                             }
 
@@ -415,16 +415,16 @@ impl Scheduler for TokioScheduler {
                                     {
                                         // One-shot: remove from in-memory registry and SQLite.
                                         map.remove(&job_clone.id);
-                                        if let Some(ref pool) = pool_clone {
-                                            if let Ok(mut conn) = pool.get() {
-                                                use crate::database::schema::scheduled_jobs;
-                                                let _ = diesel::delete(
-                                                    scheduled_jobs::table.filter(
-                                                        scheduled_jobs::id.eq(&job_clone.id),
-                                                    ),
-                                                )
-                                                .execute(&mut conn);
-                                            }
+                                        if let Some(ref pool) = pool_clone
+                                            && let Ok(mut conn) = pool.get()
+                                        {
+                                            use crate::database::schema::scheduled_jobs;
+                                            let _ = diesel::delete(
+                                                scheduled_jobs::table.filter(
+                                                    scheduled_jobs::id.eq(&job_clone.id),
+                                                ),
+                                            )
+                                            .execute(&mut conn);
                                         }
                                     } else if let Some(j) = map.get_mut(&job_clone.id) {
                                         if job_status == JobStatus::Success {

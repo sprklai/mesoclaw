@@ -10,7 +10,3 @@ pub fn db_conn(
     pool.get().map_err(|e| format!("Database error: {e}"))
 }
 
-/// Format a contextual error message.
-pub fn err_ctx(ctx: &str, err: impl std::fmt::Display) -> String {
-    format!("{ctx}: {err}")
-}

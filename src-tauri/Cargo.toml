@@ -146,6 +146,8 @@ matrix-sdk = { version = "0.9", optional = true }
 slack-morphism = { version = "2", features = ["hyper"], optional = true }
 # Non-optional: needed by both gateway server and CLI WebSocket client.
 tokio-tungstenite = "0.21"
+# Explicit rustls dependency to resolve crypto provider ambiguity at startup
+rustls = { version = "0.23", features = ["ring"] }
 
 # CLI dependencies
 clap = { version = "4", features = ["derive"] }

@@ -61,6 +61,11 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Install the ring crypto provider for rustls before any network I/O.
+    // Multiple optional dependencies (serenity, reqwest, slack-morphism, teloxide)
+    // all pull in rustls; without an explicit default, rustls panics at runtime.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     plugins::logging::init();
 
     tauri::Builder::default()
@@ -864,6 +869,11 @@ pub fn run() {
             modules::commands::start_module_command,
             modules::commands::stop_module_command,
             modules::commands::create_module_command,
+            // Memory commands
+            memory::commands::store_memory_command,
+            memory::commands::search_memory_command,
+            memory::commands::forget_memory_command,
+            memory::commands::get_daily_memory_command,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]
@@ -872,5 +882,8 @@ pub fn run() {
             }
         })
         .run(tauri::generate_context!())
-        .unwrap_or_else(|e| panic!("error while running tauri application: {e}"));
+        .unwrap_or_else(|e| {
+            log::error!("Fatal: failed to run tauri application: {e}");
+            std::process::exit(1);
+        });
 }

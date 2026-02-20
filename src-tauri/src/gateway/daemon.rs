@@ -46,6 +46,7 @@ pub fn pid_path() -> PathBuf {
 /// [`MAX_PORT_ATTEMPTS`] times before returning an error.
 ///
 /// Writes `daemon.pid` on successful bind.  Blocks until the server shuts down.
+#[allow(clippy::too_many_arguments)]
 pub async fn start_gateway(
     bus: Arc<dyn EventBus>,
     sessions: Arc<SessionRouter>,
@@ -138,7 +139,9 @@ pub async fn start_gateway(
 async fn bind_with_fallback(start_port: u16) -> Result<TcpListener, String> {
     for offset in 0..MAX_PORT_ATTEMPTS {
         let port = start_port + offset;
-        let addr: SocketAddr = format!("127.0.0.1:{port}").parse().expect("valid addr");
+        let addr: SocketAddr = format!("127.0.0.1:{port}")
+            .parse()
+            .map_err(|e| format!("Invalid address: {e}"))?;
         match TcpListener::bind(addr).await {
             Ok(listener) => return Ok(listener),
             Err(_) if offset + 1 < MAX_PORT_ATTEMPTS => continue,

@@ -229,12 +229,11 @@ impl DiscordChannel {
                 }
 
                 // Guild allow-list check.
-                if let Some(guild_id) = msg.guild_id {
-                    if !self.allowed_guild_ids.is_empty()
-                        && !self.allowed_guild_ids.contains(&guild_id.get())
-                    {
-                        return;
-                    }
+                if let Some(guild_id) = msg.guild_id
+                    && !self.allowed_guild_ids.is_empty()
+                    && !self.allowed_guild_ids.contains(&guild_id.get())
+                {
+                    return;
                 }
 
                 // Channel allow-list check.
