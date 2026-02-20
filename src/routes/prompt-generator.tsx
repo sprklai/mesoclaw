@@ -1,11 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
+import {
+	Reasoning,
+	ReasoningContent,
+} from "@/components/ai-elements/reasoning";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, Copy, Loader2, Trash2 } from "@/lib/icons";
+import { Brain, CheckCircle2, Copy, Loader2, Trash2 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import {
 	type ArtifactType,
@@ -30,8 +34,10 @@ function PromptGeneratorPage() {
 	const description = usePromptGeneratorStore((s) => s.description);
 	const status = usePromptGeneratorStore((s) => s.status);
 	const generatedContent = usePromptGeneratorStore((s) => s.generatedContent);
+	const thinkingContent = usePromptGeneratorStore((s) => s.thinkingContent);
 	const lastSaved = usePromptGeneratorStore((s) => s.lastSaved);
 	const error = usePromptGeneratorStore((s) => s.error);
+	const [showThinking, setShowThinking] = useState(false);
 
 	const setArtifactType = usePromptGeneratorStore((s) => s.setArtifactType);
 	const setName = usePromptGeneratorStore((s) => s.setName);
@@ -131,7 +137,7 @@ function PromptGeneratorPage() {
 				</div>
 
 				{/* Output panel */}
-				{(generatedContent || status === "error") && (
+				{(generatedContent || thinkingContent || status === "error") && (
 					<div className="space-y-2 rounded-lg border border-border p-4">
 						<div className="flex items-center justify-between">
 							<h2 className="text-sm font-semibold">Output</h2>
@@ -152,9 +158,31 @@ function PromptGeneratorPage() {
 							</div>
 						</div>
 
+						{/* Reasoning / thinking block */}
+						{thinkingContent && (
+							<Reasoning>
+								<button
+									type="button"
+									onClick={() => setShowThinking((v) => !v)}
+									className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+								>
+									<Brain aria-hidden className="size-3" />
+									{showThinking ? "Hide" : "View"} reasoning
+								</button>
+								{showThinking && (
+									<ReasoningContent>
+										<pre className="whitespace-pre-wrap font-mono text-xs">
+											{thinkingContent}
+										</pre>
+									</ReasoningContent>
+								)}
+							</Reasoning>
+						)}
+
+						{/* Final output only */}
 						<pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-sm">
 							{generatedContent}
-							{isGenerating && (
+							{isGenerating && !thinkingContent && (
 								<span className="inline-block animate-pulse">|</span>
 							)}
 						</pre>
