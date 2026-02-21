@@ -128,8 +128,7 @@ diesel::table! {
     memories_fts (rowid) {
         rowid -> Integer,
         content -> Nullable<Binary>,
-        #[sql_name = "memories_fts"]
-        fts_data -> Nullable<Binary>,
+        memories_fts -> Nullable<Binary>,
         rank -> Nullable<Binary>,
     }
 }
@@ -215,6 +214,8 @@ diesel::table! {
         notify_approval_request -> Integer,
         skill_auto_select -> Integer,
         skill_enabled_ids -> Text,
+        user_name -> Nullable<Text>,
+        app_display_name -> Nullable<Text>,
     }
 }
 

@@ -116,6 +116,10 @@ pub struct SettingsRow {
     pub default_model_id: Option<String>,
     pub skill_auto_select: i32,
     pub skill_enabled_ids: String,
+    /// User's name for personalization
+    pub user_name: Option<String>,
+    /// Display name for the application
+    pub app_display_name: Option<String>,
 }
 
 /// Application settings with typed enums
@@ -164,6 +168,10 @@ pub struct Settings {
     pub skill_auto_select: bool,
     /// List of enabled skill IDs.
     pub skill_enabled_ids: Vec<String>,
+    /// User's name for personalization
+    pub user_name: Option<String>,
+    /// Display name for the application
+    pub app_display_name: Option<String>,
 }
 
 impl Settings {
@@ -206,6 +214,8 @@ impl Settings {
             default_model_id: row.default_model_id,
             skill_auto_select: int_to_bool(row.skill_auto_select),
             skill_enabled_ids,
+            user_name: row.user_name,
+            app_display_name: row.app_display_name,
         })
     }
 }
@@ -249,6 +259,10 @@ pub struct SettingsUpdate {
     pub skill_auto_select: Option<bool>,
     /// List of enabled skill IDs (as JSON string).
     pub skill_enabled_ids: Option<Vec<String>>,
+    /// User's name for personalization
+    pub user_name: Option<Option<String>>,
+    /// Display name for the application
+    pub app_display_name: Option<Option<String>>,
 }
 
 /// Diesel changeset for updating settings
@@ -289,6 +303,10 @@ pub struct SettingsChangeset {
     pub default_model_id: Option<Option<String>>,
     pub skill_auto_select: Option<i32>,
     pub skill_enabled_ids: Option<String>,
+    /// User's name for personalization
+    pub user_name: Option<Option<String>>,
+    /// Display name for the application
+    pub app_display_name: Option<Option<String>>,
 }
 
 impl From<SettingsUpdate> for SettingsChangeset {
@@ -329,6 +347,8 @@ impl From<SettingsUpdate> for SettingsChangeset {
             skill_enabled_ids: update
                 .skill_enabled_ids
                 .map(|ids| serde_json::to_string(&ids).unwrap_or_else(|_| "[]".to_string())),
+            user_name: update.user_name,
+            app_display_name: update.app_display_name,
         }
     }
 }

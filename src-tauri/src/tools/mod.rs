@@ -56,7 +56,10 @@ pub fn register_builtin_tools(registry: &mut ToolRegistry, ctx: ToolContext) {
 
     // Tools that require session router.
     if let Some(session_router) = ctx.session_router {
-        registry.register(Arc::new(SessionSpawnTool::new(ctx.policy.clone(), session_router)));
+        registry.register(Arc::new(SessionSpawnTool::new(
+            ctx.policy.clone(),
+            session_router,
+        )));
     }
 }
 

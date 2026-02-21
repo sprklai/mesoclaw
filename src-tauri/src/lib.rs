@@ -818,6 +818,8 @@ pub fn run() {
             commands::settings::get_app_settings,
             commands::settings::update_app_settings,
             commands::settings::set_tray_visible,
+            commands::settings::get_user_identity_command,
+            commands::settings::set_user_identity_command,
             // Window commands
             commands::window::close_splashscreen,
             // Notification commands

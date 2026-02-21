@@ -80,7 +80,10 @@ impl Tool for SessionSpawnTool {
             .ok_or("missing required argument 'action'")?;
 
         // Security gate: spawning sessions is a medium-risk operation.
-        match self.policy.validate_command(&format!("sessions_spawn {action}")) {
+        match self
+            .policy
+            .validate_command(&format!("sessions_spawn {action}"))
+        {
             ValidationResult::Allowed => {}
             ValidationResult::NeedsApproval => {
                 return Err("session spawning requires user approval".into());
@@ -118,7 +121,10 @@ impl SessionSpawnTool {
             .and_then(Value::as_str)
             .ok_or("missing required argument 'task_name' for spawn action")?;
 
-        let lane_id = format!("lane-{}", Uuid::new_v4().to_string().split('-').next().unwrap());
+        let lane_id = format!(
+            "lane-{}",
+            Uuid::new_v4().to_string().split('-').next().unwrap()
+        );
 
         // Get parent session for depth tracking.
         let parent_session_key = args
@@ -130,7 +136,9 @@ impl SessionSpawnTool {
         // Calculate spawn depth.
         let spawn_depth = self
             .session_router
-            .get_session(&SessionKey::parse(&parent_session_key).unwrap_or_else(|_| SessionKey::main_user()))
+            .get_session(
+                &SessionKey::parse(&parent_session_key).unwrap_or_else(|_| SessionKey::main_user()),
+            )
             .map(|s| s.spawn_depth + 1)
             .unwrap_or(1);
 
@@ -149,7 +157,8 @@ impl SessionSpawnTool {
 
         // Create the session with parent relationship.
         {
-            let mut session = Session::new_subagent(subagent_key.clone(), &parent_session_key, spawn_depth);
+            let mut session =
+                Session::new_subagent(subagent_key.clone(), &parent_session_key, spawn_depth);
 
             // Add initial prompt if provided.
             if let Some(prompt) = args.get("initial_prompt").and_then(Value::as_str) {
@@ -185,10 +194,7 @@ impl SessionSpawnTool {
     /// List all sub-agent sessions.
     async fn list_sessions(&self) -> Result<ToolResult, String> {
         let keys = self.session_router.list_keys();
-        let subagent_keys: Vec<SessionKey> = keys
-            .into_iter()
-            .filter(|k| k.is_subagent())
-            .collect();
+        let subagent_keys: Vec<SessionKey> = keys.into_iter().filter(|k| k.is_subagent()).collect();
 
         let count = subagent_keys.len();
 
@@ -251,7 +257,10 @@ impl SessionSpawnTool {
         let is_subagent = session.key.is_subagent();
         let message_count = session.len();
         let spawn_depth = session.spawn_depth;
-        let parent = session.parent_session_key.clone().unwrap_or_else(|| "none".to_string());
+        let parent = session
+            .parent_session_key
+            .clone()
+            .unwrap_or_else(|| "none".to_string());
 
         Ok(ToolResult::ok(format!(
             "Session: {}\n  Type: {}\n  Messages: {}\n  Spawn Depth: {}\n  Parent: {}",

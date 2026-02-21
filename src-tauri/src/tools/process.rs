@@ -66,7 +66,9 @@ impl Tool for ProcessTool {
         match action {
             "list" => self.list_processes(&args).await,
             "kill" => self.kill_process(&args).await,
-            _ => Err(format!("unknown action '{action}': expected 'list' or 'kill'")),
+            _ => Err(format!(
+                "unknown action '{action}': expected 'list' or 'kill'"
+            )),
         }
     }
 }
@@ -75,22 +77,18 @@ impl ProcessTool {
     /// List running processes, optionally filtered by name.
     async fn list_processes(&self, args: &Value) -> Result<ToolResult, String> {
         // List action is low risk, allowed in all modes.
-        self.policy.log_action(
-            self.name(),
-            args.clone(),
-            RiskLevel::Low,
-            "allowed",
-            None,
-        );
+        self.policy
+            .log_action(self.name(), args.clone(), RiskLevel::Low, "allowed", None);
 
         let filter = args
             .get("filter")
             .and_then(Value::as_str)
             .map(str::to_lowercase);
 
-        let result = tokio::task::spawn_blocking(move || list_processes_blocking(filter.as_deref()))
-            .await
-            .map_err(|e| format!("blocking task panicked: {e}"))??;
+        let result =
+            tokio::task::spawn_blocking(move || list_processes_blocking(filter.as_deref()))
+                .await
+                .map_err(|e| format!("blocking task panicked: {e}"))??;
 
         Ok(result)
     }
@@ -100,7 +98,7 @@ impl ProcessTool {
         // Kill action is high risk - only allow in Full mode.
         if self.policy.autonomy_level != AutonomyLevel::Full {
             return Err(
-                "process kill requires Full autonomy level for security reasons".to_string()
+                "process kill requires Full autonomy level for security reasons".to_string(),
             );
         }
 
@@ -121,13 +119,8 @@ impl ProcessTool {
             }
         }
 
-        self.policy.log_action(
-            self.name(),
-            args.clone(),
-            RiskLevel::High,
-            "allowed",
-            None,
-        );
+        self.policy
+            .log_action(self.name(), args.clone(), RiskLevel::High, "allowed", None);
 
         let result = tokio::task::spawn_blocking(move || kill_process_blocking(pid))
             .await
@@ -208,15 +201,15 @@ fn kill_process_blocking(pid: u32) -> Result<ToolResult, String> {
         })))
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Ok(ToolResult::err(format!(
-            "Failed to kill process {}: {}",
-            pid, stderr
-        ))
-        .with_metadata(json!({
-            "pid": pid,
-            "success": false,
-            "error": stderr.to_string()
-        })))
+        Ok(
+            ToolResult::err(format!("Failed to kill process {}: {}", pid, stderr)).with_metadata(
+                json!({
+                    "pid": pid,
+                    "success": false,
+                    "error": stderr.to_string()
+                }),
+            ),
+        )
     }
 }
 
@@ -241,7 +234,12 @@ fn parse_ps_line(line: &str) -> Option<ProcessInfo> {
     let mem = parts[3].parse().ok()?;
     let name = parts[10].to_string();
 
-    Some(ProcessInfo { pid, cpu, mem, name })
+    Some(ProcessInfo {
+        pid,
+        cpu,
+        mem,
+        name,
+    })
 }
 
 #[cfg(test)]

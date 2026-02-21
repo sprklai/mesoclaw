@@ -237,7 +237,11 @@ impl SandboxManager {
     }
 
     /// Execute a shell command inside a sandboxed container.
-    pub async fn execute_shell(&self, command: &str, working_dir: Option<&str>) -> Result<SandboxedToolResult, String> {
+    pub async fn execute_shell(
+        &self,
+        command: &str,
+        working_dir: Option<&str>,
+    ) -> Result<SandboxedToolResult, String> {
         let config = self.build_shell_config(command, working_dir);
 
         // Ensure the image is available.

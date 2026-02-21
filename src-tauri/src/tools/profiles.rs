@@ -127,15 +127,9 @@ impl ToolProfile {
     /// Returns a human-readable description of this profile.
     pub fn description(&self) -> &'static str {
         match self {
-            ToolProfile::Minimal => {
-                "Minimal access: basic file reading and memory recall only"
-            }
-            ToolProfile::Coding => {
-                "Development access: shell, filesystem, and memory tools"
-            }
-            ToolProfile::Messaging => {
-                "Communication access: memory, web, and UI interaction tools"
-            }
+            ToolProfile::Minimal => "Minimal access: basic file reading and memory recall only",
+            ToolProfile::Coding => "Development access: shell, filesystem, and memory tools",
+            ToolProfile::Messaging => "Communication access: memory, web, and UI interaction tools",
             ToolProfile::Full => "Full access: all available tools",
         }
     }
@@ -258,10 +252,7 @@ mod tests {
     #[test]
     fn test_tool_group_from_name() {
         assert_eq!(ToolGroup::from_tool_name("shell"), Some(ToolGroup::Runtime));
-        assert_eq!(
-            ToolGroup::from_tool_name("file_read"),
-            Some(ToolGroup::Fs)
-        );
+        assert_eq!(ToolGroup::from_tool_name("file_read"), Some(ToolGroup::Fs));
         assert_eq!(
             ToolGroup::from_tool_name("sessions_spawn"),
             Some(ToolGroup::Sessions)
@@ -270,18 +261,21 @@ mod tests {
             ToolGroup::from_tool_name("memory_store"),
             Some(ToolGroup::Memory)
         );
-        assert_eq!(
-            ToolGroup::from_tool_name("web_fetch"),
-            Some(ToolGroup::Web)
-        );
+        assert_eq!(ToolGroup::from_tool_name("web_fetch"), Some(ToolGroup::Web));
         assert_eq!(ToolGroup::from_tool_name("ui_notify"), Some(ToolGroup::Ui));
         assert_eq!(ToolGroup::from_tool_name("unknown"), None);
     }
 
     #[test]
     fn test_profile_from_str() {
-        assert_eq!(ToolProfile::from_str("minimal").unwrap(), ToolProfile::Minimal);
-        assert_eq!(ToolProfile::from_str("coding").unwrap(), ToolProfile::Coding);
+        assert_eq!(
+            ToolProfile::from_str("minimal").unwrap(),
+            ToolProfile::Minimal
+        );
+        assert_eq!(
+            ToolProfile::from_str("coding").unwrap(),
+            ToolProfile::Coding
+        );
         assert_eq!(
             ToolProfile::from_str("messaging").unwrap(),
             ToolProfile::Messaging

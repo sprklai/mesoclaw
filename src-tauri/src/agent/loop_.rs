@@ -513,7 +513,10 @@ impl AgentLoop {
     #[cfg(feature = "containers")]
     async fn execute_sandboxed(&self, call: &ParsedToolCall) -> (String, bool) {
         let Some(ref sandbox) = self.sandbox else {
-            return ("Sandbox configured but no runtime available".to_string(), false);
+            return (
+                "Sandbox configured but no runtime available".to_string(),
+                false,
+            );
         };
 
         // For shell commands, use the shell execution path.
@@ -523,10 +526,7 @@ impl AgentLoop {
                 .get("command")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            let working_dir = call
-                .arguments
-                .get("working_dir")
-                .and_then(|v| v.as_str());
+            let working_dir = call.arguments.get("working_dir").and_then(|v| v.as_str());
 
             match sandbox.execute_shell(command, working_dir).await {
                 Ok(result) => (result.output, result.success),

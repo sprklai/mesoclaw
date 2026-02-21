@@ -138,7 +138,12 @@ impl CronTool {
             .get("name")
             .and_then(Value::as_str)
             .map(str::to_string)
-            .unwrap_or_else(|| format!("agent-job-{}", Uuid::new_v4().to_string().split('-').next().unwrap()));
+            .unwrap_or_else(|| {
+                format!(
+                    "agent-job-{}",
+                    Uuid::new_v4().to_string().split('-').next().unwrap()
+                )
+            });
 
         let isolated = args
             .get("isolated")
@@ -227,17 +232,19 @@ impl CronTool {
         let removed = self.scheduler.remove_job(&job_id).await;
 
         if removed {
-            Ok(ToolResult::ok(format!("Deleted job: {}", job_id))
-                .with_metadata(json!({
+            Ok(
+                ToolResult::ok(format!("Deleted job: {}", job_id)).with_metadata(json!({
                     "job_id": job_id,
                     "success": true
-                })))
+                })),
+            )
         } else {
-            Ok(ToolResult::err(format!("Job not found: {}", job_id))
-                .with_metadata(json!({
+            Ok(
+                ToolResult::err(format!("Job not found: {}", job_id)).with_metadata(json!({
                     "job_id": job_id,
                     "success": false
-                })))
+                })),
+            )
         }
     }
 

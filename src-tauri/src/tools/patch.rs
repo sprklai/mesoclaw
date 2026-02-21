@@ -3,10 +3,7 @@
 //! This tool uses the `diffy` crate to parse and apply unified diff patches.
 //! It supports conflict detection and reports success/failure with details.
 
-use std::{
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
 use serde_json::{Value, json};
@@ -120,8 +117,8 @@ fn apply_patch_blocking(
         .map_err(|e| format!("failed to read '{}': {e}", path.display()))?;
 
     // Parse the unified diff.
-    let patch = diffy::Patch::from_str(diff_content)
-        .map_err(|e| format!("failed to parse diff: {e}"))?;
+    let patch =
+        diffy::Patch::from_str(diff_content).map_err(|e| format!("failed to parse diff: {e}"))?;
 
     // Try to apply the patch.
     let result = diffy::apply(&original, &patch);
