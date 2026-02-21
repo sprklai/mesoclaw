@@ -128,7 +128,8 @@ diesel::table! {
     memories_fts (rowid) {
         rowid -> Integer,
         content -> Nullable<Binary>,
-        memories_fts -> Nullable<Binary>,
+        #[sql_name = "memories_fts"]
+        memories_fts_col -> Nullable<Binary>,
         rank -> Nullable<Binary>,
     }
 }
