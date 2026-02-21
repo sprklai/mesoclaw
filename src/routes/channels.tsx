@@ -86,6 +86,7 @@ function ChannelsPage() {
   const { t } = useTranslation("channels");
   const channels = useChannelStore((s) => s.channels);
   const messages = useChannelStore((s) => s.messages);
+  const addMessage = useChannelStore((s) => s.addMessage);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(
     channels[0]?.name ?? null,
   );
@@ -95,6 +96,22 @@ function ChannelsPage() {
   const [sendError, setSendError] = useState<string | null>(null);
 
   const channelMessages = selectedChannel ? (messages[selectedChannel] ?? []) : [];
+
+  // Auto-select most recent sender as default recipient when channel or messages change
+  useEffect(() => {
+    if (channelMessages.length > 0 && !replyRecipient) {
+      // Get the most recent message's sender (excluding "me")
+      const lastIncomingMessage = [...channelMessages].reverse().find((m) => m.from !== "me");
+      if (lastIncomingMessage) {
+        setReplyRecipient(lastIncomingMessage.from);
+      }
+    }
+  }, [selectedChannel, channelMessages]);
+
+  // Clear recipient when switching channels
+  useEffect(() => {
+    setReplyRecipient("");
+  }, [selectedChannel]);
 
   useEffect(() => {
     useContextPanelStore.getState().setContent(
@@ -109,13 +126,31 @@ function ChannelsPage() {
 
   async function handleSend(text: string) {
     if (!selectedChannel || !text.trim()) return;
+
+    // Require a recipient for all channels
+    const recipient = replyRecipient.trim();
+    if (!recipient) {
+      setSendError(t("composer.noRecipientError"));
+      return;
+    }
+
     setSending(true);
     setSendError(null);
+
+    // Add outgoing message to local store so it appears in the channel
+    const outgoingMessage = {
+      channel: selectedChannel,
+      from: "me",
+      content: text.trim(),
+      timestamp: new Date().toISOString(),
+    };
+    addMessage(selectedChannel, outgoingMessage);
+
     try {
       await invoke("send_channel_message_command", {
         channel: selectedChannel,
         message: text.trim(),
-        recipient: replyRecipient.trim() || null,
+        recipient: recipient,
       });
       setReplyText("");
     } catch (e) {
@@ -198,10 +233,10 @@ function ChannelsPage() {
                       {t("messages.empty")}
                     </p>
                   )}
-                  {channelMessages.map((msg, i) => (
-                    <div key={`${msg.from}-${msg.timestamp ?? i}-${i}`}>
+                  {channelMessages.map((msg) => (
+                    <div key={`${msg.channel}-${msg.from}-${msg.timestamp}`}>
                       <div className="mb-1 flex items-baseline gap-2 px-1">
-                        <span className="text-xs font-semibold text-foreground">
+                        <span className="text-xs font-semibold text-foreground rounded bg-muted px-2 py-1">
                           {msg.from}
                         </span>
                         <span className="text-xs text-muted-foreground">
@@ -220,7 +255,7 @@ function ChannelsPage() {
                         className="mt-1 self-start text-xs text-muted-foreground transition-colors hover:text-primary"
                         onClick={() => setReplyRecipient(msg.from)}
                       >
-                        {t("messages.replyTo", { name: msg.from })}
+                        {`Reply to ${msg.from}`}
                       </button>
                     </div>
                   ))}
@@ -252,6 +287,8 @@ function ChannelsPage() {
                   <PromptInputBody>
                     <PromptInputTextarea
                       placeholder={t("composer.placeholder")}
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
                     />
                   </PromptInputBody>
                   <PromptInputFooter>

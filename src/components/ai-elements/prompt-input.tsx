@@ -302,7 +302,7 @@ export function PromptInputBody({ children, className }: { children: React.React
 }
 
 export function PromptInputFooter({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("flex items-center justify-between gap-2 px-2 pb-2", className)}>{children}</div>;
+  return <div className={cn("flex items-center justify-end gap-2 px-2 pb-2", className)}>{children}</div>;
 }
 
 export function PromptInputTools({ children, className }: { children: React.ReactNode; className?: string }) {

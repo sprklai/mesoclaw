@@ -84,6 +84,7 @@ fn event_to_channel_message(event: AppEvent) -> Option<ChannelMessage> {
             channel,
             from,
             content,
+            ..
         } if channel == "tauri" || channel == "tauri-ipc" || channel == "tauri_ipc" => {
             let mut msg = ChannelMessage::new("tauri-ipc", content);
             if !from.is_empty() {

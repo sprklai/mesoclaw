@@ -431,12 +431,25 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
     })),
 
   addMessage: (channel, msg) =>
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [channel]: [...(state.messages[channel] ?? []), msg],
-      },
-    })),
+    set((state) => {
+      const existing = state.messages[channel] ?? [];
+      // Deduplicate by content hash (channel + from + content)
+      // Note: We don't use timestamp because it's generated in the frontend
+      // and would differ for the same message received multiple times
+      const msgKey = `${channel}-${msg.from}-${msg.content}`;
+      const isDuplicate = existing.some(
+        (m) => `${channel}-${m.from}-${m.content}` === msgKey,
+      );
+      if (isDuplicate) {
+        return state; // No change if duplicate
+      }
+      return {
+        messages: {
+          ...state.messages,
+          [channel]: [...existing, msg],
+        },
+      };
+    }),
 
   clearMessages: (channel) =>
     set((state) => ({

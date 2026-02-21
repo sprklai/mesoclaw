@@ -267,7 +267,12 @@ impl SlackChannel {
                     .map(|u| u.to_string())
                     .unwrap_or_default();
 
-                let channel_msg = ChannelMessage::new("slack", content).with_sender(sender);
+                let mut metadata = std::collections::HashMap::new();
+                metadata.insert("channel_id".to_string(), channel_id.clone());
+
+                let channel_msg = ChannelMessage::new("slack", content)
+                    .with_sender(sender)
+                    .with_metadata(metadata);
                 let _ = tx.send(channel_msg).await;
             }
             Ok(())

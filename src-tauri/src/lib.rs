@@ -391,6 +391,7 @@ pub fn run() {
                                             channel: msg.channel.clone(),
                                             from: msg.sender.unwrap_or_default(),
                                             content: msg.content.clone(),
+                                            metadata: msg.metadata.clone(),
                                         };
                                         if let Err(e) = bus_router.publish(event) {
                                             log::warn!("channel-router: publish error: {e}");
@@ -591,7 +592,7 @@ pub fn run() {
 
                     loop {
                         match rx.recv().await {
-                            Ok(AppEvent::ChannelMessage { channel, from, content }) => {
+                            Ok(AppEvent::ChannelMessage { channel, from, content, .. }) => {
                                 // Skip the internal Tauri IPC channel — its messages are
                                 // already handled by the desktop UI; routing them through
                                 // the agent a second time would create a feedback loop.
@@ -708,6 +709,11 @@ pub fn run() {
                                         map.insert(session_id.clone(), Arc::clone(&flag));
                                     }
 
+                                    log::info!(
+                                        "[channel-bridge] agent session started: {} (channel={}, from={})",
+                                        session_id, chan, chat_id
+                                    );
+
                                     let _ = bus.publish(AppEvent::AgentStarted {
                                         session_id: session_id.clone(),
                                     });
@@ -775,6 +781,10 @@ pub fn run() {
                                                 session_id: session_id.clone(),
                                                 message: response.clone(),
                                             });
+                                            log::info!(
+                                                "[channel-bridge] agent session completed: {} (channel={}, from={}, response_len={})",
+                                                session_id, chan, chat_id, response.len()
+                                            );
                                             // Send response back through the originating channel.
                                             if let Err(e) =
                                                 mgr.send(&chan, &response, Some(&chat_id)).await
@@ -794,6 +804,10 @@ pub fn run() {
                                     if let Ok(mut map) = cmap.lock() {
                                         map.remove(&session_id);
                                     }
+                                    log::debug!(
+                                        "[channel-bridge] agent session cleaned up: {}",
+                                        session_id
+                                    );
                                 });
                             }
                             Ok(_) => {} // Non-ChannelMessage event passed through filter — discard.

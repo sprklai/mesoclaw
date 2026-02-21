@@ -49,6 +49,8 @@ pub enum AppEvent {
         channel: String,
         from: String,
         content: String,
+        #[serde(default)]
+        metadata: std::collections::HashMap<String, String>,
     },
     MemoryStored {
         key: String,

@@ -13,7 +13,8 @@
   "composer": {
     "recipientLabel": "To: {{recipient}}",
     "clearRecipient": "Clear reply recipient",
-    "placeholder": "Type a reply… Enter sends, Shift+Enter for newline"
+    "placeholder": "Type a reply… Enter sends, Shift+Enter for newline",
+    "noRecipientError": "No recipient selected. Click 'Reply' on a message first."
   },
   "selectPrompt": "Select a channel"
 }

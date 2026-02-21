@@ -113,6 +113,7 @@ async fn handle_client_command(
                 channel: "ws".to_string(),
                 from: session_id.unwrap_or_default(),
                 content,
+                metadata: std::collections::HashMap::new(),
             };
             if let Err(e) = bus.publish(event) {
                 log::warn!("ws: failed to publish agent_message event: {e}");

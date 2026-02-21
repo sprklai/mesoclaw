@@ -327,6 +327,7 @@ mod tests {
                     channel: msg.channel,
                     from: msg.sender.unwrap_or_default(),
                     content: msg.content,
+                    metadata: msg.metadata,
                 });
             }
         });

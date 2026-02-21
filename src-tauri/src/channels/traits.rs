@@ -59,6 +59,11 @@ impl ChannelMessage {
         self.sender = Some(sender.into());
         self
     }
+
+    pub fn with_metadata(mut self, metadata: std::collections::HashMap<String, String>) -> Self {
+        self.metadata = metadata;
+        self
+    }
 }
 
 // ─── ChannelEvent ─────────────────────────────────────────────────────────────
