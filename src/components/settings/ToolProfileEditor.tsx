@@ -95,7 +95,7 @@ const TOOL_GROUPS: ToolGroupInfo[] = [
     id: "web",
     name: "Web",
     description: "Web and network operations",
-    tools: ["web_fetch", "web_request"],
+    tools: ["web_fetch", "web_request", "web_search"],
   },
   {
     id: "ui",
