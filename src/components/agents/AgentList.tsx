@@ -51,6 +51,7 @@ interface AgentListProps {
   onDeleteAgent: (agent: AgentConfig) => void;
   onDuplicateAgent: (agent: AgentConfig) => void;
   onToggleEnabled: (agent: AgentConfig) => void;
+  onRunAgent: (agent: AgentConfig) => void;
   onCreateAgent: () => void;
   className?: string;
 }
@@ -84,6 +85,7 @@ export function AgentList({
   onDeleteAgent,
   onDuplicateAgent,
   onToggleEnabled,
+  onRunAgent,
   onCreateAgent,
   className,
 }: AgentListProps) {
@@ -174,6 +176,18 @@ export function AgentList({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (agent.isEnabled) {
+                              onRunAgent(agent);
+                            }
+                          }}
+                          className={!agent.isEnabled ? "opacity-50 pointer-events-none" : ""}
+                        >
+                          <Play className="mr-2 h-4 w-4" />
+                          Run
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
@@ -287,6 +301,18 @@ export function AgentList({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (agent.isEnabled) {
+                          onRunAgent(agent);
+                        }
+                      }}
+                      className={!agent.isEnabled ? "opacity-50 pointer-events-none" : ""}
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      Run
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();

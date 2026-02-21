@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import {
   AgentList,
   AgentCreateDialog,
+  AgentRunDialog,
   AgentWorkspaceEditor,
   SessionHistoryViewer,
   ExecutionMonitor,
@@ -65,6 +66,8 @@ function AgentsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AgentConfig | null>(null);
   const [activeTab, setActiveTab] = useState("agents");
+  const [runDialogOpen, setRunDialogOpen] = useState(false);
+  const [runningAgent, setRunningAgent] = useState<AgentConfig | null>(null);
 
   // Load initial data
   useEffect(() => {
@@ -107,6 +110,11 @@ function AgentsPage() {
 
   const handleToggleEnabled = async (agent: AgentConfig) => {
     await toggleAgentEnabled(agent.id);
+  };
+
+  const handleRunAgent = (agent: AgentConfig) => {
+    setRunningAgent(agent);
+    setRunDialogOpen(true);
   };
 
   const handleViewSession = (sessionId: string) => {
@@ -178,6 +186,7 @@ function AgentsPage() {
               onDeleteAgent={handleDeleteAgent}
               onDuplicateAgent={handleDuplicateAgent}
               onToggleEnabled={handleToggleEnabled}
+              onRunAgent={handleRunAgent}
               onCreateAgent={handleCreateAgent}
             />
           </TabsContent>
@@ -231,6 +240,17 @@ function AgentsPage() {
         onSubmit={handleSubmitAgent}
         agent={editingAgent}
         providers={providersWithModels}
+      />
+
+      {/* Run Agent Dialog */}
+      <AgentRunDialog
+        open={runDialogOpen}
+        onOpenChange={setRunDialogOpen}
+        agent={runningAgent}
+        onRunComplete={() => {
+          loadActiveRuns();
+          loadRecentSessions();
+        }}
       />
     </div>
   );

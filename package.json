@@ -31,7 +31,15 @@
     "cargo:check": "cd src-tauri && cargo check",
     "cargo:build": "cd src-tauri && cargo build",
     "cargo:build:release": "cd src-tauri && cargo build --release",
-    "cargo:clean": "cd src-tauri && cargo clean"
+    "cargo:clean": "cd src-tauri && cargo clean",
+    "build:all": "./scripts/cross-platform-build.sh",
+    "build:default": "./scripts/cross-platform-build.sh --default",
+    "build:linux": "./scripts/cross-platform-build.sh --linux",
+    "build:windows": "./scripts/cross-platform-build.sh --windows",
+    "build:macos": "./scripts/cross-platform-build.sh --macos",
+    "build:docker": "./scripts/docker-build.sh",
+    "build:docker-windows": "./scripts/docker-build.sh --windows",
+    "build:docker-linux": "./scripts/docker-build.sh --linux"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.51",

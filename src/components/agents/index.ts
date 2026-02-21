@@ -9,3 +9,4 @@ export { AgentCreateDialog } from "./AgentCreateDialog";
 export { AgentWorkspaceEditor } from "./AgentWorkspaceEditor";
 export { SessionHistoryViewer } from "./SessionHistoryViewer";
 export { ExecutionMonitor } from "./ExecutionMonitor";
+export { AgentRunDialog } from "./AgentRunDialog";

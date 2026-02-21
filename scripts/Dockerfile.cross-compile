@@ -1,0 +1,200 @@
+# Dockerfile for cross-compiling Tauri 2.x applications
+#
+# This enables building Windows binaries from Linux and vice versa.
+#
+# Usage:
+#   docker build -t tauri-cross-compile -f scripts/Dockerfile.cross-compile .
+#   docker run --rm -v $(pwd):/app -w /app tauri-cross-compile ./scripts/cross-platform-build.sh --windows
+
+# Base stage with common dependencies
+FROM ubuntu:24.04 AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CARGO_TERM_COLOR=always
+ENV CARGO_INCREMENTAL=0
+
+# Install common dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    pkg-config \
+    libssl-dev \
+    build-essential \
+    file \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install Bun for frontend
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
+
+# Install Node.js (via bun)
+RUN corepack enable
+
+# ============================================================================
+# Linux cross-compiler stage
+# ============================================================================
+FROM base AS linux-cross
+
+# Install Tauri dependencies for Linux
+RUN apt-get update && apt-get install -y \
+    libwebkit2gtk-4.1-dev \
+    libappindicator3-dev \
+    librsvg2-dev \
+    patchelf \
+    libasound2-dev \
+    libgtk-3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cross-compilation toolchains for various architectures
+RUN apt-get update && apt-get install -y \
+    gcc-multilib \
+    g++-multilib \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    gcc-arm-linux-gnueabihf \
+    g++-arm-linux-gnueabihf \
+    libc6-dev-armhf-cross \
+    libc6-dev-arm64-cross \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Rust targets for cross-compilation
+RUN rustup target add \
+    x86_64-unknown-linux-gnu \
+    i686-unknown-linux-gnu \
+    aarch64-unknown-linux-gnu \
+    armv7-unknown-linux-gnueabihf
+
+# Configure Rust for cross-compilation
+RUN mkdir -p /root/.cargo && cat > /root/.cargo/config.toml << 'EOF'
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+
+[target.armv7-unknown-linux-gnueabihf]
+linker = "arm-linux-gnueabihf-gcc"
+
+[target.i686-unknown-linux-gnu]
+linker = "gcc"
+EOF
+
+WORKDIR /app
+
+CMD ["./scripts/cross-platform-build.sh"]
+
+# ============================================================================
+# Windows cross-compiler stage (MinGW)
+# ============================================================================
+FROM base AS windows-cross
+
+# Install MinGW-w64 for Windows cross-compilation
+RUN apt-get update && apt-get install -y \
+    mingw-w64 \
+    mingw-w64-tools \
+    nsis \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Windows targets
+RUN rustup target add \
+    x86_64-pc-windows-gnu \
+    i686-pc-windows-gnu
+
+# Configure Rust for Windows cross-compilation
+RUN mkdir -p /root/.cargo && cat > /root/.cargo/config.toml << 'EOF'
+[target.x86_64-pc-windows-gnu]
+ar = "x86_64-w64-mingw32-gcc-ar"
+linker = "x86_64-w64-mingw32-gcc"
+
+[target.i686-pc-windows-gnu]
+ar = "i686-w64-mingw32-gcc-ar"
+linker = "i686-w64-mingw32-gcc"
+EOF
+
+WORKDIR /app
+
+CMD ["./scripts/cross-platform-build.sh", "--windows"]
+
+# ============================================================================
+# Combined cross-compiler stage (all platforms)
+# ============================================================================
+FROM ubuntu:24.04 AS universal-cross
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CARGO_TERM_COLOR=always
+ENV CARGO_INCREMENTAL=0
+
+# Install all dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    pkg-config \
+    libssl-dev \
+    build-essential \
+    file \
+    ca-certificates \
+    libwebkit2gtk-4.1-dev \
+    libappindicator3-dev \
+    librsvg2-dev \
+    patchelf \
+    libasound2-dev \
+    libgtk-3-dev \
+    gcc-multilib \
+    g++-multilib \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    gcc-arm-linux-gnueabihf \
+    g++-arm-linux-gnueabihf \
+    libc6-dev-armhf-cross \
+    libc6-dev-arm64-cross \
+    mingw-w64 \
+    mingw-w64-tools \
+    nsis \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install Bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
+
+# Enable corepack for Node.js
+RUN corepack enable
+
+# Add all possible targets
+RUN rustup target add \
+    x86_64-unknown-linux-gnu \
+    i686-unknown-linux-gnu \
+    aarch64-unknown-linux-gnu \
+    armv7-unknown-linux-gnueabihf \
+    x86_64-pc-windows-gnu \
+    i686-pc-windows-gnu
+
+# Configure Rust for all cross-compilation targets
+RUN mkdir -p /root/.cargo && cat > /root/.cargo/config.toml << 'EOF'
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+
+[target.armv7-unknown-linux-gnueabihf]
+linker = "arm-linux-gnueabihf-gcc"
+
+[target.i686-unknown-linux-gnu]
+linker = "gcc"
+
+[target.x86_64-pc-windows-gnu]
+ar = "x86_64-w64-mingw32-gcc-ar"
+linker = "x86_64-w64-mingw32-gcc"
+
+[target.i686-pc-windows-gnu]
+ar = "i686-w64-mingw32-gcc-ar"
+linker = "i686-w64-mingw32-gcc"
+EOF
+
+WORKDIR /app
+
+# Default to showing help
+CMD ["./scripts/cross-platform-build.sh", "--help"]

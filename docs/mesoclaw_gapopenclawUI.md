@@ -24,7 +24,7 @@ This analysis compares the UI/UX capabilities of MesoClaw (a Tauri 2.x desktop a
    - ✅ **P2:** Keyboard shortcuts system — **DONE** (`src/hooks/useGlobalShortcuts.ts`)
    - ✅ **P2:** Notification center for system events — **DONE** (`src/components/layout/NotificationCenter.tsx`)
    - ✅ **P2:** Real-time channel status indicators — **DONE** (`src/components/channels/ChannelStatusBadge.tsx`)
-   - ⚠️ **P0:** Agent system — Default agent works, multi-agent CRUD pending
+   - ✅ **P0:** Multi-agent CRUD UI with Run functionality — **DONE** (`src/routes/agents.tsx`, `src/components/agents/`)
 
 ---
 
@@ -46,7 +46,7 @@ This analysis compares the UI/UX capabilities of MesoClaw (a Tauri 2.x desktop a
 | Model Selection | ✅ | ✅ Model Selector | — | Good implementation |
 | Context Panel | ✅ | ✅ | — | Similar patterns |
 | **Agent System** |
-| Agent Configuration UI | ✅ Full CRUD | ⚠️ Default only | Medium | Multi-agent pending |
+| Agent Configuration UI | ✅ Full CRUD | ✅ Full CRUD + Run | ~~Medium~~ ✅ DONE | `src/components/agents/` |
 | Agent Workspace Editor | ✅ SOUL.md/AGENTS.md | ✅ Workspace files work | ~~Critical~~ ✅ DONE | `src-tauri/src/agent/commands.rs` |
 | Session History Viewer | ✅ | ✅ list_sessions_command | ~~Critical~~ ✅ DONE | |
 | Execution Monitor | ✅ Real-time | ✅ run_agent_command | ~~Critical~~ ✅ DONE | |
@@ -88,15 +88,22 @@ This analysis compares the UI/UX capabilities of MesoClaw (a Tauri 2.x desktop a
 
 #### 1. ~~Agent System Backend Integration~~ ✅ DONE
 
-**Status:** Default agent working. Multi-agent CRUD pending.
+**Status:** ✅ COMPLETE - Full multi-agent CRUD with Run functionality.
 
 **Implementation:**
-- `src-tauri/src/agent/commands.rs` - Full agent and session commands
-- `src-tauri/src/agent/agent_commands.rs` - Agent loop execution
+- `src-tauri/src/commands/agents.rs` - Database CRUD commands
+- `src-tauri/src/agent/commands.rs` - Agent execution commands
 - `src/stores/agentConfigStore.ts` - Frontend store with IPC calls
+- `src/routes/agents.tsx` - Agents page with tabs
+- `src/components/agents/AgentList.tsx` - Agent list with CRUD + Run actions
+- `src/components/agents/AgentCreateDialog.tsx` - Create/Edit dialog
+- `src/components/agents/AgentRunDialog.tsx` - Run agent dialog
 
-**Remaining:**
-- Multi-agent configuration UI (currently only default agent)
+**Completed:**
+- ✅ Multi-agent CRUD UI (create, edit, delete, duplicate, toggle)
+- ✅ Agent execution with Run dialog
+- ✅ Database persistence via Diesel ORM
+- ✅ Real-time execution monitoring via Tauri events
 
 **Target State:**
 - Full CRUD with SQLite persistence via Diesel ORM
