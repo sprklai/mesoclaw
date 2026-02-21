@@ -15,6 +15,7 @@
 
 import { memo, useEffect } from "react";
 
+import { ChannelIcon } from "@/components/channels/ChannelIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -54,25 +55,6 @@ function statusLabel(status: ChannelStatus): string {
       return "Error";
     default:
       return "Disconnected";
-  }
-}
-
-function channelIcon(name: string): string {
-  switch (name) {
-    case "telegram":
-      return "✈";
-    case "discord":
-      return "🎮";
-    case "matrix":
-      return "🔷";
-    case "slack":
-      return "💬";
-    case "tauri-ipc":
-      return "🖥";
-    case "webhook":
-      return "🔗";
-    default:
-      return "📡";
   }
 }
 
@@ -119,7 +101,7 @@ const ChannelCard = memo(function ChannelCard({ entry, isSelected, onSelect }: C
         />
 
         {/* Icon + name */}
-        <span className="text-xl">{channelIcon(entry.name)}</span>
+        <ChannelIcon channel={entry.name} size={24} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">{entry.displayName}</p>
           <p className="text-xs text-muted-foreground">

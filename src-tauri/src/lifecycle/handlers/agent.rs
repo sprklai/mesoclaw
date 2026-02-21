@@ -6,8 +6,8 @@ use async_trait::async_trait;
 
 use crate::lifecycle::handlers::ResourceHandler;
 use crate::lifecycle::states::{
-    AgentPreservedState, FallbackOption, HealthStatus, PreservedState, ResourceConfig, ResourceError,
-    ResourceId, ResourceInstance, ResourceType, SessionMetadata,
+    AgentPreservedState, FallbackOption, HealthStatus, PreservedState, ResourceConfig,
+    ResourceError, ResourceId, ResourceInstance, ResourceType, SessionMetadata,
 };
 
 /// Valid substates for agent resources.
@@ -232,10 +232,8 @@ mod tests {
             ..Default::default()
         };
 
-        let instance = ResourceInstance::new(
-            ResourceId::new(ResourceType::Agent, "test:1"),
-            config,
-        );
+        let instance =
+            ResourceInstance::new(ResourceId::new(ResourceType::Agent, "test:1"), config);
 
         let fallbacks = handler.get_fallbacks(&instance);
 

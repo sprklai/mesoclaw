@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { Brain, Cpu, Wifi, WifiOff } from "@/lib/icons";
 import { useContextPanelStore } from "@/stores/contextPanelStore";
 import { useGatewayStore } from "@/stores/gatewayStore";
 import { useLLMStore } from "@/stores/llm";
+import { AIModelQuickAccess } from "@/components/ai/AIModelQuickAccess";
 
 export function ContextPanel() {
   const content = useContextPanelStore((s) => s.content);
-  const { config } = useLLMStore();
+  const { config, providersWithModels } = useLLMStore();
   const isConnected = useGatewayStore((s) => s.connected);
 
   return (
@@ -13,7 +15,11 @@ export function ContextPanel() {
       {content ? (
         <div>{content}</div>
       ) : (
-        <DefaultContextContent config={config} isConnected={isConnected} />
+        <DefaultContextContent
+          config={config}
+          providersWithModels={providersWithModels}
+          isConnected={isConnected}
+        />
       )}
     </div>
   );
@@ -21,29 +27,61 @@ export function ContextPanel() {
 
 interface DefaultContentProps {
   config: { providerId?: string; modelId?: string } | null;
+  providersWithModels: Array<{
+    id: string;
+    name: string;
+    models: Array<{ modelId: string; displayName: string }>;
+  }>;
   isConnected: boolean;
 }
 
-function DefaultContextContent({ config, isConnected }: DefaultContentProps) {
+function DefaultContextContent({
+  config,
+  providersWithModels,
+  isConnected,
+}: DefaultContentProps) {
+  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+
+  // Find the display name for the current model
+  const modelInfo = (() => {
+    if (!config?.providerId || !config?.modelId) return null;
+    const provider = providersWithModels.find((p) => p.id === config.providerId);
+    if (!provider) return null;
+    const model = provider.models.find((m) => m.modelId === config.modelId);
+    if (!model) return null;
+    return { providerName: provider.name, displayName: model.displayName };
+  })();
+
   return (
     <div className="space-y-4">
       <div>
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Active Model
         </h2>
-        <div className="rounded-lg border border-border bg-card p-3">
+        <button
+          type="button"
+          onClick={() => setModelSelectorOpen(true)}
+          className="w-full rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/50"
+        >
           <div className="flex items-center gap-2">
-            <Cpu className="size-4 text-primary" aria-hidden />
-            <div className="min-w-0">
+            <Cpu className="size-4 text-primary shrink-0" aria-hidden />
+            <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
-                {config?.modelId ?? "No model selected"}
+                {modelInfo?.displayName ?? config?.modelId ?? "No model selected"}
               </p>
               <p className="truncate text-xs text-muted-foreground">
-                {config?.providerId ?? "Configure in Settings"}
+                {modelInfo?.providerName ?? config?.providerId ?? "Configure in Settings"}
               </p>
             </div>
+            <span className="text-xs text-muted-foreground shrink-0">Change</span>
           </div>
-        </div>
+        </button>
+        <AIModelQuickAccess
+          open={modelSelectorOpen}
+          onOpenChange={setModelSelectorOpen}
+          mode="global-default"
+          filterAvailable
+        />
       </div>
 
       <div>

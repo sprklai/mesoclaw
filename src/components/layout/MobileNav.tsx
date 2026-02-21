@@ -75,7 +75,7 @@ export function MobileNav() {
 									isActive && "scale-110 transition-transform",
 								)}
 							/>
-							<span className="text-[10px] font-medium leading-none">
+							<span className="text-xs font-medium leading-none">
 								{item.label}
 							</span>
 						</Link>

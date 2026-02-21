@@ -3,12 +3,12 @@
 //! The state registry maintains the authoritative state of all tracked
 //! resources and logs state transitions for auditing.
 
+use chrono::{DateTime, Utc};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc};
 
-use super::states::{ResourceInstance, ResourceId, ResourceState, ResourceType, StateTransition};
+use super::states::{ResourceId, ResourceInstance, ResourceState, ResourceType, StateTransition};
 
 /// Maximum number of transitions to keep per resource.
 const MAX_HISTORY_PER_RESOURCE: usize = 100;
@@ -191,7 +191,10 @@ impl StateRegistry {
     }
 
     /// Get resources by state type.
-    pub async fn get_by_state(&self, predicate: impl Fn(&ResourceState) -> bool) -> Vec<ResourceInstance> {
+    pub async fn get_by_state(
+        &self,
+        predicate: impl Fn(&ResourceState) -> bool,
+    ) -> Vec<ResourceInstance> {
         let resources = self.resources.read().await;
         resources
             .values()
@@ -202,12 +205,14 @@ impl StateRegistry {
 
     /// Get stuck resources.
     pub async fn get_stuck(&self) -> Vec<ResourceInstance> {
-        self.get_by_state(|s| matches!(s, ResourceState::Stuck { .. })).await
+        self.get_by_state(|s| matches!(s, ResourceState::Stuck { .. }))
+            .await
     }
 
     /// Get running resources.
     pub async fn get_running(&self) -> Vec<ResourceInstance> {
-        self.get_by_state(|s| matches!(s, ResourceState::Running { .. })).await
+        self.get_by_state(|s| matches!(s, ResourceState::Running { .. }))
+            .await
     }
 
     /// Get the transition history for a resource.
@@ -373,7 +378,11 @@ mod tests {
         };
 
         let updated = registry
-            .update_state(&instance.id, new_state.clone(), "Starting execution".to_string())
+            .update_state(
+                &instance.id,
+                new_state.clone(),
+                "Starting execution".to_string(),
+            )
             .await;
         assert!(updated);
 

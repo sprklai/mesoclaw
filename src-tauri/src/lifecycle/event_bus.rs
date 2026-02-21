@@ -6,9 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
-use super::states::{
-    RecoveryActionType, ResourceId, ResourceType, UserInterventionRequest,
-};
+use super::states::{RecoveryActionType, ResourceId, ResourceType, UserInterventionRequest};
 
 /// All lifecycle events that flow through the system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,10 +50,7 @@ pub enum LifecycleEvent {
     },
 
     /// Resource successfully recovered
-    ResourceRecovered {
-        resource_id: ResourceId,
-        tier: u8,
-    },
+    ResourceRecovered { resource_id: ResourceId, tier: u8 },
 
     /// Resource failed (terminal or non-terminal)
     ResourceFailed {
@@ -71,9 +66,7 @@ pub enum LifecycleEvent {
     },
 
     /// User intervention needed
-    UserInterventionNeeded {
-        request: UserInterventionRequest,
-    },
+    UserInterventionNeeded { request: UserInterventionRequest },
 
     /// User intervention resolved
     UserInterventionResolved {
@@ -88,14 +81,10 @@ pub enum LifecycleEvent {
     },
 
     /// Supervisor started
-    SupervisorStarted {
-        timestamp: DateTime<Utc>,
-    },
+    SupervisorStarted { timestamp: DateTime<Utc> },
 
     /// Supervisor stopped
-    SupervisorStopped {
-        timestamp: DateTime<Utc>,
-    },
+    SupervisorStopped { timestamp: DateTime<Utc> },
 }
 
 impl LifecycleEvent {
@@ -223,7 +212,13 @@ mod tests {
 
         bus.publish(event.clone()).unwrap();
 
-        assert!(matches!(rx1.recv().await.unwrap(), LifecycleEvent::ResourceStarted { .. }));
-        assert!(matches!(rx2.recv().await.unwrap(), LifecycleEvent::ResourceStarted { .. }));
+        assert!(matches!(
+            rx1.recv().await.unwrap(),
+            LifecycleEvent::ResourceStarted { .. }
+        ));
+        assert!(matches!(
+            rx2.recv().await.unwrap(),
+            LifecycleEvent::ResourceStarted { .. }
+        ));
     }
 }

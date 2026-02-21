@@ -32,8 +32,13 @@ type LogModule = "ALL" | "AGENTS" | "CHANNELS" | "MEMORY" | "CHAT" | "SCHEDULER"
 
 export const MODULES: LogModule[] = ["ALL", "AGENTS", "CHANNELS", "MEMORY", "CHAT", "SCHEDULER", "GATEWAY", "SYSTEM"];
 
-// Target prefixes for each module category
-const MODULE_PREFIXES: Record<LogModule, string[]> = {
+// Blacklisted message patterns - these logs are hidden by default
+const MESSAGE_BLACKLIST: string[] = [
+  "job fired: boot startup",  // Noisy startup message
+];
+
+// Target prefixes for each module category (checked in target field)
+const MODULE_TARGET_PREFIXES: Record<LogModule, string[]> = {
   ALL: [],
   AGENTS: ["agent::", "agents::", "spawner", "orchestrator"],
   CHANNELS: ["channels::", "telegram", "discord", "slack", "matrix"],
@@ -42,6 +47,18 @@ const MODULE_PREFIXES: Record<LogModule, string[]> = {
   SCHEDULER: ["scheduler::"],
   GATEWAY: ["gateway::", "event_bus::"],
   SYSTEM: ["boot::", "lib::", "cli::"],
+};
+
+// Keywords to check in message content for each module
+const MODULE_MESSAGE_KEYWORDS: Record<LogModule, string[]> = {
+  ALL: [],
+  AGENTS: ["channel-bridge", "agent session", "agent error", "agent turn", "spawner"],
+  CHANNELS: ["telegram", "discord", "slack", "matrix", "channel registration", "channel-router"],
+  MEMORY: ["memory::", "store_memory", "search_memory", "daily memory"],
+  CHAT: ["stream_chat", "chat session", "llm provider"],
+  SCHEDULER: ["scheduler:", "heartbeat", "cron", "job", "schedule"],
+  GATEWAY: ["gateway::", "event_bus", "rest api", "http server"],
+  SYSTEM: ["boot:", "single-instance", "deep-link", "startup", "shutdown"],
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -78,9 +95,18 @@ function levelBadgeVariant(
 
 export function moduleMatches(entry: LogEntry, activeModule: LogModule): boolean {
   if (activeModule === "ALL") return true;
-  const prefixes = MODULE_PREFIXES[activeModule] ?? [];
+
+  // Check target field prefixes
+  const targetPrefixes = MODULE_TARGET_PREFIXES[activeModule] ?? [];
   const target = entry.target.toLowerCase();
-  return prefixes.some(prefix => target.includes(prefix));
+  if (targetPrefixes.some(prefix => target.includes(prefix))) {
+    return true;
+  }
+
+  // Also check message content for keywords
+  const messageKeywords = MODULE_MESSAGE_KEYWORDS[activeModule] ?? [];
+  const message = entry.message.toLowerCase();
+  return messageKeywords.some(keyword => message.includes(keyword));
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -143,6 +169,12 @@ function LogsPage() {
 
   const filtered = useMemo(() => {
     return entries.filter((e) => {
+      // Blacklist filter - hide noisy messages
+      const messageLower = e.message.toLowerCase();
+      if (MESSAGE_BLACKLIST.some(pattern => messageLower.includes(pattern))) {
+        return false;
+      }
+
       // Level filter
       if (activeLevel !== "ALL" && e.level.toUpperCase() !== activeLevel)
         return false;
@@ -186,7 +218,7 @@ function LogsPage() {
   const moduleCounts = useMemo(() => {
     const map: Record<string, number> = { ALL: entries.length };
     for (const e of entries) {
-      for (const [mod] of Object.entries(MODULE_PREFIXES)) {
+      for (const [mod] of Object.entries(MODULE_TARGET_PREFIXES)) {
         if (moduleMatches(e, mod as LogModule)) {
           map[mod] = (map[mod] ?? 0) + 1;
         }
@@ -370,16 +402,16 @@ function LogsPage() {
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm">
                   <tr className="border-b border-border">
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Time
                     </th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Level
                     </th>
-                    <th className="hidden px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">
+                    <th className="hidden px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">
                       Target
                     </th>
-                    <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Message
                     </th>
                   </tr>
@@ -407,7 +439,7 @@ function LogsPage() {
                         <Badge
                           variant={levelBadgeVariant(entry.level)}
                           className={cn(
-                            "text-[10px]",
+                            "text-xs",
                             levelColor(entry.level),
                           )}
                         >

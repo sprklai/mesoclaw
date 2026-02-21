@@ -72,10 +72,10 @@ function ResultRow({
         <span className="flex-1 truncate font-mono text-xs font-semibold">
           {entry.key}
         </span>
-        <Badge variant={categoryVariant(entry.category)} className="shrink-0 text-[10px]">
+        <Badge variant={categoryVariant(entry.category)} className="shrink-0 text-xs">
           {entry.category}
         </Badge>
-        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
           {Math.round(entry.score * 100)}%
         </span>
       </div>

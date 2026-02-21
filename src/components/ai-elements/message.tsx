@@ -9,15 +9,24 @@ export interface MessageProps {
 }
 
 export function Message({ from, children, className }: MessageProps) {
+  const isUser = from === "user";
+
   return (
     <div
       className={cn(
-        "group flex gap-4 px-4 py-6",
-        from === "user" && "bg-muted/30",
+        "group flex gap-4 px-4 py-4",
+        isUser && "justify-end",
         className
       )}
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-2">{children}</div>
+      <div
+        className={cn(
+          "flex min-w-0 max-w-[85%] flex-col gap-2",
+          isUser && "items-end"
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }

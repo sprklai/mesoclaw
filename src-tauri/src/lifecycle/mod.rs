@@ -66,7 +66,9 @@ pub mod states;
 pub mod supervisor;
 
 // Re-exports for convenience
-pub use escalation_manager::{EscalationConfig, EscalationManager, EscalationError, TierPolicy, TierAction};
+pub use escalation_manager::{
+    EscalationConfig, EscalationError, EscalationManager, TierAction, TierPolicy,
+};
 pub use event_bus::{LifecycleEvent, LifecycleEventBus};
 pub use handlers::ResourceHandler;
 pub use health_monitor::{HealthMonitor, HealthMonitorEvent, HealthMonitorStats};

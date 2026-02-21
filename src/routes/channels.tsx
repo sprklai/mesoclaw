@@ -15,7 +15,8 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements";
-import { ChannelStatusBadge, ChannelStatusDot } from "@/components/channels/ChannelStatusBadge";
+import { ChannelIcon } from "@/components/channels/ChannelIcon";
+import { ChannelStatusBadge } from "@/components/channels/ChannelStatusBadge";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -87,9 +88,16 @@ function ChannelsPage() {
   const channels = useChannelStore((s) => s.channels);
   const messages = useChannelStore((s) => s.messages);
   const addMessage = useChannelStore((s) => s.addMessage);
+  const loadChannels = useChannelStore((s) => s.loadChannels);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(
     channels[0]?.name ?? null,
   );
+
+  // Load channel status from backend on mount
+  useEffect(() => {
+    loadChannels();
+  }, [loadChannels]);
+
   const [replyText, setReplyText] = useState("");
   const [replyRecipient, setReplyRecipient] = useState("");
   const [sending, setSending] = useState(false);
@@ -188,7 +196,7 @@ function ChannelsPage() {
                     )}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <ChannelStatusDot status={ch.status} />
+                      <ChannelIcon channel={ch.name} size={18} />
                       <span className="truncate">{ch.displayName || ch.name}</span>
                     </div>
                     {count > 0 && (
@@ -217,7 +225,13 @@ function ChannelsPage() {
           {selectedChannel ? (
             <>
               <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-                <span className="text-sm font-semibold">#{selectedChannel}</span>
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const channel = channels.find((c) => c.name === selectedChannel);
+                    return channel ? <ChannelIcon channel={channel.name} size={20} /> : null;
+                  })()}
+                  <span className="text-sm font-semibold">#{selectedChannel}</span>
+                </div>
                 {(() => {
                   const channel = channels.find((c) => c.name === selectedChannel);
                   return channel ? (

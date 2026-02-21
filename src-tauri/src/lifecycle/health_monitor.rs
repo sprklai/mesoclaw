@@ -3,12 +3,12 @@
 //! The health monitor tracks heartbeats from resources and detects
 //! when they become stuck (stop sending heartbeats).
 
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 use tokio::task::JoinHandle;
-use chrono::{DateTime, Utc};
 
 use super::states::{HealthStatus, HeartbeatConfig, ResourceId, ResourceInstance, ResourceType};
 
@@ -56,9 +56,7 @@ pub enum HealthMonitorEvent {
         last_heartbeat: DateTime<Utc>,
     },
     /// A stuck resource recovered
-    ResourceRecovered {
-        resource_id: ResourceId,
-    },
+    ResourceRecovered { resource_id: ResourceId },
 }
 
 /// Monitors the health of tracked resources via heartbeats.
@@ -158,15 +156,19 @@ impl HealthMonitor {
             if !matches!(state.status, HealthStatus::Healthy) {
                 state.status = HealthStatus::Healthy;
 
-                let _ = self.event_sender.send(HealthMonitorEvent::ResourceRecovered {
-                    resource_id: resource_id.clone(),
-                });
+                let _ = self
+                    .event_sender
+                    .send(HealthMonitorEvent::ResourceRecovered {
+                        resource_id: resource_id.clone(),
+                    });
             }
 
-            let _ = self.event_sender.send(HealthMonitorEvent::HeartbeatRecorded {
-                resource_id: resource_id.clone(),
-                timestamp: now,
-            });
+            let _ = self
+                .event_sender
+                .send(HealthMonitorEvent::HeartbeatRecorded {
+                    resource_id: resource_id.clone(),
+                    timestamp: now,
+                });
 
             if old_status != state.status {
                 let _ = self.event_sender.send(HealthMonitorEvent::HealthChanged {
@@ -328,7 +330,7 @@ pub struct HealthMonitorStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lifecycle::states::{ResourceType, ResourceConfig};
+    use crate::lifecycle::states::{ResourceConfig, ResourceType};
 
     #[tokio::test]
     async fn test_start_stop_tracking() {

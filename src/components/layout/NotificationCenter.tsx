@@ -215,7 +215,7 @@ export function NotificationCenter() {
       >
         <Bell className="size-5" />
         {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+          <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-destructive text-xs font-medium text-destructive-foreground">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -229,7 +229,7 @@ export function NotificationCenter() {
                 variant="ghost"
                 size="sm"
                 onClick={markAllAsRead}
-                className="h-7 px-2 text-xs"
+                className="text-xs"
               >
                 <CheckCheck className="mr-1 size-3" />
                 Mark all read
@@ -240,7 +240,7 @@ export function NotificationCenter() {
                 variant="ghost"
                 size="sm"
                 onClick={clearAll}
-                className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                className="text-xs text-destructive hover:text-destructive"
               >
                 <Trash2 className="mr-1 size-3" />
                 Clear

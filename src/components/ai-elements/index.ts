@@ -30,6 +30,7 @@ export {
   PromptInputActionMenuContent,
   PromptInputActionAddAttachments,
   usePromptInputAttachments,
+  type PromptInputMessage,
 } from "./prompt-input";
 
 // Message components

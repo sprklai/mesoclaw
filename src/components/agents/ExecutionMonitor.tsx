@@ -3,6 +3,7 @@
  *
  * Features:
  * - Active runs display with status
+ * - Channel-triggered sessions (Slack, Telegram, etc.)
  * - Message flow visualization
  * - Tool call status tracking
  * - Cancel functionality
@@ -12,12 +13,15 @@ import {
   CheckCircle2,
   Clock,
   Loader2,
+  MessageSquare,
   Pause,
   Square,
+  Trash2,
   XCircle,
   Zap,
 } from "@/lib/icons";
 import type { AgentRun, ToolCallRecord } from "@/lib/agent-config";
+import { useAgentStore, type ChannelSession } from "@/stores/agentStore";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +101,15 @@ export function ExecutionMonitor({
 }: ExecutionMonitorProps) {
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // Channel sessions from agent store
+  const channelSessions = useAgentStore((s) => s.channelSessions);
+  const clearCompletedChannelSessions = useAgentStore((s) => s.clearCompletedChannelSessions);
+
+  // Start listening to agent events on mount
+  useEffect(() => {
+    useAgentStore.getState().startListening();
+  }, []);
 
   // Auto-refresh active runs
   useEffect(() => {
@@ -342,6 +355,94 @@ export function ExecutionMonitor({
               );
             })}
           </div>
+        )}
+      </div>
+
+      {/* Channel Sessions Section */}
+      {channelSessions.length > 0 && (
+        <div className="border-t border-border">
+          <div className="px-4 py-2 flex items-center justify-between bg-muted/30">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Channel Sessions
+              <Badge variant="outline" className="text-xs">
+                {channelSessions.filter((s) => s.status === "running").length} active
+              </Badge>
+            </h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearCompletedChannelSessions}
+              title="Clear completed sessions"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+          <div className="max-h-[200px] overflow-auto">
+            {channelSessions.map((session) => (
+              <ChannelSessionRow key={session.sessionId} session={session} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Channel Session Row ─────────────────────────────────────────────────────
+
+function ChannelSessionRow({ session }: { session: ChannelSession }) {
+  const isRunning = session.status === "running";
+  const isComplete = session.status === "complete";
+  const cancelChannelSession = useAgentStore((s) => s.cancelChannelSession);
+
+  const handleCancel = async () => {
+    if (confirm("Stop this channel session?")) {
+      await cancelChannelSession(session.sessionId);
+    }
+  };
+
+  return (
+    <div className="px-4 py-2 flex items-center justify-between border-b border-border/50 last:border-0 hover:bg-muted/20">
+      <div className="flex items-center gap-3 min-w-0">
+        {isRunning ? (
+          <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+        ) : isComplete ? (
+          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+        ) : (
+          <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+        )}
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm capitalize">{session.channel}</span>
+            <Badge variant={isRunning ? "default" : "secondary"} className="text-xs">
+              {session.status}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground truncate">
+            {session.finalMessage || `from: ${session.from}`}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="text-xs text-muted-foreground shrink-0">
+          {new Date(session.startedAt).toLocaleTimeString()}
+          {session.completedAt && (
+            <span className="ml-2">
+              ({Math.round((session.completedAt - session.startedAt) / 1000)}s)
+            </span>
+          )}
+        </div>
+        {isRunning && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={handleCancel}
+            title="Stop session"
+          >
+            <Square className="h-3 w-3" />
+          </Button>
         )}
       </div>
     </div>

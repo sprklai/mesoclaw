@@ -11,8 +11,8 @@ pub mod tool;
 use async_trait::async_trait;
 
 use crate::lifecycle::states::{
-    FallbackOption, HealthStatus, PreservedState, ResourceConfig, ResourceError,
-    ResourceId, ResourceInstance, ResourceType,
+    FallbackOption, HealthStatus, PreservedState, ResourceConfig, ResourceError, ResourceId,
+    ResourceInstance, ResourceType,
 };
 
 /// Core trait for all resource handlers.

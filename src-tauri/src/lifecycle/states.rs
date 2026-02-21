@@ -5,8 +5,8 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 
 // ─── ResourceType ────────────────────────────────────────────────────────────
 
@@ -769,14 +769,23 @@ mod tests {
 
     #[test]
     fn test_resource_state_is_active() {
-        assert!(ResourceState::Running {
-            substate: "thinking".into(),
-            started_at: Utc::now(),
-            progress: None
-        }.is_active());
+        assert!(
+            ResourceState::Running {
+                substate: "thinking".into(),
+                started_at: Utc::now(),
+                progress: None
+            }
+            .is_active()
+        );
 
         assert!(!ResourceState::Idle.is_active());
-        assert!(!ResourceState::Completed { at: Utc::now(), result: None }.is_active());
+        assert!(
+            !ResourceState::Completed {
+                at: Utc::now(),
+                result: None
+            }
+            .is_active()
+        );
     }
 
     #[test]

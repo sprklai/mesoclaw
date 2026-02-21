@@ -7,8 +7,8 @@ use async_trait::async_trait;
 
 use crate::lifecycle::handlers::ResourceHandler;
 use crate::lifecycle::states::{
-    ChannelPreservedState, FallbackOption, HealthStatus, PreservedState, ResourceConfig, ResourceError,
-    ResourceId, ResourceInstance, ResourceType,
+    ChannelPreservedState, FallbackOption, HealthStatus, PreservedState, ResourceConfig,
+    ResourceError, ResourceId, ResourceInstance, ResourceType,
 };
 
 /// Valid substates for channel resources.
@@ -176,7 +176,10 @@ mod tests {
         };
 
         let instance = handler
-            .start(ResourceId::new(ResourceType::Channel, "telegram:bot123"), config)
+            .start(
+                ResourceId::new(ResourceType::Channel, "telegram:bot123"),
+                config,
+            )
             .await
             .unwrap();
 

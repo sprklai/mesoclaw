@@ -156,7 +156,7 @@ export function ModuleScaffold({ className }: ModuleScaffoldProps) {
               <label className="text-xs text-muted-foreground">
                 manifest.toml preview
               </label>
-              <Badge variant="outline" className="text-[10px]">live</Badge>
+              <Badge variant="outline" className="text-xs">live</Badge>
             </div>
             <pre className="flex-1 rounded-md border bg-muted/30 p-3 text-[11px] font-mono leading-relaxed overflow-auto whitespace-pre">
               {toml}

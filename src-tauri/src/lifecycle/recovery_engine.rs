@@ -3,8 +3,8 @@
 //! The recovery engine handles the transfer & preserve strategy for
 //! recovering stuck resources.
 
-use std::sync::Arc;
 use chrono::Utc;
+use std::sync::Arc;
 
 use super::handlers::ResourceHandler;
 use super::plugin_registry::PluginRegistry;
@@ -20,7 +20,10 @@ pub enum RecoveryResult {
     /// Resource was recovered in place
     Recovered { resource_id: ResourceId },
     /// Resource was transferred to a new instance
-    Transferred { from_id: ResourceId, to_id: ResourceId },
+    Transferred {
+        from_id: ResourceId,
+        to_id: ResourceId,
+    },
     /// Recovery escalated to higher tier
     Escalated { tier: u8 },
     /// Recovery failed (may need user intervention)
@@ -33,7 +36,10 @@ pub enum RecoveryAction {
     /// Retry the same resource
     Retry { preserve_state: bool },
     /// Transfer to a new resource instance
-    Transfer { to_type: Option<ResourceType>, preserve_state: bool },
+    Transfer {
+        to_type: Option<ResourceType>,
+        preserve_state: bool,
+    },
     /// Escalate to a higher tier
     Escalate { tier: u8 },
     /// Abort the resource
@@ -81,17 +87,18 @@ impl RecoveryEngine {
 
         match action {
             RecoveryAction::Retry { preserve_state } => {
-                self.retry_resource(&instance, preserve_state, handler.as_ref()).await
+                self.retry_resource(&instance, preserve_state, handler.as_ref())
+                    .await
             }
-            RecoveryAction::Transfer { to_type, preserve_state } => {
-                self.transfer_resource(&instance, to_type, preserve_state).await
+            RecoveryAction::Transfer {
+                to_type,
+                preserve_state,
+            } => {
+                self.transfer_resource(&instance, to_type, preserve_state)
+                    .await
             }
-            RecoveryAction::Escalate { tier } => {
-                self.escalate_resource(&instance, tier).await
-            }
-            RecoveryAction::Abort { reason } => {
-                self.abort_resource(&instance, reason).await
-            }
+            RecoveryAction::Escalate { tier } => self.escalate_resource(&instance, tier).await,
+            RecoveryAction::Abort { reason } => self.abort_resource(&instance, reason).await,
         }
     }
 
@@ -102,7 +109,11 @@ impl RecoveryEngine {
         preserve_state: bool,
         handler: &dyn ResourceHandler,
     ) -> Result<RecoveryResult, ResourceError> {
-        log::info!("RecoveryEngine: retrying {} (preserve_state={})", instance.id, preserve_state);
+        log::info!(
+            "RecoveryEngine: retrying {} (preserve_state={})",
+            instance.id,
+            preserve_state
+        );
 
         // Update state to recovering
         self.state_registry
@@ -152,7 +163,9 @@ impl RecoveryEngine {
             .await;
 
         // Increment recovery attempts
-        self.state_registry.increment_recovery_attempts(&instance.id).await;
+        self.state_registry
+            .increment_recovery_attempts(&instance.id)
+            .await;
 
         Ok(RecoveryResult::Recovered {
             resource_id: instance.id.clone(),
@@ -200,7 +213,11 @@ impl RecoveryEngine {
         // Create new resource ID for target
         let new_id = ResourceId::new(
             target_type.clone(),
-            format!("{}:transferred:{}", instance.id.instance_id(), Utc::now().timestamp()),
+            format!(
+                "{}:transferred:{}",
+                instance.id.instance_id(),
+                Utc::now().timestamp()
+            ),
         );
 
         // Get target handler
@@ -266,7 +283,9 @@ impl RecoveryEngine {
         );
 
         // Update escalation tier
-        self.state_registry.set_escalation_tier(&instance.id, tier).await;
+        self.state_registry
+            .set_escalation_tier(&instance.id, tier)
+            .await;
 
         // Update state
         self.state_registry
@@ -372,14 +391,21 @@ impl RecoveryEngine {
     ) -> Result<RecoveryResult, ResourceError> {
         // This would be implemented based on the selected option
         // For now, return a placeholder
-        Err(ResourceError::Internal("User intervention handling not implemented".to_string()))
+        Err(ResourceError::Internal(
+            "User intervention handling not implemented".to_string(),
+        ))
     }
 
     /// Get the handler for a resource type.
-    fn get_handler(&self, resource_type: &ResourceType) -> Result<Box<dyn ResourceHandler>, ResourceError> {
+    fn get_handler(
+        &self,
+        resource_type: &ResourceType,
+    ) -> Result<Box<dyn ResourceHandler>, ResourceError> {
         // For now, return an error since we can't clone handlers
         // In practice, handlers would be Arc<dyn ResourceHandler>
-        Err(ResourceError::HandlerNotRegistered(resource_type.to_string()))
+        Err(ResourceError::HandlerNotRegistered(
+            resource_type.to_string(),
+        ))
     }
 }
 

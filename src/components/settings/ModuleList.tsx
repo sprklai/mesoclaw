@@ -80,11 +80,11 @@ function ModuleCard({ entry, isSelected, onSelect }: ModuleCardProps) {
             <span className="font-medium text-sm">{info.name}</span>
             <Badge
               variant={typeBadgeVariant(info.type)}
-              className="text-[10px]"
+              className="text-xs"
             >
               {info.type}
             </Badge>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {runtime.type}
             </Badge>
           </div>

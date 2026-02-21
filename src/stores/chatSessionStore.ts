@@ -8,6 +8,7 @@ export interface ChatSession {
   scope: string;
   channel: string;
   peer: string;
+  title?: string;
   createdAt: string;
   updatedAt: string;
   compactionSummary?: string;
@@ -28,6 +29,10 @@ interface ChatSessionState {
   isLoading: boolean;
   error: string | null;
 
+  // UI state that persists across navigation
+  isStreaming: boolean;
+  currentInput: string;
+
   loadSessions: () => Promise<void>;
   createSession: (providerId: string, modelId: string) => Promise<string>;
   loadSession: (sessionId: string) => Promise<void>;
@@ -35,6 +40,10 @@ interface ChatSessionState {
   loadMessages: (sessionId: string) => Promise<void>;
   saveMessage: (role: "user" | "assistant" | "system", content: string) => Promise<void>;
   clearMessages: () => Promise<void>;
+
+  // UI state setters
+  setStreaming: (streaming: boolean) => void;
+  setCurrentInput: (input: string) => void;
 
   // Helper methods for commands
   getCurrentSession: () => ChatSession | null;
@@ -49,6 +58,8 @@ export const useChatSessionStore = create<ChatSessionState>((set, get) => ({
   messages: new Map(),
   isLoading: false,
   error: null,
+  isStreaming: false,
+  currentInput: "",
 
   loadSessions: async () => {
     set({ isLoading: true, error: null });
@@ -161,5 +172,13 @@ export const useChatSessionStore = create<ChatSessionState>((set, get) => ({
     const { activeSessionId, messages } = get();
     if (!activeSessionId) return [];
     return messages.get(activeSessionId) || [];
+  },
+
+  setStreaming: (streaming: boolean) => {
+    set({ isStreaming: streaming });
+  },
+
+  setCurrentInput: (input: string) => {
+    set({ currentInput: input });
   },
 }));

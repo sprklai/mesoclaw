@@ -106,7 +106,7 @@ export function ToolExecutionStatus({ execution, className }: ToolExecutionStatu
             {open ? "▾ hide result" : "▸ show result"}
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-[10px] text-foreground/80">
+            <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-xs text-foreground/80">
               {execution.result}
             </pre>
           </CollapsibleContent>

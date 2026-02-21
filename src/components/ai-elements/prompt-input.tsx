@@ -14,6 +14,7 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -21,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Send, Square } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
-interface PromptInputMessage {
+export interface PromptInputMessage {
   /** The text content of the message. */
   text: string;
   /** File attachments (optional, for future use). */
@@ -256,21 +257,43 @@ export const PromptInputTextarea = forwardRef<
 });
 
 interface PromptInputSubmitProps extends ComponentProps<typeof Button> {
-  /** Loading state - shows spinner when true. */
+  /** Current status of the submit button. */
   status?: "ready" | "streaming" | "loading";
+  /** Callback when stop button is clicked during streaming. */
+  onStop?: () => void;
 }
 
 /**
  * Submit button for use inside PromptInput.
+ * Shows a stop button when streaming, a spinner when loading, and send button when ready.
  */
 export const PromptInputSubmit = forwardRef<
   HTMLButtonElement,
   PromptInputSubmitProps
 >(function PromptInputSubmit(
-  { status = "ready", children, disabled, className, ...props },
+  { status = "ready", onStop, children, disabled, className, ...props },
   ref
 ) {
-  const isStreamingOrLoading = status === "streaming" || status === "loading";
+  const isStreaming = status === "streaming";
+  const isLoading = status === "loading";
+
+  // Show stop button during streaming
+  if (isStreaming) {
+    return (
+      <Button
+        ref={ref}
+        type="button"
+        size="icon"
+        variant="destructive"
+        className={cn("h-9 w-9 shrink-0 rounded-lg", className)}
+        onClick={onStop}
+        title="Stop generating"
+        {...props}
+      >
+        <Square className="h-4 w-4" />
+      </Button>
+    );
+  }
 
   return (
     <Button
@@ -278,11 +301,11 @@ export const PromptInputSubmit = forwardRef<
       type="submit"
       size="icon"
       variant="default"
-      disabled={disabled || isStreamingOrLoading}
+      disabled={disabled || isLoading}
       className={cn("h-9 w-9 shrink-0 rounded-lg", className)}
       {...props}
     >
-      {isStreamingOrLoading ? (
+      {isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
         children || <Send className="h-4 w-4" />
@@ -317,25 +340,67 @@ export function PromptInputButton({ children, className, ...props }: ComponentPr
   );
 }
 
-// Action menu components (placeholder)
+// Action menu components
 export function PromptInputActionMenu({ children }: { children: React.ReactNode }) {
   return <div className="relative inline-block">{children}</div>;
 }
 
 export function PromptInputActionMenuTrigger({ children }: { children?: React.ReactNode }) {
   return (
-    <Button variant="ghost" size="sm">
+    <Button variant="ghost" size="sm" type="button">
       {children || "+"}
     </Button>
   );
 }
 
 export function PromptInputActionMenuContent({ children }: { children: React.ReactNode }) {
-  return <div className="absolute bottom-full mb-2 rounded-md border bg-popover p-1 shadow-md">{children}</div>;
+  return <div className="absolute bottom-full left-0 z-50 mb-2 rounded-md border bg-popover p-1 shadow-md">{children}</div>;
 }
 
-export function PromptInputActionAddAttachments() {
-  return <button type="button" className="rounded px-3 py-2 text-sm hover:bg-muted">Add attachments</button>;
+export function PromptInputActionAddAttachments({
+  onFilesSelected,
+  accept = "image/*,.pdf,.txt,.md",
+  multiple = true,
+}: {
+  onFilesSelected?: (files: File[]) => void;
+  accept?: string;
+  multiple?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleClick = () => {
+    inputRef.current?.click();
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0 && onFilesSelected) {
+      onFilesSelected(files);
+    }
+    // Reset input so same file can be selected again
+    e.target.value = "";
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="flex items-center gap-2 rounded px-3 py-2 text-sm hover:bg-muted"
+        onClick={handleClick}
+      >
+        <span>📎</span>
+        Add attachments
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        onChange={handleChange}
+        className="hidden"
+      />
+    </>
+  );
 }
 
 // Attachments hook

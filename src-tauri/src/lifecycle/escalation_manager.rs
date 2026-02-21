@@ -5,11 +5,11 @@
 //! - Tier 2: Fallback to alternative
 //! - Tier 3: User intervention
 
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use chrono::{DateTime, Utc};
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 
 use super::recovery_engine::RecoveryAction;
 use super::state_registry::StateRegistry;
@@ -211,7 +211,11 @@ impl EscalationManager {
         drop(states);
 
         // Get the policy for the current tier
-        let tier = if state.current_tier == 0 { 1 } else { state.current_tier };
+        let tier = if state.current_tier == 0 {
+            1
+        } else {
+            state.current_tier
+        };
         let policy = self.get_tier_policy(tier);
 
         // Check if we've exceeded attempts at this tier
@@ -229,7 +233,9 @@ impl EscalationManager {
 
         // Determine action based on tier policy
         match &policy.action {
-            TierAction::Retry => RecoveryAction::Retry { preserve_state: true },
+            TierAction::Retry => RecoveryAction::Retry {
+                preserve_state: true,
+            },
             TierAction::FallbackProvider | TierAction::FallbackChannel => {
                 RecoveryAction::Transfer {
                     to_type: None, // Handler will determine fallback
@@ -326,9 +332,7 @@ impl EscalationManager {
         if let Some(state) = states.get(resource_id) {
             if let Some(last) = state.last_attempt {
                 let policy = self.get_tier_policy(state.current_tier);
-                let elapsed = (Utc::now() - last)
-                    .to_std()
-                    .unwrap_or(Duration::ZERO);
+                let elapsed = (Utc::now() - last).to_std().unwrap_or(Duration::ZERO);
                 return elapsed < policy.cooldown;
             }
         }
@@ -367,7 +371,11 @@ impl EscalationManager {
         };
 
         let failure_context = match &resource.state {
-            ResourceState::Stuck { since, recovery_attempts, .. } => FailureContext {
+            ResourceState::Stuck {
+                since,
+                recovery_attempts,
+                ..
+            } => FailureContext {
                 error: "Resource stopped responding".to_string(),
                 recovery_attempts: *recovery_attempts,
                 running_duration_secs: (Utc::now() - *since).num_seconds() as u64,
@@ -406,9 +414,11 @@ impl EscalationManager {
             queue.insert(request.id.clone(), request.clone());
         }
 
-        let _ = self.event_sender.send(EscalationEvent::InterventionRequested {
-            request: request.clone(),
-        });
+        let _ = self
+            .event_sender
+            .send(EscalationEvent::InterventionRequested {
+                request: request.clone(),
+            });
 
         log::warn!(
             "EscalationManager: user intervention requested for {} (request_id={})",
@@ -434,10 +444,12 @@ impl EscalationManager {
         let mut queue = self.intervention_queue.write().await;
 
         if let Some(request) = queue.remove(request_id) {
-            let _ = self.event_sender.send(EscalationEvent::InterventionResolved {
-                request_id: request_id.to_string(),
-                resolution: resolution.clone(),
-            });
+            let _ = self
+                .event_sender
+                .send(EscalationEvent::InterventionResolved {
+                    request_id: request_id.to_string(),
+                    resolution: resolution.clone(),
+                });
 
             log::info!(
                 "EscalationManager: intervention {} resolved with option {}",
@@ -447,7 +459,9 @@ impl EscalationManager {
 
             Ok(())
         } else {
-            Err(EscalationError::InterventionNotFound(request_id.to_string()))
+            Err(EscalationError::InterventionNotFound(
+                request_id.to_string(),
+            ))
         }
     }
 
@@ -456,7 +470,10 @@ impl EscalationManager {
         let mut states = self.escalation_states.write().await;
         states.remove(resource_id);
 
-        log::debug!("EscalationManager: reset escalation state for {}", resource_id);
+        log::debug!(
+            "EscalationManager: reset escalation state for {}",
+            resource_id
+        );
     }
 
     /// Get the policy for a tier.
@@ -472,10 +489,7 @@ impl EscalationManager {
     /// Get the current tier for a resource.
     pub async fn get_current_tier(&self, resource_id: &str) -> u8 {
         let states = self.escalation_states.read().await;
-        states
-            .get(resource_id)
-            .map(|s| s.current_tier)
-            .unwrap_or(0)
+        states.get(resource_id).map(|s| s.current_tier).unwrap_or(0)
     }
 }
 
@@ -495,7 +509,7 @@ pub enum EscalationError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lifecycle::states::{ResourceId, ResourceType, ResourceConfig};
+    use crate::lifecycle::states::{ResourceConfig, ResourceId, ResourceType};
 
     #[tokio::test]
     async fn test_escalation_flow() {
@@ -571,7 +585,10 @@ mod tests {
             additional_data: None,
         };
 
-        manager.resolve_intervention(&request.id, resolution).await.unwrap();
+        manager
+            .resolve_intervention(&request.id, resolution)
+            .await
+            .unwrap();
 
         let pending = manager.get_pending_interventions().await;
         assert!(pending.is_empty());

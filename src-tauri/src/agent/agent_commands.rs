@@ -20,7 +20,7 @@ use crate::{
     config::app_identity::KEYCHAIN_SERVICE,
     database::{
         DbPool,
-        models::ai_provider::{AIModel, AIProvider},
+        models::ai_provider::AIProvider,
         schema::{ai_models, ai_providers},
     },
     event_bus::{AppEvent, EventBus},
@@ -44,18 +44,19 @@ pub type SessionCancelMap = Arc<Mutex<HashMap<String, Arc<std::sync::atomic::Ato
 /// Lookup order:
 /// 1. `settings.default_provider_id` → concrete provider row
 /// 2. First `is_active = 1` provider as fallback
-/// 3. Read API key from OS keyring using format `api_key:{provider_id}`
+/// 3. Model: `ai_models.is_active = 1` for provider, or fall back to `settings.default_model_id`
+/// 4. Read API key from OS keyring using format `api_key:{provider_id}`
 pub fn resolve_active_provider(pool: &DbPool) -> Result<Arc<dyn LLMProvider>, String> {
     let mut conn = pool.get().map_err(|e| format!("DB pool: {e}"))?;
 
-    // 1. Read the preferred provider id from settings (column is nullable).
+    // 1. Read the preferred provider id and default model from settings (columns are nullable).
     use crate::database::schema::settings as s;
-    let preferred_id: Option<String> = s::table
-        .select(s::default_provider_id)
-        .first::<Option<String>>(&mut conn)
+    let (preferred_id, default_model_id): (Option<String>, Option<String>) = s::table
+        .select((s::default_provider_id, s::default_model_id))
+        .first(&mut conn)
         .optional()
         .map_err(|e| format!("Failed to query settings: {e}"))?
-        .flatten();
+        .unwrap_or((None, None));
 
     // 2. Find the provider row.
     let provider: AIProvider = if let Some(ref pid) = preferred_id {
@@ -72,12 +73,32 @@ pub fn resolve_active_provider(pool: &DbPool) -> Result<Arc<dyn LLMProvider>, St
             })?
     };
 
-    // 3. Pick the first active model for this provider.
-    let model: AIModel = ai_models::table
+    // 3. Pick the first active model for this provider, or fall back to global default.
+    // First, try to find an active model for this provider in ai_models table.
+    let model_id: String = match ai_models::table
         .filter(ai_models::provider_id.eq(&provider.id))
         .filter(ai_models::is_active.eq(1))
-        .first::<AIModel>(&mut conn)
-        .map_err(|_| format!("No active model for provider '{}'.", provider.id))?;
+        .select(ai_models::model_id)
+        .first::<String>(&mut conn)
+    {
+        Ok(mid) => mid,
+        Err(_) => {
+            // No active model for this provider - try global default from settings
+            if let Some(ref default_mid) = default_model_id {
+                log::info!(
+                    "No active model for provider '{}', using global default model '{}'",
+                    provider.id,
+                    default_mid
+                );
+                default_mid.clone()
+            } else {
+                return Err(format!(
+                    "No active model for provider '{}'. Select a model in Settings → AI Provider.",
+                    provider.id
+                ));
+            }
+        }
+    };
 
     // 4. Retrieve API key from OS keyring.
     let api_key: String = if provider.requires_api_key == 0 {
@@ -96,7 +117,7 @@ pub fn resolve_active_provider(pool: &DbPool) -> Result<Arc<dyn LLMProvider>, St
     };
 
     // 5. Build the provider instance.
-    let cfg = OpenAICompatibleConfig::with_model(&api_key, &provider.base_url, &model.model_id);
+    let cfg = OpenAICompatibleConfig::with_model(&api_key, &provider.base_url, &model_id);
     let instance = OpenAICompatibleProvider::new(cfg, &provider.id)
         .map_err(|e| format!("Failed to create provider: {e}"))?;
 

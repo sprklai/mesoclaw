@@ -64,7 +64,7 @@ interface FieldSelectProps {
 function FieldSelect({ label, value, options, onChange }: FieldSelectProps) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </label>
       <select

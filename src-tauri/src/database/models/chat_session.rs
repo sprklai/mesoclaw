@@ -18,6 +18,7 @@ pub struct ChatSession {
     pub scope: String,
     pub channel: String,
     pub peer: String,
+    pub title: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     pub compaction_summary: Option<String>,
@@ -33,6 +34,7 @@ pub struct NewChatSession {
     pub scope: String,
     pub channel: String,
     pub peer: String,
+    pub title: Option<String>,
     pub compaction_summary: Option<String>,
 }
 
@@ -46,6 +48,7 @@ impl NewChatSession {
             scope: key.scope.clone(),
             channel: key.channel.clone(),
             peer: key.peer.clone(),
+            title: None,
             compaction_summary: None,
         }
     }
@@ -56,5 +59,6 @@ impl NewChatSession {
 #[diesel(table_name = chat_sessions)]
 pub struct ChatSessionUpdate {
     pub updated_at: String,
+    pub title: Option<String>,
     pub compaction_summary: Option<String>,
 }

@@ -166,10 +166,11 @@ pub type SharedPluginRegistry = Arc<PluginRegistry>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
     use crate::lifecycle::states::{
-        ResourceConfig, ResourceError, ResourceInstance, HealthStatus, PreservedState, FallbackOption,
+        FallbackOption, HealthStatus, PreservedState, ResourceConfig, ResourceError,
+        ResourceInstance,
     };
+    use async_trait::async_trait;
 
     // Mock handler for testing
     struct MockHandler {

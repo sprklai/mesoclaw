@@ -8,11 +8,11 @@ mod commands;
 pub mod config;
 pub mod database;
 pub mod event_bus;
-pub mod lifecycle;
 #[cfg(feature = "wasm-ext")]
 pub mod extensions;
 pub mod gateway;
 pub mod identity;
+pub mod lifecycle;
 pub mod memory;
 pub mod modules;
 mod plugins;

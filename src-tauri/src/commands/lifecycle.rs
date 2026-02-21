@@ -29,19 +29,29 @@ impl From<ResourceInstance> for ResourceStatus {
     fn from(instance: ResourceInstance) -> Self {
         let (state, progress, substate) = match &instance.state {
             ResourceState::Idle => ("idle".to_string(), None, None),
-            ResourceState::Running { substate, progress, .. } => {
-                ("running".to_string(), *progress, Some(substate.clone()))
-            }
-            ResourceState::Stuck { recovery_attempts, .. } => {
-                ("stuck".to_string(), None, Some(format!("recovery_attempts={}", recovery_attempts)))
-            }
-            ResourceState::Recovering { action, .. } => {
-                ("recovering".to_string(), None, Some(format!("{:?}", action)))
-            }
+            ResourceState::Running {
+                substate, progress, ..
+            } => ("running".to_string(), *progress, Some(substate.clone())),
+            ResourceState::Stuck {
+                recovery_attempts, ..
+            } => (
+                "stuck".to_string(),
+                None,
+                Some(format!("recovery_attempts={}", recovery_attempts)),
+            ),
+            ResourceState::Recovering { action, .. } => (
+                "recovering".to_string(),
+                None,
+                Some(format!("{:?}", action)),
+            ),
             ResourceState::Completed { .. } => ("completed".to_string(), None, None),
-            ResourceState::Failed { error, terminal, .. } => {
-                ("failed".to_string(), None, Some(format!("terminal={}, error={}", terminal, error)))
-            }
+            ResourceState::Failed {
+                error, terminal, ..
+            } => (
+                "failed".to_string(),
+                None,
+                Some(format!("terminal={}, error={}", terminal, error)),
+            ),
         };
 
         Self {
@@ -83,8 +93,7 @@ pub async fn get_resource_status_command(
     resource_id: String,
     supervisor: State<'_, Arc<LifecycleSupervisor>>,
 ) -> Result<ResourceStatus, String> {
-    let id = ResourceId::parse(&resource_id)
-        .map_err(|e| format!("Invalid resource ID: {}", e))?;
+    let id = ResourceId::parse(&resource_id).map_err(|e| format!("Invalid resource ID: {}", e))?;
 
     let instance = supervisor
         .get_resource(&id)
@@ -109,8 +118,7 @@ pub async fn retry_resource_command(
     resource_id: String,
     supervisor: State<'_, Arc<LifecycleSupervisor>>,
 ) -> Result<(), String> {
-    let id = ResourceId::parse(&resource_id)
-        .map_err(|e| format!("Invalid resource ID: {}", e))?;
+    let id = ResourceId::parse(&resource_id).map_err(|e| format!("Invalid resource ID: {}", e))?;
 
     supervisor
         .recover_resource(&id)
@@ -126,8 +134,7 @@ pub async fn stop_resource_command(
     resource_id: String,
     supervisor: State<'_, Arc<LifecycleSupervisor>>,
 ) -> Result<(), String> {
-    let id = ResourceId::parse(&resource_id)
-        .map_err(|e| format!("Invalid resource ID: {}", e))?;
+    let id = ResourceId::parse(&resource_id).map_err(|e| format!("Invalid resource ID: {}", e))?;
 
     supervisor
         .stop_resource(&id)
@@ -143,8 +150,7 @@ pub async fn kill_resource_command(
     resource_id: String,
     supervisor: State<'_, Arc<LifecycleSupervisor>>,
 ) -> Result<(), String> {
-    let id = ResourceId::parse(&resource_id)
-        .map_err(|e| format!("Invalid resource ID: {}", e))?;
+    let id = ResourceId::parse(&resource_id).map_err(|e| format!("Invalid resource ID: {}", e))?;
 
     supervisor
         .kill_resource(&id)
@@ -160,8 +166,7 @@ pub async fn record_resource_heartbeat_command(
     resource_id: String,
     supervisor: State<'_, Arc<LifecycleSupervisor>>,
 ) -> Result<(), String> {
-    let id = ResourceId::parse(&resource_id)
-        .map_err(|e| format!("Invalid resource ID: {}", e))?;
+    let id = ResourceId::parse(&resource_id).map_err(|e| format!("Invalid resource ID: {}", e))?;
 
     supervisor.record_heartbeat(&id).await;
     Ok(())
@@ -175,8 +180,7 @@ pub async fn update_resource_progress_command(
     substate: String,
     supervisor: State<'_, Arc<LifecycleSupervisor>>,
 ) -> Result<(), String> {
-    let id = ResourceId::parse(&resource_id)
-        .map_err(|e| format!("Invalid resource ID: {}", e))?;
+    let id = ResourceId::parse(&resource_id).map_err(|e| format!("Invalid resource ID: {}", e))?;
 
     if !supervisor.update_progress(&id, progress, substate).await {
         return Err(format!("Resource not found: {}", resource_id));
@@ -256,8 +260,7 @@ pub async fn get_resource_history_command(
     resource_id: String,
     supervisor: State<'_, Arc<LifecycleSupervisor>>,
 ) -> Result<Vec<crate::lifecycle::StateTransition>, String> {
-    let id = ResourceId::parse(&resource_id)
-        .map_err(|e| format!("Invalid resource ID: {}", e))?;
+    let id = ResourceId::parse(&resource_id).map_err(|e| format!("Invalid resource ID: {}", e))?;
 
     let history = supervisor.get_transition_history(&id).await;
     Ok(history)
@@ -273,9 +276,9 @@ fn parse_resource_type(s: &str) -> Result<ResourceType, String> {
         "subagent" => Ok(ResourceType::Subagent),
         "gateway_handler" | "gatewayhandler" | "gateway" => Ok(ResourceType::GatewayHandler),
         "memory_operation" | "memoryoperation" | "memory" => Ok(ResourceType::MemoryOperation),
-        other if other.starts_with("custom:") => {
-            Ok(ResourceType::Custom(other.strip_prefix("custom:").unwrap_or(other).to_string()))
-        }
+        other if other.starts_with("custom:") => Ok(ResourceType::Custom(
+            other.strip_prefix("custom:").unwrap_or(other).to_string(),
+        )),
         other => Err(format!("Unknown resource type: {}", other)),
     }
 }

@@ -191,7 +191,7 @@ function JobRow({ job }: { job: ScheduledJob }) {
       </td>
       <td className="py-2 px-3">
         {job.errorCount > 0 && (
-          <Badge variant="destructive" className="text-[10px]">
+          <Badge variant="destructive" className="text-xs">
             {job.errorCount} err
           </Badge>
         )}

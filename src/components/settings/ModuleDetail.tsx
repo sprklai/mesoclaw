@@ -103,11 +103,11 @@ export function ModuleDetail({ entry, className }: ModuleDetailProps) {
           {healthy === null ? (
             <span className="text-xs text-muted-foreground">Unknown</span>
           ) : healthy ? (
-            <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-700">
+            <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
               Healthy
             </Badge>
           ) : (
-            <Badge variant="destructive" className="text-[10px]">
+            <Badge variant="destructive" className="text-xs">
               Unhealthy
             </Badge>
           )}
@@ -119,7 +119,7 @@ export function ModuleDetail({ entry, className }: ModuleDetailProps) {
         <p className="text-xs font-semibold mb-2 uppercase tracking-wide text-muted-foreground">
           Module
         </p>
-        <Row label="Type" value={<Badge variant="outline" className="text-[10px]">{info.type}</Badge>} />
+        <Row label="Type" value={<Badge variant="outline" className="text-xs">{info.type}</Badge>} />
         <Row label="Version" value={info.version} />
       </div>
 
@@ -128,7 +128,7 @@ export function ModuleDetail({ entry, className }: ModuleDetailProps) {
         <p className="text-xs font-semibold mb-2 uppercase tracking-wide text-muted-foreground">
           Runtime
         </p>
-        <Row label="Runtime" value={<Badge variant="outline" className="text-[10px]">{runtime.type}</Badge>} />
+        <Row label="Runtime" value={<Badge variant="outline" className="text-xs">{runtime.type}</Badge>} />
         <Row label="Command" value={runtime.command} />
         {runtime.args.length > 0 && (
           <Row label="Args" value={runtime.args.join(" ")} />

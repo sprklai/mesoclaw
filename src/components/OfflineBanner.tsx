@@ -139,7 +139,7 @@ export function OfflineBanner({
               size="sm"
               variant="outline"
               onClick={onRetry}
-              className="h-7 px-2 text-xs"
+              className="text-xs"
               aria-label="Retry connection to database"
             >
               Retry Connection

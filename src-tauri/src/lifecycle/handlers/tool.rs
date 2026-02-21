@@ -6,8 +6,8 @@ use async_trait::async_trait;
 
 use crate::lifecycle::handlers::ResourceHandler;
 use crate::lifecycle::states::{
-    FallbackOption, HealthStatus, PreservedState, ResourceConfig, ResourceError,
-    ResourceId, ResourceInstance, ResourceType, ToolPreservedState,
+    FallbackOption, HealthStatus, PreservedState, ResourceConfig, ResourceError, ResourceId,
+    ResourceInstance, ResourceType, ToolPreservedState,
 };
 
 /// Valid substates for tool resources.

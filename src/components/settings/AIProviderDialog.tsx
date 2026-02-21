@@ -431,7 +431,7 @@ export function AIProviderDialog({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  className="text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => window.open("https://ollama.com", "_blank")}
                 >
                   <ExternalLink className="h-3 w-3 mr-1" />
@@ -472,7 +472,7 @@ export function AIProviderDialog({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  className="text-xs text-muted-foreground hover:text-foreground"
                   onClick={() =>
                     window.open("https://vercel.com/docs/ai-gateway", "_blank")
                   }
@@ -561,7 +561,7 @@ export function AIProviderDialog({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  className="text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     const url =
                       selectedProvider === "openai"
@@ -743,12 +743,12 @@ export function AIProviderDialog({
                         : "Connection failed"}
                     </div>
                     {testResult.error && (
-                      <div className="text-[10px] opacity-90 mt-0.5">
+                      <div className="text-xs opacity-90 mt-0.5">
                         {testResult.error}
                       </div>
                     )}
                     {testResult.latencyMs !== undefined && (
-                      <div className="text-[10px] opacity-75 mt-0.5">
+                      <div className="text-xs opacity-75 mt-0.5">
                         Latency: {testResult.latencyMs}ms
                       </div>
                     )}

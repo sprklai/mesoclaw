@@ -115,7 +115,7 @@ function EditorPane({ fileName }: EditorPaneProps) {
       <div className="flex items-center gap-2 shrink-0">
         <span className="font-mono text-xs font-semibold flex-1">{fileName}</span>
         {isDirty && (
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge variant="secondary" className="text-xs">
             unsaved
           </Badge>
         )}

@@ -55,6 +55,17 @@ export interface AgentSession {
   finalMessage: string | null;
 }
 
+/** Channel-triggered session info for the monitor UI. */
+export interface ChannelSession {
+  sessionId: string;
+  channel: string;      // e.g., "slack", "telegram"
+  from: string;         // user ID or chat ID
+  status: AgentSessionStatus;
+  startedAt: number;
+  completedAt: number | null;
+  finalMessage: string | null;
+}
+
 // ─── AppEvent payloads (mirrors Rust AppEvent enum) ───────────────────────────
 
 interface AgentToolStartPayload {
@@ -76,6 +87,11 @@ interface AgentCompletePayload {
   message: string;
 }
 
+interface AgentStartedPayload {
+  type: "agent_started";
+  session_id: string;
+}
+
 interface ApprovalNeededPayload {
   type: "approval_needed";
   action_id: string;
@@ -88,6 +104,7 @@ type AppEventPayload =
   | AgentToolStartPayload
   | AgentToolResultPayload
   | AgentCompletePayload
+  | AgentStartedPayload
   | ApprovalNeededPayload
   | { type: string };
 
@@ -99,6 +116,8 @@ interface AgentState {
   session: AgentSession | null;
   executions: ToolExecution[];
   approvalQueue: ApprovalRequest[];
+  /** Active channel-triggered sessions (Slack, Telegram, etc.) */
+  channelSessions: ChannelSession[];
 
   /** Unlisten function returned by `listen()`. */
   _unlisten: (() => void) | null;
@@ -138,12 +157,17 @@ interface AgentState {
   ) => Promise<void>;
 
   clearSession: () => void;
+  /** Clear completed channel sessions. */
+  clearCompletedChannelSessions: () => void;
+  /** Cancel a specific channel session. */
+  cancelChannelSession: (sessionId: string) => Promise<void>;
 }
 
 export const useAgentStore = create<AgentState>((set, get) => ({
   session: null,
   executions: [],
   approvalQueue: [],
+  channelSessions: [],
   _unlisten: null,
 
   startListening: async () => {
@@ -213,7 +237,43 @@ export const useAgentStore = create<AgentState>((set, get) => ({
                   completedAt: Date.now(),
                   finalMessage: p.message,
                 },
+            // Also update channel sessions if this is a channel session
+            channelSessions: s.channelSessions.map((cs) =>
+              cs.sessionId === p.session_id
+                ? {
+                    ...cs,
+                    status: "complete",
+                    completedAt: Date.now(),
+                    finalMessage: p.message,
+                  }
+                : cs
+            ),
           }));
+          break;
+        }
+
+        case "agent_started": {
+          const p = payload as AgentStartedPayload;
+          // Check if this is a channel-triggered session (format: channel:dm:{channel}:{from})
+          const channelMatch = p.session_id.match(/^channel:dm:(.+?):(.+)$/);
+          if (channelMatch) {
+            const [, channel, from] = channelMatch;
+            const newSession: ChannelSession = {
+              sessionId: p.session_id,
+              channel,
+              from,
+              status: "running",
+              startedAt: Date.now(),
+              completedAt: null,
+              finalMessage: null,
+            };
+            set((s) => ({
+              channelSessions: [
+                newSession,
+                ...s.channelSessions.filter((cs) => cs.sessionId !== p.session_id),
+              ].slice(0, 20), // Keep last 20
+            }));
+          }
           break;
         }
 
@@ -334,5 +394,26 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   clearSession: () => {
     set({ session: null, executions: [], approvalQueue: [] });
+  },
+
+  clearCompletedChannelSessions: () => {
+    set((s) => ({
+      channelSessions: s.channelSessions.filter((cs) => cs.status !== "complete"),
+    }));
+  },
+
+  cancelChannelSession: async (sessionId: string) => {
+    try {
+      await invoke("cancel_agent_command", { sessionId });
+    } catch {
+      // Best-effort; the backend may already have stopped.
+    }
+    set((s) => ({
+      channelSessions: s.channelSessions.map((cs) =>
+        cs.sessionId === sessionId
+          ? { ...cs, status: "complete" as AgentSessionStatus, completedAt: Date.now() }
+          : cs
+      ),
+    }));
   },
 }));

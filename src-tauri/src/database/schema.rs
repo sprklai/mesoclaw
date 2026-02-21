@@ -92,6 +92,7 @@ diesel::table! {
         scope -> Text,
         channel -> Text,
         peer -> Text,
+        title -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
         compaction_summary -> Nullable<Text>,

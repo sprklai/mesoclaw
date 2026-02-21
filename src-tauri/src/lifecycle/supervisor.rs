@@ -3,14 +3,14 @@
 //! The supervisor orchestrates all lifecycle components: health monitoring,
 //! state tracking, recovery, and escalation.
 
+use chrono::Utc;
 use serde::Serialize;
 use std::sync::Arc;
 use std::time::Duration;
-use chrono::Utc;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 use tokio::task::JoinHandle;
 
-use super::escalation_manager::{EscalationConfig, EscalationManager, EscalationError};
+use super::escalation_manager::{EscalationConfig, EscalationError, EscalationManager};
 use super::event_bus::LifecycleEvent;
 use super::handlers::ResourceHandler;
 use super::health_monitor::HealthMonitor;
@@ -206,7 +206,10 @@ impl LifecycleSupervisor {
     }
 
     /// Get all resources of a type.
-    pub async fn get_resources_by_type(&self, resource_type: ResourceType) -> Vec<ResourceInstance> {
+    pub async fn get_resources_by_type(
+        &self,
+        resource_type: ResourceType,
+    ) -> Vec<ResourceInstance> {
         self.state_registry.get_by_type(&resource_type).await
     }
 
@@ -267,7 +270,10 @@ impl LifecycleSupervisor {
     }
 
     /// Manually trigger recovery for a resource.
-    pub async fn recover_resource(&self, resource_id: &ResourceId) -> Result<RecoveryResult, ResourceError> {
+    pub async fn recover_resource(
+        &self,
+        resource_id: &ResourceId,
+    ) -> Result<RecoveryResult, ResourceError> {
         let instance = self
             .state_registry
             .get(resource_id)
@@ -278,7 +284,9 @@ impl LifecycleSupervisor {
         let action = self.escalation_manager.determine_action(&instance).await;
 
         // Record the attempt
-        self.escalation_manager.record_attempt(&resource_id.to_string()).await;
+        self.escalation_manager
+            .record_attempt(&resource_id.to_string())
+            .await;
 
         // Update state to recovering
         let action_type = match &action {
@@ -309,21 +317,31 @@ impl LifecycleSupervisor {
 
         match &result {
             Ok(RecoveryResult::Recovered { resource_id }) => {
-                let tier = self.escalation_manager.get_current_tier(&resource_id.to_string()).await;
+                let tier = self
+                    .escalation_manager
+                    .get_current_tier(&resource_id.to_string())
+                    .await;
                 let _ = self.event_bus.publish(LifecycleEvent::ResourceRecovered {
                     resource_id: resource_id.clone(),
                     tier,
                 });
-                self.escalation_manager.reset(&resource_id.to_string()).await;
+                self.escalation_manager
+                    .reset(&resource_id.to_string())
+                    .await;
             }
             Ok(RecoveryResult::Transferred { from_id, to_id }) => {
-                let _ = self.event_bus.publish(LifecycleEvent::ResourceTransferring {
-                    from_id: from_id.clone(),
-                    to_id: to_id.clone(),
-                });
+                let _ = self
+                    .event_bus
+                    .publish(LifecycleEvent::ResourceTransferring {
+                        from_id: from_id.clone(),
+                        to_id: to_id.clone(),
+                    });
             }
             Ok(RecoveryResult::Escalated { tier }) => {
-                self.escalation_manager.escalate(&resource_id.to_string()).await.ok();
+                self.escalation_manager
+                    .escalate(&resource_id.to_string())
+                    .await
+                    .ok();
             }
             Ok(RecoveryResult::Failed { reason }) => {
                 let _ = self.event_bus.publish(LifecycleEvent::ResourceFailed {
@@ -423,10 +441,12 @@ impl LifecycleSupervisor {
             .await
             .map_err(|e| ResourceError::Internal(e.to_string()))?;
 
-        let _ = self.event_bus.publish(LifecycleEvent::UserInterventionResolved {
-            request_id: request_id.to_string(),
-            selected_option: resolution.selected_option,
-        });
+        let _ = self
+            .event_bus
+            .publish(LifecycleEvent::UserInterventionResolved {
+                request_id: request_id.to_string(),
+                selected_option: resolution.selected_option,
+            });
 
         Ok(())
     }
@@ -502,7 +522,11 @@ impl LifecycleSupervisor {
                         // Check if we can auto-recover
                         if supervisor.escalation_manager.can_escalate(&instance).await {
                             // Attempt automatic recovery
-                            if !supervisor.escalation_manager.is_cooldown_active(&resource_id.to_string()).await {
+                            if !supervisor
+                                .escalation_manager
+                                .is_cooldown_active(&resource_id.to_string())
+                                .await
+                            {
                                 let _ = supervisor.recover_resource(&resource_id).await;
                             }
                         } else {
@@ -512,19 +536,21 @@ impl LifecycleSupervisor {
                                 .create_intervention_request(&instance)
                                 .await;
 
-                            let _ = supervisor.event_bus.publish(
-                                LifecycleEvent::UserInterventionNeeded { request },
-                            );
+                            let _ = supervisor
+                                .event_bus
+                                .publish(LifecycleEvent::UserInterventionNeeded { request });
                         }
                     }
                 }
 
                 // Get stats
                 let stats = supervisor.health_monitor.get_stats().await;
-                let _ = supervisor.event_bus.publish(LifecycleEvent::HealthCheckCompleted {
-                    total_checked: stats.total_tracked,
-                    stuck_found: stats.stuck,
-                });
+                let _ = supervisor
+                    .event_bus
+                    .publish(LifecycleEvent::HealthCheckCompleted {
+                        total_checked: stats.total_tracked,
+                        stuck_found: stats.stuck,
+                    });
             }
         });
 

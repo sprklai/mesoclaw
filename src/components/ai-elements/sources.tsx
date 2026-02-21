@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { CollapsibleHeaderTrigger } from "@/components/ui/collapsible-trigger";
 
 export function Sources({ children }: { children: ReactNode }) {
   return <div className="mb-2">{children}</div>;
@@ -9,15 +10,15 @@ export function Sources({ children }: { children: ReactNode }) {
 
 export function SourcesTrigger({ count }: { count: number }) {
   const [isOpen, setIsOpen] = useState(false);
+  const title = `${count} source${count !== 1 ? "s" : ""}`;
 
   return (
-    <button
-      type="button"
-      onClick={() => setIsOpen(!isOpen)}
+    <CollapsibleHeaderTrigger
+      isOpen={isOpen}
+      onToggle={() => setIsOpen(!isOpen)}
+      title={title}
       className="text-xs text-muted-foreground hover:text-foreground"
-    >
-      {count} source{count !== 1 ? "s" : ""}
-    </button>
+    />
   );
 }
 

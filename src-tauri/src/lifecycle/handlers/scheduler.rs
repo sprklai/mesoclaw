@@ -6,8 +6,8 @@ use async_trait::async_trait;
 
 use crate::lifecycle::handlers::ResourceHandler;
 use crate::lifecycle::states::{
-    FallbackOption, HealthStatus, PreservedState, ResourceConfig, ResourceError,
-    ResourceId, ResourceInstance, ResourceType, SchedulerPreservedState,
+    FallbackOption, HealthStatus, PreservedState, ResourceConfig, ResourceError, ResourceId,
+    ResourceInstance, ResourceType, SchedulerPreservedState,
 };
 
 /// Valid substates for scheduler job resources.
@@ -162,7 +162,10 @@ mod tests {
         };
 
         let instance = handler
-            .start(ResourceId::new(ResourceType::SchedulerJob, "heartbeat:1"), config)
+            .start(
+                ResourceId::new(ResourceType::SchedulerJob, "heartbeat:1"),
+                config,
+            )
             .await
             .unwrap();
 

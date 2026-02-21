@@ -135,6 +135,34 @@ pub fn save_message_command(
         .execute(&mut conn)
         .map_err(|e| e.to_string())?;
 
+    // Check if this is the first user message to set the session title
+    if request.role == "user" {
+        // Check if session already has a title
+        let session: Option<ChatSession> = chat_sessions::table
+            .find(&request.session_id)
+            .select(ChatSession::as_select())
+            .first(&mut conn)
+            .optional()
+            .map_err(|e| e.to_string())?;
+
+        if let Some(session) = session {
+            if session.title.is_none() {
+                // Generate a brief title from the first message (max 50 chars)
+                let title = generate_session_title(&request.content);
+                diesel::update(
+                    chat_sessions::table.filter(chat_sessions::id.eq(&request.session_id)),
+                )
+                .set(chat_sessions::title.eq(Some(&title)))
+                .execute(&mut conn)
+                .map_err(|e| e.to_string())?;
+                debug!(
+                    "[chat_sessions] set title '{}' for session {}",
+                    title, request.session_id
+                );
+            }
+        }
+    }
+
     // Update session updated_at timestamp
     diesel::update(chat_sessions::table.filter(chat_sessions::id.eq(&new_message.session_id)))
         .set(chat_sessions::updated_at.eq(&created_at))
@@ -146,6 +174,23 @@ pub fn save_message_command(
         .select(ChatMessage::as_select())
         .first(&mut conn)
         .map_err(|e| e.to_string())
+}
+
+/// Generate a brief title from message content.
+/// Takes the first line or first 50 characters, whichever is shorter.
+fn generate_session_title(content: &str) -> String {
+    // Get first line
+    let first_line = content.lines().next().unwrap_or(content);
+
+    // Remove any leading/trailing whitespace
+    let trimmed = first_line.trim();
+
+    // Truncate to max 50 chars, adding ellipsis if needed
+    if trimmed.len() > 50 {
+        format!("{}...", &trimmed[..47])
+    } else {
+        trimmed.to_string()
+    }
 }
 
 /// Clear all messages from a session.

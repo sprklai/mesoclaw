@@ -1,31 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
-import { CheckIcon, Sparkles } from "lucide-react";
+import { CheckIcon, MessageSquare, Plus, Sparkles, Trash2 } from "lucide-react";
+import type { ToolUIPart } from "ai";
 
-import { useChatSessionStore } from "@/stores/chatSessionStore";
+import { useChatSessionStore, type ChatSession } from "@/stores/chatSessionStore";
+import { useLLMStore } from "@/stores/llm";
 import { tryExecuteCommand } from "@/lib/chatCommands";
 import {
   Conversation,
   ConversationContent,
   ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
   Message,
+  MessageBranch,
+  MessageBranchContent,
+  MessageBranchNext,
+  MessageBranchPage,
+  MessageBranchPrevious,
+  MessageBranchSelector,
   MessageContent,
   MessageResponse,
-  PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
-  PromptInputTextarea,
-  PromptInputSubmit,
-  PromptInputTools,
-  PromptInputButton,
-  Suggestions,
-  Suggestion,
-} from "@/components/ai-elements";
+} from "@/components/ai-elements/message";
 import {
   ModelSelector,
   ModelSelectorContent,
@@ -39,18 +39,56 @@ import {
   ModelSelectorName,
   ModelSelectorTrigger,
 } from "@/components/ai-elements/model-selector";
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputButton,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+} from "@/components/ai-elements/prompt-input";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
+import {
+  Source,
+  Sources,
+  SourcesContent,
+  SourcesTrigger,
+} from "@/components/ai-elements/sources";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { APP_IDENTITY } from "@/config/app-identity";
 import { useSettings } from "@/stores/settings";
 import { useContextPanelStore } from "@/stores/contextPanelStore";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/chat")({
   component: ChatPage,
 });
 
 interface MessageType {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
+  key: string;
+  from: "user" | "assistant";
+  sources?: { href: string; title: string }[];
+  versions: {
+    id: string;
+    content: string;
+  }[];
+  reasoning?: {
+    content: string;
+    duration: number;
+  };
+  tools?: {
+    name: string;
+    description: string;
+    status: ToolUIPart["state"];
+    parameters: Record<string, unknown>;
+    result: string | undefined;
+    error: string | undefined;
+  }[];
   isStreaming?: boolean;
 }
 
@@ -82,45 +120,138 @@ interface ProviderWithModels {
 }
 
 const suggestions = [
-  "Explain how to build a desktop app with Tauri",
-  "What are the benefits of using React 19?",
-  "How does TypeScript improve code quality?",
-  "Best practices for state management in React",
-  "Explain the concept of hooks in React",
+  "What are the latest trends in AI?",
+  "How does machine learning work?",
+  "Explain quantum computing",
+  "Best practices for React development",
+  "Tell me about TypeScript benefits",
+  "How to optimize database queries?",
+  "What is the difference between SQL and NoSQL?",
+  "Explain cloud computing basics",
 ];
 
+// Suggestion Item component
+const SuggestionItem = ({
+  suggestion,
+  onClick,
+}: {
+  suggestion: string;
+  onClick: (suggestion: string) => void;
+}) => {
+  const handleClick = useCallback(() => {
+    onClick(suggestion);
+  }, [onClick, suggestion]);
+
+  return <Suggestion onClick={handleClick} suggestion={suggestion} />;
+};
+
+// Model Item component
+const ModelItem = ({
+  m,
+  isSelected,
+  onSelect,
+}: {
+  m: AvailableModel;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+}) => {
+  const handleSelect = useCallback(() => {
+    onSelect(m.id);
+  }, [onSelect, m.id]);
+
+  return (
+    <ModelSelectorItem onSelect={handleSelect} value={m.id}>
+      <ModelSelectorLogo provider={m.providerId} />
+      <ModelSelectorName>{m.name}</ModelSelectorName>
+      {isSelected ? (
+        <CheckIcon className="ml-auto size-4" />
+      ) : (
+        <div className="ml-auto size-4" />
+      )}
+    </ModelSelectorItem>
+  );
+};
+
+// Chat Context Panel Component
 function ChatContextPanel({
   messages,
   selectedModelData,
   isStreaming,
   onClear,
+  onModelClick,
+  sessions,
+  activeSessionId,
+  onNewChat,
+  onSelectSession,
+  onDeleteSession,
 }: {
   messages: MessageType[];
   selectedModelData: AvailableModel;
   isStreaming: boolean;
   onClear: () => void;
+  onModelClick: () => void;
+  sessions: ChatSession[];
+  activeSessionId: string | null;
+  onNewChat: () => void;
+  onSelectSession: (sessionId: string) => void;
+  onDeleteSession: (sessionId: string) => void;
 }) {
-  const userCount = messages.filter((m) => m.role === "user").length;
-  const assistantCount = messages.filter((m) => m.role === "assistant").length;
+  const userCount = messages.filter((m) => m.from === "user").length;
+  const assistantCount = messages.filter((m) => m.from === "assistant").length;
+
+  const formatSessionTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getSessionModel = (sessionKey: string) => {
+    const parts = sessionKey.split(":");
+    if (parts.length >= 2) {
+      return parts.slice(1).join(":");
+    }
+    return sessionKey;
+  };
 
   return (
-    <div className="space-y-4 p-4">
-      <div>
+    <div className="flex h-full flex-col">
+      {/* Active Model Section */}
+      <div className="p-4">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Active Model
         </p>
-        <div className="flex items-center gap-2">
-          <ModelSelectorLogo provider={selectedModelData.providerId} />
-          <div>
-            <p className="text-sm font-medium">{selectedModelData.name}</p>
-            <p className="text-xs text-muted-foreground">{selectedModelData.provider}</p>
+        <button
+          type="button"
+          onClick={onModelClick}
+          className="w-full rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/50"
+        >
+          <div className="flex items-center gap-2">
+            <ModelSelectorLogo provider={selectedModelData.providerId} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{selectedModelData.name}</p>
+              <p className="truncate text-xs text-muted-foreground">{selectedModelData.provider}</p>
+            </div>
+            <span className="text-xs text-muted-foreground">Change</span>
           </div>
-        </div>
+        </button>
       </div>
 
-      <div>
+      {/* Divider */}
+      <div className="mx-4 border-t border-border" />
+
+      {/* Current Session Stats */}
+      <div className="px-4 pb-4">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Session
+          Current Session
         </p>
         <div className="space-y-1 text-sm">
           <div className="flex justify-between">
@@ -134,28 +265,114 @@ function ChatContextPanel({
         </div>
       </div>
 
+      {/* Divider */}
+      <div className="mx-4 border-t border-border" />
+
       {isStreaming && (
-        <div className="flex items-center gap-2 text-xs text-primary">
+        <div className="flex items-center gap-2 px-4 pb-4 text-xs text-primary">
           <span className="size-2 animate-pulse rounded-full bg-primary" />
-          Streaming…
+          Streaming...
         </div>
       )}
 
+      {/* Divider */}
+      <div className="mx-4 border-t border-border" />
+
+      {/* Clear Conversation Button */}
       {messages.length > 0 && (
-        <button
-          type="button"
-          onClick={onClear}
-          className="w-full rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
-        >
-          Clear conversation
-        </button>
+        <div className="p-4 pb-2">
+          <button
+            type="button"
+            onClick={onClear}
+            className="w-full rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+          >
+            Clear conversation
+          </button>
+        </div>
       )}
+
+      {/* Divider */}
+      <div className="mx-4 border-t border-border" />
+
+      {/* Session History Section */}
+      <div className="flex-1 overflow-hidden">
+        <div className="flex items-center justify-between p-4 pb-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Chat History
+          </p>
+          <button
+            type="button"
+            onClick={onNewChat}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary transition-colors hover:bg-primary/10"
+          >
+            <Plus className="size-3" />
+            New
+          </button>
+        </div>
+
+        <div className="max-h-[200px] overflow-y-auto px-2">
+          {sessions.length === 0 ? (
+            <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+              No previous conversations
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {sessions.slice(0, 10).map((session) => (
+                <div
+                  key={session.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onSelectSession(session.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      onSelectSession(session.id);
+                    }
+                  }}
+                  className={cn(
+                    "group flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors",
+                    activeSessionId === session.id
+                      ? "bg-primary/10 text-primary"
+                      : "hover:bg-accent text-foreground"
+                  )}
+                >
+                  <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">
+                      {session.title || getSessionModel(session.sessionKey)}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {formatSessionTime(session.updatedAt)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSession(session.id);
+                    }}
+                    className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
+                    aria-label="Delete session"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="mx-4 border-t border-border" />
     </div>
   );
 }
 
 function ChatPage() {
   const settings = useSettings((state) => state.settings);
+
+  // LLM store for global model sync
+  const { saveProviderConfig, config: llmConfig } = useLLMStore();
 
   // Session store integration
   const {
@@ -167,11 +384,18 @@ function ChatPage() {
     loadSession,
     saveMessage,
     clearMessages,
+    deleteSession,
+    // Persisted UI state
+    isStreaming: storeIsStreaming,
+    currentInput: storeCurrentInput,
+    setStreaming,
+    setCurrentInput,
   } = useChatSessionStore();
 
   const [messages, setMessages] = useState<MessageType[]>([]);
-  const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
+  const input = storeCurrentInput;
+  const setInput = setCurrentInput;
+  const isStreaming = storeIsStreaming;
   const [sessionId, setSessionId] = useState(() => nanoid());
   const [apiKey, setApiKey] = useState("");
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
@@ -180,8 +404,13 @@ function ChatPage() {
   const sessionInitialized = useRef(false);
   // Track saved message count to avoid re-saving
   const savedMessageCount = useRef(0);
-  // Track streaming session ID for event listener
-  const streamingSessionRef = useRef(sessionId);
+
+  // Sync sessionId with activeSessionId when it changes
+  useEffect(() => {
+    if (activeSessionId && activeSessionId !== sessionId) {
+      setSessionId(activeSessionId);
+    }
+  }, [activeSessionId, sessionId]);
 
   // Available models
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
@@ -194,7 +423,6 @@ function ChatPage() {
     providerId: string;
     modelId: string;
   }>(() => {
-    // Initialize from settings
     if (settings?.llmModel) {
       const parts = settings.llmModel.split("/");
       return {
@@ -210,12 +438,9 @@ function ChatPage() {
     async function loadModels() {
       try {
         const loadedProviders = await invoke<ProviderWithModels[]>("list_ai_providers_command");
-        console.log("Loaded providers:", loadedProviders);
 
-        // Store providers for requiresApiKey checks
         setProviders(loadedProviders);
 
-        // Transform providers into flat model list
         const models: AvailableModel[] = [];
         for (const provider of loadedProviders) {
           for (const model of provider.models) {
@@ -229,18 +454,14 @@ function ChatPage() {
           }
         }
 
-        console.log("Transformed models:", models);
         setAvailableModels(models);
 
-        // If no models found, show a message
         if (models.length === 0) {
-          console.warn("No models configured in providers");
           toast.error("No AI models configured", {
-            description: "Please add models to your providers in Settings → AI Providers",
+            description: "Please add models to your providers in Settings - AI Providers",
           });
         }
       } catch (error) {
-        console.error("Failed to load models:", error);
         toast.error("Failed to load AI models", {
           description: error instanceof Error ? error.message : String(error),
         });
@@ -260,19 +481,20 @@ function ChatPage() {
     sessionInitialized.current = true;
 
     async function initSession() {
-      // If sessions exist but none is active, load the most recent one
-      if (sessions.length > 0 && !activeSessionId) {
+      if (sessions && sessions.length > 0 && !activeSessionId) {
         const lastSession = sessions[0];
         await loadSession(lastSession.id);
         setSessionId(lastSession.id);
 
-        // Load messages from the session
         const sessionMessages = useChatSessionStore.getState().messages.get(lastSession.id);
         if (sessionMessages) {
           setMessages(sessionMessages.map((m) => ({
-            id: m.id,
-            role: m.role as "user" | "assistant",
-            content: m.content,
+            key: m.id,
+            from: m.role as "user" | "assistant",
+            versions: [{
+              id: m.id,
+              content: m.content,
+            }],
             isStreaming: false,
           })));
           savedMessageCount.current = sessionMessages.length;
@@ -282,56 +504,82 @@ function ChatPage() {
     initSession();
   }, [sessions, activeSessionId, isLoadingSessions, loadSession]);
 
-  // Auto-save messages with debounce
+  // Auto-save messages with debounce and automatic memory capture
   useEffect(() => {
     if (messages.length === 0 || !activeSessionId || isStreaming) return;
 
-    // Only save if there are new messages to save
     if (messages.length <= savedMessageCount.current) return;
 
     const timeout = setTimeout(async () => {
-      // Find messages that haven't been saved yet
-      const newMessages = messages.slice(savedMessageCount.current);
+      const previousCount = savedMessageCount.current;
+      const newMessages = messages.slice(previousCount);
       for (const msg of newMessages) {
-        // Skip streaming messages
         if (!msg.isStreaming) {
-          await saveMessage(msg.role, msg.content);
+          const content = msg.versions[0]?.content || "";
+          await saveMessage(msg.from, content);
+
+          if (msg.from === "assistant" && content.length > 50) {
+            try {
+              const memoryKey = `chat:${activeSessionId}:${msg.key}`;
+              await invoke("store_memory_command", {
+                key: memoryKey,
+                content: content,
+                category: "conversation",
+              });
+            } catch {
+              // Non-blocking - memory storage failure shouldn't affect chat
+            }
+          }
         }
       }
       savedMessageCount.current = messages.length;
+
+      // Reload sessions to get updated title (generated on first message save)
+      if (previousCount === 0 && messages.length > 0) {
+        loadSessions();
+      }
     }, 1000);
 
     return () => clearTimeout(timeout);
-  }, [messages, activeSessionId, isStreaming, saveMessage]);
+  }, [messages, activeSessionId, isStreaming, saveMessage, loadSessions]);
 
-  // Update selected model when settings change
+  // Update selected model when settings or LLMStore config changes
   useEffect(() => {
-    if (settings?.llmModel) {
+    if (llmConfig?.providerId && llmConfig?.modelId) {
+      setSelectedModel({
+        providerId: llmConfig.providerId,
+        modelId: llmConfig.modelId,
+      });
+    } else if (settings?.llmModel) {
       const parts = settings.llmModel.split("/");
       setSelectedModel({
         providerId: parts[0] || "openai",
         modelId: parts.length >= 2 ? parts.slice(1).join("/") : "gpt-4o",
       });
     }
-  }, [settings?.llmModel]);
+  }, [llmConfig, settings?.llmModel]);
 
-  // Load API key from Stronghold when provider changes
+  // Load API key from keychain when provider changes
   useEffect(() => {
     async function loadApiKey() {
+      const provider = providers.find((p) => p.id === selectedModel.providerId);
+      if (!provider?.requiresApiKey) {
+        setApiKey("");
+        return;
+      }
+
       try {
         const key = await invoke<string>("keychain_get", {
           service: APP_IDENTITY.keychainService,
           key: `api_key:${selectedModel.providerId}`,
         });
         setApiKey(key || "");
-        console.log("API key loaded for provider:", selectedModel.providerId);
-      } catch (error) {
-        console.warn("No API key found for provider:", selectedModel.providerId);
+      } catch {
         setApiKey("");
       }
     }
     loadApiKey();
-  }, [selectedModel.providerId]);
+  }, [selectedModel.providerId, providers]);
 
   // Get selected model data
   const selectedModelData = useMemo(() => {
@@ -345,6 +593,65 @@ function ChatPage() {
     };
   }, [selectedModel, availableModels]);
 
+  // Handlers for session management
+  const handleNewChat = useCallback(async () => {
+    try {
+      setMessages([]);
+      savedMessageCount.current = 0;
+
+      const newSessionId = await createSession(selectedModel.providerId, selectedModel.modelId);
+      setSessionId(newSessionId);
+
+      toast.success("New chat started");
+    } catch (error) {
+      toast.error("Failed to start new chat");
+    }
+  }, [createSession, selectedModel.providerId, selectedModel.modelId]);
+
+  const handleSelectSession = useCallback(async (sessionId: string) => {
+    if (sessionId === activeSessionId) return;
+
+    try {
+      await loadSession(sessionId);
+      setSessionId(sessionId);
+
+      const sessionMessages = useChatSessionStore.getState().messages.get(sessionId);
+      if (sessionMessages) {
+        setMessages(sessionMessages.map((m) => ({
+          key: m.id,
+          from: m.role as "user" | "assistant",
+          versions: [{
+            id: m.id,
+            content: m.content,
+          }],
+          isStreaming: false,
+        })));
+        savedMessageCount.current = sessionMessages.length;
+      } else {
+        setMessages([]);
+        savedMessageCount.current = 0;
+      }
+    } catch {
+      toast.error("Failed to load conversation");
+    }
+  }, [activeSessionId, loadSession]);
+
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    try {
+      await deleteSession(sessionId);
+
+      if (sessionId === activeSessionId) {
+        setMessages([]);
+        savedMessageCount.current = 0;
+        setSessionId(nanoid());
+      }
+
+      toast.success("Conversation deleted");
+    } catch {
+      toast.error("Failed to delete conversation");
+    }
+  }, [activeSessionId, deleteSession]);
+
   // Inject context panel content
   useEffect(() => {
     useContextPanelStore.getState().setContent(
@@ -357,28 +664,40 @@ function ChatPage() {
           savedMessageCount.current = 0;
           clearMessages();
         }}
+        onModelClick={() => setModelSelectorOpen(true)}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onNewChat={handleNewChat}
+        onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
       />,
     );
     return () => useContextPanelStore.getState().clearContent();
-  }, [messages, selectedModelData, isStreaming, clearMessages]);
+  }, [messages, selectedModelData, isStreaming, clearMessages, sessions, activeSessionId, handleNewChat, handleSelectSession, handleDeleteSession]);
 
-  const handleModelSelect = useCallback((modelId: string) => {
+  const handleModelSelect = useCallback(async (modelId: string) => {
     const parts = modelId.split("/");
     if (parts.length >= 2) {
+      const providerId = parts[0];
+      const newModelId = parts.slice(1).join("/");
       setSelectedModel({
-        providerId: parts[0],
-        modelId: parts.slice(1).join("/"),
+        providerId,
+        modelId: newModelId,
       });
       setModelSelectorOpen(false);
-      toast.success(`Switched to ${parts.slice(1).join("/")}`);
+      try {
+        await saveProviderConfig(providerId, newModelId);
+        toast.success(`Switched to ${newModelId}`);
+      } catch {
+        toast.error("Failed to save model selection");
+      }
     }
-  }, []);
+  }, [saveProviderConfig]);
 
   const handleSubmit = useCallback(
-    async (message: { text?: string }) => {
+    async (message: { text?: string; files?: File[] }) => {
       const text = message.text?.trim();
       if (!text) {
-        console.log("Empty message, skipping");
         return;
       }
 
@@ -388,50 +707,52 @@ function ChatPage() {
         return;
       }
 
-      console.log("Submitting message:", text);
-      console.log("Selected model:", selectedModel);
-      console.log("API key available:", !!apiKey);
-
       // Check if provider requires API key
       const provider = providers.find((p) => p.id === selectedModel.providerId);
       if (provider?.requiresApiKey && !apiKey) {
         toast.error(`No API key found for ${selectedModel.providerId}`, {
-          description: "Please add an API key in Settings → AI Providers",
+          description: "Please add an API key in Settings - AI Providers",
         });
         return;
       }
 
       // Create session if one doesn't exist
-      let currentSessionId = activeSessionId;
-      if (!currentSessionId) {
+      let currentSessionId = activeSessionId || sessionId;
+      if (!activeSessionId) {
         try {
           currentSessionId = await createSession(selectedModel.providerId, selectedModel.modelId);
           setSessionId(currentSessionId);
-          streamingSessionRef.current = currentSessionId;
-          console.log("Created new session:", currentSessionId);
-        } catch (error) {
-          console.error("Failed to create session:", error);
+          // Ensure sessions list is refreshed
+          loadSessions();
+        } catch {
           toast.error("Failed to create chat session");
           return;
         }
       }
 
       // Add user message
+      const userMessageId = nanoid();
       const userMessage: MessageType = {
-        id: nanoid(),
-        role: "user",
-        content: text,
+        key: userMessageId,
+        from: "user",
+        versions: [{
+          id: userMessageId,
+          content: text,
+        }],
       };
       setMessages((prev) => [...prev, userMessage]);
       setInput("");
-      setIsStreaming(true);
+      setStreaming(true);
 
       // Add placeholder assistant message
       const assistantMessageId = nanoid();
       const assistantMessage: MessageType = {
-        id: assistantMessageId,
-        role: "assistant",
-        content: "",
+        key: assistantMessageId,
+        from: "assistant",
+        versions: [{
+          id: assistantMessageId,
+          content: "",
+        }],
         isStreaming: true,
       };
       setMessages((prev) => [...prev, assistantMessage]);
@@ -439,11 +760,9 @@ function ChatPage() {
       try {
         // Prepare messages for API
         const chatMessages = [...messages, userMessage].map((m) => ({
-          role: m.role,
-          content: m.content,
+          role: m.from,
+          content: m.versions[0]?.content || "",
         }));
-
-        console.log("Invoking stream_chat_command...");
 
         // Call streaming command
         await invoke("stream_chat_command", {
@@ -455,24 +774,20 @@ function ChatPage() {
             sessionId: currentSessionId,
           },
         });
-
-        console.log("stream_chat_command invoked successfully");
       } catch (error) {
-        console.error("Chat error:", error);
         toast.error("Failed to send message", {
           description: error instanceof Error ? error.message : String(error),
         });
-        setIsStreaming(false);
+        setStreaming(false);
 
         // Remove streaming message
-        setMessages((prev) => prev.filter((m) => m.id !== assistantMessageId));
+        setMessages((prev) => prev.filter((m) => m.key !== assistantMessageId));
       }
     },
-    [messages, selectedModel, apiKey, activeSessionId, createSession]
+    [messages, selectedModel, apiKey, activeSessionId, createSession, loadSessions, providers, setInput]
   );
 
-  // Track virtual keyboard height so the chat input can be pushed up when the
-  // soft keyboard appears on mobile (uses the Visual Viewport API).
+  // Track virtual keyboard height
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
@@ -485,74 +800,116 @@ function ChatPage() {
     vv.addEventListener("resize", handler);
     return () => {
       vv.removeEventListener("resize", handler);
-      // Reset when the component unmounts.
       document.documentElement.style.setProperty("--keyboard-height", "0px");
     };
   }, []);
 
-  // Listen for streaming events - use ref to track current streaming session
+  // Listen for streaming events - use sessionId directly
   useEffect(() => {
-    const currentStreamingId = streamingSessionRef.current;
-    const eventName = `chat-stream-${currentStreamingId}`;
-    console.log("Setting up listener for:", eventName);
+    const eventName = `chat-stream-${sessionId}`;
 
     const unlistenPromise = listen<{
       type: "start" | "token" | "done" | "error";
       content?: string;
       error?: string;
+      reasoning?: string;
+      sources?: { href: string; title: string }[];
     }>(eventName, (event) => {
-      console.log("Received event:", event.payload);
       const payload = event.payload;
 
       if (payload.type === "start") {
-        console.log("Stream started");
+        // Stream started
       } else if (payload.type === "token" && payload.content) {
-        console.log("Received token:", payload.content.substring(0, 50));
         setMessages((prev) => {
-          const updated = [...prev];
-          const lastMessage = updated[updated.length - 1];
-          if (lastMessage && lastMessage.role === "assistant" && lastMessage.isStreaming) {
-            lastMessage.content = payload.content || "";
+          const lastIndex = prev.length - 1;
+          const lastMessage = prev[lastIndex];
+          if (lastMessage && lastMessage.from === "assistant" && lastMessage.isStreaming) {
+            const updatedMessage: MessageType = {
+              ...lastMessage,
+              versions: [{
+                id: lastMessage.versions[0]?.id || nanoid(),
+                content: payload.content || "",
+              }],
+            };
+            if (payload.reasoning) {
+              updatedMessage.reasoning = {
+                content: payload.reasoning,
+                duration: 0,
+              };
+            }
+            if (payload.sources) {
+              updatedMessage.sources = payload.sources;
+            }
+            return [...prev.slice(0, lastIndex), updatedMessage];
           }
-          return updated;
+          return prev;
         });
       } else if (payload.type === "done") {
-        console.log("Stream completed");
-        setIsStreaming(false);
+        setStreaming(false);
         setMessages((prev) => {
-          const updated = [...prev];
-          const lastMessage = updated[updated.length - 1];
+          const lastIndex = prev.length - 1;
+          const lastMessage = prev[lastIndex];
           if (lastMessage) {
-            lastMessage.isStreaming = false;
+            const updatedMessage: MessageType = {
+              ...lastMessage,
+              isStreaming: false,
+            };
+            return [...prev.slice(0, lastIndex), updatedMessage];
           }
-          return updated;
+          return prev;
         });
       } else if (payload.type === "error") {
-        console.error("Stream error:", payload.error);
-        setIsStreaming(false);
+        setStreaming(false);
         toast.error(payload.error || "An error occurred");
-        // Remove streaming message
         setMessages((prev) => prev.slice(0, -1));
       }
     });
 
     return () => {
       unlistenPromise.then((unlisten) => {
-        console.log("Cleaning up listener");
         unlisten();
       });
     };
-  }, [sessionId]);
+  }, [sessionId, setStreaming]);
 
   const handleSuggestionClick = useCallback((suggestion: string) => {
-    setInput(suggestion);
-  }, []);
+    handleSubmit({ text: suggestion });
+  }, [handleSubmit]);
+
+  const handleStopStreaming = useCallback(() => {
+    setStreaming(false);
+    setMessages((prev) => {
+      const lastIndex = prev.length - 1;
+      const lastMessage = prev[lastIndex];
+      if (lastMessage && lastMessage.isStreaming) {
+        // If no content was received, remove the placeholder
+        if (!lastMessage.versions[0]?.content) {
+          return prev.slice(0, -1);
+        }
+        // Mark as not streaming
+        const updatedMessage: MessageType = {
+          ...lastMessage,
+          isStreaming: false,
+        };
+        return [...prev.slice(0, lastIndex), updatedMessage];
+      }
+      return prev;
+    });
+    toast.info("Generation stopped");
+  }, [setStreaming]);
 
   const handleTextChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(event.target.value);
-  }, []);
+  }, [setInput]);
 
-  const isSubmitDisabled = !input.trim() || isStreaming;
+  const handleModelSelectWrapper = useCallback((modelId: string) => {
+    handleModelSelect(modelId);
+  }, [handleModelSelect]);
+
+  const isSubmitDisabled = useMemo(
+    () => !input.trim() || isStreaming,
+    [input, isStreaming]
+  );
 
   // Group models by provider
   const modelsByProvider = useMemo(() => {
@@ -567,8 +924,7 @@ function ChatPage() {
   }, [availableModels]);
 
   return (
-    <div className="relative flex size-full flex-col overflow-hidden">
-      <PageHeader title="AI Chat" description={selectedModelData.name} className="px-4 pt-4 pb-2" />
+    <div className="relative flex size-full flex-col divide-y overflow-hidden">
       <Conversation>
         <ConversationContent>
           {messages.length === 0 ? (
@@ -582,54 +938,95 @@ function ChatPage() {
               </div>
             </div>
           ) : (
-            messages.map((message) => (
-              <Message key={message.id} from={message.role}>
-                <MessageContent>
-                  <MessageResponse>
-                    {message.content || (message.isStreaming ? "..." : "")}
-                  </MessageResponse>
-                </MessageContent>
-              </Message>
+            messages.map(({ versions, ...message }) => (
+              <MessageBranch defaultBranch={0} key={message.key}>
+                <MessageBranchContent>
+                  {versions.map((version) => (
+                    <Message
+                      from={message.from}
+                      key={`${message.key}-${version.id}`}
+                    >
+                      <div>
+                        {message.sources?.length && (
+                          <Sources>
+                            <SourcesTrigger count={message.sources.length} />
+                            <SourcesContent>
+                              {message.sources.map((source) => (
+                                <Source
+                                  href={source.href}
+                                  key={source.href}
+                                  title={source.title}
+                                />
+                              ))}
+                            </SourcesContent>
+                          </Sources>
+                        )}
+                        {message.reasoning && (
+                          <Reasoning duration={message.reasoning.duration}>
+                            <ReasoningTrigger />
+                            <ReasoningContent>
+                              {message.reasoning.content}
+                            </ReasoningContent>
+                          </Reasoning>
+                        )}
+                        <MessageContent>
+                          <MessageResponse>{version.content || (message.isStreaming ? "..." : "")}</MessageResponse>
+                        </MessageContent>
+                      </div>
+                    </Message>
+                  ))}
+                </MessageBranchContent>
+                {versions.length > 1 && (
+                  <MessageBranchSelector>
+                    <MessageBranchPrevious />
+                    <MessageBranchPage />
+                    <MessageBranchNext />
+                  </MessageBranchSelector>
+                )}
+              </MessageBranch>
             ))
           )}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="grid shrink-0 gap-2 pt-2">
+      <div className="grid shrink-0 gap-4 pt-4">
         {messages.length === 0 && (
           <Suggestions className="px-4">
             {suggestions.map((suggestion) => (
-              <Suggestion
+              <SuggestionItem
                 key={suggestion}
+                onClick={handleSuggestionClick}
                 suggestion={suggestion}
-                onClick={() => handleSuggestionClick(suggestion)}
               />
             ))}
           </Suggestions>
         )}
-
-        <div className="w-full px-4 pb-2">
-          <div className="rounded-2xl border-2 border-border shadow-sm transition-all focus-within:border-primary/40 focus-within:shadow-md">
-          <PromptInput value={input} onChange={setInput} onSubmit={handleSubmit}>
+        <div className="w-full px-4 pb-4">
+          <PromptInput onSubmit={handleSubmit}>
             <PromptInputBody>
               <PromptInputTextarea
-                value={input}
                 onChange={handleTextChange}
+                value={input}
                 placeholder="Type your message..."
-                className="min-h-[60px] w-full resize-none border-0 bg-transparent px-3 py-2 focus:outline-none focus:ring-0"
               />
             </PromptInputBody>
             <PromptInputFooter>
               <PromptInputTools>
                 <ModelSelectorDialog
-                  open={modelSelectorOpen}
                   onOpenChange={setModelSelectorOpen}
+                  open={modelSelectorOpen}
                 >
                   <ModelSelectorTrigger asChild>
-                    <PromptInputButton className="gap-2">
-                      <ModelSelectorLogo provider={selectedModel.providerId} />
-                      <ModelSelectorName>{selectedModelData.name}</ModelSelectorName>
+                    <PromptInputButton>
+                      {selectedModelData.providerId && (
+                        <ModelSelectorLogo provider={selectedModelData.providerId} />
+                      )}
+                      {selectedModelData.name && (
+                        <ModelSelectorName>
+                          {selectedModelData.name}
+                        </ModelSelectorName>
+                      )}
                     </PromptInputButton>
                   </ModelSelectorTrigger>
                   <ModelSelectorContent>
@@ -640,18 +1037,12 @@ function ChatPage() {
                         {Object.entries(modelsByProvider).map(([provider, models]) => (
                           <ModelSelectorGroup heading={provider} key={provider}>
                             {models.map((m) => (
-                              <ModelSelectorItem
+                              <ModelItem
+                                isSelected={selectedModelData.id === m.id}
                                 key={m.id}
-                                value={m.id}
-                                onSelect={() => handleModelSelect(m.id)}
-                                className="flex items-center gap-2"
-                              >
-                                <ModelSelectorLogo provider={m.providerId} />
-                                <ModelSelectorName className="flex-1">{m.name}</ModelSelectorName>
-                                {selectedModelData.id === m.id && (
-                                  <CheckIcon className="size-4 shrink-0" />
-                                )}
-                              </ModelSelectorItem>
+                                m={m}
+                                onSelect={handleModelSelectWrapper}
+                              />
                             ))}
                           </ModelSelectorGroup>
                         ))}
@@ -663,10 +1054,10 @@ function ChatPage() {
               <PromptInputSubmit
                 disabled={isSubmitDisabled}
                 status={isStreaming ? "streaming" : "ready"}
+                onStop={handleStopStreaming}
               />
             </PromptInputFooter>
           </PromptInput>
-          </div>
         </div>
       </div>
     </div>
