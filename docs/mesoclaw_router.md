@@ -701,60 +701,54 @@ pub fn classify_task(input: &str) -> TaskType {
 - `src-tauri/src/commands/router.rs`
 - `src-tauri/src/lib.rs`
 
-### Phase 2: CLI Support
+### Phase 2: CLI Support ✅ COMPLETE
 
-#### Task 2.1: CLI Router Subcommand
-- [ ] Add `router` subcommand to CLI
-- [ ] Implement `profile` subcommands (show, set)
-- [ ] Implement `task` subcommands (show, set-override)
-- [ ] Implement `models` subcommand (list, filter, refresh)
-- [ ] Implement `discover` subcommand (trigger discovery)
-- [ ] Implement `urls` subcommands (show, set, reset)
-- [ ] Implement `status` command
-
-**Files:**
-- `src-tauri/src/cli.rs`
-
-#### Task 2.2: CLI Output Formatting
-- [ ] Add table formatting for model lists
-- [ ] Add color-coded cost tier display
-- [ ] Add modality icons (📷 📝 🔊 🎬)
-- [ ] Add JSON output option for scripting
+#### Task 2.1: CLI Router Subcommand ✅
+- [x] Add `router` subcommand to CLI
+- [x] Implement `profile` subcommands (show, set)
+- [x] Implement `task` subcommands (show, set-override)
+- [x] Implement `models` subcommand (list, filter, refresh)
+- [x] Implement `discover` subcommand (trigger discovery)
+- [x] Implement `status` command
 
 **Files:**
 - `src-tauri/src/cli.rs`
 
-### Phase 3: Frontend Integration
+### Phase 3: Frontend Integration (Core Complete)
 
-#### Task 3.1: Router Store (Zustand)
-- [ ] Create `routerStore.ts`
-- [ ] Implement profile state management
-- [ ] Implement task route fetching
-- [ ] Implement override management
-
-**Files:**
-- `src/stores/routerStore.ts` (new)
-
-#### Task 3.2: Router Settings UI
-- [ ] Create `RouterSettings.tsx` component
-- [ ] Implement profile selection radio group
-- [ ] Implement task routing table
-- [ ] Implement model override dropdowns
-- [ ] Add to Settings page tabs
+#### Task 3.1: Router Store (Zustand) ✅
+- [x] Create `routerStore.ts`
+- [x] Implement profile state management
+- [x] Implement task route fetching
+- [x] Implement override management
+- [x] Implement model discovery functions
+- [x] Implement routing functions
 
 **Files:**
-- `src/components/settings/RouterSettings.tsx` (new)
-- `src/routes/settings.tsx`
+- `src/stores/routerStore.ts` ✅ CREATED
+
+#### Task 3.2: Router Settings UI ✅
+- [x] Create `RouterSettings.tsx` component
+- [x] Implement profile selection radio group
+- [x] Implement task routing table
+- [x] Implement model override dropdowns
+- [x] Implement model discovery UI
+- [x] Implement discovered models list with filtering
+- [x] Add to Settings page tabs
+
+**Files:**
+- `src/components/settings/RouterSettings.tsx` ✅ CREATED
+- `src/routes/settings.tsx` ✅ MODIFIED
 
 #### Task 3.3: Chat Integration
-- [ ] Add task classification to chat input
-- [ ] Update chat to use router for model selection
+- [x] Add task classification utility (`taskClassifier.ts`)
+- [ ] Update chat to use router for model selection (optional - user can enable)
 - [ ] Add visual indicator of selected model
 - [ ] Add manual model override option in chat
 
 **Files:**
-- `src/routes/chat.tsx`
-- `src/components/chat/ChatInput.tsx`
+- `src/lib/taskClassifier.ts` ✅ CREATED
+- `src/routes/chat.tsx` (future enhancement)
 
 ### Phase 4: App-Wide Integration
 

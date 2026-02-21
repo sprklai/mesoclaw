@@ -9,6 +9,8 @@ import { IdentityEditor } from "@/components/settings/IdentityEditor";
 import { JobList } from "@/components/settings/JobList";
 import { MobileSettings } from "@/components/settings/MobileSettings";
 import { ModuleList } from "@/components/settings/ModuleList";
+import { ProfileSettings } from "@/components/settings/ProfileSettings";
+import { RouterSettings } from "@/components/settings/RouterSettings";
 import { SettingsNav, type SettingsSection } from "@/components/settings/SettingsNav";
 import { SkillsSettingsTab } from "@/components/settings/SkillsSettingsTab";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -24,9 +26,11 @@ export const Route = createFileRoute("/settings")({
 
 const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "ai", label: "AI Provider", description: "Providers, models, API keys" },
+  { id: "router", label: "Router", description: "Model routing and discovery" },
+  { id: "profile", label: "Profile", description: "Your name and bot name" },
   { id: "skills", label: "Skills", description: "Prompt templates" },
   { id: "app", label: "App Settings", description: "Theme, autostart, notifications" },
-  { id: "identity", label: "Identity", description: "Agent name and personality" },
+  { id: "identity", label: "Agent Personality", description: "SOUL.md and identity files" },
   { id: "scheduler", label: "Scheduler", description: "Scheduled jobs" },
   { id: "modules", label: "Modules", description: "Sidecar modules" },
   { id: "channels", label: "Channels", description: "Telegram and other channels" },
@@ -121,6 +125,8 @@ function SettingsPage() {
           <h2 className="mb-6 text-lg font-semibold">{activeLabel}</h2>
 
           {activeSection === "ai" && <AISettingsTab />}
+          {activeSection === "router" && <RouterSettings />}
+          {activeSection === "profile" && <ProfileSettings />}
           {activeSection === "skills" && <SkillsSettingsTab />}
           {activeSection === "app" && (
             <AppSettingsTab
