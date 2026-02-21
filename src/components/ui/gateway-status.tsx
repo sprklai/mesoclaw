@@ -2,11 +2,12 @@
  * Gateway connection status indicator shown in the app topbar.
  *
  * Displays a small coloured dot + label reflecting the current state of the
- * MesoClaw daemon gateway connection tracked by `useGatewayStore`.
+ * daemon gateway connection tracked by `useGatewayStore`.
  */
 
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { getAppDisplayName } from "@/stores/appSettingsStore";
 import { useGatewayStore } from "@/stores/gatewayStore";
 
 export function GatewayStatus() {
@@ -28,6 +29,8 @@ export function GatewayStatus() {
       ? "bg-green-500"
       : "bg-muted-foreground/40";
 
+  const appName = getAppDisplayName();
+
   return (
     <div
       className="flex items-center gap-1.5 text-xs text-muted-foreground"
@@ -35,8 +38,8 @@ export function GatewayStatus() {
         checking
           ? "Checking gateway connection…"
           : connected
-            ? "MesoClaw daemon is connected"
-            : "MesoClaw daemon is not running"
+            ? `${appName} daemon is connected`
+            : `${appName} daemon is not running`
       }
       aria-live="polite"
       aria-label={`Gateway: ${label}`}

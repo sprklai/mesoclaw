@@ -10,7 +10,7 @@ use std::time::Duration;
 use tokio::sync::{RwLock, broadcast};
 use tokio::task::JoinHandle;
 
-use super::escalation_manager::{EscalationConfig, EscalationError, EscalationManager};
+use super::escalation_manager::{EscalationConfig, EscalationManager};
 use super::event_bus::LifecycleEvent;
 use super::handlers::ResourceHandler;
 use super::health_monitor::HealthMonitor;
@@ -18,9 +18,8 @@ use super::plugin_registry::PluginRegistry;
 use super::recovery_engine::{RecoveryAction, RecoveryEngine, RecoveryResult};
 use super::state_registry::StateRegistry;
 use super::states::{
-    HealthStatus, HeartbeatConfig, InterventionResolution, PreservedState, RecoveryActionType,
-    ResourceConfig, ResourceError, ResourceId, ResourceInstance, ResourceState, ResourceType,
-    SupervisorConfig, UserInterventionRequest,
+    InterventionResolution, RecoveryActionType, ResourceConfig, ResourceError, ResourceId,
+    ResourceInstance, ResourceState, ResourceType, SupervisorConfig, UserInterventionRequest,
 };
 
 /// The central controller for resource lifecycle management.
@@ -337,7 +336,7 @@ impl LifecycleSupervisor {
                         to_id: to_id.clone(),
                     });
             }
-            Ok(RecoveryResult::Escalated { tier }) => {
+            Ok(RecoveryResult::Escalated { tier: _tier }) => {
                 self.escalation_manager
                     .escalate(&resource_id.to_string())
                     .await
@@ -358,7 +357,7 @@ impl LifecycleSupervisor {
 
     /// Gracefully stop a resource.
     pub async fn stop_resource(&self, resource_id: &ResourceId) -> Result<(), ResourceError> {
-        let instance = self
+        let _instance = self
             .state_registry
             .get(resource_id)
             .await
@@ -630,6 +629,7 @@ pub type SharedLifecycleSupervisor = Arc<LifecycleSupervisor>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lifecycle::states::HealthStatus;
 
     #[tokio::test]
     async fn test_spawn_and_get_resource() {

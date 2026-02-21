@@ -45,6 +45,7 @@ export type { AnyIcon, IconProps, IconType, LucideIcon } from "./types";
 // ============================================
 export {
 	// Status & Feedback
+	Activity,
 	AlertCircle,
 	AlertTriangle,
 	Bell,

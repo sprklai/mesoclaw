@@ -10,8 +10,8 @@ use super::handlers::ResourceHandler;
 use super::plugin_registry::PluginRegistry;
 use super::state_registry::StateRegistry;
 use super::states::{
-    InterventionResolution, PreservedState, RecoveryActionType, ResourceConfig, ResourceError,
-    ResourceId, ResourceInstance, ResourceType,
+    InterventionResolution, PreservedState, RecoveryActionType, ResourceError, ResourceId,
+    ResourceInstance, ResourceType,
 };
 
 /// Result of a recovery attempt.
@@ -50,7 +50,8 @@ pub enum RecoveryAction {
 pub struct RecoveryEngine {
     /// State registry for resource tracking
     state_registry: Arc<StateRegistry>,
-    /// Plugin registry for handler lookup
+    /// Plugin registry for handler lookup (for future use)
+    #[allow(dead_code)]
     plugin_registry: Arc<PluginRegistry>,
 }
 
@@ -413,5 +414,19 @@ impl RecoveryEngine {
 mod tests {
     use super::*;
 
-    // Placeholder for recovery engine tests
+    #[test]
+    fn test_recovery_action_debug() {
+        let action = RecoveryAction::Retry {
+            preserve_state: true,
+        };
+        assert!(format!("{:?}", action).contains("Retry"));
+    }
+
+    #[test]
+    fn test_recovery_result_debug() {
+        let result = RecoveryResult::Failed {
+            reason: "test".to_string(),
+        };
+        assert!(format!("{:?}", result).contains("Failed"));
+    }
 }

@@ -5,6 +5,7 @@
 //! - **Task routing**: `TaskType::Code` → preferred provider list, in priority order
 //! - **Cost-tier selection**: prefer cheaper models unless `CostTier::High` is requested
 //! - **Availability fallback**: if the primary target is unavailable, walk the priority list
+//! - **Routing profiles**: eco/balanced/premium for automatic model selection
 //!
 //! # Configuration
 //! Routing rules are supplied as [`RouterConfig`], which can be constructed from defaults
@@ -27,6 +28,157 @@ pub enum CostTier {
     Medium,
     /// Most capable / expensive models.
     High,
+}
+
+// ─── RoutingProfile ───────────────────────────────────────────────────────────
+
+/// Routing profiles for automatic model selection based on cost/quality tradeoffs.
+///
+/// Each profile maps to different cost tier preferences for task-based routing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum RoutingProfile {
+    /// Cost-optimized routing. Prefers Low tier models with Medium fallback.
+    /// Best for development, testing, and budget-conscious usage.
+    Eco,
+    /// Balanced quality/cost routing. Prefers Medium tier with Low/High fallback.
+    /// Best for general use (default).
+    #[default]
+    Balanced,
+    /// Maximum quality routing. Prefers High tier models with Medium fallback.
+    /// Best for production and critical tasks.
+    Premium,
+}
+
+impl RoutingProfile {
+    /// Parse a routing profile from a string (case-insensitive).
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "eco" | "economy" | "budget" | "cheap" => RoutingProfile::Eco,
+            "balanced" | "default" | "standard" => RoutingProfile::Balanced,
+            "premium" | "pro" | "quality" | "best" => RoutingProfile::Premium,
+            _ => RoutingProfile::Balanced,
+        }
+    }
+
+    /// Get the preferred cost tier for this profile.
+    pub fn preferred_cost_tier(&self) -> CostTier {
+        match self {
+            RoutingProfile::Eco => CostTier::Low,
+            RoutingProfile::Balanced => CostTier::Medium,
+            RoutingProfile::Premium => CostTier::High,
+        }
+    }
+
+    /// Get the fallback cost tier for this profile when preferred is unavailable.
+    pub fn fallback_cost_tier(&self) -> CostTier {
+        match self {
+            RoutingProfile::Eco => CostTier::Medium,
+            RoutingProfile::Balanced => CostTier::Low,
+            RoutingProfile::Premium => CostTier::Medium,
+        }
+    }
+}
+
+// ─── ModelModality ────────────────────────────────────────────────────────────
+
+/// Supported modalities for multi-modal models.
+///
+/// Used to filter models based on the capabilities required for a request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelModality {
+    /// Text generation (default for all LLMs).
+    Text,
+    /// Image understanding (vision).
+    Image,
+    /// Image generation (e.g., DALL-E, Stable Diffusion).
+    ImageGeneration,
+    /// Audio transcription (speech-to-text).
+    AudioTranscription,
+    /// Audio generation (text-to-speech).
+    AudioGeneration,
+    /// Video understanding.
+    Video,
+    /// Embedding generation for vector search.
+    Embedding,
+}
+
+impl ModelModality {
+    /// Check if this modality is a generation modality (produces output).
+    pub fn is_generative(&self) -> bool {
+        matches!(
+            self,
+            ModelModality::Text
+                | ModelModality::ImageGeneration
+                | ModelModality::AudioGeneration
+                | ModelModality::Embedding
+        )
+    }
+
+    /// Check if this modality is an understanding modality (consumes input).
+    pub fn is_understanding(&self) -> bool {
+        matches!(
+            self,
+            ModelModality::Text
+                | ModelModality::Image
+                | ModelModality::AudioTranscription
+                | ModelModality::Video
+        )
+    }
+}
+
+// ─── ModelCapabilities ────────────────────────────────────────────────────────
+
+/// Model capabilities for routing decisions.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ModelCapabilities {
+    /// Supports function/tool calling.
+    #[serde(default)]
+    pub tool_calling: bool,
+    /// Supports structured JSON output.
+    #[serde(default)]
+    pub structured_output: bool,
+    /// Supports streaming responses.
+    #[serde(default = "default_streaming")]
+    pub streaming: bool,
+    /// Supports system prompts.
+    #[serde(default = "default_system_prompt")]
+    pub system_prompt: bool,
+    /// Maximum output tokens (if known).
+    #[serde(default)]
+    pub max_output_tokens: Option<i32>,
+}
+
+fn default_streaming() -> bool {
+    true
+}
+fn default_system_prompt() -> bool {
+    true
+}
+
+impl ModelCapabilities {
+    /// Create capabilities for a standard text-only model.
+    pub fn text_only() -> Self {
+        Self {
+            tool_calling: false,
+            structured_output: false,
+            streaming: true,
+            system_prompt: true,
+            max_output_tokens: None,
+        }
+    }
+
+    /// Create capabilities for a model with all features enabled.
+    pub fn full_featured() -> Self {
+        Self {
+            tool_calling: true,
+            structured_output: true,
+            streaming: true,
+            system_prompt: true,
+            max_output_tokens: Some(4096),
+        }
+    }
 }
 
 // ─── TaskType ─────────────────────────────────────────────────────────────────
@@ -75,6 +227,13 @@ pub struct ModelTarget {
     /// Cost tier of this target (for tier-based selection).
     #[serde(default)]
     pub cost_tier: CostTier,
+    /// Modalities supported by this model (for multi-modal routing).
+    #[serde(default = "default_modalities")]
+    pub modalities: Vec<ModelModality>,
+}
+
+fn default_modalities() -> Vec<ModelModality> {
+    vec![ModelModality::Text]
 }
 
 impl ModelTarget {
@@ -87,7 +246,42 @@ impl ModelTarget {
             provider_id: provider_id.into(),
             model: model.into(),
             cost_tier,
+            modalities: vec![ModelModality::Text],
         }
+    }
+
+    /// Create a model target with specific modalities.
+    pub fn with_modalities(
+        provider_id: impl Into<String>,
+        model: impl Into<String>,
+        cost_tier: CostTier,
+        modalities: Vec<ModelModality>,
+    ) -> Self {
+        Self {
+            provider_id: provider_id.into(),
+            model: model.into(),
+            cost_tier,
+            modalities,
+        }
+    }
+
+    /// Create a multi-modal model target (text + image).
+    pub fn multimodal(
+        provider_id: impl Into<String>,
+        model: impl Into<String>,
+        cost_tier: CostTier,
+    ) -> Self {
+        Self::with_modalities(
+            provider_id,
+            model,
+            cost_tier,
+            vec![ModelModality::Text, ModelModality::Image],
+        )
+    }
+
+    /// Check if this target supports all the required modalities.
+    pub fn supports_modalities(&self, required: &[ModelModality]) -> bool {
+        required.iter().all(|m| self.modalities.contains(m))
     }
 }
 
@@ -115,6 +309,10 @@ impl TaskRoute {
 /// in future iterations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RouterConfig {
+    /// Active routing profile (eco/balanced/premium).
+    #[serde(default)]
+    pub profile: RoutingProfile,
+
     /// Model aliases: short name → concrete target.
     /// Example: `"claude" → ModelTarget { provider_id: "vercel-ai-gateway", model: "anthropic/claude-sonnet-4-5" }`.
     #[serde(default)]
@@ -250,6 +448,7 @@ impl RouterConfig {
         );
 
         Self {
+            profile: RoutingProfile::Balanced,
             aliases,
             task_routes,
             fallback: ModelTarget::new("vercel-ai-gateway", "openai/gpt-4o-mini", CostTier::Low),
@@ -268,6 +467,7 @@ impl RouterConfig {
             ]),
         );
         Self {
+            profile: RoutingProfile::Balanced,
             aliases: HashMap::new(),
             task_routes,
             fallback: ModelTarget::new("provider-fallback", "test-fallback", CostTier::Low),
@@ -314,6 +514,7 @@ impl ModelRouter {
             provider_id: self.config.fallback.provider_id.clone(),
             model: alias_or_model.to_string(),
             cost_tier: CostTier::Medium,
+            modalities: vec![ModelModality::Text],
         }
     }
 
@@ -376,6 +577,143 @@ impl ModelRouter {
     /// Return all registered alias keys.
     pub fn alias_keys(&self) -> Vec<&str> {
         self.config.aliases.keys().map(String::as_str).collect()
+    }
+
+    /// Return the active routing profile.
+    pub fn profile(&self) -> RoutingProfile {
+        self.config.profile
+    }
+
+    /// Route based on the active profile's preferred cost tier.
+    ///
+    /// Uses the profile's preferred tier first, then falls back to the fallback tier,
+    /// and finally to the primary target for the task.
+    pub fn route_by_profile(&self, task: TaskType) -> &ModelTarget {
+        let preferred = self.config.profile.preferred_cost_tier();
+        let fallback = self.config.profile.fallback_cost_tier();
+
+        // Try to find a target with the preferred cost tier
+        if let Some(target) = self
+            .targets_for(task)
+            .into_iter()
+            .find(|t| t.cost_tier == preferred)
+        {
+            return target;
+        }
+
+        // Fall back to the profile's fallback tier
+        if let Some(target) = self
+            .targets_for(task)
+            .into_iter()
+            .find(|t| t.cost_tier == fallback)
+        {
+            return target;
+        }
+
+        // Ultimate fallback: primary target
+        self.primary_for(task)
+    }
+
+    /// Route to a model that supports all required modalities.
+    ///
+    /// Returns the first target for the task type that supports all required modalities,
+    /// or `None` if no suitable model is found.
+    pub fn route_for_modalities(
+        &self,
+        task: TaskType,
+        required_modalities: &[ModelModality],
+    ) -> Option<&ModelTarget> {
+        self.targets_for(task)
+            .into_iter()
+            .find(|target| target.supports_modalities(required_modalities))
+    }
+
+    /// Combined routing: profile + modality + fallback.
+    ///
+    /// 1. Filter targets by required modalities
+    /// 2. Find target matching profile's preferred tier
+    /// 3. Fall back to profile's fallback tier
+    /// 4. Fall back to any target that supports modalities
+    pub fn route_with_modality_and_profile(
+        &self,
+        task: TaskType,
+        required_modalities: &[ModelModality],
+    ) -> Option<&ModelTarget> {
+        let targets: Vec<_> = self
+            .targets_for(task)
+            .into_iter()
+            .filter(|t| t.supports_modalities(required_modalities))
+            .collect();
+
+        if targets.is_empty() {
+            return None;
+        }
+
+        let preferred = self.config.profile.preferred_cost_tier();
+        let fallback = self.config.profile.fallback_cost_tier();
+
+        // Try preferred tier
+        if let Some(target) = targets.iter().find(|t| t.cost_tier == preferred) {
+            return Some(*target);
+        }
+
+        // Try fallback tier
+        if let Some(target) = targets.iter().find(|t| t.cost_tier == fallback) {
+            return Some(*target);
+        }
+
+        // Return first matching target
+        targets.into_iter().next()
+    }
+
+    /// Classify a task type from input text using heuristics.
+    pub fn classify_task(input: &str) -> TaskType {
+        let lower = input.to_lowercase();
+
+        // Code indicators
+        if lower.contains("code")
+            || lower.contains("debug")
+            || lower.contains("implement")
+            || lower.contains("function")
+            || lower.contains("class")
+            || lower.contains("bug")
+            || lower.contains("error")
+            || lower.contains("fix")
+            || lower.contains("refactor")
+        {
+            return TaskType::Code;
+        }
+
+        // Analysis indicators
+        if lower.contains("analyze")
+            || lower.contains("compare")
+            || lower.contains("summarize")
+            || lower.contains("explain")
+            || lower.contains("why")
+            || lower.contains("how does")
+            || lower.contains("review")
+        {
+            return TaskType::Analysis;
+        }
+
+        // Creative indicators
+        if lower.contains("write")
+            || lower.contains("create")
+            || lower.contains("design")
+            || lower.contains("brainstorm")
+            || lower.contains("idea")
+            || lower.contains("story")
+            || lower.contains("poem")
+        {
+            return TaskType::Creative;
+        }
+
+        // Fast indicators (short queries)
+        if input.len() < 50 && !lower.contains('?') {
+            return TaskType::Fast;
+        }
+
+        TaskType::General
     }
 
     // ── Private helpers ───────────────────────────────────────────────────
@@ -554,5 +892,202 @@ mod tests {
         let router = vercel_router();
         let fb = router.fallback();
         assert_eq!(fb.cost_tier, CostTier::Low);
+    }
+
+    // ── RoutingProfile tests ───────────────────────────────────────────────
+
+    #[test]
+    fn routing_profile_from_str() {
+        assert_eq!(RoutingProfile::from_str("eco"), RoutingProfile::Eco);
+        assert_eq!(RoutingProfile::from_str("economy"), RoutingProfile::Eco);
+        assert_eq!(RoutingProfile::from_str("ECO"), RoutingProfile::Eco);
+        assert_eq!(
+            RoutingProfile::from_str("balanced"),
+            RoutingProfile::Balanced
+        );
+        assert_eq!(
+            RoutingProfile::from_str("default"),
+            RoutingProfile::Balanced
+        );
+        assert_eq!(RoutingProfile::from_str("premium"), RoutingProfile::Premium);
+        assert_eq!(RoutingProfile::from_str("pro"), RoutingProfile::Premium);
+        assert_eq!(
+            RoutingProfile::from_str("unknown"),
+            RoutingProfile::Balanced
+        );
+    }
+
+    #[test]
+    fn routing_profile_cost_tier_mapping() {
+        assert_eq!(RoutingProfile::Eco.preferred_cost_tier(), CostTier::Low);
+        assert_eq!(RoutingProfile::Eco.fallback_cost_tier(), CostTier::Medium);
+
+        assert_eq!(
+            RoutingProfile::Balanced.preferred_cost_tier(),
+            CostTier::Medium
+        );
+        assert_eq!(RoutingProfile::Balanced.fallback_cost_tier(), CostTier::Low);
+
+        assert_eq!(
+            RoutingProfile::Premium.preferred_cost_tier(),
+            CostTier::High
+        );
+        assert_eq!(
+            RoutingProfile::Premium.fallback_cost_tier(),
+            CostTier::Medium
+        );
+    }
+
+    // ── ModelModality tests ────────────────────────────────────────────────
+
+    #[test]
+    fn model_modality_is_generative() {
+        assert!(ModelModality::Text.is_generative());
+        assert!(ModelModality::ImageGeneration.is_generative());
+        assert!(ModelModality::AudioGeneration.is_generative());
+        assert!(ModelModality::Embedding.is_generative());
+        assert!(!ModelModality::Image.is_generative());
+        assert!(!ModelModality::AudioTranscription.is_generative());
+        assert!(!ModelModality::Video.is_generative());
+    }
+
+    #[test]
+    fn model_modality_is_understanding() {
+        assert!(ModelModality::Text.is_understanding());
+        assert!(ModelModality::Image.is_understanding());
+        assert!(ModelModality::AudioTranscription.is_understanding());
+        assert!(ModelModality::Video.is_understanding());
+        assert!(!ModelModality::ImageGeneration.is_understanding());
+        assert!(!ModelModality::AudioGeneration.is_understanding());
+        assert!(!ModelModality::Embedding.is_understanding());
+    }
+
+    // ── ModelTarget modality tests ──────────────────────────────────────────
+
+    #[test]
+    fn model_target_supports_modalities() {
+        let text_only = ModelTarget::new("test", "model", CostTier::Medium);
+        assert!(text_only.supports_modalities(&[ModelModality::Text]));
+        assert!(!text_only.supports_modalities(&[ModelModality::Image]));
+
+        let multimodal = ModelTarget::multimodal("test", "model", CostTier::Medium);
+        assert!(multimodal.supports_modalities(&[ModelModality::Text]));
+        assert!(multimodal.supports_modalities(&[ModelModality::Image]));
+        assert!(multimodal.supports_modalities(&[ModelModality::Text, ModelModality::Image]));
+        assert!(!multimodal.supports_modalities(&[ModelModality::Video]));
+    }
+
+    // ── Profile-based routing tests ────────────────────────────────────────
+
+    #[test]
+    fn route_by_profile_balanced() {
+        let router = vercel_router();
+        let target = router.route_by_profile(TaskType::Code);
+        // Balanced profile prefers Medium tier for Code
+        assert_eq!(target.cost_tier, CostTier::Medium);
+    }
+
+    #[test]
+    fn route_by_profile_uses_fallback_tier() {
+        // Fast tasks only have Low tier models in the default config
+        let router = vercel_router();
+        let target = router.route_by_profile(TaskType::Fast);
+        // Should get a Low tier model since that's all that's available
+        assert_eq!(target.cost_tier, CostTier::Low);
+    }
+
+    // ── Modality-aware routing tests ────────────────────────────────────────
+
+    #[test]
+    fn route_for_modalities_text_only() {
+        let router = vercel_router();
+        let target = router.route_for_modalities(TaskType::Code, &[ModelModality::Text]);
+        assert!(target.is_some());
+        let target = target.unwrap();
+        assert!(target.supports_modalities(&[ModelModality::Text]));
+    }
+
+    #[test]
+    fn route_for_modalities_multimodal() {
+        let router = vercel_router();
+        // Default config models are text-only, so this should return None
+        let target = router.route_for_modalities(TaskType::Code, &[ModelModality::Image]);
+        assert!(target.is_none());
+    }
+
+    // ── Task classification tests ───────────────────────────────────────────
+
+    #[test]
+    fn classify_task_code() {
+        assert_eq!(ModelRouter::classify_task("Fix this bug"), TaskType::Code);
+        assert_eq!(
+            ModelRouter::classify_task("Implement a new feature"),
+            TaskType::Code
+        );
+        assert_eq!(
+            ModelRouter::classify_task("Debug the error"),
+            TaskType::Code
+        );
+        assert_eq!(
+            ModelRouter::classify_task("Refactor the class"),
+            TaskType::Code
+        );
+    }
+
+    #[test]
+    fn classify_task_analysis() {
+        assert_eq!(
+            ModelRouter::classify_task("Analyze the data"),
+            TaskType::Analysis
+        );
+        assert_eq!(
+            ModelRouter::classify_task("Summarize this text"),
+            TaskType::Analysis
+        );
+        assert_eq!(
+            ModelRouter::classify_task("Why did this happen?"),
+            TaskType::Analysis
+        );
+        assert_eq!(
+            ModelRouter::classify_task("Explain how does it work"),
+            TaskType::Analysis
+        );
+    }
+
+    #[test]
+    fn classify_task_creative() {
+        assert_eq!(
+            ModelRouter::classify_task("Write a story"),
+            TaskType::Creative
+        );
+        assert_eq!(
+            ModelRouter::classify_task("Create a design"),
+            TaskType::Creative
+        );
+        assert_eq!(
+            ModelRouter::classify_task("Brainstorm ideas"),
+            TaskType::Creative
+        );
+    }
+
+    #[test]
+    fn classify_task_fast() {
+        assert_eq!(ModelRouter::classify_task("Hello"), TaskType::Fast);
+        assert_eq!(ModelRouter::classify_task("Ok thanks"), TaskType::Fast);
+    }
+
+    #[test]
+    fn classify_task_general() {
+        // Use longer inputs to avoid triggering the Fast heuristic (< 50 chars without ?)
+        assert_eq!(
+            ModelRouter::classify_task("Tell me about the current weather conditions today"),
+            TaskType::General
+        );
+        assert_eq!(
+            ModelRouter::classify_task(
+                "What is the capital city of France and can you tell me more about it?"
+            ),
+            TaskType::General
+        );
     }
 }

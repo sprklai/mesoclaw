@@ -245,7 +245,12 @@ export const useLLMStore = create<LLMStore>((set, get) => ({
       const providers = await invoke<ProviderWithKeyStatus[]>(
         "list_providers_with_key_status_command"
       );
-      set({ providersWithKeyStatus: providers });
+      // Ensure models array is always present (IPC response may not include it)
+      const providersWithModels = providers.map((p) => ({
+        ...p,
+        models: p.models ?? [],
+      }));
+      set({ providersWithKeyStatus: providersWithModels });
     } catch (error) {
       console.error(
         "[LLMStore] Failed to load providers with key status:",

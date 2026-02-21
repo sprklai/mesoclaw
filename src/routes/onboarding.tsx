@@ -11,15 +11,14 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { AIProviderManagement } from "@/components/settings/AIProviderManagement";
+import { AIProviderConfiguration } from "@/components/settings/AIProviderConfiguration";
 import { ChannelList } from "@/components/settings/ChannelList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { APP_IDENTITY } from "@/config/app-identity";
-import { getAppIdentityWithDisplayName } from "@/lib/app-display-name";
 import { cn } from "@/lib/utils";
-import { useAppSettingsStore } from "@/stores/appSettingsStore";
+import { useAppSettingsStore, useAppIdentity } from "@/stores/appSettingsStore";
 
 export const Route = createFileRoute("/onboarding")({
   component: OnboardingPage,
@@ -387,7 +386,7 @@ function IdentityStep({ onNext }: IdentityStepProps) {
 
 function AIProviderStep() {
   return (
-    <div className="w-full max-w-2xl space-y-6">
+    <div className="w-full max-w-3xl space-y-6">
       <div className="space-y-1">
         <h2 className="text-2xl font-bold tracking-tight">Set up AI</h2>
         <p className="text-sm text-muted-foreground">
@@ -395,7 +394,11 @@ function AIProviderStep() {
         </p>
       </div>
 
-      <AIProviderManagement />
+      <AIProviderConfiguration
+        showGlobalDefault={false}
+        showHeader={false}
+        compact={true}
+      />
     </div>
   );
 }
@@ -429,8 +432,7 @@ interface DoneStepProps {
 }
 
 function DoneStep({ onComplete }: DoneStepProps) {
-  const appDisplayName = useAppSettingsStore((s) => s.appDisplayName);
-  const identity = getAppIdentityWithDisplayName(appDisplayName);
+  const identity = useAppIdentity();
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-8 text-center">

@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { APP_IDENTITY } from "@/config/app-identity";
-import { APP_TITLE } from "@/constants";
 import { PanelLeft, PanelLeftClose } from "@/lib/icons";
+import { useAppIdentity } from "@/stores/appSettingsStore";
 import { cn } from "@/lib/utils";
 
 interface SidebarHeaderProps {
@@ -11,6 +11,8 @@ interface SidebarHeaderProps {
 }
 
 export function SidebarHeader({ expanded, onToggle }: SidebarHeaderProps) {
+  const identity = useAppIdentity();
+
   return (
     <div
       data-tauri-drag-region
@@ -28,7 +30,7 @@ export function SidebarHeader({ expanded, onToggle }: SidebarHeaderProps) {
         />
         {expanded && (
           <span className="truncate font-semibold text-sidebar-foreground">
-            {APP_TITLE}
+            {identity.productName}
           </span>
         )}
       </div>

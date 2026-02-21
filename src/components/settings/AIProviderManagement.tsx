@@ -284,7 +284,7 @@ export function AIProviderManagement() {
                       : "Local provider"}
                   </span>
                   <span>•</span>
-                  <span>{provider.models.length} models</span>
+                  <span>{provider.models?.length ?? 0} models</span>
                 </div>
               </div>
 

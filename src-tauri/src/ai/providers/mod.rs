@@ -9,7 +9,10 @@ pub mod router;
 // Public re-exports
 pub use openai_compatible::{OpenAICompatibleConfig, OpenAICompatibleProvider};
 pub use reliable::ReliableProvider;
-pub use router::{CostTier, ModelRouter, ModelTarget, RouterConfig, TaskRoute, TaskType};
+pub use router::{
+    CostTier, ModelCapabilities, ModelModality, ModelRouter, ModelTarget, RouterConfig,
+    RoutingProfile, TaskRoute, TaskType,
+};
 
 /// Provider type enum for known providers
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

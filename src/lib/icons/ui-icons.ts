@@ -33,6 +33,7 @@
 // CONNECTION & NETWORK
 // ============================================
 export {
+	Activity,
 	AlertCircle,
 	AlertTriangle,
 	Bell,

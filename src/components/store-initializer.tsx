@@ -4,18 +4,21 @@ import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "@/stores/settings";
 import { useLLMStore } from "@/stores/llm";
 import { useGatewayStore } from "@/stores/gatewayStore";
+import { useAppSettingsStore } from "@/stores/appSettingsStore";
 
 /**
  * Component to initialize all Zustand stores on app mount.
  *
  * Initialization order:
  * 1. Settings + LLM config (blocking — required before splash closes)
- * 2. Gateway connection check (non-blocking — runs in background)
+ * 2. User identity (blocking — required for app display name)
+ * 3. Gateway connection check (non-blocking — runs in background)
  */
 export function StoreInitializer() {
   const initialize = useSettings((state) => state.initialize);
   const initializeLLM = useLLMStore((state) => state.initialize);
   const checkGateway = useGatewayStore((state) => state.checkConnection);
+  const loadUserIdentity = useAppSettingsStore((state) => state.loadUserIdentity);
 
   useEffect(() => {
     const initializeStores = async () => {
@@ -23,6 +26,9 @@ export function StoreInitializer() {
         // Initialize settings and LLM config (required before UI renders).
         await initialize();
         await initializeLLM();
+
+        // Load user identity (app display name, user name).
+        await loadUserIdentity();
 
         // Close splash screen after critical stores are ready.
         await invoke("close_splashscreen");
@@ -38,7 +44,7 @@ export function StoreInitializer() {
     };
 
     initializeStores();
-  }, [initialize, initializeLLM, checkGateway]);
+  }, [initialize, initializeLLM, checkGateway, loadUserIdentity]);
 
   return null;
 }

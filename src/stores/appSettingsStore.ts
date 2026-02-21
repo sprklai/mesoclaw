@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { APP_IDENTITY } from "@/config/app-identity";
+
 export interface AppSettings {
 	// Appearance
 	theme: "light" | "dark" | "system";
@@ -26,6 +28,26 @@ export interface AppSettings {
 	onboardingCompleted: boolean;
 }
 
+/**
+ * App identity with custom display name applied.
+ * This is the merged identity used throughout the app.
+ */
+export interface AppIdentity {
+	productName: string;
+	slug: string;
+	reverseDomain: string;
+	bundleIdentifier: string;
+	iconAssetPath: string;
+	keychainService: string;
+	credentialsService: string;
+	strongholdClientName: string;
+	strongholdVaultPassword: string;
+	openRouterHttpReferer: string;
+	openRouterTitle: string;
+	trayTooltip: string;
+	skillsConfigDirName: string;
+}
+
 interface AppSettingsActions {
 	setTheme: (theme: AppSettings["theme"]) => void;
 	setSidebarExpanded: (expanded: boolean) => void;
@@ -43,6 +65,8 @@ interface AppSettingsActions {
 	) => Promise<void>;
 	completeOnboarding: () => void;
 	resetSettings: () => void;
+	/** Get the current app identity with custom display name applied */
+	getAppIdentity: () => AppIdentity;
 }
 
 type AppSettingsStore = AppSettings & AppSettingsActions;
@@ -62,7 +86,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 export const useAppSettingsStore = create<AppSettingsStore>()(
 	persist(
-		(set) => ({
+		(set, get) => ({
 			...DEFAULT_SETTINGS,
 
 			setTheme: (theme) => set({ theme }),
@@ -106,9 +130,35 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
 			completeOnboarding: () => set({ onboardingCompleted: true }),
 
 			resetSettings: () => set(DEFAULT_SETTINGS),
+
+			getAppIdentity: () => {
+				const { appDisplayName } = get();
+				const productName = appDisplayName?.trim() || APP_IDENTITY.productName;
+				return {
+					...APP_IDENTITY,
+					productName,
+				};
+			},
 		}),
 		{
 			name: "app-settings-storage",
 		},
 	),
 );
+
+/**
+ * Hook to get the current app identity with custom display name.
+ * Use this throughout the app for consistent identity access.
+ */
+export function useAppIdentity(): AppIdentity {
+	const getAppIdentity = useAppSettingsStore((state) => state.getAppIdentity);
+	return getAppIdentity();
+}
+
+/**
+ * Get the current display name synchronously (for non-hook contexts).
+ */
+export function getAppDisplayName(): string {
+	const { appDisplayName } = useAppSettingsStore.getState();
+	return appDisplayName?.trim() || APP_IDENTITY.productName;
+}

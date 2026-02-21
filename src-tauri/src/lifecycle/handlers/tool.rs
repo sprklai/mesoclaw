@@ -23,7 +23,8 @@ pub const TOOL_SUBSTATES: &[&str] = &[
 
 /// Handler for tool resources.
 pub struct ToolHandler {
-    /// Maximum retry attempts
+    /// Maximum retry attempts (for future use)
+    #[allow(dead_code)]
     max_retries: u32,
 }
 

@@ -159,7 +159,7 @@ impl ResourceHandler for AgentHandler {
             .filter(|p| *p != current_provider)
             .take(3)
             .enumerate()
-            .map(|(i, provider)| FallbackOption {
+            .map(|(_i, provider)| FallbackOption {
                 id: format!("fallback_{}", provider),
                 label: format!("Switch to {}", provider),
                 description: format!("Use {} as the LLM provider", provider),
@@ -174,7 +174,7 @@ impl ResourceHandler for AgentHandler {
 
     async fn health_check(
         &self,
-        instance: &ResourceInstance,
+        _instance: &ResourceInstance,
     ) -> Result<HealthStatus, ResourceError> {
         // Actual implementation would:
         // 1. Check if agent loop is still responsive

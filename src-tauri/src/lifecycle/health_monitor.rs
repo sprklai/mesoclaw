@@ -10,7 +10,7 @@ use std::time::Duration;
 use tokio::sync::{RwLock, broadcast};
 use tokio::task::JoinHandle;
 
-use super::states::{HealthStatus, HeartbeatConfig, ResourceId, ResourceInstance, ResourceType};
+use super::states::{HealthStatus, HeartbeatConfig, ResourceId, ResourceInstance};
 
 /// Internal state tracked for each monitored resource.
 #[derive(Debug, Clone)]
@@ -67,7 +67,8 @@ pub struct HealthMonitor {
     check_tasks: Arc<RwLock<HashMap<ResourceId, JoinHandle<()>>>>,
     /// Event sender for health monitor events
     event_sender: broadcast::Sender<HealthMonitorEvent>,
-    /// Default heartbeat configuration
+    /// Default heartbeat configuration (for future use)
+    #[allow(dead_code)]
     default_config: HeartbeatConfig,
 }
 
@@ -372,9 +373,10 @@ mod tests {
     async fn test_detect_stuck() {
         let monitor = HealthMonitor::new();
 
-        // Use a custom config with very short interval
+        // Use a custom config with very short interval and low threshold
         let config = HeartbeatConfig {
             interval_secs: 0,
+            stuck_threshold: 1, // Trigger stuck after 1 missed heartbeat
             ..Default::default()
         };
 

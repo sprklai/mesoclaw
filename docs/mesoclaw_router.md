@@ -96,61 +96,228 @@ Profile: PREMIUM
 └── Fallback: claude-sonnet-4.5
 ```
 
-## Prepopulated Models by Provider
+## Dynamic Model Discovery
 
-### OpenAI
-| Model | Cost Tier | Context | Best For |
-|-------|-----------|---------|----------|
-| `gpt-4o` | Medium | 128K | General purpose |
-| `gpt-4o-mini` | Low | 128K | Fast, cost-effective |
-| `gpt-4-turbo` | Medium | 128K | Legacy compatibility |
-| `o3` | High | 200K | Reasoning, analysis |
-| `o4-mini` | Medium | 128K | Reasoning (cheaper) |
-| `gpt-3.5-turbo` | Low | 16K | Simple tasks |
+Unlike hardcoded model lists, MesoClaw Router dynamically discovers available models from each provider at runtime. This ensures users always see up-to-date model lists including newly released models.
 
-### Anthropic
-| Model | Cost Tier | Context | Best For |
-|-------|-----------|---------|----------|
-| `claude-opus-4-5-20250219` | High | 200K | Complex reasoning |
-| `claude-sonnet-4-5-20250219` | Medium | 200K | Code, general |
-| `claude-haiku-4-5-20251001` | Low | 200K | Fast responses |
+### Official Model Documentation (User-Configurable)
 
-### Google AI
-| Model | Cost Tier | Context | Best For |
-|-------|-----------|---------|----------|
-| `gemini-2.0-flash` | Low | 1M | Fast, cost-effective |
-| `gemini-1.5-pro` | Medium | 2M | General purpose |
-| `gemini-1.5-flash` | Low | 1M | Quick tasks |
+The following documentation pages are used as reference for model discovery. Users can update these URLs in settings if providers change their documentation locations:
 
-### Groq
-| Model | Cost Tier | Context | Best For |
-|-------|-----------|---------|----------|
-| `llama-3.3-70b-versatile` | Low | 128K | Fast inference |
-| `llama-3.1-8b-instant` | Low | 128K | Ultra-fast |
-| `mixtral-8x7b-32768` | Low | 32K | Balanced |
+| Provider | Documentation URL | Discovery Method |
+|----------|-------------------|------------------|
+| **OpenAI** | `https://developers.openai.com/api/docs/models` | API + docs parsing |
+| **Anthropic** | `https://platform.claude.com/docs/en/about-claude/models/overview` | Docs parsing (no API) |
+| **Google AI** | `https://ai.google.dev/gemini-api/docs/models` | Docs parsing |
+| **Groq** | `https://console.groq.com/docs/models` | API + docs parsing |
+| **Vercel AI Gateway** | `https://vercel.com/ai-gateway/models` | API + docs parsing |
+| **OpenRouter** | `https://openrouter.ai/models` | API + docs parsing |
+| **Ollama** | Local: `http://localhost:11434/api/tags` | **Existing discovery command** |
 
-### Ollama (Local)
-| Model | Cost Tier | Context | Best For |
-|-------|-----------|---------|----------|
-| `llama3.2:3b` | Low | 128K | Fast local |
-| `llama3.1:70b` | Medium | 128K | Quality local |
-| `codellama:34b` | Medium | 16K | Code local |
-| `deepseek-coder:33b` | Medium | 16K | Code local |
+### Provider Discovery Endpoints
 
-### OpenRouter (Multi-Provider)
-| Model | Cost Tier | Context | Best For |
-|-------|-----------|---------|----------|
-| `anthropic/claude-sonnet-4` | Medium | 200K | Via OpenRouter |
-| `openai/gpt-4o` | Medium | 128K | Via OpenRouter |
-| `google/gemini-2.0-flash-exp` | Low | 1M | Via OpenRouter |
-| `deepseek/deepseek-chat` | Low | 64K | Budget option |
+| Provider | Discovery Method | Endpoint | Notes |
+|----------|------------------|----------|-------|
+| **Ollama** | Local API | `GET http://localhost:11434/api/tags` | **Repurpose existing `discover_ollama_models_command`** |
+| **Vercel AI Gateway** | OpenAI-compatible API | `GET /v1/models` | Requires API key, returns provider-prefixed models |
+| **OpenRouter** | OpenAI-compatible API | `GET https://openrouter.ai/api/v1/models` | 300+ models from multiple providers |
+| **OpenAI** | OpenAI API | `GET https://api.openai.com/v1/models` | Native OpenAI models |
+| **Anthropic** | Static list + manual | N/A | Anthropic doesn't have a list endpoint |
+| **Google AI** | Static list + manual | N/A | Google AI SDK provides model constants |
+| **Groq** | OpenAI-compatible API | `GET https://api.groq.com/openai/v1/models` | OpenAI-compatible |
 
-### Vercel AI Gateway
-| Model | Cost Tier | Context | Best For |
-|-------|-----------|---------|----------|
-| `anthropic/claude-sonnet-4-5` | Medium | 200K | Via Gateway |
-| `openai/gpt-4o` | Medium | 128K | Via Gateway |
-| `google/gemini-2.0-flash` | Low | 1M | Via Gateway |
+### User Configuration for Documentation URLs
+
+Users can customize the documentation URLs in settings:
+
+```typescript
+// src/types/router.ts
+interface ProviderDocConfig {
+  providerId: string;
+  docUrl: string;
+  lastUpdated: string;
+  autoRefresh: boolean;
+}
+
+// Default configuration
+const DEFAULT_DOC_URLS: Record<string, string> = {
+  openai: 'https://developers.openai.com/api/docs/models',
+  anthropic: 'https://platform.claude.com/docs/en/about-claude/models/overview',
+  google_ai: 'https://ai.google.dev/gemini-api/docs/models',
+  groq: 'https://console.groq.com/docs/models',
+  vercel_ai_gateway: 'https://vercel.com/ai-gateway/models',
+  openrouter: 'https://openrouter.ai/models',
+};
+```
+
+### Model Refresh UI
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Settings > Router > Model Sources                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Model Documentation Sources                                        │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  Provider      │ Documentation URL                │ Refresh │   │
+│  ├─────────────────────────────────────────────────────────────┤   │
+│  │  OpenAI        │ developers.openai.com/.../models │ [Sync]  │   │
+│  │  Anthropic     │ platform.claude.com/.../models   │ [Sync]  │   │
+│  │  Google AI     │ ai.google.dev/.../models         │ [Sync]  │   │
+│  │  Groq          │ console.groq.com/docs/models     │ [Sync]  │   │
+│  │  Vercel Gateway│ vercel.com/ai-gateway/models     │ [Sync]  │   │
+│  │  OpenRouter    │ openrouter.ai/models             │ [Sync]  │   │
+│  │  Ollama (local)│ localhost:11434                  │ [Sync]  │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  [Sync All Models]  [Edit URLs...]  [Reset to Defaults]            │
+│                                                                     │
+│  Last synced: 2026-02-21 14:32:00                                  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Model Metadata Schema (Multi-Modality Support)
+
+```rust
+/// Extended model metadata supporting multi-modality
+pub struct DiscoveredModel {
+    /// Unique model identifier (e.g., "anthropic/claude-sonnet-4-5")
+    pub id: String,
+    /// Display name for UI
+    pub display_name: String,
+    /// Provider that owns this model
+    pub provider_id: String,
+    /// Cost tier for routing decisions
+    pub cost_tier: CostTier,
+    /// Maximum context window in tokens
+    pub context_limit: i32,
+    /// Modalities supported by this model
+    pub modalities: Vec<ModelModality>,
+    /// Model capabilities
+    pub capabilities: ModelCapabilities,
+    /// Last discovery timestamp
+    pub discovered_at: DateTime<Utc>,
+}
+
+/// Supported modalities for future extensibility
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ModelModality {
+    /// Text generation (default)
+    Text,
+    /// Image understanding (vision)
+    Image,
+    /// Image generation
+    ImageGeneration,
+    /// Audio transcription
+    AudioTranscription,
+    /// Audio generation (TTS)
+    AudioGeneration,
+    /// Video understanding
+    Video,
+    /// Embedding generation
+    Embedding,
+}
+
+/// Model capabilities for routing decisions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelCapabilities {
+    /// Supports function/tool calling
+    pub tool_calling: bool,
+    /// Supports structured JSON output
+    pub structured_output: bool,
+    /// Supports streaming responses
+    pub streaming: bool,
+    /// Supports system prompts
+    pub system_prompt: bool,
+    /// Maximum output tokens
+    pub max_output_tokens: Option<i32>,
+}
+```
+
+### Discovery Implementation
+
+```rust
+// src-tauri/src/ai/model_discovery.rs
+
+/// Trait for provider-specific model discovery
+#[async_trait]
+pub trait ModelDiscovery: Send + Sync {
+    /// Discover available models from this provider
+    async fn discover_models(&self, config: &ProviderConfig) -> Result<Vec<DiscoveredModel>, DiscoveryError>;
+
+    /// Check if discovery is available (e.g., API accessible)
+    async fn is_available(&self, config: &ProviderConfig) -> bool;
+}
+
+/// Ollama discovery - uses existing implementation
+pub struct OllamaDiscovery;
+
+#[async_trait]
+impl ModelDiscovery for OllamaDiscovery {
+    async fn discover_models(&self, config: &ProviderConfig) -> Result<Vec<DiscoveredModel>, DiscoveryError> {
+        // Calls existing discover_ollama_models_command logic
+        // GET http://localhost:11434/api/tags
+        // Transforms OllamaModel -> DiscoveredModel
+    }
+}
+
+/// Vercel AI Gateway discovery
+pub struct VercelAIGatewayDiscovery;
+
+#[async_trait]
+impl ModelDiscovery for VercelAIGatewayDiscovery {
+    async fn discover_models(&self, config: &ProviderConfig) -> Result<Vec<DiscoveredModel>, DiscoveryError> {
+        // GET /v1/models with API key
+        // Response: { "data": [{ "id": "anthropic/claude-sonnet-4", ... }] }
+        // Parses provider prefix to determine original provider
+    }
+}
+
+/// OpenRouter discovery
+pub struct OpenRouterDiscovery;
+
+#[async_trait]
+impl ModelDiscovery for OpenRouterDiscovery {
+    async fn discover_models(&self, config: &ProviderConfig) -> Result<Vec<DiscoveredModel>, DiscoveryError> {
+        // GET https://openrouter.ai/api/v1/models
+        // 300+ models with pricing and capability info
+        // Rich metadata including context limits and pricing
+    }
+}
+```
+
+### Default Model Fallbacks
+
+When discovery fails or before discovery runs, use sensible defaults:
+
+```rust
+// Static fallback models per provider (used when API unavailable)
+pub static FALLBACK_MODELS: LazyLock<HashMap<&'static str, Vec<DiscoveredModel>>> = LazyLock::new(|| {
+    HashMap::from([
+        ("openai", vec![
+            DiscoveredModel::text_only("gpt-4o", "OpenAI", CostTier::Medium, 128_000),
+            DiscoveredModel::text_only("gpt-4o-mini", "OpenAI", CostTier::Low, 128_000),
+        ]),
+        ("anthropic", vec![
+            DiscoveredModel::text_only("claude-sonnet-4-5-20250219", "Anthropic", CostTier::Medium, 200_000),
+            DiscoveredModel::text_only("claude-haiku-4-5-20251001", "Anthropic", CostTier::Low, 200_000),
+        ]),
+        ("google_ai", vec![
+            DiscoveredModel::multimodal("gemini-2.0-flash", "Google AI", CostTier::Low, 1_000_000, vec![ModelModality::Text, ModelModality::Image]),
+            DiscoveredModel::multimodal("gemini-1.5-pro", "Google AI", CostTier::Medium, 2_000_000, vec![ModelModality::Text, ModelModality::Image]),
+        ]),
+        // Ollama uses discovered models only (no fallback)
+    ])
+});
+```
+
+### Discovery Schedule
+
+1. **On Startup**: Discover models for all active providers
+2. **On Provider Add**: Discover models when new provider configured
+3. **Manual Refresh**: User-triggered refresh via UI or CLI
+4. **Periodic Refresh**: Optional background refresh (default: disabled)
 
 ## Database Schema
 
@@ -164,9 +331,37 @@ CREATE TABLE router_config (
     custom_routes TEXT,  -- JSON: { "code": ["model1", "model2"], ... }
     -- Per-task overrides
     task_overrides TEXT, -- JSON: { "code": "claude-opus-4", ... }
+    -- Last model discovery timestamp
+    last_discovery TEXT, -- ISO timestamp
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+```
+
+### New Table: `discovered_models`
+
+Stores dynamically discovered models with multi-modality support:
+
+```sql
+CREATE TABLE discovered_models (
+    id TEXT PRIMARY KEY,              -- e.g., "anthropic/claude-sonnet-4-5"
+    display_name TEXT NOT NULL,       -- Human-readable name
+    provider_id TEXT NOT NULL,        -- e.g., "vercel-ai-gateway"
+    model_id TEXT NOT NULL,           -- Original model ID from provider
+    cost_tier TEXT NOT NULL DEFAULT 'medium',  -- 'low', 'medium', 'high'
+    context_limit INTEGER DEFAULT 4096,
+    -- Multi-modality support
+    modalities TEXT NOT NULL DEFAULT '["text"]',  -- JSON array: ["text", "image", "audio"]
+    capabilities TEXT,                -- JSON: { "tool_calling": true, "streaming": true, ... }
+    -- Metadata
+    discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    UNIQUE(provider_id, model_id)     -- Prevent duplicates per provider
+);
+
+CREATE INDEX idx_discovered_models_provider ON discovered_models(provider_id);
+CREATE INDEX idx_discovered_models_tier ON discovered_models(cost_tier);
+CREATE INDEX idx_discovered_models_modalities ON discovered_models(modalities);
 ```
 
 ### Migration File
@@ -178,11 +373,30 @@ CREATE TABLE router_config (
     active_profile TEXT NOT NULL DEFAULT 'balanced',
     custom_routes TEXT,
     task_overrides TEXT,
+    last_discovery TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 INSERT INTO router_config (id, active_profile) VALUES (1, 'balanced');
+
+CREATE TABLE discovered_models (
+    id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    model_id TEXT NOT NULL,
+    cost_tier TEXT NOT NULL DEFAULT 'medium',
+    context_limit INTEGER DEFAULT 4096,
+    modalities TEXT NOT NULL DEFAULT '["text"]',
+    capabilities TEXT,
+    discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    UNIQUE(provider_id, model_id)
+);
+
+CREATE INDEX idx_discovered_models_provider ON discovered_models(provider_id);
+CREATE INDEX idx_discovered_models_tier ON discovered_models(cost_tier);
+CREATE INDEX idx_discovered_models_modalities ON discovered_models(modalities);
 ```
 
 ## API Design
@@ -222,9 +436,18 @@ mesoclaw router profile set <eco|balanced|premium>  # Set profile
 mesoclaw router task <task>          # Show model for task
 mesoclaw router task <task> --set <model>  # Override task model
 
-# Model listing
-mesoclaw router models               # List all routable models
+# Model discovery
+mesoclaw router discover             # Discover models for all active providers
+mesoclaw router discover --provider <name>  # Discover for specific provider
+mesoclaw router models               # List all discovered models
 mesoclaw router models --provider <name>  # Filter by provider
+mesoclaw router models --modality <text|image|audio|video>  # Filter by modality
+mesoclaw router models --refresh     # Force refresh from provider APIs
+
+# Documentation URL management
+mesoclaw router urls                 # Show documentation URLs
+mesoclaw router urls set <provider> <url>  # Update documentation URL
+mesoclaw router urls reset           # Reset all URLs to defaults
 
 # Routing info
 mesoclaw router status               # Full routing status
@@ -389,56 +612,93 @@ pub fn classify_task(input: &str) -> TaskType {
 
 ## Implementation Tasks
 
-### Phase 1: Core Infrastructure (Backend)
+### Phase 1: Core Infrastructure (Backend) ✅ COMPLETE
 
-#### Task 1.1: Database Migration
-- [ ] Create migration `add_router_config`
-- [ ] Add `router_config` table to schema.rs
-- [ ] Create Diesel model for RouterConfig
-- [ ] Add CRUD operations in database/models/router_config.rs
+#### Task 1.1: Database Migration ✅
+- [x] Create migration `add_router_config`
+- [x] Add `router_config` table to schema.rs
+- [x] Add `discovered_models` table to schema.rs
+- [x] Create Diesel model for RouterConfig
+- [x] Create Diesel model for DiscoveredModel with multi-modality support
+- [x] Add CRUD operations in database/models/router_config.rs
+- [x] Add CRUD operations in database/models/discovered_model.rs
 
 **Files:**
-- `src-tauri/migrations/YYYY-MM-DD-HHMMSS-add_router_config/`
+- `src-tauri/migrations/2026-02-21-124207-add_router_config/`
 - `src-tauri/src/database/schema.rs`
 - `src-tauri/src/database/models/router_config.rs`
+- `src-tauri/src/database/models/discovered_model.rs`
 
-#### Task 1.2: Routing Profile Enum
-- [ ] Add `RoutingProfile` enum to router.rs
-- [ ] Implement profile → cost tier mapping
-- [ ] Create profile-specific routing rules
-- [ ] Add serialization/deserialization
+#### Task 1.2: Routing Profile Enum ✅
+- [x] Add `RoutingProfile` enum to router.rs
+- [x] Implement profile → cost tier mapping
+- [x] Create profile-specific routing rules
+- [x] Add serialization/deserialization
+- [x] Add `ModelModality` enum (Text, Image, Audio, Video, Embedding)
+- [x] Add `ModelCapabilities` struct
 
 **Files:**
 - `src-tauri/src/ai/providers/router.rs`
 
-#### Task 1.3: Model Registry
-- [ ] Create `ModelRegistry` struct with prepopulated models
-- [ ] Add provider-specific model lists
-- [ ] Implement cost tier assignment per model
-- [ ] Add model availability checking
+#### Task 1.3: Model Discovery Infrastructure ✅
+- [x] Create `ModelDiscovery` trait for provider-specific discovery
+- [x] Implement `OllamaDiscovery` (repurposed from existing discovery)
+- [x] Implement `VercelAIGatewayDiscovery` (GET /v1/models)
+- [x] Implement `OpenRouterDiscovery` (GET /api/v1/models)
+- [x] Implement `OpenAIDiscovery` (GET /v1/models)
+- [x] Implement `GroqDiscovery` (OpenAI-compatible)
+- [x] Add cost tier, context limit, and vision support inference heuristics
 
 **Files:**
-- `src-tauri/src/ai/model_registry.rs` (new)
+- `src-tauri/src/ai/discovery/mod.rs`
+- `src-tauri/src/ai/discovery/ollama.rs`
+- `src-tauri/src/ai/discovery/vercel_gateway.rs`
+- `src-tauri/src/ai/discovery/openrouter.rs`
+- `src-tauri/src/ai/discovery/openai.rs`
+- `src-tauri/src/ai/discovery/groq.rs`
 
-#### Task 1.4: Router Service
-- [ ] Create `RouterService` to manage routing state
-- [ ] Integrate with database for persistence
-- [ ] Add profile switching logic
-- [ ] Implement task override handling
-
-**Files:**
-- `src-tauri/src/services/router.rs` (new)
-
-#### Task 1.5: Router Commands
-- [ ] Implement `get_router_config_command`
-- [ ] Implement `set_router_profile_command`
-- [ ] Implement `get_routing_for_task_command`
-- [ ] Implement `set_task_model_override_command`
-- [ ] Implement `get_available_models_for_routing_command`
-- [ ] Register commands in lib.rs
+#### Task 1.4: Model Registry Service ✅
+- [x] Create `ModelRegistry` to manage discovered models
+- [x] Implement model discovery on demand
+- [x] Implement model sync to database
+- [x] Add modality filtering for routing decisions
+- [x] Add cost tier filtering
+- [x] Add profile-based model selection
 
 **Files:**
-- `src-tauri/src/commands/router.rs` (new)
+- `src-tauri/src/services/model_registry.rs`
+
+#### Task 1.5: Router Service ✅
+- [x] Create `RouterService` to manage routing state
+- [x] Integrate with database for persistence
+- [x] Integrate with ModelRegistry for model availability
+- [x] Add profile switching logic
+- [x] Implement task override handling
+- [x] Implement modality-aware routing
+
+**Files:**
+- `src-tauri/src/services/router.rs`
+
+#### Task 1.6: Router Commands ✅
+- [x] Implement `get_router_config`
+- [x] Implement `set_router_profile`
+- [x] Implement `get_discovered_models`
+- [x] Implement `get_discovered_models_by_provider`
+- [x] Implement `discover_models`
+- [x] Implement `set_task_override`
+- [x] Implement `clear_task_override`
+- [x] Implement `route_message`
+- [x] Implement `route_message_with_modalities`
+- [x] Implement `get_available_models`
+- [x] Implement `is_provider_available`
+- [x] Implement `reload_models`
+- [x] Implement `get_model_count`
+- [x] Implement `initialize_router`
+- [x] Register commands in lib.rs
+- [x] Add RouterState management
+
+**Files:**
+- `src-tauri/src/commands/router.rs`
 - `src-tauri/src/lib.rs`
 
 ### Phase 2: CLI Support
@@ -447,7 +707,9 @@ pub fn classify_task(input: &str) -> TaskType {
 - [ ] Add `router` subcommand to CLI
 - [ ] Implement `profile` subcommands (show, set)
 - [ ] Implement `task` subcommands (show, set-override)
-- [ ] Implement `models` subcommand (list, filter)
+- [ ] Implement `models` subcommand (list, filter, refresh)
+- [ ] Implement `discover` subcommand (trigger discovery)
+- [ ] Implement `urls` subcommands (show, set, reset)
 - [ ] Implement `status` command
 
 **Files:**
@@ -456,6 +718,7 @@ pub fn classify_task(input: &str) -> TaskType {
 #### Task 2.2: CLI Output Formatting
 - [ ] Add table formatting for model lists
 - [ ] Add color-coded cost tier display
+- [ ] Add modality icons (📷 📝 🔊 🎬)
 - [ ] Add JSON output option for scripting
 
 **Files:**
@@ -559,8 +822,16 @@ pub fn classify_task(input: &str) -> TaskType {
 | File | Purpose |
 |------|---------|
 | `src-tauri/migrations/...add_router_config/` | Database migration |
-| `src-tauri/src/database/models/router_config.rs` | Diesel model |
-| `src-tauri/src/ai/model_registry.rs` | Prepopulated model list |
+| `src-tauri/src/database/models/router_config.rs` | Diesel model for router config |
+| `src-tauri/src/database/models/discovered_model.rs` | Diesel model for discovered models |
+| `src-tauri/src/ai/model_discovery.rs` | Discovery trait and types |
+| `src-tauri/src/ai/discovery/mod.rs` | Discovery module |
+| `src-tauri/src/commands/ollama.rs` | Modified to use shared discovery types |
+| `src-tauri/src/ai/discovery/vercel_gateway.rs` | Vercel AI Gateway discovery |
+| `src-tauri/src/ai/discovery/openrouter.rs` | OpenRouter discovery |
+| `src-tauri/src/ai/discovery/openai.rs` | OpenAI discovery |
+| `src-tauri/src/ai/discovery/groq.rs` | Groq discovery |
+| `src-tauri/src/ai/model_registry.rs` | Model registry service |
 | `src-tauri/src/services/router.rs` | Router service |
 | `src-tauri/src/commands/router.rs` | Tauri commands |
 | `src/stores/routerStore.ts` | Frontend state |
@@ -571,8 +842,9 @@ pub fn classify_task(input: &str) -> TaskType {
 
 | File | Changes |
 |------|---------|
-| `src-tauri/src/database/schema.rs` | Add router_config table |
-| `src-tauri/src/ai/providers/router.rs` | Add RoutingProfile, enhance routing |
+| `src-tauri/src/database/schema.rs` | Add router_config and discovered_models tables |
+| `src-tauri/src/ai/providers/router.rs` | Add RoutingProfile, multi-modality support |
+| `src-tauri/src/commands/ollama.rs` | Update to use shared discovery infrastructure |
 | `src-tauri/src/cli.rs` | Add router CLI commands |
 | `src-tauri/src/lib.rs` | Register router commands |
 | `src/routes/settings.tsx` | Add Router tab |
@@ -584,11 +856,83 @@ pub fn classify_task(input: &str) -> TaskType {
 
 1. **Profile Switching**: User can switch between eco/balanced/premium profiles
 2. **Task Routing**: Different tasks (code, analysis, creative) route to appropriate models
-3. **CLI Support**: All router functions accessible from command line
-4. **UI Control**: Full router configuration in Settings UI
-5. **App-Wide**: Router used consistently across chat, agents, scheduler
-6. **Fallback**: Graceful fallback when primary model unavailable
-7. **Customization**: Users can override per-task model selection
+3. **Dynamic Discovery**: Models are discovered from provider APIs and documentation, not hardcoded
+4. **Multi-Modality Support**: Router can select models based on required modalities (text, image, audio, video)
+5. **CLI Support**: All router functions accessible from command line
+6. **UI Control**: Full router configuration in Settings UI
+7. **App-Wide**: Router used consistently across chat, agents, scheduler
+8. **Fallback**: Graceful fallback when primary model unavailable
+9. **Customization**: Users can override per-task model selection
+10. **Ollama Integration**: Uses existing discovered local models, not hardcoded list
+11. **User-Configurable URLs**: Users can update documentation URLs for model discovery
+
+## Multi-Modality Routing
+
+### Modality Detection
+
+The router can detect required modalities from the request context:
+
+```rust
+pub fn detect_required_modalities(request: &ChatRequest) -> Vec<ModelModality> {
+    let mut modalities = vec![ModelModality::Text]; // Always need text
+
+    // Check for images in messages
+    if request.messages.iter().any(|m| m.has_images()) {
+        modalities.push(ModelModality::Image);
+    }
+
+    // Check for audio attachments
+    if request.attachments.iter().any(|a| a.is_audio()) {
+        modalities.push(ModelModality::AudioTranscription);
+    }
+
+    // Check for video attachments
+    if request.attachments.iter().any(|a| a.is_video()) {
+        modalities.push(ModelModality::Video);
+    }
+
+    modalities
+}
+```
+
+### Modality-Aware Routing
+
+```rust
+impl ModelRouter {
+    /// Route to a model that supports all required modalities
+    pub fn route_for_modalities(
+        &self,
+        task: TaskType,
+        required_modalities: &[ModelModality],
+    ) -> Option<&ModelTarget> {
+        self.targets_for(task)
+            .into_iter()
+            .find(|target| {
+                let model = self.registry.get_model(&target.model)?;
+                model.supports_all_modalities(required_modalities)
+            })
+    }
+}
+```
+
+### UI Indication
+
+When a request requires specific modalities, the UI shows which models support them:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Select Model for Image Analysis                                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Required modalities: 📷 Image + 📝 Text                           │
+│                                                                     │
+│  ● claude-sonnet-4-5 (Anthropic) - Supports 📷 📝                  │
+│  ○ gpt-4o (OpenAI) - Supports 📷 📝 🔊                             │
+│  ○ gemini-2.0-flash (Google) - Supports 📷 📝 🔊 🎬                │
+│  ○ gpt-4o-mini (OpenAI) - Text only (incompatible)                 │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ## Risks & Mitigations
 
@@ -596,8 +940,10 @@ pub fn classify_task(input: &str) -> TaskType {
 |------|------------|
 | Task misclassification | Simple heuristics + manual override option |
 | Provider unavailability | Fallback chain in routing rules |
-| Model list outdated | Configurable model list + user additions |
-| Performance overhead | Cache routing decisions, async loading |
+| Model list outdated | Dynamic discovery from provider APIs |
+| Discovery API failure | Static fallback models per provider |
+| Performance overhead | Cache routing decisions, async discovery |
+| Multi-modality mismatch | Modality-aware routing with UI feedback |
 
 ## Future Enhancements (Out of Scope)
 
@@ -606,3 +952,6 @@ pub fn classify_task(input: &str) -> TaskType {
 - A/B testing for model selection
 - ClawRouter integration (x402 payment)
 - Multi-model parallel execution
+- Audio generation (TTS) routing
+- Embedding model routing
+- Fine-tuned model support

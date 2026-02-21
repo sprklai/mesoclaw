@@ -11,33 +11,17 @@ import { cn } from "@/lib/utils";
 import {
   Activity,
   AlertTriangle,
-  CheckCircle,
+  CheckCircle2,
   Clock,
   RefreshCw,
   Square,
   Trash2,
   XCircle,
-  Zap,
   List,
-  BarChart3,
-} from "lucide-react";
+} from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { ResourceStatus } from "@/stores/lifecycleStore";
 
 interface LifecycleStatusProps {
@@ -104,7 +88,7 @@ export function LifecycleStatus({
       case "recovering":
         return <RefreshCw className="h-4 w-4 text-yellow-500 animate-spin" />;
       case "completed":
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
+        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
       case "failed":
         return <XCircle className="h-4 w-4 text-red-600" />;
     }
@@ -163,90 +147,72 @@ export function LifecycleStatus({
       {/* Stats Overview */}
       {stats && !compact && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Resources
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalResources}</div>
-            </CardContent>
-          </Card>
+          <div className="rounded-lg border bg-card p-4">
+            <div className="text-sm font-medium text-muted-foreground">
+              Total Resources
+            </div>
+            <div className="text-2xl font-bold">{stats.totalResources}</div>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Running
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {stats.running}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="rounded-lg border bg-card p-4">
+            <div className="text-sm font-medium text-muted-foreground">
+              Running
+            </div>
+            <div className="text-2xl font-bold text-green-600">
+              {stats.running}
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Stuck
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{stats.stuck}</div>
-            </CardContent>
-          </Card>
+          <div className="rounded-lg border bg-card p-4">
+            <div className="text-sm font-medium text-muted-foreground">
+              Stuck
+            </div>
+            <div className="text-2xl font-bold text-red-600">{stats.stuck}</div>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Monitoring
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <div
-                  className={cn(
-                    "h-2 w-2 rounded-full",
-                    isMonitoring ? "bg-green-500" : "bg-gray-400"
-                  )}
-                />
-                <span className="text-sm">
-                  {isMonitoring ? "Active" : "Inactive"}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="rounded-lg border bg-card p-4">
+            <div className="text-sm font-medium text-muted-foreground">
+              Monitoring
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  isMonitoring ? "bg-green-500" : "bg-gray-400"
+                )}
+              />
+              <span className="text-sm">
+                {isMonitoring ? "Active" : "Inactive"}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Resource List */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <List className="h-5 w-5" />
-              Resources
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                filterType
-                  ? fetchResourcesByType(filterType)
-                  : fetchAllResources()
-              }
-              disabled={isLoading}
-            >
-              <RefreshCw
-                className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")}
-              />
-              Refresh
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-lg border bg-card">
+        <div className="flex items-center justify-between border-b p-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <List className="h-5 w-5" />
+            Resources
+          </h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              filterType
+                ? fetchResourcesByType(filterType)
+                : fetchAllResources()
+            }
+            disabled={isLoading}
+          >
+            <RefreshCw
+              className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")}
+            />
+            Refresh
+          </Button>
+        </div>
+        <div className="p-4">
           {resources.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No resources tracked
@@ -278,150 +244,134 @@ export function LifecycleStatus({
             </div>
           ) : (
             // Full view - table
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Resource ID</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>State</TableHead>
-                  <TableHead>Progress</TableHead>
-                  <TableHead>Tier</TableHead>
-                  <TableHead>Created</TableHead>
-                  {showControls && <TableHead>Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {resources.map((resource) => (
-                  <TableRow
-                    key={resource.id}
-                    className={cn(
-                      "cursor-pointer",
-                      selectedResourceId === resource.id && "bg-muted"
-                    )}
-                    onClick={() => selectResource(resource.id)}
-                  >
-                    <TableCell className="font-mono text-xs">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger className="truncate max-w-[150px] block">
-                            {resource.id}
-                          </TooltipTrigger>
-                          <TooltipContent>{resource.id}</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{resource.resourceType}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getStateIcon(resource.state)}
-                        <Badge className={getStateColor(resource.state)}>
-                          {resource.state}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {resource.progress !== undefined ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-green-500"
-                              style={{ width: `${(resource.progress ?? 0) * 100}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {Math.round((resource.progress ?? 0) * 100)}%
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2 text-sm font-medium">Resource ID</th>
+                    <th className="text-left p-2 text-sm font-medium">Type</th>
+                    <th className="text-left p-2 text-sm font-medium">State</th>
+                    <th className="text-left p-2 text-sm font-medium">Progress</th>
+                    <th className="text-left p-2 text-sm font-medium">Tier</th>
+                    <th className="text-left p-2 text-sm font-medium">Created</th>
+                    {showControls && <th className="text-left p-2 text-sm font-medium">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {resources.map((resource) => (
+                    <tr
+                      key={resource.id}
+                      className={cn(
+                        "border-b cursor-pointer hover:bg-muted/50",
+                        selectedResourceId === resource.id && "bg-muted"
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        Tier {resource.escalationTier}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatDate(resource.createdAt)}
-                    </TableCell>
-                    {showControls && (
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRetry(resource.id);
-                                  }}
-                                  disabled={
-                                    resource.state !== "stuck" &&
-                                    resource.state !== "failed"
-                                  }
-                                >
-                                  <RefreshCw className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Retry</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleStop(resource.id);
-                                  }}
-                                  disabled={resource.state !== "running"}
-                                >
-                                  <Square className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Stop</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-red-500 hover:text-red-600"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleKill(resource.id);
-                                  }}
-                                  disabled={
-                                    resource.state !== "stuck" &&
-                                    resource.state !== "running"
-                                  }
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Kill</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                      onClick={() => selectResource(resource.id)}
+                    >
+                      <td className="p-2 font-mono text-xs">
+                        <Tooltip content={resource.id}>
+                          <span className="truncate max-w-[150px] block">
+                            {resource.id}
+                          </span>
+                        </Tooltip>
+                      </td>
+                      <td className="p-2">
+                        <Badge variant="outline">{resource.resourceType}</Badge>
+                      </td>
+                      <td className="p-2">
+                        <div className="flex items-center gap-2">
+                          {getStateIcon(resource.state)}
+                          <Badge className={getStateColor(resource.state)}>
+                            {resource.state}
+                          </Badge>
                         </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      </td>
+                      <td className="p-2">
+                        {resource.progress !== undefined ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-green-500"
+                                style={{ width: `${(resource.progress ?? 0) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {Math.round((resource.progress ?? 0) * 100)}%
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        <Badge variant="secondary">
+                          Tier {resource.escalationTier}
+                        </Badge>
+                      </td>
+                      <td className="p-2 text-xs text-muted-foreground">
+                        {formatDate(resource.createdAt)}
+                      </td>
+                      {showControls && (
+                        <td className="p-2">
+                          <div className="flex items-center gap-1">
+                            <Tooltip content="Retry">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRetry(resource.id);
+                                }}
+                                disabled={
+                                  resource.state !== "stuck" &&
+                                  resource.state !== "failed"
+                                }
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                            </Tooltip>
+
+                            <Tooltip content="Stop">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStop(resource.id);
+                                }}
+                                disabled={resource.state !== "running"}
+                              >
+                                <Square className="h-4 w-4" />
+                              </Button>
+                            </Tooltip>
+
+                            <Tooltip content="Kill">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-red-500 hover:text-red-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleKill(resource.id);
+                                }}
+                                disabled={
+                                  resource.state !== "stuck" &&
+                                  resource.state !== "running"
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </Tooltip>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

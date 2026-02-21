@@ -14,6 +14,7 @@ import { Route as PromptGeneratorRouteImport } from './routes/prompt-generator'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as LogsRouteImport } from './routes/logs'
+import { Route as LifecycleRouteImport } from './routes/lifecycle'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as AgentsRouteImport } from './routes/agents'
@@ -44,6 +45,11 @@ const LogsRoute = LogsRouteImport.update({
   path: '/logs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LifecycleRoute = LifecycleRouteImport.update({
+  id: '/lifecycle',
+  path: '/lifecycle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/agents': typeof AgentsRoute
   '/channels': typeof ChannelsRoute
   '/chat': typeof ChatRoute
+  '/lifecycle': typeof LifecycleRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/onboarding': typeof OnboardingRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/agents': typeof AgentsRoute
   '/channels': typeof ChannelsRoute
   '/chat': typeof ChatRoute
+  '/lifecycle': typeof LifecycleRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/onboarding': typeof OnboardingRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/agents': typeof AgentsRoute
   '/channels': typeof ChannelsRoute
   '/chat': typeof ChatRoute
+  '/lifecycle': typeof LifecycleRoute
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/onboarding': typeof OnboardingRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/channels'
     | '/chat'
+    | '/lifecycle'
     | '/logs'
     | '/memory'
     | '/onboarding'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/channels'
     | '/chat'
+    | '/lifecycle'
     | '/logs'
     | '/memory'
     | '/onboarding'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/channels'
     | '/chat'
+    | '/lifecycle'
     | '/logs'
     | '/memory'
     | '/onboarding'
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   AgentsRoute: typeof AgentsRoute
   ChannelsRoute: typeof ChannelsRoute
   ChatRoute: typeof ChatRoute
+  LifecycleRoute: typeof LifecycleRoute
   LogsRoute: typeof LogsRoute
   MemoryRoute: typeof MemoryRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LogsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lifecycle': {
+      id: '/lifecycle'
+      path: '/lifecycle'
+      fullPath: '/lifecycle'
+      preLoaderRoute: typeof LifecycleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/chat': {
       id: '/chat'
       path: '/chat'
@@ -220,6 +240,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgentsRoute: AgentsRoute,
   ChannelsRoute: ChannelsRoute,
   ChatRoute: ChatRoute,
+  LifecycleRoute: LifecycleRoute,
   LogsRoute: LogsRoute,
   MemoryRoute: MemoryRoute,
   OnboardingRoute: OnboardingRoute,

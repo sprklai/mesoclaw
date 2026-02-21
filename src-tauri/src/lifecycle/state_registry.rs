@@ -3,7 +3,7 @@
 //! The state registry maintains the authoritative state of all tracked
 //! resources and logs state transitions for auditing.
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;

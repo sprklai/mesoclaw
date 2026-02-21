@@ -24,7 +24,8 @@ pub const SCHEDULER_SUBSTATES: &[&str] = &[
 
 /// Handler for scheduler job resources.
 pub struct SchedulerHandler {
-    /// Maximum retry attempts
+    /// Maximum retry attempts (for future use)
+    #[allow(dead_code)]
     max_retries: u32,
 }
 

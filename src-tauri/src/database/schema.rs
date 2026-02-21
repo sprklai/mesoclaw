@@ -165,6 +165,33 @@ diesel::table! {
 }
 
 diesel::table! {
+    discovered_models (id) {
+        id -> Text,
+        display_name -> Text,
+        provider_id -> Text,
+        model_id -> Text,
+        cost_tier -> Text,
+        context_limit -> Nullable<Integer>,
+        modalities -> Text,
+        capabilities -> Nullable<Text>,
+        discovered_at -> Timestamp,
+        is_active -> Integer,
+    }
+}
+
+diesel::table! {
+    router_config (id) {
+        id -> Integer,
+        active_profile -> Text,
+        custom_routes -> Nullable<Text>,
+        task_overrides -> Nullable<Text>,
+        last_discovery -> Nullable<Text>,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     scheduled_jobs (id) {
         id -> Text,
         name -> Text,
@@ -250,6 +277,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     ai_providers,
     chat_messages,
     chat_sessions,
+    discovered_models,
     generated_prompts,
     memories,
     memories_fts,
@@ -257,6 +285,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     memories_fts_data,
     memories_fts_docsize,
     memories_fts_idx,
+    router_config,
     scheduled_jobs,
     settings,
     tool_audit_log,

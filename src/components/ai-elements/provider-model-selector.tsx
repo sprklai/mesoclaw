@@ -53,7 +53,7 @@ export const ProviderModelSelector = memo(function ProviderModelSelector({
   // Provider options
   const providerOptions: SelectOption[] = providers.map((provider) => ({
     value: provider.id,
-    label: `${provider.name} (${provider.models.length} models)`,
+    label: `${provider.name} (${provider.models?.length ?? 0} models)`,
   }));
 
   return (

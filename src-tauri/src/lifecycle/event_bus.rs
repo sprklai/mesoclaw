@@ -120,7 +120,9 @@ impl LifecycleEvent {
             LifecycleEvent::ResourceRecovered { resource_id, .. } => Some(resource_id),
             LifecycleEvent::ResourceFailed { resource_id, .. } => Some(resource_id),
             LifecycleEvent::ResourceCompleted { resource_id, .. } => Some(resource_id),
-            LifecycleEvent::UserInterventionNeeded { request, .. } => {
+            LifecycleEvent::UserInterventionNeeded {
+                request: _request, ..
+            } => {
                 // Parse the resource_id from the request
                 None // Request has a string, not ResourceId
             }

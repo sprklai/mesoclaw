@@ -12,6 +12,7 @@ pub mod logs;
 pub mod notifications;
 pub mod ollama;
 pub mod prompt_generator;
+pub mod router;
 pub mod settings;
 pub mod skills;
 pub mod streaming_chat;

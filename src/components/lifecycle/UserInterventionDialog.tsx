@@ -5,17 +5,15 @@
  * intervention is required to proceed with recovery.
  */
 
-import { useEffect } from "react";
 import { useLifecycleStore } from "@/stores/lifecycleStore";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
-  AlertCircle,
   RefreshCw,
   XCircle,
   Settings,
   Info,
-} from "lucide-react";
+} from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,8 +24,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import type { UserInterventionRequest, InterventionOption } from "@/stores/lifecycleStore";
 
 interface UserInterventionDialogProps {
@@ -56,13 +52,6 @@ export function UserInterventionDialog({
   // Use prop intervention or store intervention
   const intervention = propIntervention ?? activeIntervention;
   const isOpen = intervention !== null;
-
-  // Auto-show dialog when there's an active intervention
-  useEffect(() => {
-    if (activeIntervention && !propIntervention) {
-      // Could trigger a notification here
-    }
-  }, [activeIntervention, propIntervention]);
 
   const handleSelectOption = async (option: InterventionOption) => {
     if (!intervention) return;
@@ -125,14 +114,12 @@ export function UserInterventionDialog({
 
         <div className="space-y-4">
           {/* Failure Context */}
-          <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2 text-red-700 dark:text-red-400">
-                <AlertCircle className="h-4 w-4" />
-                Failure Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
+            <div className="text-sm font-medium flex items-center gap-2 text-red-700 dark:text-red-400 mb-3">
+              <AlertTriangle className="h-4 w-4" />
+              Failure Details
+            </div>
+            <div className="text-sm space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <span className="text-muted-foreground">Resource:</span>
@@ -146,7 +133,7 @@ export function UserInterventionDialog({
                 </div>
               </div>
 
-              <Separator className="my-2" />
+              <div className="border-t border-red-200 dark:border-red-800 my-2" />
 
               <div>
                 <span className="text-muted-foreground">Error:</span>
@@ -177,8 +164,8 @@ export function UserInterventionDialog({
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Options */}
           <div className="space-y-2">

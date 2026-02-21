@@ -1,5 +1,6 @@
 pub mod agents;
 pub mod context;
+pub mod discovery;
 pub mod prompts;
 pub mod provider;
 pub mod providers;

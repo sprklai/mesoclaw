@@ -172,7 +172,8 @@ impl Default for EscalationState {
 pub struct EscalationManager {
     /// Configuration
     config: EscalationConfig,
-    /// State registry for resource lookup
+    /// State registry for resource lookup (for future use)
+    #[allow(dead_code)]
     state_registry: Arc<StateRegistry>,
     /// Escalation state by resource ID
     escalation_states: RwLock<HashMap<String, EscalationState>>,
@@ -443,7 +444,7 @@ impl EscalationManager {
     ) -> Result<(), EscalationError> {
         let mut queue = self.intervention_queue.write().await;
 
-        if let Some(request) = queue.remove(request_id) {
+        if let Some(_request) = queue.remove(request_id) {
             let _ = self
                 .event_sender
                 .send(EscalationEvent::InterventionResolved {

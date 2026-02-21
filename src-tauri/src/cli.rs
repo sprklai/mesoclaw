@@ -102,6 +102,8 @@ enum Commands {
     Gui,
     /// Watch a path for changes and trigger an agent on each change.
     Watch(WatchArgs),
+    /// Manage LLM routing profiles and model discovery.
+    Router(RouterArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -282,6 +284,29 @@ struct WatchArgs {
     /// Debounce delay in milliseconds before triggering the agent.
     #[arg(long, default_value = "500")]
     debounce_ms: u64,
+}
+
+#[derive(Parser, Debug)]
+struct RouterArgs {
+    /// Router action: profile | task | models | discover | status | test
+    #[arg(default_value = "status")]
+    action: String,
+    /// Profile name (for profile set): eco | balanced | premium
+    name: Option<String>,
+    /// Task type (for task commands): code | general | fast | creative | analysis
+    #[arg(long)]
+    task: Option<String>,
+    /// Model ID (for task set-override)
+    #[arg(long)]
+    model: Option<String>,
+    /// Provider ID (for discover, models filter)
+    #[arg(long)]
+    provider: Option<String>,
+    /// Modality filter (for models): text | image | audio | video
+    #[arg(long)]
+    modality: Option<String>,
+    /// Test message (for test action)
+    message: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -486,6 +511,104 @@ impl GatewayClient {
             .json::<Value>()
             .await
     }
+
+    // Router API methods
+
+    async fn get_router_config(&self) -> reqwest::Result<Value> {
+        self.client
+            .get(format!("{}/api/v1/router/config", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn set_router_profile(&self, profile: String) -> reqwest::Result<Value> {
+        self.client
+            .post(format!("{}/api/v1/router/profile", self.base_url))
+            .header("Authorization", self.auth_header())
+            .json(&json!({ "profile": profile }))
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn get_discovered_models(&self) -> reqwest::Result<Value> {
+        self.client
+            .get(format!("{}/api/v1/router/models", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn get_discovered_models_by_provider(
+        &self,
+        provider_id: String,
+    ) -> reqwest::Result<Value> {
+        self.client
+            .get(format!(
+                "{}/api/v1/router/models/{}",
+                self.base_url, provider_id
+            ))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn discover_models(&self, provider_id: String) -> reqwest::Result<usize> {
+        let result: Value = self
+            .client
+            .post(format!("{}/api/v1/router/discover", self.base_url))
+            .header("Authorization", self.auth_header())
+            .json(&json!({ "provider_id": provider_id }))
+            .send()
+            .await?
+            .json()
+            .await?;
+        Ok(result.as_u64().unwrap_or(0) as usize)
+    }
+
+    async fn set_task_override(&self, task: String, model_id: String) -> reqwest::Result<Value> {
+        self.client
+            .post(format!("{}/api/v1/router/override", self.base_url))
+            .header("Authorization", self.auth_header())
+            .json(&json!({ "task": task, "model_id": model_id }))
+            .send()
+            .await?
+            .json::<Value>()
+            .await
+    }
+
+    async fn route_message(&self, message: String) -> reqwest::Result<Option<String>> {
+        let result: Value = self
+            .client
+            .post(format!("{}/api/v1/router/route", self.base_url))
+            .header("Authorization", self.auth_header())
+            .json(&json!({ "message": message }))
+            .send()
+            .await?
+            .json()
+            .await?;
+        Ok(result.as_str().map(|s| s.to_string()))
+    }
+
+    async fn get_model_count(&self) -> reqwest::Result<usize> {
+        let result: Value = self
+            .client
+            .get(format!("{}/api/v1/router/count", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await?
+            .json()
+            .await?;
+        Ok(result.as_u64().unwrap_or(0) as usize)
+    }
 }
 
 /// Resolve or start the gateway, returning a ready client.
@@ -551,6 +674,7 @@ async fn dispatch(command: &Commands, raw: bool, json_mode: bool) {
             println!("gui: not yet implemented — launch mesoclaw-desktop directly");
         }
         Commands::Watch(args) => handle_watch(args, raw, json_mode).await,
+        Commands::Router(args) => handle_router(args, raw, json_mode).await,
     }
 }
 
@@ -2596,6 +2720,270 @@ async fn handle_watch(args: &WatchArgs, raw: bool, json_mode: bool) {
                 }
             }
             Err(e) => eprintln!("[watch] agent error: {e}"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Router commands
+// ---------------------------------------------------------------------------
+
+/// Handle router CLI commands.
+async fn handle_router(args: &RouterArgs, raw: bool, json_mode: bool) {
+    match args.action.as_str() {
+        "profile" => handle_router_profile(args, raw, json_mode).await,
+        "task" => handle_router_task(args, raw, json_mode).await,
+        "models" => handle_router_models(args, raw, json_mode).await,
+        "discover" => handle_router_discover(args, raw, json_mode).await,
+        "test" => handle_router_test(args, raw, json_mode).await,
+        "status" | _ => handle_router_status(raw, json_mode).await,
+    }
+}
+
+async fn handle_router_profile(args: &RouterArgs, raw: bool, json_mode: bool) {
+    let Some(client) = require_gateway().await else {
+        return;
+    };
+
+    match &args.name {
+        Some(profile) => {
+            // Set profile
+            match client.set_router_profile(profile.clone()).await {
+                Ok(_) => {
+                    if !raw && !json_mode {
+                        println!("Profile set to: {}", profile);
+                    }
+                }
+                Err(e) => print_err(&format!("Failed to set profile: {e}")),
+            }
+        }
+        None => {
+            // Get current profile
+            match client.get_router_config().await {
+                Ok(config) => {
+                    if json_mode {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&config).unwrap_or_default()
+                        );
+                    } else if raw {
+                        println!("{}", config["activeProfile"].as_str().unwrap_or("unknown"));
+                    } else {
+                        println!(
+                            "Active profile: {}",
+                            config["activeProfile"].as_str().unwrap_or("unknown")
+                        );
+                        println!("Available: eco, balanced, premium");
+                    }
+                }
+                Err(e) => print_err(&format!("Failed to get router config: {e}")),
+            }
+        }
+    }
+}
+
+async fn handle_router_task(args: &RouterArgs, raw: bool, json_mode: bool) {
+    let Some(client) = require_gateway().await else {
+        return;
+    };
+
+    let Some(task) = &args.task else {
+        print_err("Task type required. Use --task <code|general|fast|creative|analysis>");
+        return;
+    };
+
+    match &args.model {
+        Some(model) => {
+            // Set override
+            match client.set_task_override(task.clone(), model.clone()).await {
+                Ok(_) => {
+                    if !raw && !json_mode {
+                        println!("Task '{}' override set to: {}", task, model);
+                    }
+                }
+                Err(e) => print_err(&format!("Failed to set task override: {e}")),
+            }
+        }
+        None => {
+            // Get current routing for task
+            print_err("Task routing display not yet implemented. Use --model to set override.");
+        }
+    }
+}
+
+async fn handle_router_models(args: &RouterArgs, raw: bool, json_mode: bool) {
+    let Some(client) = require_gateway().await else {
+        return;
+    };
+
+    let models = match &args.provider {
+        Some(provider) => {
+            client
+                .get_discovered_models_by_provider(provider.clone())
+                .await
+        }
+        None => client.get_discovered_models().await,
+    };
+
+    match models {
+        Ok(models) => {
+            // Filter by modality if specified
+            let filtered: Vec<_> = if let Some(modality) = &args.modality {
+                models
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter(|m| {
+                                m["modalities"]
+                                    .as_array()
+                                    .map(|mods| mods.iter().any(|mo| mo.as_str() == Some(modality)))
+                                    .unwrap_or(false)
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            } else {
+                models
+                    .as_array()
+                    .map(|arr| arr.iter().collect::<Vec<_>>())
+                    .unwrap_or_default()
+            };
+
+            if json_mode {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&filtered).unwrap_or_default()
+                );
+            } else if raw {
+                for model in &filtered {
+                    println!("{}", model["modelId"].as_str().unwrap_or("unknown"));
+                }
+            } else {
+                println!("Discovered models ({}):", filtered.len());
+                for model in &filtered {
+                    let tier = model["costTier"].as_str().unwrap_or("medium");
+                    let provider = model["providerId"].as_str().unwrap_or("unknown");
+                    let modalities = model["modalities"]
+                        .as_array()
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|m| m.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        })
+                        .unwrap_or_default();
+                    println!(
+                        "  {} ({}) - {} tier [{}]",
+                        model["modelId"].as_str().unwrap_or("unknown"),
+                        provider,
+                        tier,
+                        modalities
+                    );
+                }
+            }
+        }
+        Err(e) => print_err(&format!("Failed to get models: {e}")),
+    }
+}
+
+async fn handle_router_discover(args: &RouterArgs, raw: bool, _json_mode: bool) {
+    let Some(client) = require_gateway().await else {
+        return;
+    };
+
+    let Some(provider) = &args.provider else {
+        print_err("Provider required. Use --provider <provider_id>");
+        println!("Available providers: openai, groq, ollama, vercel-ai-gateway, openrouter");
+        return;
+    };
+
+    if !raw {
+        println!("Discovering models from {}...", provider);
+    }
+
+    match client.discover_models(provider.clone()).await {
+        Ok(count) => {
+            if !raw {
+                println!("Discovered {} models from {}", count, provider);
+            } else {
+                println!("{}", count);
+            }
+        }
+        Err(e) => print_err(&format!("Discovery failed: {e}")),
+    }
+}
+
+async fn handle_router_test(args: &RouterArgs, raw: bool, _json_mode: bool) {
+    let Some(client) = require_gateway().await else {
+        return;
+    };
+
+    let Some(message) = &args.message else {
+        print_err("Message required. Usage: router test \"your message\"");
+        return;
+    };
+
+    match client.route_message(message.clone()).await {
+        Ok(Some(model)) => {
+            if raw {
+                println!("{}", model);
+            } else {
+                println!("Routed to: {}", model);
+            }
+        }
+        Ok(None) => {
+            print_err("No suitable model found for message");
+        }
+        Err(e) => print_err(&format!("Routing failed: {e}")),
+    }
+}
+
+async fn handle_router_status(raw: bool, json_mode: bool) {
+    let Some(client) = require_gateway().await else {
+        return;
+    };
+
+    // Get router config
+    let config = client.get_router_config().await;
+    let model_count = client.get_model_count().await;
+
+    match (config, model_count) {
+        (Ok(config), Ok(count)) => {
+            if json_mode {
+                let status = json!({
+                    "profile": config["activeProfile"].as_str().unwrap_or("unknown"),
+                    "modelCount": count,
+                    "taskOverrides": config["taskOverrides"],
+                });
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&status).unwrap_or_default()
+                );
+            } else if raw {
+                println!(
+                    "profile={}",
+                    config["activeProfile"].as_str().unwrap_or("unknown")
+                );
+                println!("model_count={}", count);
+            } else {
+                println!("Router Status");
+                println!("=============");
+                println!(
+                    "Active profile: {}",
+                    config["activeProfile"].as_str().unwrap_or("unknown")
+                );
+                println!("Discovered models: {}", count);
+                println!();
+                println!("Commands:");
+                println!("  mesoclaw router profile set <eco|balanced|premium>");
+                println!("  mesoclaw router task --task <type> --model <model_id>");
+                println!("  mesoclaw router models [--provider <id>] [--modality <type>]");
+                println!("  mesoclaw router discover --provider <id>");
+                println!("  mesoclaw router test \"your message\"");
+            }
+        }
+        (Err(e), _) | (_, Err(e)) => {
+            print_err(&format!("Failed to get router status: {e}"));
         }
     }
 }

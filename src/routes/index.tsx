@@ -2,8 +2,8 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { Brain, MessageSquare, Settings, Sparkles } from "lucide-react";
 import { GatewayStatus } from "@/components/ui/gateway-status";
 import { ActivityDashboard } from "@/components/dashboard";
-import { APP_IDENTITY } from "@/config/app-identity";
 import { useLLMStore } from "@/stores/llm";
+import { useAppIdentity } from "@/stores/appSettingsStore";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 
@@ -13,6 +13,7 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { config } = useLLMStore();
+  const identity = useAppIdentity();
 
   const hour = new Date().getHours();
   const greeting =
@@ -49,7 +50,7 @@ function HomePage() {
     <div className="flex h-full flex-col">
       <div className="shrink-0 p-6">
         <PageHeader
-          title={`${greeting}, ${APP_IDENTITY.productName}`}
+          title={`${greeting}, ${identity.productName}`}
           description={new Date().toLocaleDateString("en-US", {
             weekday: "long",
             month: "long",

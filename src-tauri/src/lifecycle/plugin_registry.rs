@@ -56,7 +56,7 @@ impl PluginRegistry {
         // Note: We return a Box clone here for thread-safety. In practice,
         // handlers are cheaply clonable or stateless.
         let handlers = self.handlers.read().unwrap();
-        handlers.get(resource_type).map(|h| {
+        handlers.get(resource_type).map(|_h| {
             // Create a new boxed handler - this requires ResourceHandler to be clonable
             // For now, we'll return a reference wrapper. Actually, we can't return
             // a reference from a read guard that lives beyond the function.

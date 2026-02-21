@@ -435,6 +435,23 @@ pub fn run() {
             let pool = database::init(app.handle())?;
             app.manage(pool.clone());
 
+            // Initialize ModelRegistry and RouterService
+            {
+                use services::model_registry::ModelRegistry;
+                use services::router::RouterService;
+                use commands::router::RouterState;
+
+                let registry = Arc::new(ModelRegistry::new(pool.clone()));
+                let router = Arc::new(RouterService::new(pool.clone(), Arc::clone(&registry)));
+
+                app.manage(RouterState {
+                    router,
+                    registry,
+                });
+
+                log::info!("boot: model registry and router service initialized");
+            }
+
             // Initialize scheduler before the gateway so it can be threaded in.
             // Initialised with SQLite persistence + agent loop support.
             let sched = {
@@ -1006,6 +1023,21 @@ pub fn run() {
             commands::lifecycle::spawn_resource_command,
             commands::lifecycle::is_lifecycle_monitoring_command,
             commands::lifecycle::get_resource_history_command,
+            // Router commands
+            commands::router::get_router_config,
+            commands::router::set_router_profile,
+            commands::router::get_discovered_models,
+            commands::router::get_discovered_models_by_provider,
+            commands::router::discover_models,
+            commands::router::set_task_override,
+            commands::router::clear_task_override,
+            commands::router::route_message,
+            commands::router::route_message_with_modalities,
+            commands::router::get_available_models,
+            commands::router::is_provider_available,
+            commands::router::reload_models,
+            commands::router::get_model_count,
+            commands::router::initialize_router,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]

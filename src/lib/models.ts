@@ -56,10 +56,11 @@ export interface GlobalDefaultModel {
 
 /**
  * Provider with API key status for settings UI.
+ * Note: models may not be populated when loading from IPC backend.
  */
 export interface ProviderWithKeyStatus extends AIProvider {
   hasApiKey: boolean;
-  models: AIModel[];
+  models?: AIModel[];
 }
 
 /**
