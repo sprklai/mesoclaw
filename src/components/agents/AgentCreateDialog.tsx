@@ -8,8 +8,8 @@
  * - Form validation with error display
  * - Supports both create and edit modes
  */
-import { Loader2, Plus } from "@/lib/icons";
-import type { AgentConfig, CreateAgentRequest, UpdateAgentRequest } from "@/lib/agent-config";
+import { Loader2, Plus, Shield } from "@/lib/icons";
+import type { AgentConfig, CreateAgentRequest, UpdateAgentRequest, ToolProfile } from "@/lib/agent-config";
 import { DEFAULT_AGENT_CONFIG } from "@/lib/agent-config";
 import type { ProviderWithModels } from "@/lib/models";
 
@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { ToolProfileSelect } from "@/components/settings/ToolProfileEditor";
 import { cn } from "@/lib/utils";
 
 import { useState } from "react";
@@ -88,6 +89,7 @@ export function AgentCreateDialog({
   const [temperature, setTemperature] = useState(agent?.temperature ?? DEFAULT_AGENT_CONFIG.temperature ?? 0.7);
   const [maxTokens, setMaxTokens] = useState(agent?.maxTokens ?? DEFAULT_AGENT_CONFIG.maxTokens ?? 4096);
   const [maxIterations, setMaxIterations] = useState(agent?.maxIterations ?? DEFAULT_AGENT_CONFIG.maxIterations ?? 20);
+  const [toolProfile, setToolProfile] = useState<ToolProfile>(agent?.toolProfile ?? DEFAULT_AGENT_CONFIG.toolProfile ?? "full");
   const [isEnabled, setIsEnabled] = useState(agent?.isEnabled ?? true);
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -163,6 +165,7 @@ export function AgentCreateDialog({
         temperature,
         maxTokens,
         maxIterations,
+        toolProfile,
         isEnabled,
       } as UpdateAgentRequest);
     } else {
@@ -175,6 +178,7 @@ export function AgentCreateDialog({
         temperature,
         maxTokens,
         maxIterations,
+        toolProfile,
       } as CreateAgentRequest);
     }
 
@@ -194,6 +198,7 @@ export function AgentCreateDialog({
       setTemperature(DEFAULT_AGENT_CONFIG.temperature ?? 0.7);
       setMaxTokens(DEFAULT_AGENT_CONFIG.maxTokens ?? 4096);
       setMaxIterations(DEFAULT_AGENT_CONFIG.maxIterations ?? 20);
+      setToolProfile(DEFAULT_AGENT_CONFIG.toolProfile ?? "full");
       setIsEnabled(true);
     }
     setErrors({});
@@ -383,6 +388,22 @@ export function AgentCreateDialog({
               />
               <p className="text-xs text-muted-foreground">
                 Maximum number of tool-call iterations before stopping.
+              </p>
+            </div>
+
+            {/* Tool Profile */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-muted-foreground" />
+                <Label htmlFor="toolProfile">Tool Profile</Label>
+              </div>
+              <ToolProfileSelect
+                value={toolProfile}
+                onChange={setToolProfile}
+                disabled={isLoading}
+              />
+              <p className="text-xs text-muted-foreground">
+                Controls which tools this agent can use. Use "messaging" or "full" for web access.
               </p>
             </div>
 

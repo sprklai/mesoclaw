@@ -6,6 +6,12 @@
  */
 
 /**
+ * Tool access profile for agents.
+ * Controls which tools are available to the agent.
+ */
+export type ToolProfile = "minimal" | "coding" | "messaging" | "full";
+
+/**
  * Agent status for UI display.
  */
 export type AgentStatus = "idle" | "running" | "paused" | "error" | "completed";
@@ -35,6 +41,8 @@ export interface AgentConfig {
   maxIterations: number;
   /** Maximum number of messages to keep in context */
   maxHistory: number;
+  /** Tool access profile */
+  toolProfile: ToolProfile;
   /** Whether this agent is enabled */
   isEnabled: boolean;
   /** Creation timestamp */
@@ -51,6 +59,7 @@ export const DEFAULT_AGENT_CONFIG: Partial<AgentConfig> = {
   maxTokens: 4096,
   maxIterations: 20,
   maxHistory: 50,
+  toolProfile: "full",
   isEnabled: true,
 };
 
@@ -127,6 +136,7 @@ export interface CreateAgentRequest {
   maxTokens?: number;
   maxIterations?: number;
   maxHistory?: number;
+  toolProfile?: ToolProfile;
 }
 
 /**
@@ -143,5 +153,6 @@ export interface UpdateAgentRequest {
   maxTokens?: number;
   maxIterations?: number;
   maxHistory?: number;
+  toolProfile?: ToolProfile;
   isEnabled?: boolean;
 }

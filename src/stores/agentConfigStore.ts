@@ -109,6 +109,7 @@ function backendAgentToFrontend(agent: BackendAgent): AgentConfig {
     maxTokens: agent.max_tokens ?? 4096,
     maxIterations: 20, // Default, not stored in backend
     maxHistory: 50, // Default, not stored in backend
+    toolProfile: "full", // Default, not stored in database yet
     isEnabled: agent.is_active === 1,
     createdAt: new Date(agent.created_at).getTime(),
     updatedAt: new Date(agent.updated_at).getTime(),
