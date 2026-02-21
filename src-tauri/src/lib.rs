@@ -8,6 +8,7 @@ mod commands;
 pub mod config;
 pub mod database;
 pub mod event_bus;
+pub mod lifecycle;
 #[cfg(feature = "wasm-ext")]
 pub mod extensions;
 pub mod gateway;
@@ -151,6 +152,29 @@ pub fn run() {
                 Arc::new(event_bus::TokioBroadcastBus::new());
             event_bus::TauriBridge::new(bus.clone(), app.handle().clone()).start();
             app.manage(bus.clone());
+
+            // Initialize lifecycle supervisor for resource management.
+            let lifecycle_config = lifecycle::SupervisorConfig::default();
+            let lifecycle_event_bus = lifecycle::LifecycleEventBus::new();
+            let lifecycle_supervisor = Arc::new(lifecycle::LifecycleSupervisor::with_event_bus(
+                lifecycle_config,
+                lifecycle_event_bus,
+            ));
+
+            // Register lifecycle handlers.
+            lifecycle_supervisor.register_handler(Box::new(lifecycle::handlers::agent::AgentHandler::new()));
+            lifecycle_supervisor.register_handler(Box::new(lifecycle::handlers::channel::ChannelHandler::new()));
+            lifecycle_supervisor.register_handler(Box::new(lifecycle::handlers::tool::ToolHandler::new()));
+            lifecycle_supervisor.register_handler(Box::new(lifecycle::handlers::scheduler::SchedulerHandler::new()));
+
+            // Start lifecycle monitoring.
+            let supervisor_clone = Arc::clone(&lifecycle_supervisor);
+            tauri::async_runtime::spawn(async move {
+                supervisor_clone.start_monitoring().await;
+            });
+
+            app.manage(lifecycle_supervisor);
+            log::info!("boot: lifecycle supervisor initialized and monitoring started");
 
             // Initialize activity buffer and subscribe to event bus.
             let activity_buffer = Arc::new(activity::ActivityBuffer::with_default_size());
@@ -445,7 +469,7 @@ pub fn run() {
                 let s = if let Some(components) = agent_components {
                     scheduler::TokioScheduler::new_with_agent(bus_sched, Some(pool.clone()), components)
                 } else {
-                    log::warn!("scheduler: no LLM provider configured; Heartbeat/AgentTurn payloads will be skipped");
+                    log::info!("scheduler: no LLM provider configured yet; configure one in Settings → AI Providers to enable Heartbeat/AgentTurn jobs");
                     scheduler::TokioScheduler::new_with_persistence(bus_sched, Some(pool.clone()))
                 };
 
@@ -592,7 +616,7 @@ pub fn run() {
 
                     loop {
                         match rx.recv().await {
-                            Ok(AppEvent::ChannelMessage { channel, from, content, .. }) => {
+                            Ok(AppEvent::ChannelMessage { channel, from, content, metadata }) => {
                                 // Skip the internal Tauri IPC channel — its messages are
                                 // already handled by the desktop UI; routing them through
                                 // the agent a second time would create a feedback loop.
@@ -684,6 +708,12 @@ pub fn run() {
                                 let sessions = Arc::clone(&sessions_for_bridge);
                                 let chan = channel.clone();
                                 let chat_id = from.clone();
+                                let msg_metadata = metadata.clone();
+                                // For Slack, use channel_id from metadata; otherwise fall back to from.
+                                let recipient = msg_metadata
+                                    .get("channel_id")
+                                    .cloned()
+                                    .unwrap_or_else(|| chat_id.clone());
 
                                 tauri::async_runtime::spawn(async move {
                                     let provider = match resolve_active_provider(&pool) {
@@ -787,7 +817,7 @@ pub fn run() {
                                             );
                                             // Send response back through the originating channel.
                                             if let Err(e) =
-                                                mgr.send(&chan, &response, Some(&chat_id)).await
+                                                mgr.send(&chan, &response, Some(&recipient)).await
                                             {
                                                 log::warn!(
                                                     "channel-bridge [{chan}]: send failed: {e}"
@@ -960,6 +990,22 @@ pub fn run() {
             memory::commands::get_daily_memory_command,
             // Activity commands
             activity::commands::get_recent_activity_command,
+            // Lifecycle management commands
+            commands::lifecycle::get_all_resources_command,
+            commands::lifecycle::get_resources_by_type_command,
+            commands::lifecycle::get_resource_status_command,
+            commands::lifecycle::get_stuck_resources_command,
+            commands::lifecycle::retry_resource_command,
+            commands::lifecycle::stop_resource_command,
+            commands::lifecycle::kill_resource_command,
+            commands::lifecycle::record_resource_heartbeat_command,
+            commands::lifecycle::update_resource_progress_command,
+            commands::lifecycle::get_pending_interventions_command,
+            commands::lifecycle::resolve_intervention_command,
+            commands::lifecycle::get_supervisor_stats_command,
+            commands::lifecycle::spawn_resource_command,
+            commands::lifecycle::is_lifecycle_monitoring_command,
+            commands::lifecycle::get_resource_history_command,
         ])
         .on_window_event(|window, event| {
             #[cfg(desktop)]

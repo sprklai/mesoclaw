@@ -6,6 +6,7 @@ pub mod chat;
 pub mod chat_sessions;
 pub mod file_browser;
 pub mod keychain;
+pub mod lifecycle;
 pub mod llm;
 pub mod logs;
 pub mod notifications;
