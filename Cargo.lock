@@ -4733,6 +4733,7 @@ dependencies = [
  "tracing-appender",
  "tracing-log",
  "tracing-subscriber",
+ "url",
  "urlencoding",
  "uuid",
  "wasmtime",

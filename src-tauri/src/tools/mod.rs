@@ -7,6 +7,7 @@ pub mod registry;
 pub mod session_spawn;
 pub mod shell;
 pub mod traits;
+pub mod web;
 
 use std::sync::Arc;
 
@@ -23,6 +24,7 @@ pub use registry::ToolRegistry;
 pub use session_spawn::SessionSpawnTool;
 pub use shell::ShellTool;
 pub use traits::{Tool, ToolInfo, ToolResult};
+pub use web::{WebFetchTool, WebRequestTool, WebSearchTool};
 
 /// Context needed to register all built-in tools.
 pub struct ToolContext {
@@ -48,6 +50,9 @@ pub fn register_builtin_tools(registry: &mut ToolRegistry, ctx: ToolContext) {
     registry.register(Arc::new(FileListTool::new(ctx.policy.clone())));
     registry.register(Arc::new(PatchTool::new(ctx.policy.clone())));
     registry.register(Arc::new(ProcessTool::new(ctx.policy.clone())));
+    registry.register(Arc::new(WebFetchTool::new(ctx.policy.clone())));
+    registry.register(Arc::new(WebRequestTool::new(ctx.policy.clone())));
+    registry.register(Arc::new(WebSearchTool::new(ctx.policy.clone())));
 
     // Tools that require scheduler.
     if let Some(scheduler) = ctx.scheduler {
@@ -73,5 +78,8 @@ pub fn register_core_tools(registry: &mut ToolRegistry, policy: Arc<SecurityPoli
     registry.register(Arc::new(FileWriteTool::new(policy.clone())));
     registry.register(Arc::new(FileListTool::new(policy.clone())));
     registry.register(Arc::new(PatchTool::new(policy.clone())));
-    registry.register(Arc::new(ProcessTool::new(policy)));
+    registry.register(Arc::new(ProcessTool::new(policy.clone())));
+    registry.register(Arc::new(WebFetchTool::new(policy.clone())));
+    registry.register(Arc::new(WebRequestTool::new(policy.clone())));
+    registry.register(Arc::new(WebSearchTool::new(policy)));
 }

@@ -1,8 +1,8 @@
 # MesoClaw vs OpenClaw: Gap Analysis & Implementation Plan
 
-**Document Version:** 1.2
+**Document Version:** 1.3
 **Last Updated:** 2026-02-21
-**Status:** Gap Analysis Phases A, B, C Complete
+**Status:** Gap Analysis Phases A, B, C Complete; Web Tools Implemented
 
 ---
 
@@ -156,6 +156,9 @@ Based on `docs/implementation-plan.md`, MesoClaw has completed:
 - ✅ **ProcessTool** — Process listing (list) and management (kill)
 - ✅ **CronTool** — Agent-initiated job scheduling with interval/cron support
 - ✅ **SessionSpawnTool** — Sub-agent session spawning with depth tracking
+- ✅ **WebFetchTool** — HTTP GET requests to fetch web content
+- ✅ **WebRequestTool** — Generic HTTP requests (GET, POST, PUT, DELETE, etc.)
+- ✅ **WebSearchTool** — Web search using DuckDuckGo (no API key required)
 - ✅ **ToolProfile enum** — Minimal, Coding, Messaging, Full
 - ✅ **ToolGroup enum** — Runtime, Fs, Sessions, Memory, Web, Ui
 - ✅ **Profile resolution** — `is_tool_allowed()` for access control
@@ -167,6 +170,7 @@ Based on `docs/implementation-plan.md`, MesoClaw has completed:
 - `src-tauri/src/tools/process.rs` — ProcessTool
 - `src-tauri/src/tools/cron.rs` — CronTool
 - `src-tauri/src/tools/session_spawn.rs` — SessionSpawnTool
+- `src-tauri/src/tools/web.rs` — WebFetchTool, WebRequestTool
 - `src-tauri/src/tools/profiles.rs` — ToolProfile, ToolGroup
 - `src-tauri/src/tools/registry.rs` — `list_filtered()` method
 - `src/components/settings/ToolProfileEditor.tsx` — Frontend UI
@@ -434,3 +438,4 @@ Based on impact and effort:
 | 2026-02-20 | 1.0 | Initial gap analysis document |
 | 2026-02-20 | 1.1 | Updated with actual implementation status from implementation-plan.md; corrected gap assessments based on completed Phases 0-8; added accurate current state comparison |
 | 2026-02-21 | 1.2 | **Phases A, B, C Complete**: Added SandboxManager integration (Phase A); Added PatchTool, ProcessTool, CronTool, SessionSpawnTool (Phase B); Added ToolProfile/ToolGroup abstraction (Phase B); Evaluated sqlite-vec, deferred until scale justifies (Phase C); Updated gap matrix and success metrics |
+| 2026-02-21 | 1.3 | **Web Tools Added**: Implemented WebFetchTool, WebRequestTool, and WebSearchTool for HTTP requests and web search; Agents can now fetch web content, interact with REST APIs, and perform web searches |
