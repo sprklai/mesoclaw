@@ -426,7 +426,16 @@ impl TelegramChannel {
         use teloxide::prelude::*;
         use teloxide::types::UpdateKind;
 
-        let bot = Bot::new(&self.token);
+        // Create a custom HTTP client with timeout longer than the polling timeout.
+        // Telegram long-polling can take up to `polling_timeout_secs` to return,
+        // so the HTTP client needs additional buffer time.
+        let http_timeout = std::time::Duration::from_secs(self.polling_timeout_secs as u64 + 30);
+        let client = reqwest::Client::builder()
+            .timeout(http_timeout)
+            .connect_timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| format!("failed to create HTTP client: {e}"))?;
+        let bot = Bot::with_client(&self.token, client);
         let allowed = Arc::clone(&self.allowed_chat_ids);
         let mut attempt = 0u32;
         // Offset acknowledges processed updates; must be last_id + 1.

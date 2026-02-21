@@ -836,7 +836,7 @@ async fn handle_agent(args: &AgentArgs, raw: bool, json_mode: bool) {
                 },
                 Ok(resp) => {
                     let status = resp.status();
-                    if status == axum::http::StatusCode::NOT_FOUND {
+                    if status == reqwest::StatusCode::NOT_FOUND {
                         print_err(&format!("Session '{session_id}' not found."));
                     } else {
                         let body = resp.text().await.unwrap_or_default();
@@ -943,7 +943,7 @@ async fn handle_sessions(args: &SessionArgs, raw: bool, json_mode: bool) {
                 },
                 Ok(resp) => {
                     let status = resp.status();
-                    if status == axum::http::StatusCode::NOT_FOUND {
+                    if status == reqwest::StatusCode::NOT_FOUND {
                         print_err(&format!("Session '{session_id}' not found."));
                     } else {
                         let body = resp.text().await.unwrap_or_default();
