@@ -8,6 +8,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use super::{AgentError, AgentId, AgentStatus, ThinkingLevel, VerboseLevel};
+use crate::tools::ToolProfile;
 
 /// Model configuration for an agent.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -97,6 +98,9 @@ pub struct AgentConfig {
     /// Concurrency settings.
     #[serde(default)]
     pub concurrency: ConcurrencyConfig,
+    /// Tool access profile for this agent.
+    #[serde(default)]
+    pub tool_profile: ToolProfile,
     /// Whether this agent is user-defined.
     #[serde(default)]
     pub is_user_defined: bool,
@@ -126,6 +130,7 @@ impl AgentConfig {
             verbose_level: VerboseLevel::default(),
             timeout_seconds: 300, // 5 minutes default
             concurrency: ConcurrencyConfig::default(),
+            tool_profile: ToolProfile::default(),
             is_user_defined: true,
             created_at: now.clone(),
             updated_at: now,
@@ -157,6 +162,9 @@ impl AgentConfig {
         if let Some(concurrency) = changes.concurrency {
             self.concurrency = concurrency;
         }
+        if let Some(tool_profile) = changes.tool_profile {
+            self.tool_profile = tool_profile;
+        }
         if let Some(status) = changes.status {
             self.status = status;
         }
@@ -178,6 +186,7 @@ pub struct AgentConfigUpdate {
     pub verbose_level: Option<VerboseLevel>,
     pub timeout_seconds: Option<u64>,
     pub concurrency: Option<ConcurrencyConfig>,
+    pub tool_profile: Option<ToolProfile>,
     pub status: Option<AgentStatus>,
     pub metadata: Option<HashMap<String, serde_json::Value>>,
 }

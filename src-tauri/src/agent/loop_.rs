@@ -13,7 +13,7 @@
 //!   SecurityPolicy.validate_command(tool_name)
 //!     Denied        → skip, inform LLM
 //!     NeedsApproval → emit ApprovalNeeded event → wait (timeout) → execute or skip
-//!     Allowed       → execute tool → emit ToolResult event → append to history
+//!     Allowed       → execute tool (sandboxed if configured) → emit ToolResult event → append to history
 //!       │
 //!       ▼
 //! iteration += 1; if < max_iterations → repeat
@@ -32,11 +32,15 @@ use crate::{
         LLMProvider,
         types::{CompletionRequest, Message, MessageRole},
     },
+    config::schema::SandboxMode,
     event_bus::{AppEvent, EventBus},
     memory::traits::Memory,
     security::{SecurityPolicy, ValidationResult},
     tools::ToolRegistry,
 };
+
+#[cfg(feature = "containers")]
+use crate::modules::container::SandboxManager;
 
 use super::tool_parser::{ParsedToolCall, parse_tool_calls};
 
@@ -147,6 +151,11 @@ pub struct AgentLoop {
     cancel_flag: Option<Arc<AtomicBool>>,
     /// Optional memory store for automatic context injection at session start.
     memory: Option<Arc<dyn Memory>>,
+    /// Optional sandbox manager for tool isolation.
+    #[cfg(feature = "containers")]
+    sandbox: Option<Arc<SandboxManager>>,
+    /// Sandbox mode - controls which tools are sandboxed.
+    sandbox_mode: SandboxMode,
 }
 
 impl AgentLoop {
@@ -166,6 +175,9 @@ impl AgentLoop {
             config,
             cancel_flag: None,
             memory: None,
+            #[cfg(feature = "containers")]
+            sandbox: None,
+            sandbox_mode: SandboxMode::default(),
         }
     }
 
@@ -182,6 +194,23 @@ impl AgentLoop {
     /// and prepend them as a system context message before the first LLM call.
     pub fn with_memory(mut self, memory: Arc<dyn Memory>) -> Self {
         self.memory = Some(memory);
+        self
+    }
+
+    /// Attach a sandbox manager for tool isolation.
+    ///
+    /// When set, tool execution will be sandboxed in containers according
+    /// to the configured sandbox mode.
+    #[cfg(feature = "containers")]
+    pub fn with_sandbox(mut self, sandbox: Arc<SandboxManager>) -> Self {
+        self.sandbox_mode = sandbox.mode();
+        self.sandbox = Some(sandbox);
+        self
+    }
+
+    /// Set the sandbox mode directly (useful when no runtime is available).
+    pub fn with_sandbox_mode(mut self, mode: SandboxMode) -> Self {
+        self.sandbox_mode = mode;
         self
     }
 
@@ -331,12 +360,16 @@ impl AgentLoop {
     // ── Internal ─────────────────────────────────────────────────────────────
 
     /// Execute a single tool call, applying the security policy.
+    ///
+    /// If sandboxing is configured and applicable, the tool will be executed
+    /// inside a container for isolation.
     #[tracing::instrument(
         name = "agent.tool",
         skip_all,
         fields(
             tool = %call.name,
             call_id = ?call.call_id,
+            sandboxed = self.should_use_sandbox(),
         )
     )]
     async fn execute_tool_call(&self, call: &ParsedToolCall) -> AgentMessage {
@@ -421,18 +454,6 @@ impl AgentLoop {
             ValidationResult::Allowed => {}
         }
 
-        // Look up the tool in the registry.
-        let Some(tool) = self.tool_registry.get(&call.name) else {
-            let msg = format!("Tool '{}' is not registered", call.name);
-            self.emit_tool_result(&call.name, &msg, false);
-            return AgentMessage::ToolResult {
-                tool_name: call.name.clone(),
-                call_id: call.call_id.clone(),
-                result: msg,
-                success: false,
-            };
-        };
-
         // Emit start event.
         if let Some(bus) = &self.bus {
             let _ = bus.publish(AppEvent::AgentToolStart {
@@ -441,11 +462,16 @@ impl AgentLoop {
             });
         }
 
-        // Execute.
-        let (result_str, success) = match tool.execute(call.arguments.clone()).await {
-            Ok(tr) => (tr.output, tr.success),
-            Err(e) => (e, false),
+        // Execute - either sandboxed or direct.
+        #[cfg(feature = "containers")]
+        let (result_str, success) = if self.should_use_sandbox() {
+            self.execute_sandboxed(call).await
+        } else {
+            self.execute_direct(call).await
         };
+
+        #[cfg(not(feature = "containers"))]
+        let (result_str, success) = self.execute_direct(call).await;
 
         // Audit-log every tool execution.
         self.security_policy.log_action(
@@ -463,6 +489,71 @@ impl AgentLoop {
             call_id: call.call_id.clone(),
             result: result_str,
             success,
+        }
+    }
+
+    /// Check if sandboxing should be used for this tool execution.
+    ///
+    /// Agent loop tool calls are always considered "non-main" thread since
+    /// they're spawned by the agent, not direct user action.
+    #[cfg(feature = "containers")]
+    fn should_use_sandbox(&self) -> bool {
+        // Agent-executed tools are always considered non-main
+        let is_main_thread = false;
+        self.sandbox_mode.is_sandboxed(is_main_thread) && self.sandbox.is_some()
+    }
+
+    /// Check if sandboxing should be used (always false without containers feature).
+    #[cfg(not(feature = "containers"))]
+    fn should_use_sandbox(&self) -> bool {
+        false
+    }
+
+    /// Execute a tool in a sandboxed container.
+    #[cfg(feature = "containers")]
+    async fn execute_sandboxed(&self, call: &ParsedToolCall) -> (String, bool) {
+        let Some(ref sandbox) = self.sandbox else {
+            return ("Sandbox configured but no runtime available".to_string(), false);
+        };
+
+        // For shell commands, use the shell execution path.
+        if call.name == "shell" {
+            let command = call
+                .arguments
+                .get("command")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let working_dir = call
+                .arguments
+                .get("working_dir")
+                .and_then(|v| v.as_str());
+
+            match sandbox.execute_shell(command, working_dir).await {
+                Ok(result) => (result.output, result.success),
+                Err(e) => (format!("Sandbox error: {e}"), false),
+            }
+        } else {
+            // For other tools, use the generic tool execution.
+            match sandbox
+                .execute_tool(&call.name, call.arguments.clone(), None)
+                .await
+            {
+                Ok(result) => (result.output, result.success),
+                Err(e) => (format!("Sandbox error: {e}"), false),
+            }
+        }
+    }
+
+    /// Execute a tool directly (without sandboxing).
+    async fn execute_direct(&self, call: &ParsedToolCall) -> (String, bool) {
+        // Look up the tool in the registry.
+        let Some(tool) = self.tool_registry.get(&call.name) else {
+            return (format!("Tool '{}' is not registered", call.name), false);
+        };
+
+        match tool.execute(call.arguments.clone()).await {
+            Ok(tr) => (tr.output, tr.success),
+            Err(e) => (e, false),
         }
     }
 

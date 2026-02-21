@@ -160,7 +160,8 @@ pub fn run() {
             // Initialize security policy and tool registry.
             let policy = Arc::new(security::SecurityPolicy::default_policy());
             let mut registry = tools::ToolRegistry::new();
-            tools::register_builtin_tools(&mut registry, policy.clone());
+            // Register core tools (scheduler and session_router available later).
+            tools::register_core_tools(&mut registry, policy.clone());
             app.manage(policy);
             // Store registry in an Arc so agent_commands can clone a cheap handle.
             app.manage(Arc::new(registry));

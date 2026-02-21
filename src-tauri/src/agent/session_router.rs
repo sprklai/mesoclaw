@@ -250,7 +250,7 @@ impl Session {
     }
 
     /// Create a subagent session with parent relationship.
-    fn new_subagent(key: SessionKey, parent_key: &str, spawn_depth: u32) -> Self {
+    pub fn new_subagent(key: SessionKey, parent_key: &str, spawn_depth: u32) -> Self {
         Self {
             key,
             messages: Vec::new(),

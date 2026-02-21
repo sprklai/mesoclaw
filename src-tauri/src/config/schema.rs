@@ -55,6 +55,65 @@ impl Default for ProviderConfig {
     }
 }
 
+// ─── SandboxMode ─────────────────────────────────────────────────────────────
+
+/// Controls which tool executions are sandboxed in containers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxMode {
+    /// No sandboxing - all tools run directly on the host.
+    Off,
+    /// Only non-main-thread tools are sandboxed (tools spawned by agents).
+    #[default]
+    NonMain,
+    /// All tool executions are sandboxed in containers.
+    All,
+}
+
+impl SandboxMode {
+    /// Returns true if this mode requires sandboxing for tool execution.
+    pub fn is_sandboxed(&self, is_main_thread: bool) -> bool {
+        match self {
+            SandboxMode::Off => false,
+            SandboxMode::NonMain => !is_main_thread,
+            SandboxMode::All => true,
+        }
+    }
+}
+
+// ─── SandboxConfig ───────────────────────────────────────────────────────────
+
+/// Configuration for container-based tool sandboxing.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct SandboxConfig {
+    /// Which tools should be sandboxed.
+    pub mode: SandboxMode,
+    /// Default container image for sandboxed tools.
+    pub default_image: String,
+    /// Memory limit in MB for sandboxed containers.
+    pub memory_limit_mb: Option<u64>,
+    /// Whether to disable network access in sandboxed containers.
+    pub network_disabled: bool,
+    /// Timeout in seconds for sandboxed tool execution.
+    pub timeout_secs: Option<u64>,
+    /// Additional volume mounts (host_path:container_path format).
+    pub volumes: Vec<String>,
+}
+
+impl Default for SandboxConfig {
+    fn default() -> Self {
+        Self {
+            mode: SandboxMode::default(),
+            default_image: "alpine:3.20".to_string(),
+            memory_limit_mb: Some(256),
+            network_disabled: true,
+            timeout_secs: Some(60),
+            volumes: Vec::new(),
+        }
+    }
+}
+
 // ─── SecurityConfig ───────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -70,6 +129,8 @@ pub struct SecurityConfig {
     pub rate_limit_per_minute: u32,
     /// Rate limit: max tool calls per hour.
     pub rate_limit_per_hour: u32,
+    /// Sandbox configuration for tool isolation.
+    pub sandbox: SandboxConfig,
 }
 
 impl Default for SecurityConfig {
@@ -80,6 +141,7 @@ impl Default for SecurityConfig {
             blocked_commands: Vec::new(),
             rate_limit_per_minute: 60,
             rate_limit_per_hour: 600,
+            sandbox: SandboxConfig::default(),
         }
     }
 }

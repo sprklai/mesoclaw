@@ -1,6 +1,6 @@
 //! Tauri IPC commands for the memory subsystem.
 
-use log::{info, warn};
+use log::info;
 use std::sync::Arc;
 
 use tauri::State;

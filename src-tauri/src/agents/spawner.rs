@@ -12,7 +12,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::agent::{
-    loop_::{AgentConfig, AgentLoop, AgentMessage},
+    loop_::{AgentConfig, AgentLoop},
     session_router::{SessionKey, SessionRouter},
 };
 use crate::ai::LLMProvider;

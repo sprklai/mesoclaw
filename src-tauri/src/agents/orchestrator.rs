@@ -5,9 +5,8 @@
 //! strategies (all, first, any N).
 
 use chrono::{DateTime, Utc};
-use log::{debug, info, warn};
+use log::info;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task::JoinSet;
 

@@ -18,9 +18,11 @@ use async_trait::async_trait;
 
 pub mod docker;
 pub mod podman;
+pub mod sandbox;
 
 pub use docker::DockerRuntime;
 pub use podman::PodmanRuntime;
+pub use sandbox::{SandboxManager, SandboxedToolResult};
 
 // ─── ContainerConfig ──────────────────────────────────────────────────────────
 
