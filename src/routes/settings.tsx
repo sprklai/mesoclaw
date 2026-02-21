@@ -13,7 +13,10 @@ import { ProfileSettings } from "@/components/settings/ProfileSettings";
 import { RouterSettings } from "@/components/settings/RouterSettings";
 import { SettingsNav, type SettingsSection } from "@/components/settings/SettingsNav";
 import { SkillsSettingsTab } from "@/components/settings/SkillsSettingsTab";
+import { Button } from "@/components/ui/button";
+import { Bot, ExternalLink } from "@/lib/icons";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Link } from "@tanstack/react-router";
 import { useHandleSettings } from "@/hooks/use-handle-settings";
 import { useContextPanelStore } from "@/stores/contextPanelStore";
 
@@ -29,6 +32,7 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "router", label: "Router", description: "Model routing and discovery" },
   { id: "profile", label: "Profile", description: "Your name and bot name" },
   { id: "skills", label: "Skills", description: "Prompt templates" },
+  { id: "agents", label: "Agents", description: "Agent configurations" },
   { id: "app", label: "App Settings", description: "Theme, autostart, notifications" },
   { id: "identity", label: "Agent Personality", description: "SOUL.md and identity files" },
   { id: "scheduler", label: "Scheduler", description: "Scheduled jobs" },
@@ -128,6 +132,46 @@ function SettingsPage() {
           {activeSection === "router" && <RouterSettings />}
           {activeSection === "profile" && <ProfileSettings />}
           {activeSection === "skills" && <SkillsSettingsTab />}
+          {activeSection === "agents" && (
+            <div className="space-y-6">
+              <p className="text-sm text-muted-foreground">
+                Configure agent profiles, tool access, and system prompts. Agents are
+                configurable AI assistants that can use tools to perform tasks.
+              </p>
+              <div className="rounded-lg border bg-muted/30 p-6">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                    <Bot className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold">Agent Management</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Create, edit, and manage agent configurations
+                    </p>
+                  </div>
+                  <Link to="/agents">
+                    <Button>
+                      Open Agents Page
+                      <ExternalLink className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+              <div className="rounded-lg border p-4">
+                <h4 className="mb-2 font-medium">Tool Profiles</h4>
+                <p className="text-sm text-muted-foreground">
+                  When creating agents, you can select a tool profile to control which
+                  tools they can access:
+                </p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  <li><strong>Minimal</strong> — Read-only file access and memory</li>
+                  <li><strong>Coding</strong> — Shell, filesystem, and memory tools</li>
+                  <li><strong>Messaging</strong> — Memory, web, and UI tools</li>
+                  <li><strong>Full</strong> — All available tools</li>
+                </ul>
+              </div>
+            </div>
+          )}
           {activeSection === "app" && (
             <AppSettingsTab
               theme={theme}
