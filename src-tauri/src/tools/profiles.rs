@@ -32,7 +32,7 @@ impl ToolGroup {
             ToolGroup::Fs => &["file_read", "file_write", "file_list"],
             ToolGroup::Sessions => &["sessions_spawn", "sessions_list", "sessions_kill"],
             ToolGroup::Memory => &["memory_store", "memory_recall", "memory_forget"],
-            ToolGroup::Web => &["web_fetch", "web_request"],
+            ToolGroup::Web => &["web_fetch", "web_request", "web_search"],
             ToolGroup::Ui => &["ui_dialog", "ui_notify", "ui_prompt"],
         }
     }
