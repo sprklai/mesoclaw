@@ -171,11 +171,15 @@ pub async fn test_provider_connection_command(
         .first::<AIModel>(&mut conn)
         .map_err(|e| format!("Failed to load model: {}", e))?;
 
-    // Create the provider instance specifically for testing with the test model
-    // We don't use create_provider_from_db here because that loads the default model from settings
-    // Instead, we create the provider directly with the test model we want to use
-    let config =
-        OpenAICompatibleConfig::with_model(effective_api_key, &provider.base_url, &model.model_id);
+    // Create the provider instance with provider-specific configuration
+    // This ensures required headers are included (e.g., anthropic-version for Anthropic,
+    // HTTP-Referer/X-Title for OpenRouter)
+    let config = create_test_config(
+        &provider.id,
+        effective_api_key,
+        &provider.base_url,
+        &model.model_id,
+    );
 
     let provider_instance = OpenAICompatibleProvider::new(config, &provider.id)
         .map_err(|e| format!("Failed to create provider: {}", e))?;
@@ -371,6 +375,62 @@ pub fn update_provider_command(
     }
 
     Ok(())
+}
+
+/// Create a provider-specific configuration for testing connections
+///
+/// Uses the appropriate factory method for each provider to ensure
+/// provider-specific headers are included (e.g., anthropic-version for Anthropic,
+/// HTTP-Referer/X-Title for OpenRouter).
+fn create_test_config(
+    provider_id: &str,
+    api_key: &str,
+    base_url: &str,
+    model_id: &str,
+) -> OpenAICompatibleConfig {
+    match provider_id {
+        "anthropic" => {
+            let mut config = OpenAICompatibleConfig::anthropic(api_key);
+            config.base_url = base_url.to_string();
+            config.default_model = model_id.to_string();
+            config
+        }
+        "openrouter" => {
+            let mut config = OpenAICompatibleConfig::openrouter(api_key);
+            config.base_url = base_url.to_string();
+            config.default_model = model_id.to_string();
+            config
+        }
+        "vercel-ai-gateway" => {
+            let mut config = OpenAICompatibleConfig::vercel_gateway(api_key);
+            config.base_url = base_url.to_string();
+            config.default_model = model_id.to_string();
+            config
+        }
+        "openai" => {
+            let mut config = OpenAICompatibleConfig::openai(api_key);
+            config.base_url = base_url.to_string();
+            config.default_model = model_id.to_string();
+            config
+        }
+        "gemini" | "google" => {
+            let mut config = OpenAICompatibleConfig::gemini(api_key);
+            config.base_url = base_url.to_string();
+            config.default_model = model_id.to_string();
+            config
+        }
+        "ollama" => {
+            let mut config = OpenAICompatibleConfig::ollama();
+            config.base_url = base_url.to_string();
+            config.default_model = model_id.to_string();
+            config
+        }
+        _ => {
+            // Default: generic OpenAI-compatible with no special headers
+            // Used for user-defined providers and any unknown providers
+            OpenAICompatibleConfig::with_model(api_key, base_url, model_id)
+        }
+    }
 }
 
 /// Check if an API key exists in the keychain for a provider
@@ -642,5 +702,133 @@ mod tests {
 
         assert_eq!(deserialized.provider.id, "openai");
         assert_eq!(deserialized.has_api_key, true);
+    }
+
+    #[test]
+    fn test_create_test_config_anthropic() {
+        let config = create_test_config(
+            "anthropic",
+            "test-key",
+            "https://api.anthropic.com/v1",
+            "claude-sonnet-4-5",
+        );
+
+        assert_eq!(config.api_key, "test-key");
+        assert_eq!(config.base_url, "https://api.anthropic.com/v1");
+        assert_eq!(config.default_model, "claude-sonnet-4-5");
+        // Anthropic MUST have the anthropic-version header
+        assert_eq!(
+            config.extra_headers.get("anthropic-version"),
+            Some(&"2023-06-01".to_string())
+        );
+    }
+
+    #[test]
+    fn test_create_test_config_openrouter() {
+        let config = create_test_config(
+            "openrouter",
+            "test-key",
+            "https://openrouter.ai/api/v1",
+            "anthropic/claude-sonnet-4-5",
+        );
+
+        assert_eq!(config.api_key, "test-key");
+        assert_eq!(config.base_url, "https://openrouter.ai/api/v1");
+        assert_eq!(config.default_model, "anthropic/claude-sonnet-4-5");
+        // OpenRouter MUST have HTTP-Referer and X-Title headers
+        assert!(config.extra_headers.contains_key("HTTP-Referer"));
+        assert!(config.extra_headers.contains_key("X-Title"));
+    }
+
+    #[test]
+    fn test_create_test_config_vercel_gateway() {
+        let config = create_test_config(
+            "vercel-ai-gateway",
+            "test-key",
+            "https://ai-gateway.vercel.sh/v1",
+            "google/gemini-3-flash",
+        );
+
+        assert_eq!(config.api_key, "test-key");
+        assert_eq!(config.base_url, "https://ai-gateway.vercel.sh/v1");
+        assert_eq!(config.default_model, "google/gemini-3-flash");
+    }
+
+    #[test]
+    fn test_create_test_config_openai() {
+        let config =
+            create_test_config("openai", "test-key", "https://api.openai.com/v1", "gpt-4.1");
+
+        assert_eq!(config.api_key, "test-key");
+        assert_eq!(config.base_url, "https://api.openai.com/v1");
+        assert_eq!(config.default_model, "gpt-4.1");
+        // OpenAI doesn't require special headers
+        assert!(config.extra_headers.is_empty());
+    }
+
+    #[test]
+    fn test_create_test_config_gemini() {
+        let config = create_test_config(
+            "gemini",
+            "test-key",
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            "gemini-2.5-flash",
+        );
+
+        assert_eq!(config.api_key, "test-key");
+        assert_eq!(
+            config.base_url,
+            "https://generativelanguage.googleapis.com/v1beta/openai"
+        );
+        assert_eq!(config.default_model, "gemini-2.5-flash");
+        // Gemini doesn't require special headers
+        assert!(config.extra_headers.is_empty());
+    }
+
+    #[test]
+    fn test_create_test_config_google_alias() {
+        // "google" should be treated the same as "gemini"
+        let config = create_test_config(
+            "google",
+            "test-key",
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            "gemini-2.5-flash",
+        );
+
+        assert_eq!(config.api_key, "test-key");
+        assert_eq!(config.default_model, "gemini-2.5-flash");
+    }
+
+    #[test]
+    fn test_create_test_config_ollama() {
+        let config = create_test_config(
+            "ollama",
+            "", // Ollama doesn't need an API key
+            "http://localhost:11434/v1",
+            "llama3",
+        );
+
+        assert_eq!(config.api_key, "");
+        assert_eq!(config.base_url, "http://localhost:11434/v1");
+        assert_eq!(config.default_model, "llama3");
+        // Ollama doesn't require special headers
+        assert!(config.extra_headers.is_empty());
+    }
+
+    #[test]
+    fn test_create_test_config_unknown_provider() {
+        // Unknown providers should fall back to generic config
+        let config = create_test_config(
+            "custom-provider",
+            "test-key",
+            "https://custom.api.com/v1",
+            "custom-model",
+        );
+
+        assert_eq!(config.api_key, "test-key");
+        assert_eq!(config.base_url, "https://custom.api.com/v1");
+        assert_eq!(config.default_model, "custom-model");
+        // Generic config has no special headers
+        assert!(config.extra_headers.is_empty());
     }
 }

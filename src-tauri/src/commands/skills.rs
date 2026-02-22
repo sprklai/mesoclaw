@@ -151,6 +151,36 @@ pub async fn set_skill_auto_select_command(
     Ok(())
 }
 
+/// Create a new skill template file on disk and reload the registry.
+#[tauri::command]
+pub async fn create_skill_command(
+    id: String,
+    name: String,
+    description: String,
+    category: String,
+    template: String,
+) -> Result<SkillInfo, String> {
+    crate::prompts::loader::create_skill_file(&id, &name, &description, &category, &template)?;
+
+    // Reload the registry
+    let registry = get_or_init_registry().await;
+    registry.load().await;
+
+    // Return the newly created skill info
+    registry
+        .get(&id)
+        .await
+        .map(|t| SkillInfo {
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            category: t.category,
+            default_enabled: true,
+            source: "filesystem".to_string(),
+        })
+        .ok_or_else(|| "Failed to load created skill".to_string())
+}
+
 /// Delete a skill template file from disk and reload the registry.
 #[tauri::command]
 pub async fn delete_skill_command(skill_id: String) -> Result<(), String> {

@@ -181,7 +181,8 @@ impl ModelDiscovery for VercelGatewayDiscovery {
 
     fn discovery_url(&self, config: &ProviderConfig) -> String {
         let base = config.base_url.trim_end_matches('/');
-        format!("{}/v1/models", base)
+        // Base URL should already include /v1 (e.g., https://ai-gateway.vercel.sh/v1)
+        format!("{}/models", base)
     }
 }
 
@@ -229,10 +230,10 @@ mod tests {
     #[test]
     fn test_vercel_gateway_discovery_url() {
         let discovery = VercelGatewayDiscovery::new();
-        let config = ProviderConfig::new("vercel-ai-gateway", "https://api.vercel.ai");
+        let config = ProviderConfig::new("vercel-ai-gateway", "https://ai-gateway.vercel.sh/v1");
         assert_eq!(
             discovery.discovery_url(&config),
-            "https://api.vercel.ai/v1/models"
+            "https://ai-gateway.vercel.sh/v1/models"
         );
     }
 

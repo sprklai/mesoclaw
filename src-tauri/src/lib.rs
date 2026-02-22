@@ -946,6 +946,7 @@ pub fn run() {
             commands::skills::list_skills_by_category_command,
             commands::skills::set_skill_auto_select_command,
             commands::skills::suggest_skills_command,
+            commands::skills::create_skill_command,
             commands::skills::delete_skill_command,
             commands::skills::update_skill_command,
             // Approval command
