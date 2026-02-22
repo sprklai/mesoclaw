@@ -19,6 +19,7 @@ import {
   initializeSkillDefaults,
   reloadSkills,
   getSkillDetails,
+  createSkill,
 } from "@/lib/tauri/skills";
 import { extractErrorMessage } from "@/lib/error-utils";
 import { withStoreLoading } from "@/lib/store-utils";
@@ -55,6 +56,14 @@ interface SkillStore {
   refresh: () => Promise<void>;
   /** Get full skill details */
   getSkillDetails: (skillId: string) => Promise<SkillDefinition | null>;
+  /** Create a new skill */
+  createSkill: (options: {
+    id: string;
+    name: string;
+    description: string;
+    category: string;
+    template: string;
+  }) => Promise<SkillInfo | null>;
   /** Clear error state */
   clearError: () => void;
 }
@@ -201,6 +210,20 @@ export const useSkillStore = create<SkillStore>((set, get) => ({
       newCache.set(skillId, details);
       set({ skillDetailsCache: newCache });
       return details;
+    } catch (error) {
+      set({ error: extractErrorMessage(error) });
+      return null;
+    }
+  },
+
+  createSkill: async (options) => {
+    const { loadSkills, loadSettings } = get();
+    try {
+      const skillInfo = await createSkill(options);
+      // Reload skills and settings to reflect the new skill
+      await loadSkills();
+      await loadSettings();
+      return skillInfo;
     } catch (error) {
       set({ error: extractErrorMessage(error) });
       return null;

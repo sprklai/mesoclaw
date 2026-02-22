@@ -124,6 +124,19 @@ export async function deleteSkill(skillId: string): Promise<void> {
 }
 
 /**
+ * Create a new skill template file.
+ */
+export async function createSkill(options: {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  template: string;
+}): Promise<SkillInfo> {
+  return invoke<SkillInfo>("create_skill_command", options);
+}
+
+/**
  * Update the raw content of a skill template file on disk.
  */
 export async function updateSkill(

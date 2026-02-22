@@ -4,13 +4,14 @@
  * Allows users to configure which AI skills are enabled for their workspace.
  */
 
-import { Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { SkillInfo } from "@/lib/tauri/skills/types";
 
 import { SettingRow } from "@/components/setting-row";
 import { SettingsSection } from "@/components/settings-section";
+import { SkillCreationDialog } from "@/components/settings/SkillCreationDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -189,17 +190,43 @@ export function SkillsSettingsTab(_props: SkillsSettingsTabProps) {
             Configure which AI capabilities are available for this workspace.
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-        >
-          <RefreshCw
-            className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
-          />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <SkillCreationDialog onCreated={handleRefresh} />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Quick start guide */}
+      <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+        <div className="flex items-start gap-3">
+          <Sparkles className="h-5 w-5 text-primary mt-0.5" />
+          <div className="flex-1">
+            <h4 className="text-sm font-medium mb-1">What are Skills?</h4>
+            <p className="text-sm text-muted-foreground mb-2">
+              Skills are reusable prompt templates that help you get consistent, high-quality responses from AI.
+              Use them for code review, documentation, debugging, and more.
+            </p>
+            <a
+              href="https://github.com/anthropics/claude-code#skills"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center text-sm text-primary hover:underline"
+            >
+              Learn more about creating skills
+              <ExternalLink className="h-3 w-3 ml-1" />
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* Auto-select setting */}
@@ -253,14 +280,17 @@ export function SkillsSettingsTab(_props: SkillsSettingsTabProps) {
       {categories.length === 0 && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Sparkles className="h-8 w-8 text-muted-foreground mb-3" />
-          <p className="text-muted-foreground">No skills available.</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Skills will appear here once they're loaded.
+          <p className="text-muted-foreground font-medium">No skills available</p>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">
+            Create your first skill to get started with reusable AI prompts.
           </p>
-          <Button variant="outline" className="mt-4" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Load Skills
-          </Button>
+          <div className="flex items-center gap-2">
+            <SkillCreationDialog onCreated={handleRefresh} />
+            <Button variant="outline" onClick={handleRefresh}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reload
+            </Button>
+          </div>
         </div>
       )}
     </div>
