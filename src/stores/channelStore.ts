@@ -92,14 +92,6 @@ export interface ChannelEntry {
 
 const DEFAULT_CHANNELS: ChannelEntry[] = [
   {
-    name: "tauri-ipc",
-    displayName: "Desktop IPC",
-    status: "connected",
-    messageCount: 0,
-    lastError: null,
-    config: { type: "tauri-ipc" },
-  },
-  {
     name: "telegram",
     displayName: "Telegram",
     status: "disconnected",

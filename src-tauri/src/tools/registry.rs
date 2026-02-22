@@ -64,6 +64,13 @@ impl ToolRegistry {
     pub fn is_empty(&self) -> bool {
         self.tools.is_empty()
     }
+
+    /// Iterate over all registered tools (unfiltered).
+    ///
+    /// Returns an iterator yielding `(name, tool)` pairs.
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Arc<dyn Tool>)> {
+        self.tools.iter()
+    }
 }
 
 impl Default for ToolRegistry {

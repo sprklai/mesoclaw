@@ -8,6 +8,7 @@ use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use super::types::{IDENTITY_FILES, Identity, IdentityMeta};
 use crate::event_bus::{AppEvent, EventBus};
+use crate::tools::{ToolProfile, ToolRegistry, generate_tool_schema_text};
 
 // ─── Embedded defaults ────────────────────────────────────────────────────────
 
@@ -163,6 +164,52 @@ impl IdentityLoader {
         .iter()
         .map(|(header, body)| format!("{header}\n\n{body}"))
         .collect();
+
+        if let Some(ctx) = daily_context
+            && !ctx.trim().is_empty()
+        {
+            parts.push(format!("# Memory\n\n{ctx}"));
+        }
+
+        parts.join("\n\n---\n\n")
+    }
+
+    /// Build the system prompt with dynamic tool schema injection.
+    ///
+    /// This method replaces the static TOOLS.md content with dynamically
+    /// generated tool schemas from the registry, filtered by the given profile.
+    /// This ensures the LLM always has accurate information about available tools.
+    ///
+    /// # Arguments
+    /// * `daily_context` - Optional daily memory context from `DailyMemory::build_daily_context`
+    /// * `tool_registry` - The tool registry to generate schemas from
+    /// * `tool_profile` - The profile to filter tools by (e.g., Messaging for channels)
+    ///
+    /// # Returns
+    /// A complete system prompt string with injected tool schemas
+    pub fn build_system_prompt_with_tools(
+        &self,
+        daily_context: Option<&str>,
+        tool_registry: Option<&ToolRegistry>,
+        tool_profile: ToolProfile,
+    ) -> String {
+        let id = self.get();
+        let mut parts: Vec<String> = [
+            ("# Soul", id.soul.as_str()),
+            ("# Agents", id.agents.as_str()),
+            ("# User", id.user.as_str()),
+        ]
+        .iter()
+        .map(|(header, body)| format!("{header}\n\n{body}"))
+        .collect();
+
+        // Inject dynamic tool schemas if registry provided
+        if let Some(registry) = tool_registry {
+            parts.push(generate_tool_schema_text(registry, tool_profile));
+        } else {
+            // Fall back to static TOOLS.md content
+            parts.push(format!("# Tools\n\n{}", id.tools));
+        }
 
         if let Some(ctx) = daily_context
             && !ctx.trim().is_empty()

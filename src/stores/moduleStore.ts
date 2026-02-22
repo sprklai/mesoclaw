@@ -34,6 +34,8 @@ export interface RuntimeConfig {
   command: string;
   args: string[];
   env: Record<string, string>;
+  volumes: string[];
+  image: string | null;
   timeout_secs: number | null;
 }
 
@@ -57,6 +59,16 @@ export interface ModuleEntry {
   errorMessage: string | null;
 }
 
+// ─── Template types ───────────────────────────────────────────────────────────
+
+export interface TemplateInfo {
+  id: string;
+  name: string;
+  description: string;
+  runtimeTypes: string[];
+  defaultImage: string | null;
+}
+
 // ─── Scaffold form ────────────────────────────────────────────────────────────
 
 export interface ScaffoldForm {
@@ -65,6 +77,14 @@ export interface ScaffoldForm {
   runtimeType: RuntimeType;
   command: string;
   description: string;
+  /** Template type for generating starter files */
+  template: string;
+  /** Container image name */
+  image: string;
+  /** Environment variables */
+  env: Record<string, string>;
+  /** Volume mounts */
+  volumes: string[];
 }
 
 const DEFAULT_SCAFFOLD: ScaffoldForm = {
@@ -73,12 +93,17 @@ const DEFAULT_SCAFFOLD: ScaffoldForm = {
   runtimeType: "native",
   command: "",
   description: "",
+  template: "empty",
+  image: "",
+  env: {},
+  volumes: [],
 };
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 interface ModuleState {
   modules: ModuleEntry[];
+  templates: TemplateInfo[];
   loading: boolean;
   error: string | null;
 
@@ -89,6 +114,7 @@ interface ModuleState {
   scaffolding: boolean;
 
   loadModules: () => Promise<void>;
+  loadTemplates: () => Promise<void>;
   startModule: (moduleId: string) => Promise<void>;
   stopModule: (moduleId: string) => Promise<void>;
   selectModule: (moduleId: string | null) => void;
@@ -101,6 +127,7 @@ interface ModuleState {
 
 export const useModuleStore = create<ModuleState>((set, get) => ({
   modules: [],
+  templates: [],
   loading: false,
   error: null,
   selectedId: null,
@@ -121,6 +148,15 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
         onError: () => set({ modules: [] }),
       }
     );
+  },
+
+  loadTemplates: async () => {
+    try {
+      const templates = await invoke<TemplateInfo[]>("list_module_templates_command");
+      set({ templates });
+    } catch {
+      // Templates are optional; don't set error
+    }
   },
 
   startModule: async (moduleId) => {
@@ -172,6 +208,10 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
           runtimeType: scaffoldForm.runtimeType,
           command: scaffoldForm.command,
           description: scaffoldForm.description,
+          template: scaffoldForm.template || null,
+          image: scaffoldForm.image || null,
+          env: Object.keys(scaffoldForm.env).length > 0 ? scaffoldForm.env : null,
+          volumes: scaffoldForm.volumes.length > 0 ? scaffoldForm.volumes : null,
         });
         await get().loadModules();
         set({

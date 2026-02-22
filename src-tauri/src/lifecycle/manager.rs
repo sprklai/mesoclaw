@@ -10,10 +10,10 @@ use crate::agent::session_router::{SessionKey, SessionRouter};
 use crate::event_bus::EventBus;
 
 use super::events;
+use super::state_registry::StateRegistry;
 use super::states::{
     ResourceConfig, ResourceId, ResourceInstance, ResourceState, ResourceType, StateTransition,
 };
-use super::state_registry::StateRegistry;
 use super::storage::LifecycleStorage;
 
 /// Unified lifecycle manager combining SessionRouter and StateRegistry.
@@ -122,7 +122,11 @@ impl LifecycleManager {
         // Update registry
         let from_state = format!("{:?}", current.state);
         self.registry
-            .update_state(&resource_id, new_state.clone(), format!("Substate: {}", substate))
+            .update_state(
+                &resource_id,
+                new_state.clone(),
+                format!("Substate: {}", substate),
+            )
             .await;
 
         // Record transition
@@ -133,7 +137,8 @@ impl LifecycleManager {
             timestamp: chrono::Utc::now(),
             reason: format!("Substate change: {}", substate),
         };
-        self.storage.record_transition(&transition, Some(substate))?;
+        self.storage
+            .record_transition(&transition, Some(substate))?;
 
         // Update persistent storage
         let updated_instance = ResourceInstance {
@@ -144,7 +149,12 @@ impl LifecycleManager {
 
         // Emit event
         if let Some(ref app) = self.app_handle {
-            let _ = events::emit_progress_updated(app, &resource_id.to_string(), progress.unwrap_or(0.0), substate);
+            let _ = events::emit_progress_updated(
+                app,
+                &resource_id.to_string(),
+                progress.unwrap_or(0.0),
+                substate,
+            );
             let _ = events::emit_state_changed(
                 app,
                 &resource_id.to_string(),
@@ -178,7 +188,11 @@ impl LifecycleManager {
 
         // Update registry
         self.registry
-            .update_state(&resource_id, new_state.clone(), "Session completed".to_string())
+            .update_state(
+                &resource_id,
+                new_state.clone(),
+                "Session completed".to_string(),
+            )
             .await;
 
         // Record transition
@@ -228,7 +242,11 @@ impl LifecycleManager {
 
         // Update registry
         self.registry
-            .update_state(&resource_id, new_state.clone(), format!("Failed: {}", error))
+            .update_state(
+                &resource_id,
+                new_state.clone(),
+                format!("Failed: {}", error),
+            )
             .await;
 
         // Record transition
@@ -272,7 +290,11 @@ impl LifecycleManager {
 
         // Update registry to idle
         self.registry
-            .update_state(&resource_id, ResourceState::Idle, "Stopped by user".to_string())
+            .update_state(
+                &resource_id,
+                ResourceState::Idle,
+                "Stopped by user".to_string(),
+            )
             .await;
 
         // Record transition
@@ -340,7 +362,10 @@ impl LifecycleManager {
     }
 
     /// Get resources by type.
-    pub async fn get_resources_by_type(&self, resource_type: &ResourceType) -> Vec<ResourceInstance> {
+    pub async fn get_resources_by_type(
+        &self,
+        resource_type: &ResourceType,
+    ) -> Vec<ResourceInstance> {
         self.registry.get_by_type(resource_type).await
     }
 

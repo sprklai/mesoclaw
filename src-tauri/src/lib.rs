@@ -72,10 +72,23 @@ pub fn run() {
 
     plugins::logging::init();
 
-    tauri::Builder::default()
+    // Initialize CrabNebula DevTools for debugging (only in debug builds)
+    // https://v2.tauri.app/develop/debug/crabnebula-devtools/
+    #[cfg(debug_assertions)]
+    let devtools = tauri_plugin_devtools::init();
+
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_shell::init());
+
+    // Register devtools plugin (only in debug builds)
+    #[cfg(debug_assertions)]
+    {
+        builder = builder.plugin(devtools);
+    }
+
+    builder
         .setup(|app| {
 
             // Initialize Stronghold with Argon2 password hashing
@@ -629,6 +642,17 @@ pub fn run() {
                     session_router::SessionRouter,
                 };
                 use event_bus::{AppEvent, EventFilter, EventType};
+                use tools::ToolProfile;
+
+                /// Get the appropriate tool profile for a channel type.
+                /// Messaging channels (Telegram, Discord, Slack, Matrix) get the Messaging profile
+                /// which includes web and memory tools but not shell/file_write.
+                fn get_tool_profile_for_channel(channel: &str) -> ToolProfile {
+                    match channel {
+                        "telegram" | "discord" | "slack" | "matrix" => ToolProfile::Messaging,
+                        _ => ToolProfile::Full,
+                    }
+                }
 
                 // Per-channel persistent session history (7.1.5).
                 let bridge_sessions = Arc::new(SessionRouter::new());
@@ -825,7 +849,14 @@ pub fn run() {
                                         );
                                     }
 
-                                    let system_prompt = ident.build_system_prompt();
+                                    // Build system prompt with dynamic tool schema injection.
+                                    // Use Messaging profile for external channels (limited tool access).
+                                    let profile = get_tool_profile_for_channel(&chan);
+                                    let system_prompt = ident.build_system_prompt_with_tools(
+                                        None,
+                                        Some(&reg),
+                                        profile,
+                                    );
                                     let agent = AgentLoop::new(
                                         provider,
                                         reg,
@@ -975,6 +1006,8 @@ pub fn run() {
             commands::ai_providers::test_provider_connection_command,
             commands::ai_providers::add_custom_model_command,
             commands::ai_providers::delete_model_command,
+            commands::ai_providers::seed_ai_models_command,
+            commands::ai_providers::reset_and_seed_models_command,
             commands::ai_providers::reactivate_provider_command,
             commands::ai_providers::update_provider_command,
             commands::ai_providers::add_user_provider_command,
@@ -1072,6 +1105,7 @@ pub fn run() {
             modules::commands::start_module_command,
             modules::commands::stop_module_command,
             modules::commands::create_module_command,
+            modules::commands::list_module_templates_command,
             // Memory commands
             memory::commands::store_memory_command,
             memory::commands::search_memory_command,

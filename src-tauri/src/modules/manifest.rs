@@ -79,6 +79,12 @@ pub struct RuntimeConfig {
     /// Extra environment variables passed to the process.
     #[serde(default)]
     pub env: HashMap<String, String>,
+    /// Volume mounts in "host_path:container_path[:ro]" format (container runtimes only).
+    #[serde(default)]
+    pub volumes: Vec<String>,
+    /// Container image name (e.g., "python:3.12-slim"). Required for container runtimes.
+    #[serde(default)]
+    pub image: Option<String>,
     /// Per-invocation wall-clock timeout.  Defaults to 30 seconds.
     pub timeout_secs: Option<u64>,
 }

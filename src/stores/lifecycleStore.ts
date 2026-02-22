@@ -344,9 +344,16 @@ export const useLifecycleStore = create<LifecycleState & LifecycleActions>((set,
 
     // Listen for session created events
     const unlistenCreated = await listen<ResourceStatus>("lifecycle:session:created", (event) => {
-      set((state) => ({
-        resources: [...state.resources, event.payload],
-      }));
+      set((state) => {
+        // Avoid duplicates - check if resource already exists
+        const exists = state.resources.some((r) => r.id === event.payload.id);
+        if (exists) {
+          return state;
+        }
+        return {
+          resources: [...state.resources, event.payload],
+        };
+      });
     });
     newListeners.push(unlistenCreated);
 

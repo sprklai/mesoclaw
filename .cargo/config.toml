@@ -13,12 +13,12 @@ rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
 [target.x86_64-apple-darwin]
-rustflags = ["-C", "link-arg=-ld64.lld"]
+#rustflags = ["-C", "link-arg=-ld64.lld"]
 # On macOS, also use the mold linker as fallback if available
 # rustflags = ["-C", "linker=/usr/local/bin/mold"]
 
 [target.aarch64-apple-darwin]
-rustflags = ["-C", "link-arg=-ld64.lld"]
+#rustflags = ["-C", "link-arg=-ld64.lld"]
 
 [target.x86_64-pc-windows-msvc]
 rustflags = ["-C", "link-arg=/SUBSYSTEM:WINDOWS"]

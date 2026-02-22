@@ -588,12 +588,16 @@ impl From<crate::lifecycle::ResourceInstance> for LifecycleResourceStatus {
     fn from(instance: crate::lifecycle::ResourceInstance) -> Self {
         let (state, substate, progress) = match &instance.state {
             crate::lifecycle::ResourceState::Idle => ("idle".to_string(), None, None),
-            crate::lifecycle::ResourceState::Running { substate, progress, .. } => {
-                ("running".to_string(), Some(substate.clone()), *progress)
-            }
+            crate::lifecycle::ResourceState::Running {
+                substate, progress, ..
+            } => ("running".to_string(), Some(substate.clone()), *progress),
             crate::lifecycle::ResourceState::Stuck { .. } => ("stuck".to_string(), None, None),
-            crate::lifecycle::ResourceState::Recovering { .. } => ("recovering".to_string(), None, None),
-            crate::lifecycle::ResourceState::Completed { .. } => ("completed".to_string(), None, None),
+            crate::lifecycle::ResourceState::Recovering { .. } => {
+                ("recovering".to_string(), None, None)
+            }
+            crate::lifecycle::ResourceState::Completed { .. } => {
+                ("completed".to_string(), None, None)
+            }
             crate::lifecycle::ResourceState::Failed { .. } => ("failed".to_string(), None, None),
         };
 
@@ -611,12 +615,12 @@ impl From<crate::lifecycle::ResourceInstance> for LifecycleResourceStatus {
 }
 
 /// `GET /api/v1/lifecycle` — list all tracked resources.
-pub async fn list_lifecycle_resources(
-    State(state): State<GatewayState>,
-) -> impl IntoResponse {
+pub async fn list_lifecycle_resources(State(state): State<GatewayState>) -> impl IntoResponse {
     let resources = state.lifecycle.get_all_resources().await;
-    let statuses: Vec<LifecycleResourceStatus> =
-        resources.into_iter().map(LifecycleResourceStatus::from).collect();
+    let statuses: Vec<LifecycleResourceStatus> = resources
+        .into_iter()
+        .map(LifecycleResourceStatus::from)
+        .collect();
     Json(json!({ "resources": statuses, "count": statuses.len() }))
 }
 
@@ -636,16 +640,20 @@ pub async fn get_lifecycle_resource(
             return (
                 StatusCode::BAD_REQUEST,
                 Json(json!({ "error": format!("Invalid resource ID: {}", e) })),
-            ).into_response();
+            )
+                .into_response();
         }
     };
 
     match state.lifecycle.get_resource(&id).await {
-        Some(instance) => Json(json!({ "resource": LifecycleResourceStatus::from(instance) })).into_response(),
+        Some(instance) => {
+            Json(json!({ "resource": LifecycleResourceStatus::from(instance) })).into_response()
+        }
         None => (
             StatusCode::NOT_FOUND,
             Json(json!({ "error": format!("Resource '{}' not found", params.id) })),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -660,7 +668,8 @@ pub async fn stop_lifecycle_resource(
             return (
                 StatusCode::BAD_REQUEST,
                 Json(json!({ "error": format!("Invalid resource ID: {}", e) })),
-            ).into_response();
+            )
+                .into_response();
         }
     };
 
@@ -669,7 +678,8 @@ pub async fn stop_lifecycle_resource(
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -684,7 +694,8 @@ pub async fn kill_lifecycle_resource(
             return (
                 StatusCode::BAD_REQUEST,
                 Json(json!({ "error": format!("Invalid resource ID: {}", e) })),
-            ).into_response();
+            )
+                .into_response();
         }
     };
 
@@ -693,7 +704,8 @@ pub async fn kill_lifecycle_resource(
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }
 
@@ -708,7 +720,8 @@ pub async fn retry_lifecycle_resource(
             return (
                 StatusCode::BAD_REQUEST,
                 Json(json!({ "error": format!("Invalid resource ID: {}", e) })),
-            ).into_response();
+            )
+                .into_response();
         }
     };
 
@@ -717,6 +730,7 @@ pub async fn retry_lifecycle_resource(
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
-        ).into_response(),
+        )
+            .into_response(),
     }
 }

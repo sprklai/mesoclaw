@@ -162,5 +162,9 @@ tauri-plugin-autostart = "2.5.1"
 tokio = { version = "1", features = ["rt", "macros", "time"] }
 tempfile = "3.13"
 
+# CrabNebula DevTools - only in debug builds for instrumentation
+[target.'cfg(debug_assertions)'.dependencies]
+tauri-plugin-devtools = "2"
+
 # Profile configuration lives in the workspace root Cargo.toml so that it
 # is not silently ignored by Cargo (member-crate profiles are ignored).

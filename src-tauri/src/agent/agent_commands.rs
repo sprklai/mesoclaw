@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use diesel::prelude::*;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
         provider::LLMProvider,
         providers::openai_compatible::{OpenAICompatibleConfig, OpenAICompatibleProvider},
     },
-    commands::router::RouterState,
+    commands::{lifecycle::ResourceStatus, router::RouterState},
     config::app_identity::KEYCHAIN_SERVICE,
     database::{
         DbPool,
@@ -31,9 +31,9 @@ use crate::{
     },
     event_bus::{AppEvent, EventBus},
     identity::IdentityLoader,
-    lifecycle::{LifecycleSupervisor, ResourceConfig, ResourceId, ResourceType},
+    lifecycle::{LifecycleSupervisor, ResourceConfig, ResourceType, lifecycle_events},
     security::SecurityPolicy,
-    tools::ToolRegistry,
+    tools::{ToolProfile, ToolRegistry},
 };
 
 // ─── Cancellation map ─────────────────────────────────────────────────────────
@@ -228,6 +228,7 @@ pub async fn resolve_routed_provider(
 )]
 pub async fn start_agent_session_command(
     message: String,
+    app_handle: AppHandle,
     pool: State<'_, DbPool>,
     tool_registry: State<'_, Arc<ToolRegistry>>,
     security_policy: State<'_, Arc<SecurityPolicy>>,
@@ -240,12 +241,21 @@ pub async fn start_agent_session_command(
     tracing::Span::current().record("session_id", session_id.as_str());
 
     // Register with lifecycle supervisor for tracking
-    let lifecycle_id = ResourceId::new(ResourceType::Agent, format!("session:{}", session_id));
     let lifecycle_config = ResourceConfig::default();
-    if let Ok(instance) = supervisor.spawn_resource(ResourceType::Agent, lifecycle_config.clone()).await {
-        log::debug!("Lifecycle tracking started for session {}", session_id);
-        let _ = lifecycle_id; // Used for tracking
-    }
+    let lifecycle_id = match supervisor
+        .spawn_resource(ResourceType::Agent, lifecycle_config)
+        .await
+    {
+        Ok(id) => {
+            // Emit Tauri event so frontend lifecycle store shows the running resource
+            if let Some(instance) = supervisor.get_resource(&id).await {
+                let status = ResourceStatus::from(instance);
+                let _ = app_handle.emit(lifecycle_events::SESSION_CREATED, status);
+            }
+            Some(id)
+        }
+        Err(_) => None,
+    };
 
     // Register a cancellation flag for this session.
     let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -275,8 +285,10 @@ pub async fn start_agent_session_command(
     let policy = Arc::clone(&*security_policy);
     let bus = Arc::clone(&*event_bus);
 
-    // Build system prompt from identity files.
-    let system_prompt = identity_loader.build_system_prompt();
+    // Build system prompt from identity files with dynamic tool schema injection.
+    // Desktop app gets Full profile (all tools).
+    let system_prompt =
+        identity_loader.build_system_prompt_with_tools(None, Some(&registry), ToolProfile::Full);
 
     // Emit AgentStarted so clients can capture session_id for cancellation
     // before the run completes (fixes Finding #1).
@@ -299,6 +311,12 @@ pub async fn start_agent_session_command(
 
     // Remove the cancellation entry when done (success or failure).
     cleanup(&cancel_map, &session_id);
+
+    // Stop lifecycle tracking and emit Tauri event for frontend
+    if let Some(ref id) = lifecycle_id {
+        let _ = supervisor.stop_resource(id).await;
+        let _ = app_handle.emit(lifecycle_events::SESSION_COMPLETED, id.to_string());
+    }
 
     let response_text = result?;
 
@@ -352,6 +370,7 @@ pub async fn cancel_agent_session_command(
 )]
 pub async fn start_routed_agent_session_command(
     message: String,
+    app_handle: AppHandle,
     pool: State<'_, DbPool>,
     tool_registry: State<'_, Arc<ToolRegistry>>,
     security_policy: State<'_, Arc<SecurityPolicy>>,
@@ -359,9 +378,27 @@ pub async fn start_routed_agent_session_command(
     identity_loader: State<'_, IdentityLoader>,
     cancel_map: State<'_, SessionCancelMap>,
     router_state: State<'_, RouterState>,
+    supervisor: State<'_, Arc<LifecycleSupervisor>>,
 ) -> Result<String, String> {
     let session_id = Uuid::new_v4().to_string();
     tracing::Span::current().record("session_id", session_id.as_str());
+
+    // Register with lifecycle supervisor for tracking
+    let lifecycle_config = ResourceConfig::default();
+    let lifecycle_id = match supervisor
+        .spawn_resource(ResourceType::Agent, lifecycle_config)
+        .await
+    {
+        Ok(id) => {
+            // Emit Tauri event so frontend lifecycle store shows the running resource
+            if let Some(instance) = supervisor.get_resource(&id).await {
+                let status = ResourceStatus::from(instance);
+                let _ = app_handle.emit(lifecycle_events::SESSION_CREATED, status);
+            }
+            Some(id)
+        }
+        Err(_) => None,
+    };
 
     // Register a cancellation flag for this session.
     let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -391,8 +428,10 @@ pub async fn start_routed_agent_session_command(
     let policy = Arc::clone(&*security_policy);
     let bus = Arc::clone(&*event_bus);
 
-    // Build system prompt from identity files.
-    let system_prompt = identity_loader.build_system_prompt();
+    // Build system prompt from identity files with dynamic tool schema injection.
+    // Desktop app gets Full profile (all tools).
+    let system_prompt =
+        identity_loader.build_system_prompt_with_tools(None, Some(&registry), ToolProfile::Full);
 
     // Emit AgentStarted so clients can capture session_id for cancellation.
     let _ = bus.publish(AppEvent::AgentStarted {
@@ -413,6 +452,12 @@ pub async fn start_routed_agent_session_command(
 
     // Remove the cancellation entry when done.
     cleanup(&cancel_map, &session_id);
+
+    // Stop lifecycle tracking and emit Tauri event for frontend
+    if let Some(ref id) = lifecycle_id {
+        let _ = supervisor.stop_resource(id).await;
+        let _ = app_handle.emit(lifecycle_events::SESSION_COMPLETED, id.to_string());
+    }
 
     let response_text = result?;
 

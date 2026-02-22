@@ -1,127 +1,127 @@
-name: Release
+# name: Release
 
-on:
-  workflow_dispatch:
-    inputs:
-      draft:
-        description: "Publish as draft release (uncheck to release immediately)"
-        type: boolean
-        default: true
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       draft:
+#         description: "Publish as draft release (uncheck to release immediately)"
+#         type: boolean
+#         default: true
 
-env:
-  CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: 0
+# env:
+#   CARGO_TERM_COLOR: always
+#   CARGO_INCREMENTAL: 0
 
-jobs:
-  # ── 1. Create the GitHub Release ─────────────────────────────────────────────
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      release-id: ${{ steps.create-release.outputs.id }}
-      version: ${{ steps.version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
+# jobs:
+#   # ── 1. Create the GitHub Release ─────────────────────────────────────────────
+#   create-release:
+#     name: Create Release
+#     runs-on: ubuntu-latest
+#     outputs:
+#       release-id: ${{ steps.create-release.outputs.id }}
+#       version: ${{ steps.version.outputs.version }}
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - name: Read version from tauri.conf.json
-        id: version
-        run: |
-          VERSION=$(python3 -c "import json; print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+#       - name: Read version from tauri.conf.json
+#         id: version
+#         run: |
+#           VERSION=$(python3 -c "import json; print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
+#           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Create draft release
-        id: create-release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: "MesoClaw v${{ steps.version.outputs.version }}"
-          draft: ${{ inputs.draft }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#       - name: Create draft release
+#         id: create-release
+#         uses: softprops/action-gh-release@v2
+#         with:
+#           tag_name: v${{ steps.version.outputs.version }}
+#           name: "MesoClaw v${{ steps.version.outputs.version }}"
+#           draft: ${{ inputs.draft }}
+#           generate_release_notes: true
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── 2. Build & sign for all desktop platforms ─────────────────────────────────
-  build:
-    name: Build / ${{ matrix.name }}
-    needs: create-release
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macOS (Apple Silicon)
-            runner: macos-latest
-            rust_targets: aarch64-apple-darwin
-            tauri_args: --target aarch64-apple-darwin
+#   # ── 2. Build & sign for all desktop platforms ─────────────────────────────────
+#   build:
+#     name: Build / ${{ matrix.name }}
+#     needs: create-release
+#     permissions:
+#       contents: write
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         include:
+#           - name: macOS (Apple Silicon)
+#             runner: macos-latest
+#             rust_targets: aarch64-apple-darwin
+#             tauri_args: --target aarch64-apple-darwin
 
-          - name: macOS (Intel)
-            runner: macos-latest
-            rust_targets: x86_64-apple-darwin
-            tauri_args: --target x86_64-apple-darwin
+#           - name: macOS (Intel)
+#             runner: macos-latest
+#             rust_targets: x86_64-apple-darwin
+#             tauri_args: --target x86_64-apple-darwin
 
-          - name: macOS (Universal)
-            runner: macos-latest
-            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
-            tauri_args: --target universal-apple-darwin
+#           - name: macOS (Universal)
+#             runner: macos-latest
+#             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+#             tauri_args: --target universal-apple-darwin
 
-          - name: Windows (x64)
-            runner: windows-latest
-            rust_targets: ""
-            tauri_args: --target x86_64-pc-windows-msvc
+#           - name: Windows (x64)
+#             runner: windows-latest
+#             rust_targets: ""
+#             tauri_args: --target x86_64-pc-windows-msvc
 
-          - name: Linux Ubuntu 22.04 (deb)
-            runner: ubuntu-22.04
-            rust_targets: ""
-            tauri_args: --bundles deb
+#           - name: Linux Ubuntu 22.04 (deb)
+#             runner: ubuntu-22.04
+#             rust_targets: ""
+#             tauri_args: --bundles deb
 
-          - name: Linux Ubuntu 24.04 (AppImage + RPM)
-            runner: ubuntu-24.04
-            rust_targets: ""
-            tauri_args: --bundles appimage,rpm
+#           - name: Linux Ubuntu 24.04 (AppImage + RPM)
+#             runner: ubuntu-24.04
+#             rust_targets: ""
+#             tauri_args: --bundles appimage,rpm
 
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
+#     runs-on: ${{ matrix.runner }}
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust_targets }}
+#       - name: Install Rust stable
+#         uses: dtolnay/rust-toolchain@stable
+#         with:
+#           targets: ${{ matrix.rust_targets }}
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: "./src-tauri -> target"
+#       - name: Rust cache
+#         uses: swatinem/rust-cache@v2
+#         with:
+#           workspaces: "./src-tauri -> target"
 
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v2
+#       - name: Install Bun
+#         uses: oven-sh/setup-bun@v2
 
-      - name: Install Linux system dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libasound2-dev
+#       - name: Install Linux system dependencies
+#         if: runner.os == 'Linux'
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y \
+#             libwebkit2gtk-4.1-dev \
+#             libappindicator3-dev \
+#             librsvg2-dev \
+#             patchelf \
+#             libasound2-dev
 
-      - name: Install frontend dependencies
-        run: bun install --frozen-lockfile
+#       - name: Install frontend dependencies
+#         run: bun install --frozen-lockfile
 
-      - name: Build and upload release artifacts
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          releaseId: ${{ needs.create-release.outputs.release-id }}
-          args: ${{ matrix.tauri_args }}
+#       - name: Build and upload release artifacts
+#         uses: tauri-apps/tauri-action@v0
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+#           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+#           APPLE_ID: ${{ secrets.APPLE_ID }}
+#           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+#           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+#           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+#           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+#         with:
+#           releaseId: ${{ needs.create-release.outputs.release-id }}
+#           args: ${{ matrix.tauri_args }}

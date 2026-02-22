@@ -657,6 +657,139 @@ pub fn set_global_default_model_command(
     Ok(())
 }
 
+// ─── Model Seeding Commands ──────────────────────────────────────────────────
+
+/// Embedded models.json content
+const MODELS_JSON: &str = include_str!("../../../models.json");
+
+/// Provider definition from models.json
+#[derive(Debug, Clone, Deserialize)]
+struct ProviderDefinition {
+    name: String,
+    base_url: String,
+    #[serde(default)]
+    requires_api_key: bool,
+    models: Vec<ModelDefinition>,
+}
+
+/// Model definition from models.json
+#[derive(Debug, Clone, Deserialize)]
+struct ModelDefinition {
+    id: String,
+    display_name: String,
+    #[serde(default)]
+    context_limit: Option<i32>,
+}
+
+/// Seed standard AI models from embedded models.json.
+///
+/// This inserts providers and models that don't already exist in the database.
+/// It will not overwrite existing entries.
+#[tauri::command]
+pub fn seed_ai_models_command(pool: State<'_, DbPool>) -> Result<i64, String> {
+    let mut conn = db_conn(&pool)?;
+
+    // Parse the embedded models.json
+    let providers: std::collections::HashMap<String, ProviderDefinition> =
+        serde_json::from_str(MODELS_JSON)
+            .map_err(|e| format!("Failed to parse models.json: {}", e))?;
+
+    let mut inserted_count = 0i64;
+
+    for (provider_id, provider_def) in providers {
+        // Check if provider exists
+        let provider_exists = diesel::select(diesel::dsl::exists(
+            ai_providers::table.filter(ai_providers::id.eq(&provider_id)),
+        ))
+        .get_result::<bool>(&mut conn)
+        .map_err(|e| format!("Failed to check provider existence: {}", e))?;
+
+        if !provider_exists {
+            // Insert provider
+            let new_provider = NewAIProvider::new(
+                &provider_id,
+                &provider_def.name,
+                &provider_def.base_url,
+                provider_def.requires_api_key,
+            );
+
+            diesel::insert_into(ai_providers::table)
+                .values(&new_provider)
+                .execute(&mut conn)
+                .map_err(|e| format!("Failed to insert provider {}: {}", provider_id, e))?;
+        }
+
+        // Insert models that don't exist
+        for model_def in provider_def.models {
+            // Generate model record ID (provider_id + model_id)
+            let model_record_id = format!("{}:{}", provider_id, model_def.id);
+
+            // Check if model exists
+            let model_exists = diesel::select(diesel::dsl::exists(
+                ai_models::table.filter(ai_models::id.eq(&model_record_id)),
+            ))
+            .get_result::<bool>(&mut conn)
+            .map_err(|e| format!("Failed to check model existence: {}", e))?;
+
+            if !model_exists {
+                let new_model = NewAIModel::new(
+                    &model_record_id,
+                    &provider_id,
+                    &model_def.id,
+                    &model_def.display_name,
+                    model_def.context_limit,
+                    false, // is_custom = false for seeded models
+                );
+
+                diesel::insert_into(ai_models::table)
+                    .values(&new_model)
+                    .execute(&mut conn)
+                    .map_err(|e| format!("Failed to insert model {}: {}", model_def.id, e))?;
+
+                inserted_count += 1;
+            }
+        }
+    }
+
+    Ok(inserted_count)
+}
+
+/// Reset and re-seed all standard AI models.
+///
+/// This deletes all non-custom models (and providers with no custom models)
+/// and re-seeds from models.json.
+#[tauri::command]
+pub fn reset_and_seed_models_command(pool: State<'_, DbPool>) -> Result<i64, String> {
+    let mut conn = db_conn(&pool)?;
+
+    // Delete all non-custom models
+    diesel::delete(ai_models::table.filter(ai_models::is_custom.eq(0)))
+        .execute(&mut conn)
+        .map_err(|e| format!("Failed to delete standard models: {}", e))?;
+
+    // Delete providers that have no custom models and are not user-defined
+    // First, find providers that have custom models
+    let providers_with_custom_models: Vec<String> = ai_models::table
+        .filter(ai_models::is_custom.eq(1))
+        .select(ai_models::provider_id)
+        .distinct()
+        .load(&mut conn)
+        .map_err(|e| format!("Failed to find providers with custom models: {}", e))?;
+
+    // Delete standard providers (not user-defined and not having custom models)
+    diesel::delete(
+        ai_providers::table
+            .filter(ai_providers::is_user_defined.eq(0))
+            .filter(ai_providers::id.ne_all(&providers_with_custom_models)),
+    )
+    .execute(&mut conn)
+    .map_err(|e| format!("Failed to delete standard providers: {}", e))?;
+
+    // Now seed fresh
+    drop(conn); // Release the connection before calling seed
+    seed_ai_models_command(pool)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {

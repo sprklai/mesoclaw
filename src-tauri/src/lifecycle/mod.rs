@@ -74,8 +74,8 @@ pub use escalation_manager::{
 };
 pub use event_bus::{LifecycleEvent, LifecycleEventBus};
 pub use events::{
-    emit_lifecycle_event, emit_session_created, emit_session_completed, emit_session_failed,
-    emit_state_changed, events as lifecycle_events, StateChangePayload,
+    StateChangePayload, emit_lifecycle_event, emit_session_completed, emit_session_created,
+    emit_session_failed, emit_state_changed, events as lifecycle_events,
 };
 pub use handlers::ResourceHandler;
 pub use health_monitor::{HealthMonitor, HealthMonitorEvent, HealthMonitorStats};

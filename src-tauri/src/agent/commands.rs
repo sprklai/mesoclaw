@@ -172,6 +172,7 @@ pub async fn delete_agent_command(
 pub async fn run_agent_command(
     _agent_id: String,
     message: String,
+    app_handle: tauri::AppHandle,
     pool: State<'_, DbPool>,
     tool_registry: State<'_, Arc<ToolRegistry>>,
     security_policy: State<'_, Arc<SecurityPolicy>>,
@@ -184,6 +185,7 @@ pub async fn run_agent_command(
     // The agent_id parameter is reserved for future multi-agent support.
     super::agent_commands::start_agent_session_command(
         message,
+        app_handle,
         pool,
         tool_registry,
         security_policy,

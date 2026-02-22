@@ -5,6 +5,7 @@
 
 use tauri::{AppHandle, Emitter};
 
+use crate::commands::lifecycle::ResourceStatus;
 use crate::lifecycle::states::ResourceInstance;
 
 /// Event names for lifecycle notifications.
@@ -106,7 +107,9 @@ pub fn emit_lifecycle_event(
 
 /// Emit a session created event.
 pub fn emit_session_created(app: &AppHandle, instance: &ResourceInstance) -> Result<(), String> {
-    emit_lifecycle_event(app, events::SESSION_CREATED, &instance)
+    // Convert to ResourceStatus for frontend compatibility
+    let status = ResourceStatus::from(instance.clone());
+    emit_lifecycle_event(app, events::SESSION_CREATED, &status)
 }
 
 /// Emit a state changed event.
@@ -137,11 +140,7 @@ pub fn emit_session_completed(app: &AppHandle, resource_id: &str) -> Result<(), 
 }
 
 /// Emit a session failed event.
-pub fn emit_session_failed(
-    app: &AppHandle,
-    resource_id: &str,
-    error: &str,
-) -> Result<(), String> {
+pub fn emit_session_failed(app: &AppHandle, resource_id: &str, error: &str) -> Result<(), String> {
     let payload = serde_json::json!({
         "resourceId": resource_id,
         "error": error,
@@ -224,7 +223,12 @@ pub fn emit_resources_updated(
     app: &AppHandle,
     resources: &[ResourceInstance],
 ) -> Result<(), String> {
-    emit_lifecycle_event(app, events::RESOURCES_UPDATED, &resources)
+    // Convert to ResourceStatus for frontend compatibility
+    let statuses: Vec<ResourceStatus> = resources
+        .iter()
+        .map(|r| ResourceStatus::from(r.clone()))
+        .collect();
+    emit_lifecycle_event(app, events::RESOURCES_UPDATED, &statuses)
 }
 
 #[cfg(test)]

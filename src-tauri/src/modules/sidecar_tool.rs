@@ -309,6 +309,8 @@ mod tests {
                 command: command.to_string(),
                 args: vec![],
                 env: HashMap::new(),
+                volumes: vec![],
+                image: None,
                 timeout_secs: Some(5),
             },
             security: SecurityConfig::default(),

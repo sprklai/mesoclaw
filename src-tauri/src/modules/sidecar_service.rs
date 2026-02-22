@@ -238,6 +238,8 @@ mod tests {
                 command: "true".to_string(), // exists on Linux, exits 0 immediately
                 args: vec![],
                 env: Default::default(),
+                volumes: vec![],
+                image: None,
                 timeout_secs: Some(5),
             },
             security: SecurityConfig::default(),
@@ -265,6 +267,8 @@ mod tests {
                 command: "true".to_string(),
                 args: vec![],
                 env: Default::default(),
+                volumes: vec![],
+                image: None,
                 timeout_secs: None,
             },
             security: SecurityConfig::default(),

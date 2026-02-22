@@ -57,12 +57,8 @@ impl LifecycleStorage {
         .bind::<diesel::sql_types::Text, _>(&config_json)
         .bind::<diesel::sql_types::Integer, _>(instance.current_escalation_tier as i32)
         .bind::<diesel::sql_types::Integer, _>(instance.recovery_attempts as i32)
-        .bind::<diesel::sql_types::Integer, _>(
-            instance.heartbeat_config.interval_secs as i32,
-        )
-        .bind::<diesel::sql_types::Integer, _>(
-            instance.heartbeat_config.stuck_threshold as i32,
-        )
+        .bind::<diesel::sql_types::Integer, _>(instance.heartbeat_config.interval_secs as i32)
+        .bind::<diesel::sql_types::Integer, _>(instance.heartbeat_config.stuck_threshold as i32)
         .bind::<diesel::sql_types::Text, _>(&instance.created_at.to_rfc3339())
         .execute(conn)
         .map_err(|e| format!("Failed to save instance: {}", e))?;
@@ -91,13 +87,14 @@ impl LifecycleStorage {
         .load(conn)
         .map_err(|e| format!("Failed to load instances: {}", e))?;
 
-        rows.into_iter()
-            .map(|row| row_to_instance(row))
-            .collect()
+        rows.into_iter().map(|row| row_to_instance(row)).collect()
     }
 
     /// Load a specific instance by ID.
-    pub fn load_instance(&self, resource_id: &ResourceId) -> Result<Option<ResourceInstance>, String> {
+    pub fn load_instance(
+        &self,
+        resource_id: &ResourceId,
+    ) -> Result<Option<ResourceInstance>, String> {
         let conn = &mut self
             .pool
             .get()
@@ -124,7 +121,11 @@ impl LifecycleStorage {
     }
 
     /// Record a state transition in the history.
-    pub fn record_transition(&self, transition: &StateTransition, substate: Option<&str>) -> Result<(), String> {
+    pub fn record_transition(
+        &self,
+        transition: &StateTransition,
+        substate: Option<&str>,
+    ) -> Result<(), String> {
         let conn = &mut self
             .pool
             .get()
@@ -138,16 +139,10 @@ impl LifecycleStorage {
             "#,
         )
         .bind::<diesel::sql_types::Text, _>(&transition.resource_id)
-        .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(
-            &transition.from_state,
-        )
+        .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(&transition.from_state)
         .bind::<diesel::sql_types::Text, _>(&transition.to_state)
-        .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(
-            &substate,
-        )
-        .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(
-            &transition.reason,
-        )
+        .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(&substate)
+        .bind::<diesel::sql_types::Nullable<diesel::sql_types::Text>, _>(&transition.reason)
         .bind::<diesel::sql_types::Text, _>(&transition.timestamp.to_rfc3339())
         .execute(conn)
         .map_err(|e| format!("Failed to record transition: {}", e))?;
@@ -156,7 +151,11 @@ impl LifecycleStorage {
     }
 
     /// Get transition history for a resource.
-    pub fn get_transitions(&self, resource_id: &ResourceId, limit: usize) -> Result<Vec<StateTransition>, String> {
+    pub fn get_transitions(
+        &self,
+        resource_id: &ResourceId,
+        limit: usize,
+    ) -> Result<Vec<StateTransition>, String> {
         let conn = &mut self
             .pool
             .get()
@@ -221,12 +220,10 @@ impl LifecycleStorage {
             .get()
             .map_err(|e| format!("Failed to get database connection: {}", e))?;
 
-        diesel::sql_query(
-            "DELETE FROM lifecycle_instances WHERE resource_id = ?",
-        )
-        .bind::<diesel::sql_types::Text, _>(&resource_id.to_string())
-        .execute(conn)
-        .map_err(|e| format!("Failed to remove instance: {}", e))?;
+        diesel::sql_query("DELETE FROM lifecycle_instances WHERE resource_id = ?")
+            .bind::<diesel::sql_types::Text, _>(&resource_id.to_string())
+            .execute(conn)
+            .map_err(|e| format!("Failed to remove instance: {}", e))?;
 
         Ok(())
     }
@@ -257,12 +254,8 @@ impl LifecycleStorage {
         .bind::<diesel::sql_types::Text, _>(&request.resource_id)
         .bind::<diesel::sql_types::Text, _>(&request.resource_type.to_string())
         .bind::<diesel::sql_types::Text, _>(&request.failure_context.error)
-        .bind::<diesel::sql_types::Integer, _>(
-            request.failure_context.recovery_attempts as i32,
-        )
-        .bind::<diesel::sql_types::Integer, _>(
-            request.failure_context.running_duration_secs as i32,
-        )
+        .bind::<diesel::sql_types::Integer, _>(request.failure_context.recovery_attempts as i32)
+        .bind::<diesel::sql_types::Integer, _>(request.failure_context.running_duration_secs as i32)
         .bind::<diesel::sql_types::Text, _>(&request.failure_context.last_state)
         .bind::<diesel::sql_types::Text, _>(&attempted_tiers_json)
         .bind::<diesel::sql_types::Text, _>(&options_json)
@@ -403,7 +396,12 @@ struct InterventionRow {
 
 fn row_to_instance(row: InstanceRow) -> Result<ResourceInstance, String> {
     let resource_type = parse_resource_type(&row.resource_type)?;
-    let instance_id = row.resource_id.splitn(2, ':').nth(1).unwrap_or(&row.resource_id).to_string();
+    let instance_id = row
+        .resource_id
+        .splitn(2, ':')
+        .nth(1)
+        .unwrap_or(&row.resource_id)
+        .to_string();
     let resource_id = ResourceId::new(resource_type.clone(), instance_id);
 
     let config: ResourceConfig = serde_json::from_str(&row.config_json)
@@ -468,9 +466,9 @@ fn parse_resource_type(s: &str) -> Result<ResourceType, String> {
         "subagent" => Ok(ResourceType::Subagent),
         "gateway_handler" => Ok(ResourceType::GatewayHandler),
         "memory_operation" => Ok(ResourceType::MemoryOperation),
-        other if other.starts_with("custom:") => {
-            Ok(ResourceType::Custom(other.strip_prefix("custom:").unwrap_or(other).to_string()))
-        }
+        other if other.starts_with("custom:") => Ok(ResourceType::Custom(
+            other.strip_prefix("custom:").unwrap_or(other).to_string(),
+        )),
         other => Err(format!("Unknown resource type: {}", other)),
     }
 }
@@ -493,12 +491,18 @@ fn get_progress(state: &ResourceState) -> Option<f32> {
     }
 }
 
-fn parse_state(state_str: &str, substate: &Option<String>, progress: Option<f32>) -> Result<ResourceState, String> {
+fn parse_state(
+    state_str: &str,
+    substate: &Option<String>,
+    progress: Option<f32>,
+) -> Result<ResourceState, String> {
     let now = Utc::now();
     match state_str {
         "idle" => Ok(ResourceState::Idle),
         "running" => Ok(ResourceState::Running {
-            substate: substate.clone().unwrap_or_else(|| "initialized".to_string()),
+            substate: substate
+                .clone()
+                .unwrap_or_else(|| "initialized".to_string()),
             started_at: now,
             progress,
         }),
@@ -554,8 +558,14 @@ mod tests {
 
     #[test]
     fn test_parse_resource_type() {
-        assert!(matches!(parse_resource_type("agent"), Ok(ResourceType::Agent)));
-        assert!(matches!(parse_resource_type("channel"), Ok(ResourceType::Channel)));
+        assert!(matches!(
+            parse_resource_type("agent"),
+            Ok(ResourceType::Agent)
+        ));
+        assert!(matches!(
+            parse_resource_type("channel"),
+            Ok(ResourceType::Channel)
+        ));
         assert!(parse_resource_type("invalid").is_err());
     }
 }

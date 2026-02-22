@@ -120,7 +120,10 @@ pub async fn start_gateway(
         .route("/api/v1/lifecycle/{id}", get(get_lifecycle_resource))
         .route("/api/v1/lifecycle/{id}/stop", post(stop_lifecycle_resource))
         .route("/api/v1/lifecycle/{id}/kill", post(kill_lifecycle_resource))
-        .route("/api/v1/lifecycle/{id}/retry", post(retry_lifecycle_resource))
+        .route(
+            "/api/v1/lifecycle/{id}/retry",
+            post(retry_lifecycle_resource),
+        )
         .layer(middleware::from_fn(auth_middleware))
         .with_state(state.clone());
 
