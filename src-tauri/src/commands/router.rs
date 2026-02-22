@@ -11,6 +11,7 @@ use crate::database::models::{DiscoveredModelData, RouterConfigData};
 use crate::services::{model_registry::ModelRegistry, router::RouterService};
 
 /// Router state for Tauri commands
+#[derive(Clone)]
 pub struct RouterState {
     pub router: Arc<RouterService>,
     pub registry: Arc<ModelRegistry>,

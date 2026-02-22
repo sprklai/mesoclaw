@@ -93,8 +93,7 @@ export function RouterSettings() {
     isLoadingModels,
     isDiscovering,
     error,
-    loadConfig,
-    loadModels,
+    initialize,
     setProfile,
     setTaskOverride,
     clearTaskOverride,
@@ -106,11 +105,10 @@ export function RouterSettings() {
   const [providerFilter, setProviderFilter] = useState<string>("all");
   const [discoveringProvider, setDiscoveringProvider] = useState<string | null>(null);
 
-  // Initialize on mount
+  // Initialize on mount - use initialize() which handles loading state properly
   useEffect(() => {
-    void loadConfig();
-    void loadModels();
-  }, [loadConfig, loadModels]);
+    void initialize();
+  }, [initialize]);
 
   // Show error toast if error occurs
   useEffect(() => {

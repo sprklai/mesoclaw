@@ -13,6 +13,10 @@
 //! ## AgentLoop integration
 //! When `AgentComponents` are supplied the scheduler can execute `Heartbeat`
 //! and `AgentTurn` payloads through the real agent loop.
+//!
+//! ## Router integration
+//! When `AgentComponents.router` is set, `AgentTurn` jobs will use router-based
+//! model selection based on the message content and active routing profile.
 
 use std::{
     collections::HashMap,
@@ -29,6 +33,7 @@ use uuid::Uuid;
 use crate::{
     agent::loop_::{AgentConfig, AgentLoop},
     ai::provider::LLMProvider,
+    commands::router::RouterState,
     database::{DbPool, schema::scheduled_jobs},
     event_bus::{AppEvent, EventBus},
     identity::loader::IdentityLoader,
@@ -43,11 +48,18 @@ use super::traits::{
 // ─── AgentComponents ─────────────────────────────────────────────────────────
 
 /// Everything needed to spin up an [`AgentLoop`] inside a scheduled job.
+///
+/// When `router` is set, `AgentTurn` jobs will use router-based model selection
+/// to automatically choose the best model based on task classification.
 pub struct AgentComponents {
     pub provider: Arc<dyn LLMProvider>,
     pub tool_registry: Arc<ToolRegistry>,
     pub security_policy: Arc<SecurityPolicy>,
     pub identity_loader: Arc<IdentityLoader>,
+    /// Optional router for automatic model selection in AgentTurn jobs
+    pub router: Option<Arc<RouterState>>,
+    /// Optional database pool for resolving routed models
+    pub pool: Option<DbPool>,
 }
 
 // ─── Diesel row type ─────────────────────────────────────────────────────────
@@ -577,8 +589,37 @@ async fn execute_job(
                 );
             };
             let system_prompt = agent.identity_loader.build_system_prompt();
+
+            // Use router-based model selection if router is configured
+            let provider = if let (Some(router_state), Some(pool)) = (&agent.router, &agent.pool) {
+                // Try router-based model selection
+                if let Some(model_id) = router_state.router.route(prompt).await {
+                    log::info!(
+                        "[Scheduler] Router selected model '{}' for AgentTurn job",
+                        model_id
+                    );
+                    // Try to resolve provider for routed model
+                    match crate::agent::agent_commands::resolve_provider_for_model(pool, &model_id)
+                    {
+                        Ok(p) => p,
+                        Err(e) => {
+                            log::warn!(
+                                "[Scheduler] Failed to resolve routed model '{}': {}. Using default provider.",
+                                model_id,
+                                e
+                            );
+                            agent.provider.clone()
+                        }
+                    }
+                } else {
+                    agent.provider.clone()
+                }
+            } else {
+                agent.provider.clone()
+            };
+
             let loop_ = AgentLoop::new(
-                agent.provider.clone(),
+                provider,
                 agent.tool_registry.clone(),
                 agent.security_policy.clone(),
                 Some(bus),

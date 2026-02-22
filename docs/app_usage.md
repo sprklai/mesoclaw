@@ -23,68 +23,73 @@ A comprehensive guide to using MesoClaw, your AI-powered desktop application for
   - [4.4 Setting Default Model](#44-setting-default-model)
   - [4.5 Custom / User-Defined Providers](#45-custom--user-defined-providers)
   - [4.6 Ollama (Local Models)](#46-ollama-local-models)
-- [5. Scheduler](#5-scheduler)
-  - [5.1 Creating a Scheduled Job](#51-creating-a-scheduled-job)
-  - [5.2 Schedule Types](#52-schedule-types)
-  - [5.3 Job Payload Types](#53-job-payload-types)
-  - [5.4 Managing Jobs](#54-managing-jobs)
-  - [5.5 Viewing Execution History](#55-viewing-execution-history)
-  - [5.6 Error Handling & Backoff](#56-error-handling--backoff)
-- [6. Heartbeat Monitoring](#6-heartbeat-monitoring)
-  - [6.1 What is Heartbeat?](#61-what-is-heartbeat)
-  - [6.2 Creating HEARTBEAT.md](#62-creating-heartbeatmd)
-  - [6.3 Setting Up a Heartbeat Job](#63-setting-up-a-heartbeat-job)
-  - [6.4 Active Hours](#64-active-hours)
-  - [6.5 Viewing Heartbeat Results](#65-viewing-heartbeat-results)
-  - [6.6 Troubleshooting Heartbeat Failures](#66-troubleshooting-heartbeat-failures)
-- [7. Messaging Channels](#7-messaging-channels)
-  - [7.1 Supported Platforms](#71-supported-platforms)
-  - [7.2 Setting Up Telegram](#72-setting-up-telegram)
-  - [7.3 Setting Up Discord](#73-setting-up-discord)
-  - [7.4 Setting Up Slack](#74-setting-up-slack)
-  - [7.5 Setting Up Matrix](#75-setting-up-matrix)
-  - [7.6 Testing Connection](#76-testing-connection)
-  - [7.7 Using the Channels Page](#77-using-the-channels-page)
-  - [7.8 Sending & Receiving Messages](#78-sending--receiving-messages)
-- [8. Memory](#8-memory)
-  - [8.1 Semantic Search](#81-semantic-search)
-  - [8.2 Daily Timeline](#82-daily-timeline)
-  - [8.3 Memory Categories](#83-memory-categories)
-- [9. Identity (Agent Personality)](#9-identity-agent-personality)
-  - [9.1 Understanding Identity Files](#91-understanding-identity-files)
-  - [9.2 Editing Identity](#92-editing-identity)
-  - [9.3 Hot-Reload](#93-hot-reload)
-- [10. Skills (Prompt Templates)](#10-skills-prompt-templates)
-  - [10.1 What are Skills?](#101-what-are-skills)
-  - [10.2 Managing Skills](#102-managing-skills)
-  - [10.3 Skill Auto-Selection](#103-skill-auto-selection)
-  - [10.4 Creating Custom Skills](#104-creating-custom-skills)
-- [11. Prompt Generator](#11-prompt-generator)
-  - [11.1 Artifact Types](#111-artifact-types)
-  - [11.2 Generating Content](#112-generating-content)
-  - [11.3 Library Management](#113-library-management)
-- [12. Modules (Extensions)](#12-modules-extensions)
-  - [12.1 What are Modules?](#121-what-are-modules)
-  - [12.2 Module Types](#122-module-types)
-  - [12.3 Creating a Module](#123-creating-a-module)
-  - [12.4 Starting & Stopping Modules](#124-starting--stopping-modules)
-  - [12.5 MCP Server Modules](#125-mcp-server-modules)
-- [13. Logs](#13-logs)
-  - [13.1 Viewing Logs](#131-viewing-logs)
-  - [13.2 Filtering by Level](#132-filtering-by-level)
-  - [13.3 Searching Logs](#133-searching-logs)
-  - [13.4 Live Tail Mode](#134-live-tail-mode)
-- [14. App Settings](#14-app-settings)
-  - [14.1 Appearance](#141-appearance)
-  - [14.2 Behavior](#142-behavior)
-  - [14.3 Notifications & DND](#143-notifications--dnd)
-  - [14.4 Developer Options](#144-developer-options)
-- [15. Advanced Settings](#15-advanced-settings)
-- [16. Security & Privacy](#16-security--privacy)
-  - [16.1 API Key Storage](#161-api-key-storage)
-  - [16.2 Channel Credential Storage](#162-channel-credential-storage)
-  - [16.3 Data Locations](#163-data-locations)
-- [17. Troubleshooting](#17-troubleshooting)
+- [5. Smart Model Router](#5-smart-model-router)
+  - [5.1 Routing Profiles](#51-routing-profiles)
+  - [5.2 Task Classification](#52-task-classification)
+  - [5.3 Configuring the Router](#53-configuring-the-router)
+  - [5.4 Model Discovery](#54-model-discovery)
+- [6. Scheduler](#6-scheduler)
+  - [6.1 Creating a Scheduled Job](#61-creating-a-scheduled-job)
+  - [6.2 Schedule Types](#62-schedule-types)
+  - [6.3 Job Payload Types](#63-job-payload-types)
+  - [6.4 Managing Jobs](#64-managing-jobs)
+  - [6.5 Viewing Execution History](#65-viewing-execution-history)
+  - [6.6 Error Handling & Backoff](#66-error-handling--backoff)
+- [7. Heartbeat Monitoring](#7-heartbeat-monitoring)
+  - [7.1 What is Heartbeat?](#71-what-is-heartbeat)
+  - [7.2 Creating HEARTBEAT.md](#72-creating-heartbeatmd)
+  - [7.3 Setting Up a Heartbeat Job](#73-setting-up-a-heartbeat-job)
+  - [7.4 Active Hours](#74-active-hours)
+  - [7.5 Viewing Heartbeat Results](#75-viewing-heartbeat-results)
+  - [7.6 Troubleshooting Heartbeat Failures](#76-troubleshooting-heartbeat-failures)
+- [8. Messaging Channels](#8-messaging-channels)
+  - [8.1 Supported Platforms](#81-supported-platforms)
+  - [8.2 Setting Up Telegram](#82-setting-up-telegram)
+  - [8.3 Setting Up Discord](#83-setting-up-discord)
+  - [8.4 Setting Up Slack](#84-setting-up-slack)
+  - [8.5 Setting Up Matrix](#85-setting-up-matrix)
+  - [8.6 Testing Connection](#86-testing-connection)
+  - [8.7 Using the Channels Page](#87-using-the-channels-page)
+  - [8.8 Sending & Receiving Messages](#88-sending--receiving-messages)
+- [9. Memory](#9-memory)
+  - [9.1 Semantic Search](#91-semantic-search)
+  - [9.2 Daily Timeline](#92-daily-timeline)
+  - [9.3 Memory Categories](#93-memory-categories)
+- [10. Identity (Agent Personality)](#10-identity-agent-personality)
+  - [10.1 Understanding Identity Files](#101-understanding-identity-files)
+  - [10.2 Editing Identity](#102-editing-identity)
+  - [10.3 Hot-Reload](#103-hot-reload)
+- [11. Skills (Prompt Templates)](#11-skills-prompt-templates)
+  - [11.1 What are Skills?](#111-what-are-skills)
+  - [11.2 Managing Skills](#112-managing-skills)
+  - [11.3 Skill Auto-Selection](#113-skill-auto-selection)
+  - [11.4 Creating Custom Skills](#114-creating-custom-skills)
+- [12. Prompt Generator](#12-prompt-generator)
+  - [12.1 Artifact Types](#121-artifact-types)
+  - [12.2 Generating Content](#122-generating-content)
+  - [12.3 Library Management](#123-library-management)
+- [13. Modules (Extensions)](#13-modules-extensions)
+  - [13.1 What are Modules?](#131-what-are-modules)
+  - [13.2 Module Types](#132-module-types)
+  - [13.3 Creating a Module](#133-creating-a-module)
+  - [13.4 Starting & Stopping Modules](#134-starting--stopping-modules)
+  - [13.5 MCP Server Modules](#135-mcp-server-modules)
+- [14. Logs](#14-logs)
+  - [14.1 Viewing Logs](#141-viewing-logs)
+  - [14.2 Filtering by Level](#142-filtering-by-level)
+  - [14.3 Searching Logs](#143-searching-logs)
+  - [14.4 Live Tail Mode](#144-live-tail-mode)
+- [15. App Settings](#15-app-settings)
+  - [15.1 Appearance](#151-appearance)
+  - [15.2 Behavior](#152-behavior)
+  - [15.3 Notifications & DND](#153-notifications--dnd)
+  - [15.4 Developer Options](#154-developer-options)
+- [16. Advanced Settings](#16-advanced-settings)
+- [17. Security & Privacy](#17-security--privacy)
+  - [17.1 API Key Storage](#171-api-key-storage)
+  - [17.2 Channel Credential Storage](#172-channel-credential-storage)
+  - [17.3 Data Locations](#173-data-locations)
+- [18. Troubleshooting](#18-troubleshooting)
   - [17.1 Common Issues](#171-common-issues)
   - [17.2 Gateway Status](#172-gateway-status)
   - [17.3 Channel Connection Issues](#173-channel-connection-issues)
@@ -317,11 +322,95 @@ Ollama lets you run AI models locally on your machine without an API key.
 
 ---
 
-## 5. Scheduler
+## 5. Smart Model Router
+
+The Smart Model Router automatically selects the best AI model for your task based on content analysis and cost/quality preferences. Access it at **Settings > Router**.
+
+### 5.1 Routing Profiles
+
+The router offers three profiles to balance cost versus quality:
+
+| Profile | Description | Best For |
+|---------|-------------|----------|
+| **Eco** | Cost-Effective | Budget-conscious usage, high-volume tasks |
+| **Balanced** | Default balance | General use (recommended) |
+| **Premium** | Best Quality | Complex reasoning, critical tasks |
+
+**How profiles work:**
+- Each profile maps task types to model cost tiers (low/medium/high)
+- **Eco** prefers low-cost models with high-quality fallbacks
+- **Balanced** uses medium-cost models by default
+- **Premium** always selects the highest-quality available models
+
+To change your profile:
+1. Go to **Settings > Router**
+2. Select a profile from the dropdown: Eco, Balanced, or Premium
+3. Changes apply immediately to new conversations and agent tasks
+
+### 5.2 Task Classification
+
+The router analyzes your input to classify the task type automatically:
+
+| Task Type | Detected By | Example Prompts |
+|-----------|-------------|-----------------|
+| **Code** | Programming keywords | "debug this", "implement", "refactor", "fix bug" |
+| **Analysis** | Analysis keyword | "analyze", "explain", "summarize", "compare" |
+| **Creative** | Creative keyword | "write a story", "create", "brainstorm", "design" |
+| **Fast** | Short messages | Quick acknowledgments ("ok", "thanks", "yes") |
+| **General** | Default fallback | Questions, general conversation |
+
+Classification is case-insensitive and prioritized: Code > Analysis > Creative > Fast > General.
+
+### 5.3 Configuring the Router
+
+**Enable/Disable Routing:**
+1. Go to **Settings > Router**
+2. Toggle "Enable Smart Routing" on/off
+3. When disabled, models are selected manually
+
+**Task Type Overrides:**
+Override the model for specific task types:
+1. In **Settings > Router**, find the Task Overrides section
+2. Click a task type (Code, Analysis, Creative, Fast, General)
+3. Select a specific model from the dropdown
+4. The router will use your chosen model for that task type
+
+**Modality Filtering:**
+Filter models by capability:
+1. In **Settings > Router**, find the Modality Filters section
+2. Toggle modalities: Text, Image, Audio, Video, Embedding
+3. Only models supporting selected modalities will be considered
+
+### 5.4 Model Discovery
+
+The router dynamically discovers available models from your configured providers:
+
+**Refresh Models:**
+1. Go to **Settings > Router**
+2. Click the **Refresh Models** button
+3. The router queries all configured providers for their available models
+4. Discovered models appear in the model list with their cost tier and modalities
+
+**Cost Tier Assignment:**
+Models are automatically assigned cost tiers based on provider pricing:
+- **Low**: Budget models (GPT-3.5, Claude Haiku, Gemini Flash)
+- **Medium**: Standard models (GPT-4o-mini, Claude Sonnet)
+- **High**: Premium models (GPT-4o, Claude Opus, Gemini Pro)
+
+**Model Status:**
+- Active models are included in routing
+- Inactive models are ignored
+- Toggle model status in the model list
+
+> **Tip:** For best results, configure API keys for multiple providers (Settings > AI Provider) to give the router a wider selection of models.
+
+---
+
+## 6. Scheduler
 
 The Scheduler allows you to create automated jobs that run on a recurring schedule. Access it at **Settings > Scheduler**.
 
-### 5.1 Creating a Scheduled Job
+### 6.1 Creating a Scheduled Job
 
 1. Navigate to **Settings > Scheduler**.
 2. Click the **+ Add Job** button in the top right.
@@ -332,7 +421,7 @@ The Scheduler allows you to create automated jobs that run on a recurring schedu
    - Additional fields depending on the action type.
 4. Click **Create Job** to submit.
 
-### 5.2 Schedule Types
+### 6.2 Schedule Types
 
 | Type | Description | Example |
 |------|-------------|---------|
@@ -354,7 +443,7 @@ The Scheduler allows you to create automated jobs that run on a recurring schedu
 > - `0 9 * * 1-5` -- 9 AM on weekdays
 > - `0 0 * * *` -- midnight daily
 
-### 5.3 Job Payload Types
+### 6.3 Job Payload Types
 
 When creating a job, select one of three action types from the **Action** dropdown:
 
@@ -364,7 +453,7 @@ When creating a job, select one of three action types from the **Action** dropdo
 | **Agent Turn** | "Agent Turn (custom prompt)" | Runs an AI agent with a custom prompt you provide. A **Prompt** text field appears where you enter the instruction (e.g., "Summarise today's work"). |
 | **Notify** | "Publish notification" | Publishes an event or notification message. A **Message** text field appears where you enter the notification text (e.g., "Reminder: check progress"). |
 
-### 5.4 Managing Jobs
+### 6.4 Managing Jobs
 
 The Scheduler tab displays a table of all configured jobs with the following columns:
 
@@ -382,7 +471,7 @@ The Scheduler tab displays a table of all configured jobs with the following col
 
 **To delete a job:** Click the **Delete** button. The job is removed immediately.
 
-### 5.5 Viewing Execution History
+### 6.5 Viewing Execution History
 
 For each job, you can view the last 100 execution runs. Click on a job row to expand the execution history, which shows:
 
@@ -390,7 +479,7 @@ For each job, you can view the last 100 execution runs. Click on a job row to ex
 - Status (success or failure)
 - Output or error message
 
-### 5.6 Error Handling & Backoff
+### 6.6 Error Handling & Backoff
 
 When a job fails, MesoClaw applies an exponential backoff strategy to avoid hammering failing services:
 
@@ -408,13 +497,13 @@ Jobs persist in the SQLite database and reload automatically when the applicatio
 
 ---
 
-## 6. Heartbeat Monitoring
+## 7. Heartbeat Monitoring
 
-### 6.1 What is Heartbeat?
+### 7.1 What is Heartbeat?
 
 Heartbeat is a special scheduler job type that performs automated health checks on your system. It reads a checklist from a `HEARTBEAT.md` file, passes each item to an AI agent for verification, and reports the results.
 
-### 6.2 Creating HEARTBEAT.md
+### 7.2 Creating HEARTBEAT.md
 
 Create a file named `HEARTBEAT.md` in your MesoClaw configuration directory with checklist items using standard Markdown task syntax:
 
@@ -428,7 +517,7 @@ Create a file named `HEARTBEAT.md` in your MesoClaw configuration directory with
 
 Each `- [ ]` item represents a health check that the AI agent will attempt to verify.
 
-### 6.3 Setting Up a Heartbeat Job
+### 7.3 Setting Up a Heartbeat Job
 
 1. Go to **Settings > Scheduler**.
 2. Click **+ Add Job**.
@@ -439,11 +528,11 @@ Each `- [ ]` item represents a health check that the AI agent will attempt to ve
 5. Under **Action**, select **"Run Heartbeat checklist"** from the dropdown.
 6. Click **Create Job**.
 
-### 6.4 Active Hours
+### 7.4 Active Hours
 
 Heartbeat supports an `active_hours` configuration (e.g., 9-17) to restrict checks to working hours only. Outside of active hours, heartbeat jobs are silently skipped.
 
-### 6.5 Viewing Heartbeat Results
+### 7.5 Viewing Heartbeat Results
 
 1. Go to **Settings > Scheduler**.
 2. Locate your heartbeat job in the jobs table.
@@ -452,7 +541,7 @@ Heartbeat supports an `active_hours` configuration (e.g., 9-17) to restrict chec
    - **HEARTBEAT_OK**: All checklist items passed (silent success).
    - **HeartbeatAlert**: One or more items failed, with details about which checks did not pass.
 
-### 6.6 Troubleshooting Heartbeat Failures
+### 7.6 Troubleshooting Heartbeat Failures
 
 If a heartbeat check fails:
 
@@ -464,11 +553,11 @@ If a heartbeat check fails:
 
 ---
 
-## 7. Messaging Channels
+## 8. Messaging Channels
 
 Channels allow your AI agent to communicate through external messaging platforms. Configure channels at **Settings > Channels** and view messages at the **Channels** page (`/channels`).
 
-### 7.1 Supported Platforms
+### 8.1 Supported Platforms
 
 | Platform | Status | Description |
 |----------|--------|-------------|
@@ -478,7 +567,7 @@ Channels allow your AI agent to communicate through external messaging platforms
 | **Matrix** | Available | Bridges WhatsApp, Slack, IRC, Signal, and more through the Matrix protocol |
 | **WhatsApp** | Via Matrix bridge | Use the Matrix channel with a WhatsApp bridge |
 
-### 7.2 Setting Up Telegram
+### 8.2 Setting Up Telegram
 
 1. Create a Telegram bot through [BotFather](https://t.me/BotFather):
    - Send `/newbot` to BotFather
@@ -494,7 +583,7 @@ Channels allow your AI agent to communicate through external messaging platforms
 
 > **Tip:** To find your Telegram chat ID, send a message to your bot and visit `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` in a browser.
 
-### 7.3 Setting Up Discord
+### 8.3 Setting Up Discord
 
 1. Create a Discord application and bot at the [Discord Developer Portal](https://discord.com/developers/applications).
 2. Copy the bot token from the Bot section.
@@ -508,7 +597,7 @@ Channels allow your AI agent to communicate through external messaging platforms
 7. Click **Test Connection** to verify. Discord health checks call the `get_current_user()` API.
 8. Click **Connect** to activate.
 
-### 7.4 Setting Up Slack
+### 8.4 Setting Up Slack
 
 1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps).
 2. Enable **Socket Mode** in your app settings.
@@ -522,7 +611,7 @@ Channels allow your AI agent to communicate through external messaging platforms
 7. Click **Test Connection** to verify. Slack health checks call the `auth.test` API.
 8. Click **Connect** to activate.
 
-### 7.5 Setting Up Matrix
+### 8.5 Setting Up Matrix
 
 1. Create an account on your Matrix homeserver (or use an existing one).
 2. Generate an access token for the account.
@@ -538,7 +627,7 @@ Channels allow your AI agent to communicate through external messaging platforms
 
 > **Tip:** Matrix is particularly powerful because it supports bridges to WhatsApp, Slack, IRC, Signal, and other protocols. Configure bridges on your homeserver to extend MesoClaw's reach.
 
-### 7.6 Testing Connection
+### 8.6 Testing Connection
 
 Each channel has a **Test Connection** button in its configuration panel. When clicked:
 
@@ -553,7 +642,7 @@ Each channel has a **Test Connection** button in its configuration panel. When c
 
 > **Important:** Always test your connection before saving and connecting. This helps catch typos in tokens or IDs early.
 
-### 7.7 Using the Channels Page
+### 8.7 Using the Channels Page
 
 Navigate to the **Channels** page from the sidebar to view and interact with messages.
 
@@ -581,7 +670,7 @@ Click a channel name in the sidebar to view its messages in the right panel.
 
 > **Note:** If no channels are configured, the sidebar displays a message with a link to configure channels in Settings.
 
-### 7.8 Sending & Receiving Messages
+### 8.8 Sending & Receiving Messages
 
 **Viewing messages:**
 
@@ -610,11 +699,11 @@ Click a channel name in the sidebar to view its messages in the right panel.
 
 ---
 
-## 8. Memory
+## 9. Memory
 
 The Memory page (`/memory`) provides access to the agent's semantic memory system. Navigate to it from the sidebar or the Home dashboard "Memory" card.
 
-### 8.1 Semantic Search
+### 9.1 Semantic Search
 
 1. Select the **Search** tab (active by default).
 2. Type a natural language query into the search field (e.g., "What did we discuss about authentication?").
@@ -627,7 +716,7 @@ The context panel on the right provides search tips:
 - Try searching for topics, events, or entities
 - Results are ranked by semantic similarity
 
-### 8.2 Daily Timeline
+### 9.2 Daily Timeline
 
 1. Select the **Daily Timeline** tab.
 2. You see a date-based browser for journal entries.
@@ -636,7 +725,7 @@ The context panel on the right provides search tips:
 
 The context panel shows today's date and a hint to "Browse journal entries by day in the timeline."
 
-### 8.3 Memory Categories
+### 9.3 Memory Categories
 
 Memory entries are organized into categories:
 
@@ -651,11 +740,11 @@ Memory data is stored and searched via the gateway REST API.
 
 ---
 
-## 9. Identity (Agent Personality)
+## 10. Identity (Agent Personality)
 
 The Identity editor lets you customize the AI agent's personality, values, and behavior. Access it at **Settings > Identity**.
 
-### 9.1 Understanding Identity Files
+### 10.1 Understanding Identity Files
 
 Identity is defined through a collection of Markdown files that shape the agent's system prompt. Common identity files include:
 
@@ -666,7 +755,7 @@ Identity is defined through a collection of Markdown files that shape the agent'
 
 These files collectively determine how the AI agent responds, what tone it uses, and what principles it follows.
 
-### 9.2 Editing Identity
+### 10.2 Editing Identity
 
 1. Go to **Settings > Identity**.
 2. The left sidebar shows a list of all identity files in monospace font under the heading "Identity Files."
@@ -681,7 +770,7 @@ These files collectively determine how the AI agent responds, what tone it uses,
 
 > **Note:** If no file is selected, the editor area shows "Select a file to edit."
 
-### 9.3 Hot-Reload
+### 10.3 Hot-Reload
 
 Changes to identity files are hot-reloaded into the system prompt. After saving a file:
 
@@ -695,9 +784,9 @@ Identity files are also accessible via the gateway REST API:
 
 ---
 
-## 10. Skills (Prompt Templates)
+## 11. Skills (Prompt Templates)
 
-### 10.1 What are Skills?
+### 11.1 What are Skills?
 
 Skills are reusable prompt templates that enhance AI responses for specific tasks. They are Markdown files with YAML frontmatter, stored in `~/.config/mesoclaw/skills/`.
 
@@ -723,7 +812,7 @@ You are an expert code reviewer. Analyze the following code for:
 Provide actionable feedback with specific line references.
 ```
 
-### 10.2 Managing Skills
+### 11.2 Managing Skills
 
 Access skill management at **Settings > Skills**.
 
@@ -733,14 +822,14 @@ From this tab you can:
 - **Reload** skills from the filesystem to pick up new or modified files
 - **Delete** skills you no longer need
 
-### 10.3 Skill Auto-Selection
+### 11.3 Skill Auto-Selection
 
 MesoClaw can automatically suggest or select skills based on the context of your conversation. When the AI detects that a particular skill matches your request, it may:
 
 - Apply the skill's prompt template automatically
 - Suggest relevant skills for you to choose from
 
-### 10.4 Creating Custom Skills
+### 11.4 Creating Custom Skills
 
 **Method 1: Manual file creation**
 
@@ -761,11 +850,11 @@ See [Section 11](#11-prompt-generator) for full details on the Prompt Generator.
 
 ---
 
-## 11. Prompt Generator
+## 12. Prompt Generator
 
 The Prompt Generator (`/prompt-generator`) is a tool for creating AI prompt templates for various purposes. It generates content using AI and saves it to your library.
 
-### 11.1 Artifact Types
+### 12.1 Artifact Types
 
 Select the type of artifact you want to generate using the pill buttons at the top:
 
@@ -777,7 +866,7 @@ Select the type of artifact you want to generate using the pill buttons at the t
 | **Claude Skill** | Claude Code skill file |
 | **Generic** | General-purpose prompt template |
 
-### 11.2 Generating Content
+### 12.2 Generating Content
 
 1. Select an artifact type from the pill buttons.
 2. Fill in the form:
@@ -792,7 +881,7 @@ Select the type of artifact you want to generate using the pill buttons at the t
    - **Clear**: Reset the form
    - **Regenerate**: Generate a new version with the same inputs
 
-### 11.3 Library Management
+### 12.3 Library Management
 
 Below the generator form, a **Library** section shows all previously generated artifacts and installed skills.
 
@@ -818,15 +907,15 @@ Below the generator form, a **Library** section shows all previously generated a
 
 ---
 
-## 12. Modules (Extensions)
+## 13. Modules (Extensions)
 
 Modules are sidecar processes that extend MesoClaw's capabilities. Access module management at **Settings > Modules**.
 
-### 12.1 What are Modules?
+### 13.1 What are Modules?
 
 Modules are external tools, services, or MCP (Model Context Protocol) servers that run alongside MesoClaw. They can provide additional AI capabilities, integrations with external services, or custom tools for the agent.
 
-### 12.2 Module Types
+### 13.2 Module Types
 
 | Type | Badge Color | Description |
 |------|-------------|-------------|
@@ -842,7 +931,7 @@ Each module also has a **runtime type**:
 | **docker** | Runs in a Docker container |
 | **podman** | Runs in a Podman container |
 
-### 12.3 Creating a Module
+### 13.3 Creating a Module
 
 1. Go to **Settings > Modules**.
 2. Click the **+ New Module** button.
@@ -856,7 +945,7 @@ Each module also has a **runtime type**:
 
 Module manifests are stored as TOML files at `~/.config/mesoclaw/modules/{id}/manifest.toml`.
 
-### 12.4 Starting & Stopping Modules
+### 13.4 Starting & Stopping Modules
 
 Each module card in the grid shows:
 
@@ -871,7 +960,7 @@ Each module card in the grid shows:
 
 **To view module details:** Click the module card to select it. A detail panel expands to the right showing the full module configuration and status information. Click the **X** button in the detail panel to close it.
 
-### 12.5 MCP Server Modules
+### 13.5 MCP Server Modules
 
 MCP (Model Context Protocol) server modules are a special category that allows AI models to access external tools and resources. When an MCP module is running:
 
@@ -881,11 +970,11 @@ MCP (Model Context Protocol) server modules are a special category that allows A
 
 ---
 
-## 13. Logs
+## 14. Logs
 
 The Logs page (`/logs`) provides a real-time view of application log entries from the current session.
 
-### 13.1 Viewing Logs
+### 14.1 Viewing Logs
 
 1. Navigate to **Logs** from the sidebar.
 2. You see a table with the following columns:
@@ -909,7 +998,7 @@ The Logs page (`/logs`) provides a real-time view of application log entries fro
 | DEBUG | Green | None |
 | TRACE | Gray | None |
 
-### 13.2 Filtering by Level
+### 14.2 Filtering by Level
 
 The toolbar at the top contains level filter buttons: **ALL**, **TRACE**, **DEBUG**, **INFO**, **WARN**, **ERROR**.
 
@@ -918,7 +1007,7 @@ The toolbar at the top contains level filter buttons: **ALL**, **TRACE**, **DEBU
 3. Each level button shows a count of matching entries (e.g., "ERROR 3").
 4. Click **ALL** to show entries of every level.
 
-### 13.3 Searching Logs
+### 14.3 Searching Logs
 
 1. Use the **search field** in the toolbar (magnifying glass icon, placeholder "Search messages...").
 2. Type a search term to filter log entries.
@@ -927,7 +1016,7 @@ The toolbar at the top contains level filter buttons: **ALL**, **TRACE**, **DEBU
 
 > **Tip:** Combine level filtering with search for precise results. For example, select "ERROR" and search for "database" to find all database-related errors.
 
-### 13.4 Live Tail Mode
+### 14.4 Live Tail Mode
 
 Live tail mode automatically refreshes the log view every 2 seconds to show the latest entries.
 
@@ -943,11 +1032,11 @@ Live tail mode automatically refreshes the log view every 2 seconds to show the 
 
 ---
 
-## 14. App Settings
+## 15. App Settings
 
 Access application settings at **Settings > App Settings**. Changes auto-save as you update them.
 
-### 14.1 Appearance
+### 15.1 Appearance
 
 | Setting | Description | Options |
 |---------|-------------|---------|
@@ -955,14 +1044,14 @@ Access application settings at **Settings > App Settings**. Changes auto-save as
 | **Language** | Interface language | Available language options |
 | **Sidebar Expanded** | Whether the sidebar starts expanded or collapsed | Toggle switch |
 
-### 14.2 Behavior
+### 15.2 Behavior
 
 | Setting | Description | Default |
 |---------|-------------|---------|
 | **Show in Tray** | Keep MesoClaw in the system tray when the window is closed | Off |
 | **Launch at Login** | Automatically start MesoClaw when you log in to your computer | Off |
 
-### 14.3 Notifications & DND
+### 15.3 Notifications & DND
 
 **Master notification toggle:**
 
@@ -989,7 +1078,7 @@ Access application settings at **Settings > App Settings**. Changes auto-save as
 
 > **Note:** Per-category toggles are disabled when the master notification switch is off.
 
-### 14.4 Developer Options
+### 15.4 Developer Options
 
 | Setting | Description |
 |---------|-------------|
@@ -1000,7 +1089,7 @@ Access application settings at **Settings > App Settings**. Changes auto-save as
 
 ---
 
-## 15. Advanced Settings
+## 16. Advanced Settings
 
 Access advanced configuration at **Settings > Advanced**. These settings are intended for power users.
 
@@ -1031,9 +1120,9 @@ Access advanced configuration at **Settings > Advanced**. These settings are int
 
 ---
 
-## 16. Security & Privacy
+## 17. Security & Privacy
 
-### 16.1 API Key Storage
+### 17.1 API Key Storage
 
 MesoClaw stores all API keys in your operating system's secure credential store:
 
@@ -1049,11 +1138,11 @@ API keys are:
 - Encrypted at rest by the OS credential manager
 - Zeroized in memory after use (using the `zeroize` crate)
 
-### 16.2 Channel Credential Storage
+### 17.2 Channel Credential Storage
 
 Channel credentials (bot tokens, access tokens, API keys) follow the same security model as AI provider API keys. They are stored in the OS keyring under the service identifier `com.sprklai.mesoclaw`.
 
-### 16.3 Data Locations
+### 17.3 Data Locations
 
 | Data | Location |
 |------|----------|
@@ -1066,9 +1155,9 @@ Channel credentials (bot tokens, access tokens, API keys) follow the same securi
 
 ---
 
-## 17. Troubleshooting
+## 18. Troubleshooting
 
-### 17.1 Common Issues
+### 18.1 Common Issues
 
 **No AI models appear in the Chat model selector:**
 
@@ -1096,7 +1185,7 @@ Channel credentials (bot tokens, access tokens, API keys) follow the same securi
 2. Restart the application.
 3. Check the system logs for crash reports.
 
-### 17.2 Gateway Status
+### 18.2 Gateway Status
 
 The Gateway Status indicator appears on the Home dashboard in the top-right corner.
 
@@ -1108,7 +1197,7 @@ The Gateway Status indicator appears on the Home dashboard in the top-right corn
 
 The gateway provides the HTTP REST API that the Memory system, Identity system, and other features depend on. If the gateway is offline, these features will not function.
 
-### 17.3 Channel Connection Issues
+### 18.3 Channel Connection Issues
 
 **Telegram:**
 

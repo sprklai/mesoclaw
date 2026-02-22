@@ -85,6 +85,7 @@ bun run tauri build      # Production bundle (macOS/Windows/Linux)
 ### Current (v0.x)
 
 - **Multi-provider LLM support** — OpenAI, Anthropic, Google AI, Groq, Ollama, Vercel AI Gateway, OpenRouter
+- **Smart model router** — Automatic model selection based on task type (code, analysis, creative) with 3 profiles: eco (cost-effective), balanced (default), premium (best quality)
 - **Streaming responses** via Server-Sent Events
 - **Secure API key storage** — OS keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service). Keys never touch disk.
 - **Prompt template system** — Filesystem-based skill templates in `~/.mesoclaw/prompts/`

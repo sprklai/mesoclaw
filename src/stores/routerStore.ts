@@ -184,6 +184,9 @@ export const useRouterStore = create<RouterStore>((set, get) => ({
 
       // Load config and models in parallel
       await Promise.all([get().loadConfig(), get().loadModels()]);
+
+      // Mark loading complete on success
+      set({ isLoading: false });
     } catch (error) {
       console.error("[RouterStore] Failed to initialize:", error);
       set({

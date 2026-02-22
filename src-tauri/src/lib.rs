@@ -474,6 +474,11 @@ pub fn run() {
                     .ok_or("IdentityLoader not initialised before scheduler")?;
 
                 // Try to resolve the active LLM provider; scheduler still works without one.
+                // Also include router state for automatic model selection in AgentTurn jobs.
+                let router_state_sched = app
+                    .try_state::<commands::router::RouterState>()
+                    .map(|s| Arc::new((*s.inner()).clone()));
+
                 let agent_components = agent::agent_commands::resolve_active_provider(&pool)
                     .ok()
                     .map(|provider| scheduler::tokio_scheduler::AgentComponents {
@@ -481,6 +486,8 @@ pub fn run() {
                         tool_registry: registry_sched,
                         security_policy: policy_sched,
                         identity_loader: id_loader_sched,
+                        router: router_state_sched,
+                        pool: Some(pool.clone()),
                     });
 
                 let s = if let Some(components) = agent_components {
@@ -951,6 +958,7 @@ pub fn run() {
             identity::commands::get_system_prompt_command,
             // Agent session commands
             agent::agent_commands::start_agent_session_command,
+            agent::agent_commands::start_routed_agent_session_command,
             agent::agent_commands::cancel_agent_session_command,
             // Agent management commands
             agent::commands::list_agents_command,

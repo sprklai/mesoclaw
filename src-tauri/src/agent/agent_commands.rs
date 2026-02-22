@@ -3,6 +3,11 @@
 //! Each command builds an [`AgentLoop`] on-the-fly from managed app state,
 //! runs a single agent turn, and returns the final response.  Cancellation
 //! is tracked via a shared `SessionCancelMap`.
+//!
+//! ## Router Integration
+//! The `start_routed_agent_session_command` uses the MesoClaw router to
+//! automatically select the best model based on task classification and
+//! the active routing profile (eco/balanced/premium).
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -17,6 +22,7 @@ use crate::{
         provider::LLMProvider,
         providers::openai_compatible::{OpenAICompatibleConfig, OpenAICompatibleProvider},
     },
+    commands::router::RouterState,
     config::app_identity::KEYCHAIN_SERVICE,
     database::{
         DbPool,
@@ -122,6 +128,85 @@ pub fn resolve_active_provider(pool: &DbPool) -> Result<Arc<dyn LLMProvider>, St
         .map_err(|e| format!("Failed to create provider: {e}"))?;
 
     Ok(Arc::new(instance))
+}
+
+/// Resolve a provider for a specific model ID.
+///
+/// This is used by the router integration to get a provider instance
+/// for a model that was selected by the routing logic.
+///
+/// Lookup order:
+/// 1. Find provider that has this model in `ai_models` table
+/// 2. Get the provider's API key from OS keyring
+/// 3. Build the provider instance with the specified model
+pub fn resolve_provider_for_model(
+    pool: &DbPool,
+    model_id: &str,
+) -> Result<Arc<dyn LLMProvider>, String> {
+    let mut conn = pool.get().map_err(|e| format!("DB pool: {e}"))?;
+
+    // Find the provider that has this model
+    let provider: AIProvider = ai_providers::table
+        .inner_join(ai_models::table.on(ai_models::provider_id.eq(ai_providers::id)))
+        .filter(ai_models::model_id.eq(model_id))
+        .select(AIProvider::as_select())
+        .first(&mut conn)
+        .map_err(|e| format!("No provider found for model '{}': {e}", model_id))?;
+
+    // Retrieve API key from OS keyring
+    let api_key: String = if provider.requires_api_key == 0 {
+        "local".to_string()
+    } else {
+        let key_name = format!("api_key:{}", provider.id);
+        keyring::Entry::new(KEYCHAIN_SERVICE, &key_name)
+            .map_err(|e| format!("Keyring entry error: {e}"))?
+            .get_password()
+            .map_err(|_| {
+                format!(
+                    "No API key stored for '{}'. Open Settings → Providers and save your key.",
+                    provider.id
+                )
+            })?
+    };
+
+    // Build the provider instance with the specified model
+    let cfg = OpenAICompatibleConfig::with_model(&api_key, &provider.base_url, model_id);
+    let instance = OpenAICompatibleProvider::new(cfg, &provider.id)
+        .map_err(|e| format!("Failed to create provider: {e}"))?;
+
+    Ok(Arc::new(instance))
+}
+
+/// Resolve provider using router-based model selection.
+///
+/// Uses the router to classify the message and select the best model,
+/// then resolves a provider for that model. Falls back to active provider
+/// if routing fails or no suitable model is found.
+pub async fn resolve_routed_provider(
+    pool: &DbPool,
+    router: &RouterState,
+    message: &str,
+) -> Result<Arc<dyn LLMProvider>, String> {
+    // Try to get a routed model from the router service
+    if let Some(model_id) = router.router.route(message).await {
+        log::info!("[Agent] Router selected model: {}", model_id);
+
+        // Try to resolve a provider for this model
+        match resolve_provider_for_model(pool, &model_id) {
+            Ok(provider) => return Ok(provider),
+            Err(e) => {
+                log::warn!(
+                    "[Agent] Failed to resolve provider for routed model '{}': {}. Falling back to active provider.",
+                    model_id,
+                    e
+                );
+            }
+        }
+    }
+
+    // Fallback to active provider
+    log::info!("[Agent] Using default active provider");
+    resolve_active_provider(pool)
 }
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
@@ -237,4 +322,95 @@ pub async fn cancel_agent_session_command(
             session_id
         )),
     }
+}
+
+/// Start an agent session with router-based model selection.
+///
+/// This command uses the MesoClaw router to automatically select the best
+/// model based on task classification and the active routing profile.
+///
+/// The router will:
+/// 1. Classify the message into a task type (code, analysis, creative, etc.)
+/// 2. Check for any task-specific overrides
+/// 3. Select a model based on the active profile (eco/balanced/premium)
+/// 4. Fall back to the active provider if routing fails
+#[tauri::command]
+#[tracing::instrument(
+    name = "command.agent.start_routed",
+    skip_all,
+    fields(session_id = tracing::field::Empty, msg_len = message.len())
+)]
+pub async fn start_routed_agent_session_command(
+    message: String,
+    pool: State<'_, DbPool>,
+    tool_registry: State<'_, Arc<ToolRegistry>>,
+    security_policy: State<'_, Arc<SecurityPolicy>>,
+    event_bus: State<'_, Arc<dyn EventBus>>,
+    identity_loader: State<'_, IdentityLoader>,
+    cancel_map: State<'_, SessionCancelMap>,
+    router_state: State<'_, RouterState>,
+) -> Result<String, String> {
+    let session_id = Uuid::new_v4().to_string();
+    tracing::Span::current().record("session_id", session_id.as_str());
+
+    // Register a cancellation flag for this session.
+    let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    {
+        let mut map = cancel_map.lock().map_err(|e| format!("lock: {e}"))?;
+        map.insert(session_id.clone(), Arc::clone(&flag));
+    }
+
+    // Helper: always remove the cancel-map entry before returning.
+    let cleanup = |cancel_map: &State<'_, SessionCancelMap>, id: &str| {
+        if let Ok(mut map) = cancel_map.lock() {
+            map.remove(id);
+        }
+    };
+
+    // Resolve LLM provider using router-based model selection.
+    let provider = match resolve_routed_provider(&pool, &router_state, &message).await {
+        Ok(p) => p,
+        Err(e) => {
+            cleanup(&cancel_map, &session_id);
+            return Err(e);
+        }
+    };
+
+    // Clone Arc handles out of Tauri State wrappers.
+    let registry = Arc::clone(&*tool_registry);
+    let policy = Arc::clone(&*security_policy);
+    let bus = Arc::clone(&*event_bus);
+
+    // Build system prompt from identity files.
+    let system_prompt = identity_loader.build_system_prompt();
+
+    // Emit AgentStarted so clients can capture session_id for cancellation.
+    let _ = bus.publish(AppEvent::AgentStarted {
+        session_id: session_id.clone(),
+    });
+
+    // Construct and run the agent loop with cancellation support.
+    let agent = AgentLoop::new(
+        provider,
+        registry,
+        policy,
+        Some(bus.clone()),
+        AgentConfig::default(),
+    )
+    .with_cancel_flag(Arc::clone(&flag));
+
+    let result = agent.run(&system_prompt, &message).await;
+
+    // Remove the cancellation entry when done.
+    cleanup(&cancel_map, &session_id);
+
+    let response_text = result?;
+
+    // Emit AgentComplete so EventBus subscribers know we're done.
+    let _ = bus.publish(AppEvent::AgentComplete {
+        session_id,
+        message: response_text.clone(),
+    });
+
+    Ok(response_text)
 }

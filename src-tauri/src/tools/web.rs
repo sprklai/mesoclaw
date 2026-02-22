@@ -6,8 +6,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use reqwest::redirect::Policy;
 use reqwest::Url;
+use reqwest::redirect::Policy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -51,7 +51,9 @@ impl WebFetchTool {
 
         match parsed.scheme() {
             "http" | "https" => Ok(parsed),
-            scheme => Err(format!("unsupported URL scheme: {scheme}. Only http and https are allowed.")),
+            scheme => Err(format!(
+                "unsupported URL scheme: {scheme}. Only http and https are allowed."
+            )),
         }
     }
 
@@ -176,9 +178,7 @@ impl Tool for WebFetchTool {
         let response_headers: std::collections::HashMap<String, String> = response
             .headers()
             .iter()
-            .filter_map(|(name, value)| {
-                Some((name.to_string(), value.to_str().ok()?.to_string()))
-            })
+            .filter_map(|(name, value)| Some((name.to_string(), value.to_str().ok()?.to_string())))
             .collect();
 
         // Get content_type from headers map to avoid borrowing response again
@@ -208,8 +208,7 @@ impl Tool for WebFetchTool {
         if truncated {
             output.push_str(&format!(
                 "Note: Response truncated to {} bytes (original: {} bytes)\n",
-                MAX_RESPONSE_SIZE,
-                original_len
+                MAX_RESPONSE_SIZE, original_len
             ));
         }
         output.push_str("\n");
@@ -259,7 +258,9 @@ impl WebRequestTool {
 
         match parsed.scheme() {
             "http" | "https" => Ok(parsed),
-            scheme => Err(format!("unsupported URL scheme: {scheme}. Only http and https are allowed.")),
+            scheme => Err(format!(
+                "unsupported URL scheme: {scheme}. Only http and https are allowed."
+            )),
         }
     }
 }
@@ -494,13 +495,14 @@ impl WebSearchTool {
         // Looking for: <a class="result__a" href="URL">TITLE</a>
         // And: <a class="result__snippet" ...>SNIPPET</a>
 
-        let result_pattern = regex::Regex::new(
-            r#"<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([^<]+)</a>"#
-        ).unwrap();
+        let result_pattern =
+            regex::Regex::new(r#"<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([^<]+)</a>"#)
+                .unwrap();
 
         let snippet_pattern = regex::Regex::new(
-            r#"<a[^>]*class="result__snippet"[^>]*>([^<]*(?:<[^>]+>[^<]*)*)</a>"#
-        ).unwrap();
+            r#"<a[^>]*class="result__snippet"[^>]*>([^<]*(?:<[^>]+>[^<]*)*)</a>"#,
+        )
+        .unwrap();
 
         // Split by result containers
         let result_blocks: Vec<&str> = html.split("class=\"result__body\"").collect();
@@ -546,9 +548,7 @@ impl WebSearchTool {
                         .unwrap_or_default()
                         .to_string();
                 } else {
-                    return urlencoding::decode(encoded)
-                        .unwrap_or_default()
-                        .to_string();
+                    return urlencoding::decode(encoded).unwrap_or_default().to_string();
                 }
             }
         }
@@ -709,7 +709,12 @@ mod tests {
         let schema = tool.parameters_schema();
         assert_eq!(schema["type"], "object");
         assert!(schema["properties"]["url"].is_object());
-        assert!(schema["required"].as_array().unwrap().contains(&json!("url")));
+        assert!(
+            schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("url"))
+        );
     }
 
     #[test]
@@ -795,7 +800,12 @@ mod tests {
         let schema = tool.parameters_schema();
         assert_eq!(schema["type"], "object");
         assert!(schema["properties"]["query"].is_object());
-        assert!(schema["required"].as_array().unwrap().contains(&json!("query")));
+        assert!(
+            schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("query"))
+        );
     }
 
     #[tokio::test]
