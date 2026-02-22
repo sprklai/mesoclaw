@@ -11,6 +11,7 @@ use crate::{
     database::schema::ai_providers,
     event_bus::{AppEvent, EventBus},
     identity::{IdentityLoader, types::IDENTITY_FILES, types::IdentityFileInfo},
+    lifecycle::{LifecycleSupervisor, ResourceId},
     memory::{
         store::InMemoryStore,
         traits::{Memory as _, MemoryCategory},
@@ -36,6 +37,8 @@ pub struct GatewayState {
     pub scheduler: Arc<TokioScheduler>,
     /// Shared cancel flags for running agent sessions.
     pub cancel_map: SessionCancelMap,
+    /// Lifecycle supervisor for resource management.
+    pub lifecycle: Arc<LifecycleSupervisor>,
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────
@@ -564,4 +567,156 @@ pub async fn scheduler_job_history(
 ) -> impl IntoResponse {
     let history = state.scheduler.job_history(&params.job_id).await;
     Json(json!({ "job_id": params.job_id, "history": history, "count": history.len() }))
+}
+
+// ─── Lifecycle endpoints ──────────────────────────────────────────────────────
+
+/// Resource status for API responses.
+#[derive(Debug, Serialize)]
+pub struct LifecycleResourceStatus {
+    pub id: String,
+    pub resource_type: String,
+    pub state: String,
+    pub substate: Option<String>,
+    pub progress: Option<f32>,
+    pub created_at: String,
+    pub recovery_attempts: u32,
+    pub escalation_tier: u8,
+}
+
+impl From<crate::lifecycle::ResourceInstance> for LifecycleResourceStatus {
+    fn from(instance: crate::lifecycle::ResourceInstance) -> Self {
+        let (state, substate, progress) = match &instance.state {
+            crate::lifecycle::ResourceState::Idle => ("idle".to_string(), None, None),
+            crate::lifecycle::ResourceState::Running { substate, progress, .. } => {
+                ("running".to_string(), Some(substate.clone()), *progress)
+            }
+            crate::lifecycle::ResourceState::Stuck { .. } => ("stuck".to_string(), None, None),
+            crate::lifecycle::ResourceState::Recovering { .. } => ("recovering".to_string(), None, None),
+            crate::lifecycle::ResourceState::Completed { .. } => ("completed".to_string(), None, None),
+            crate::lifecycle::ResourceState::Failed { .. } => ("failed".to_string(), None, None),
+        };
+
+        Self {
+            id: instance.id.to_string(),
+            resource_type: instance.resource_type.to_string(),
+            state,
+            substate,
+            progress,
+            created_at: instance.created_at.to_rfc3339(),
+            recovery_attempts: instance.recovery_attempts,
+            escalation_tier: instance.current_escalation_tier,
+        }
+    }
+}
+
+/// `GET /api/v1/lifecycle` — list all tracked resources.
+pub async fn list_lifecycle_resources(
+    State(state): State<GatewayState>,
+) -> impl IntoResponse {
+    let resources = state.lifecycle.get_all_resources().await;
+    let statuses: Vec<LifecycleResourceStatus> =
+        resources.into_iter().map(LifecycleResourceStatus::from).collect();
+    Json(json!({ "resources": statuses, "count": statuses.len() }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResourceIdPath {
+    pub id: String,
+}
+
+/// `GET /api/v1/lifecycle/{id}` — get a specific resource.
+pub async fn get_lifecycle_resource(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<ResourceIdPath>,
+) -> impl IntoResponse {
+    let id = match ResourceId::parse(&params.id) {
+        Ok(id) => id,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("Invalid resource ID: {}", e) })),
+            ).into_response();
+        }
+    };
+
+    match state.lifecycle.get_resource(&id).await {
+        Some(instance) => Json(json!({ "resource": LifecycleResourceStatus::from(instance) })).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": format!("Resource '{}' not found", params.id) })),
+        ).into_response(),
+    }
+}
+
+/// `POST /api/v1/lifecycle/{id}/stop` — gracefully stop a resource.
+pub async fn stop_lifecycle_resource(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<ResourceIdPath>,
+) -> impl IntoResponse {
+    let id = match ResourceId::parse(&params.id) {
+        Ok(id) => id,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("Invalid resource ID: {}", e) })),
+            ).into_response();
+        }
+    };
+
+    match state.lifecycle.stop_resource(&id).await {
+        Ok(()) => Json(json!({ "id": params.id, "status": "stopped" })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
+}
+
+/// `POST /api/v1/lifecycle/{id}/kill` — force kill a resource.
+pub async fn kill_lifecycle_resource(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<ResourceIdPath>,
+) -> impl IntoResponse {
+    let id = match ResourceId::parse(&params.id) {
+        Ok(id) => id,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("Invalid resource ID: {}", e) })),
+            ).into_response();
+        }
+    };
+
+    match state.lifecycle.kill_resource(&id).await {
+        Ok(()) => Json(json!({ "id": params.id, "status": "killed" })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
+}
+
+/// `POST /api/v1/lifecycle/{id}/retry` — retry a stuck resource.
+pub async fn retry_lifecycle_resource(
+    State(state): State<GatewayState>,
+    axum::extract::Path(params): axum::extract::Path<ResourceIdPath>,
+) -> impl IntoResponse {
+    let id = match ResourceId::parse(&params.id) {
+        Ok(id) => id,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": format!("Invalid resource ID: {}", e) })),
+            ).into_response();
+        }
+    };
+
+    match state.lifecycle.recover_resource(&id).await {
+        Ok(_result) => Json(json!({ "id": params.id, "status": "retrying" })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
 }

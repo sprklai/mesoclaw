@@ -31,6 +31,7 @@ use crate::{
     },
     event_bus::{AppEvent, EventBus},
     identity::IdentityLoader,
+    lifecycle::{LifecycleSupervisor, ResourceConfig, ResourceId, ResourceType},
     security::SecurityPolicy,
     tools::ToolRegistry,
 };
@@ -233,9 +234,18 @@ pub async fn start_agent_session_command(
     event_bus: State<'_, Arc<dyn EventBus>>,
     identity_loader: State<'_, IdentityLoader>,
     cancel_map: State<'_, SessionCancelMap>,
+    supervisor: State<'_, Arc<LifecycleSupervisor>>,
 ) -> Result<String, String> {
     let session_id = Uuid::new_v4().to_string();
     tracing::Span::current().record("session_id", session_id.as_str());
+
+    // Register with lifecycle supervisor for tracking
+    let lifecycle_id = ResourceId::new(ResourceType::Agent, format!("session:{}", session_id));
+    let lifecycle_config = ResourceConfig::default();
+    if let Ok(instance) = supervisor.spawn_resource(ResourceType::Agent, lifecycle_config.clone()).await {
+        log::debug!("Lifecycle tracking started for session {}", session_id);
+        let _ = lifecycle_id; // Used for tracking
+    }
 
     // Register a cancellation flag for this session.
     let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));

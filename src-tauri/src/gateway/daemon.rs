@@ -13,6 +13,7 @@ use crate::{
     database::DbPool,
     event_bus::EventBus,
     identity::IdentityLoader,
+    lifecycle::LifecycleSupervisor,
     memory::store::InMemoryStore,
     modules::ModuleRegistry,
     scheduler::TokioScheduler,
@@ -22,10 +23,12 @@ use super::{
     auth::{auth_middleware, load_or_create_token},
     routes::{
         GatewayState, create_scheduler_job, create_session, delete_scheduler_job, forget_memory,
-        get_identity_file, health, list_identity_files, list_memory, list_modules,
+        get_identity_file, get_lifecycle_resource, health, kill_lifecycle_resource,
+        list_identity_files, list_lifecycle_resources, list_memory, list_modules,
         list_scheduler_jobs, list_sessions, module_health, provider_status, reload_modules,
-        scheduler_job_history, search_memory, send_approval, start_module, stop_module,
-        store_memory, toggle_scheduler_job, update_identity_file,
+        retry_lifecycle_resource, scheduler_job_history, search_memory, send_approval,
+        start_module, stop_lifecycle_resource, stop_module, store_memory, toggle_scheduler_job,
+        update_identity_file,
     },
     ws::ws_handler,
 };
@@ -56,6 +59,7 @@ pub async fn start_gateway(
     memory: Arc<InMemoryStore>,
     scheduler: Arc<TokioScheduler>,
     cancel_map: SessionCancelMap,
+    lifecycle: Arc<LifecycleSupervisor>,
 ) -> Result<(), String> {
     // Ensure the token exists before accepting connections.
     load_or_create_token()?;
@@ -69,6 +73,7 @@ pub async fn start_gateway(
         memory,
         scheduler,
         cancel_map,
+        lifecycle,
     };
 
     // Build the router.
@@ -110,6 +115,12 @@ pub async fn start_gateway(
             "/api/v1/scheduler/jobs/{job_id}/history",
             get(scheduler_job_history),
         )
+        // Lifecycle endpoints
+        .route("/api/v1/lifecycle", get(list_lifecycle_resources))
+        .route("/api/v1/lifecycle/{id}", get(get_lifecycle_resource))
+        .route("/api/v1/lifecycle/{id}/stop", post(stop_lifecycle_resource))
+        .route("/api/v1/lifecycle/{id}/kill", post(kill_lifecycle_resource))
+        .route("/api/v1/lifecycle/{id}/retry", post(retry_lifecycle_resource))
         .layer(middleware::from_fn(auth_middleware))
         .with_state(state.clone());
 

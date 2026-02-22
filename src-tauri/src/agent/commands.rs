@@ -178,6 +178,7 @@ pub async fn run_agent_command(
     event_bus: State<'_, Arc<dyn EventBus>>,
     identity_loader: State<'_, IdentityLoader>,
     cancel_map: State<'_, SessionCancelMap>,
+    supervisor: State<'_, Arc<crate::lifecycle::LifecycleSupervisor>>,
 ) -> Result<String, String> {
     // For now, all runs use the default agent.
     // The agent_id parameter is reserved for future multi-agent support.
@@ -189,6 +190,7 @@ pub async fn run_agent_command(
         event_bus,
         identity_loader,
         cancel_map,
+        supervisor,
     )
     .await
 }

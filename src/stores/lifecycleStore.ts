@@ -337,25 +337,126 @@ export const useLifecycleStore = create<LifecycleState & LifecycleActions>((set,
 
     // Clean up existing listeners
     listeners.forEach((unlisten) => unlisten());
+    const newListeners: UnlistenFn[] = [];
 
-    // Note: In a real implementation, we'd subscribe to lifecycle events
-    // emitted via the Tauri event system. For now, we'll use polling.
-    // The backend would emit events like:
-    // - "lifecycle:resource_started"
-    // - "lifecycle:resource_stuck"
-    // - "lifecycle:resource_recovered"
-    // - "lifecycle:user_intervention_needed"
+    // Import listen function
+    const { listen } = await import("@tauri-apps/api/event");
 
-    // Set up periodic refresh
+    // Listen for session created events
+    const unlistenCreated = await listen<ResourceStatus>("lifecycle:session:created", (event) => {
+      set((state) => ({
+        resources: [...state.resources, event.payload],
+      }));
+    });
+    newListeners.push(unlistenCreated);
+
+    // Listen for state changed events
+    const unlistenStateChanged = await listen<{
+      resourceId: string;
+      resourceType: string;
+      fromState: string;
+      toState: string;
+      substate?: string;
+      progress?: number;
+      timestamp: string;
+    }>("lifecycle:state:changed", (event) => {
+      const { resourceId, toState, substate, progress } = event.payload;
+      set((state) => ({
+        resources: state.resources.map((r) =>
+          r.id === resourceId
+            ? { ...r, state: toState as ResourceStatus["state"], substate, progress }
+            : r
+        ),
+      }));
+    });
+    newListeners.push(unlistenStateChanged);
+
+    // Listen for session completed events
+    const unlistenCompleted = await listen<string>("lifecycle:session:completed", (event) => {
+      set((state) => ({
+        resources: state.resources.filter((r) => r.id !== event.payload),
+      }));
+    });
+    newListeners.push(unlistenCompleted);
+
+    // Listen for session failed events
+    const unlistenFailed = await listen<{ resourceId: string; error: string }>(
+      "lifecycle:session:failed",
+      (event) => {
+        const { resourceId } = event.payload;
+        set((state) => ({
+          resources: state.resources.map((r) =>
+            r.id === resourceId ? { ...r, state: "failed" as const } : r
+          ),
+        }));
+      }
+    );
+    newListeners.push(unlistenFailed);
+
+    // Listen for session stuck events
+    const unlistenStuck = await listen<{ resourceId: string; recoveryAttempts: number }>(
+      "lifecycle:session:stuck",
+      (event) => {
+        const { resourceId, recoveryAttempts } = event.payload;
+        set((state) => ({
+          resources: state.resources.map((r) =>
+            r.id === resourceId
+              ? { ...r, state: "stuck" as const, recoveryAttempts }
+              : r
+          ),
+        }));
+      }
+    );
+    newListeners.push(unlistenStuck);
+
+    // Listen for progress update events
+    const unlistenProgress = await listen<{
+      resourceId: string;
+      progress: number;
+      substate: string;
+    }>("lifecycle:progress:updated", (event) => {
+      const { resourceId, progress, substate } = event.payload;
+      set((state) => ({
+        resources: state.resources.map((r) =>
+          r.id === resourceId ? { ...r, progress, substate } : r
+        ),
+      }));
+    });
+    newListeners.push(unlistenProgress);
+
+    // Listen for resources batch update events
+    const unlistenResourcesUpdated = await listen<ResourceStatus[]>(
+      "lifecycle:resources:updated",
+      (event) => {
+        set({ resources: event.payload });
+      }
+    );
+    newListeners.push(unlistenResourcesUpdated);
+
+    // Listen for intervention required events
+    const unlistenIntervention = await listen<UserInterventionRequest>(
+      "lifecycle:intervention:required",
+      (event) => {
+        set((state) => ({
+          pendingInterventions: [...state.pendingInterventions, event.payload],
+        }));
+      }
+    );
+    newListeners.push(unlistenIntervention);
+
+    // Initial load
+    await get().fetchAllResources();
+    await get().fetchStats();
+    await get().fetchPendingInterventions();
+
+    // Set up periodic refresh as fallback (less frequent now that we have events)
     const refreshInterval = setInterval(() => {
-      get().fetchAllResources();
       get().fetchStats();
-      get().fetchPendingInterventions();
-    }, 5000);
+    }, 30000); // 30 seconds instead of 5 seconds
 
-    // Store the interval cleanup function
+    // Store all cleanup functions
     set({
-      _listeners: [() => clearInterval(refreshInterval)],
+      _listeners: [...newListeners, () => clearInterval(refreshInterval)],
     });
   },
 

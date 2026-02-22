@@ -721,6 +721,7 @@ async fn handle_daemon(args: &DaemonArgs) {
                     event_bus::TokioBroadcastBus,
                     gateway::start_gateway,
                     identity::IdentityLoader,
+                    lifecycle::{LifecycleSupervisor, SupervisorConfig},
                     memory::store::InMemoryStore,
                     modules::ModuleRegistry,
                     scheduler::{TokioScheduler, traits::Scheduler as _},
@@ -779,6 +780,8 @@ async fn handle_daemon(args: &DaemonArgs) {
                 // CLI daemon has no live agent sessions, so start with an empty cancel map.
                 let cancel_map: local_ts_lib::agent::agent_commands::SessionCancelMap =
                     Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
+                // CLI daemon uses a basic lifecycle supervisor with default handlers.
+                let lifecycle = Arc::new(LifecycleSupervisor::new(SupervisorConfig::default()));
                 if let Err(e) = start_gateway(
                     bus,
                     sessions,
@@ -788,6 +791,7 @@ async fn handle_daemon(args: &DaemonArgs) {
                     memory,
                     sched,
                     cancel_map,
+                    lifecycle,
                 )
                 .await
                 {

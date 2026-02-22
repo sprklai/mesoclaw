@@ -57,12 +57,15 @@
 
 pub mod escalation_manager;
 pub mod event_bus;
+pub mod events;
 pub mod handlers;
 pub mod health_monitor;
+pub mod manager;
 pub mod plugin_registry;
 pub mod recovery_engine;
 pub mod state_registry;
 pub mod states;
+pub mod storage;
 pub mod supervisor;
 
 // Re-exports for convenience
@@ -70,8 +73,13 @@ pub use escalation_manager::{
     EscalationConfig, EscalationError, EscalationManager, TierAction, TierPolicy,
 };
 pub use event_bus::{LifecycleEvent, LifecycleEventBus};
+pub use events::{
+    emit_lifecycle_event, emit_session_created, emit_session_completed, emit_session_failed,
+    emit_state_changed, events as lifecycle_events, StateChangePayload,
+};
 pub use handlers::ResourceHandler;
 pub use health_monitor::{HealthMonitor, HealthMonitorEvent, HealthMonitorStats};
+pub use manager::{LifecycleManager, SharedLifecycleManager};
 pub use plugin_registry::PluginRegistry;
 pub use recovery_engine::{RecoveryAction, RecoveryEngine, RecoveryResult};
 pub use state_registry::{StateRegistry, StateRegistryStats};
@@ -81,6 +89,7 @@ pub use states::{
     ResourceId, ResourceInstance, ResourceState, ResourceType, StateTransition, SupervisorConfig,
     UserInterventionRequest,
 };
+pub use storage::LifecycleStorage;
 pub use supervisor::{InterventionInterface, LifecycleSupervisor, SupervisorStats};
 
 /// Default heartbeat interval in seconds.

@@ -435,6 +435,11 @@ pub fn run() {
             let pool = database::init(app.handle())?;
             app.manage(pool.clone());
 
+            // Initialize lifecycle storage for crash recovery
+            let lifecycle_storage = Arc::new(lifecycle::LifecycleStorage::new(pool.clone()));
+            app.manage(lifecycle_storage.clone());
+            log::info!("boot: lifecycle storage initialized");
+
             // Initialize ModelRegistry and RouterService
             {
                 use services::model_registry::ModelRegistry;
@@ -590,6 +595,10 @@ pub fn run() {
                     .try_state::<agent::agent_commands::SessionCancelMap>()
                     .map(|s| s.inner().clone())
                     .ok_or("SessionCancelMap not initialised before gateway")?;
+                let lifecycle_for_gateway: Arc<lifecycle::LifecycleSupervisor> = app
+                    .try_state::<Arc<lifecycle::LifecycleSupervisor>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("LifecycleSupervisor not initialised before gateway")?;
                 tauri::async_runtime::spawn(async move {
                     if let Err(e) = gateway::start_gateway(
                         bus_for_gateway,
@@ -600,6 +609,7 @@ pub fn run() {
                         memory_for_gateway,
                         sched_for_gateway,
                         cancel_map_for_gateway,
+                        lifecycle_for_gateway,
                     )
                     .await
                     {
