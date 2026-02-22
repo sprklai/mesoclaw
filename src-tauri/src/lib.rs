@@ -658,6 +658,11 @@ pub fn run() {
                     .try_state::<SessionCancelMap>()
                     .map(|s| s.inner().clone())
                     .ok_or("SessionCancelMap not initialised before channel-bridge")?;
+                let bridge_lifecycle: Arc<lifecycle::LifecycleSupervisor> = app
+                    .try_state::<Arc<lifecycle::LifecycleSupervisor>>()
+                    .map(|s| s.inner().clone())
+                    .ok_or("LifecycleSupervisor not initialised before channel-bridge")?;
+                let bridge_app_handle = app.handle().clone();
 
                 // Move into the subscription loop.
                 let sessions_for_bridge = Arc::clone(&bridge_sessions);
@@ -758,6 +763,8 @@ pub fn run() {
                                 let ident = Arc::clone(&bridge_identity);
                                 let cmap = Arc::clone(&bridge_cancel);
                                 let sessions = Arc::clone(&sessions_for_bridge);
+                                let supervisor = Arc::clone(&bridge_lifecycle);
+                                let app_handle = bridge_app_handle.clone();
                                 let chan = channel.clone();
                                 let chat_id = from.clone();
                                 let msg_metadata = metadata.clone();
@@ -799,6 +806,24 @@ pub fn run() {
                                     let _ = bus.publish(AppEvent::AgentStarted {
                                         session_id: session_id.clone(),
                                     });
+
+                                    // Register with lifecycle supervisor for lifecycle management UI.
+                                    let lifecycle_id = supervisor
+                                        .spawn_resource(
+                                            lifecycle::ResourceType::Agent,
+                                            lifecycle::ResourceConfig::default(),
+                                        )
+                                        .await
+                                        .ok();
+                                    if let Some(ref id) = lifecycle_id {
+                                        if let Some(instance) = supervisor.get_resource(id).await {
+                                            let _ = lifecycle::emit_session_created(&app_handle, &instance);
+                                        }
+                                        log::debug!(
+                                            "[channel-bridge] lifecycle resource spawned: {}",
+                                            id
+                                        );
+                                    }
 
                                     let system_prompt = ident.build_system_prompt();
                                     let agent = AgentLoop::new(
@@ -881,6 +906,16 @@ pub fn run() {
                                                 "channel-bridge [{chan}]: agent error: {e}"
                                             );
                                         }
+                                    }
+
+                                    // Emit session completed event for lifecycle management UI.
+                                    if let Some(ref id) = lifecycle_id {
+                                        let _ = supervisor.stop_resource(id).await;
+                                        let _ = lifecycle::emit_session_completed(&app_handle, &id.to_string());
+                                        log::debug!(
+                                            "[channel-bridge] lifecycle resource stopped: {}",
+                                            id
+                                        );
                                     }
 
                                     if let Ok(mut map) = cmap.lock() {
