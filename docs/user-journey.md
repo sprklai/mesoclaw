@@ -12,6 +12,7 @@ CLI Install ──▶ First Command ──▶ REPL Sessions ──▶ Pipe/Watch
      │                                                                  │
      └──▶ GUI Launch ──▶ Setup Wizard ──▶ Chat ──▶ Agent ──▶ Daily Use ─┤
                         (non-developer path)                             │
+                                                                         ├──▶ Lifecycle Management (resource control)
                                                                          ├──▶ Channels (Telegram)
                                                                          ├──▶ Mobile & Tablet
                                                                          ├──▶ Sidecar Modules (Python, Node.js, MCP)
@@ -156,6 +157,7 @@ Morning Boot                     Active Work                    Background
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | **9:00 AM**  | App launches. Boot sequence loads identity, warms providers, starts scheduler. Agent greets user with morning briefing from heartbeat results. | Boot, Identity, Scheduler, Notifications |
 | **9:15 AM**  | User asks agent to analyze a new codebase. Agent runs 10+ tool calls autonomously, reads files, builds understanding.                          | Agent Loop, Tools, Security, Memory      |
+| **9:30 AM**  | User checks Lifecycle page to see active agent sessions and their progress.                                                                    | Lifecycle Management                     |
 | **10:00 AM** | User has follow-up questions. Agent recalls earlier analysis from memory without re-reading files.                                             | Memory (recall), Session                 |
 | **12:00 PM** | Background: heartbeat runs, checks email/calendar/GitHub. No user interaction needed.                                                          | Scheduler, Heartbeat, Event Bus          |
 | **12:01 PM** | Desktop notification: "PR #42 has merge conflicts"                                                                                             | Notifications                            |

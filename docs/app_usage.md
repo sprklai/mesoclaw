@@ -79,20 +79,24 @@ A comprehensive guide to using MesoClaw, your AI-powered desktop application for
   - [14.2 Filtering by Level](#142-filtering-by-level)
   - [14.3 Searching Logs](#143-searching-logs)
   - [14.4 Live Tail Mode](#144-live-tail-mode)
-- [15. App Settings](#15-app-settings)
-  - [15.1 Appearance](#151-appearance)
-  - [15.2 Behavior](#152-behavior)
-  - [15.3 Notifications & DND](#153-notifications--dnd)
-  - [15.4 Developer Options](#154-developer-options)
-- [16. Advanced Settings](#16-advanced-settings)
-- [17. Security & Privacy](#17-security--privacy)
-  - [17.1 API Key Storage](#171-api-key-storage)
-  - [17.2 Channel Credential Storage](#172-channel-credential-storage)
-  - [17.3 Data Locations](#173-data-locations)
-- [18. Troubleshooting](#18-troubleshooting)
-  - [17.1 Common Issues](#171-common-issues)
-  - [17.2 Gateway Status](#172-gateway-status)
-  - [17.3 Channel Connection Issues](#173-channel-connection-issues)
+- [15. Lifecycle Management](#15-lifecycle-management)
+  - [15.1 Viewing Active Resources](#151-viewing-active-resources)
+  - [15.2 Resource States](#152-resource-states)
+  - [15.3 Controlling Resources](#153-controlling-resources)
+- [16. App Settings](#16-app-settings)
+  - [16.1 Appearance](#161-appearance)
+  - [16.2 Behavior](#162-behavior)
+  - [16.3 Notifications & DND](#163-notifications--dnd)
+  - [16.4 Developer Options](#164-developer-options)
+- [17. Advanced Settings](#17-advanced-settings)
+- [18. Security & Privacy](#18-security--privacy)
+  - [18.1 API Key Storage](#181-api-key-storage)
+  - [18.2 Channel Credential Storage](#182-channel-credential-storage)
+  - [18.3 Data Locations](#183-data-locations)
+- [19. Troubleshooting](#19-troubleshooting)
+  - [19.1 Common Issues](#191-common-issues)
+  - [19.2 Gateway Status](#192-gateway-status)
+  - [19.3 Channel Connection Issues](#193-channel-connection-issues)
 
 ---
 
@@ -1032,11 +1036,49 @@ Live tail mode automatically refreshes the log view every 2 seconds to show the 
 
 ---
 
-## 15. App Settings
+## 15. Lifecycle Management
+
+The Lifecycle page (`/lifecycle`) shows all active resources managed by MesoClaw, including agent sessions, channel connections, scheduler jobs, and tool executions.
+
+### 15.1 Viewing Active Resources
+
+1. Navigate to **Lifecycle** from the sidebar.
+2. The main view shows a list of all tracked resources with their current state.
+3. Each resource displays:
+   - **ID**: Unique identifier (e.g., `agent:session:abc123`)
+   - **Type**: Resource type (Agent, Channel, Tool, SchedulerJob)
+   - **State**: Current lifecycle state
+   - **Progress**: Completion percentage (if applicable)
+   - **Created**: When the resource was created
+
+### 15.2 Resource States
+
+| State | Description |
+|-------|-------------|
+| **Idle** | Resource is initialized but not actively running |
+| **Running** | Resource is actively processing |
+| **Stuck** | Resource has stopped responding (missed heartbeats) |
+| **Recovering** | Automatic recovery is in progress |
+| **Completed** | Resource finished successfully |
+| **Failed** | Resource terminated with an error |
+
+### 15.3 Controlling Resources
+
+For each resource, you can:
+
+1. **Stop** - Gracefully stop the resource, allowing it to complete current operations
+2. **Kill** - Force terminate the resource immediately
+3. **Retry** - Attempt to restart a failed or stuck resource
+
+> **Note:** Agent sessions automatically register with lifecycle management when you start a chat. The lifecycle page provides real-time updates as states change.
+
+---
+
+## 16. App Settings
 
 Access application settings at **Settings > App Settings**. Changes auto-save as you update them.
 
-### 15.1 Appearance
+### 16.1 Appearance
 
 | Setting | Description | Options |
 |---------|-------------|---------|
@@ -1044,14 +1086,14 @@ Access application settings at **Settings > App Settings**. Changes auto-save as
 | **Language** | Interface language | Available language options |
 | **Sidebar Expanded** | Whether the sidebar starts expanded or collapsed | Toggle switch |
 
-### 15.2 Behavior
+### 16.2 Behavior
 
 | Setting | Description | Default |
 |---------|-------------|---------|
 | **Show in Tray** | Keep MesoClaw in the system tray when the window is closed | Off |
 | **Launch at Login** | Automatically start MesoClaw when you log in to your computer | Off |
 
-### 15.3 Notifications & DND
+### 16.3 Notifications & DND
 
 **Master notification toggle:**
 
@@ -1078,7 +1120,7 @@ Access application settings at **Settings > App Settings**. Changes auto-save as
 
 > **Note:** Per-category toggles are disabled when the master notification switch is off.
 
-### 15.4 Developer Options
+### 16.4 Developer Options
 
 | Setting | Description |
 |---------|-------------|
@@ -1089,7 +1131,7 @@ Access application settings at **Settings > App Settings**. Changes auto-save as
 
 ---
 
-## 16. Advanced Settings
+## 17. Advanced Settings
 
 Access advanced configuration at **Settings > Advanced**. These settings are intended for power users.
 
@@ -1120,9 +1162,9 @@ Access advanced configuration at **Settings > Advanced**. These settings are int
 
 ---
 
-## 17. Security & Privacy
+## 18. Security & Privacy
 
-### 17.1 API Key Storage
+### 18.1 API Key Storage
 
 MesoClaw stores all API keys in your operating system's secure credential store:
 
@@ -1138,11 +1180,11 @@ API keys are:
 - Encrypted at rest by the OS credential manager
 - Zeroized in memory after use (using the `zeroize` crate)
 
-### 17.2 Channel Credential Storage
+### 18.2 Channel Credential Storage
 
 Channel credentials (bot tokens, access tokens, API keys) follow the same security model as AI provider API keys. They are stored in the OS keyring under the service identifier `com.sprklai.mesoclaw`.
 
-### 17.3 Data Locations
+### 18.3 Data Locations
 
 | Data | Location |
 |------|----------|
@@ -1155,9 +1197,9 @@ Channel credentials (bot tokens, access tokens, API keys) follow the same securi
 
 ---
 
-## 18. Troubleshooting
+## 19. Troubleshooting
 
-### 18.1 Common Issues
+### 19.1 Common Issues
 
 **No AI models appear in the Chat model selector:**
 
@@ -1185,7 +1227,7 @@ Channel credentials (bot tokens, access tokens, API keys) follow the same securi
 2. Restart the application.
 3. Check the system logs for crash reports.
 
-### 18.2 Gateway Status
+### 19.2 Gateway Status
 
 The Gateway Status indicator appears on the Home dashboard in the top-right corner.
 
@@ -1197,7 +1239,7 @@ The Gateway Status indicator appears on the Home dashboard in the top-right corn
 
 The gateway provides the HTTP REST API that the Memory system, Identity system, and other features depend on. If the gateway is offline, these features will not function.
 
-### 18.3 Channel Connection Issues
+### 19.3 Channel Connection Issues
 
 **Telegram:**
 

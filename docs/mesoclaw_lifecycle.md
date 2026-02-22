@@ -1676,6 +1676,65 @@ tauriclaw lifecycle monitor
 
 ---
 
+## Gateway API Integration
+
+The lifecycle system exposes REST endpoints through the gateway daemon for external control.
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/lifecycle` | List all tracked resources |
+| `GET` | `/api/v1/lifecycle/{id}` | Get specific resource status |
+| `POST` | `/api/v1/lifecycle/{id}/stop` | Gracefully stop a resource |
+| `POST` | `/api/v1/lifecycle/{id}/kill` | Force kill a resource |
+| `POST` | `/api/v1/lifecycle/{id}/retry` | Retry a failed/stuck resource |
+
+### Response Format
+
+```json
+{
+  "resources": [
+    {
+      "id": "agent:session:abc123",
+      "resourceType": "Agent",
+      "state": "running",
+      "substate": "thinking",
+      "progress": 0.5,
+      "createdAt": "2026-02-21T12:00:00Z",
+      "recoveryAttempts": 0,
+      "escalationTier": 0
+    }
+  ],
+  "count": 1
+}
+```
+
+### Authentication
+
+All lifecycle endpoints require Bearer token authentication:
+
+```bash
+TOKEN=$(cat ~/.mesoclaw/daemon.token)
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18790/api/v1/lifecycle
+```
+
+### Usage Example
+
+```bash
+# Start the daemon
+mesoclaw daemon start
+
+# List all resources
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:18790/api/v1/lifecycle
+
+# Stop a stuck agent
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:18790/api/v1/lifecycle/agent:session:abc123/stop
+```
+
+---
+
 ## Future Enhancements
 
 1. **Distributed Supervisor** - Support multi-instance deployments

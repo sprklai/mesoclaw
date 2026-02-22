@@ -178,6 +178,22 @@ src-tauri/src/
 │   ├── webhook.rs                   #   HTTP webhook listener (axum)
 │   └── mod.rs                       #   Channel manager (lifecycle, health)
 │
+├── lifecycle/                       # ── Resource Lifecycle Management ──
+│   ├── supervisor.rs                #   Centralized resource supervisor
+│   ├── state_registry.rs            #   Resource state tracking
+│   ├── health_monitor.rs            #   Heartbeat tracking + stuck detection
+│   ├── storage.rs                   #   SQLite persistence for crash recovery
+│   ├── manager.rs                   #   Unified SessionRouter + StateRegistry
+│   ├── events.rs                    #   Tauri event emission
+│   ├── recovery_engine.rs           #   Transfer + preserve recovery
+│   ├── escalation_manager.rs        #   Tiered escalation (retry/fallback/user)
+│   ├── handlers/                    #   Resource-type handlers
+│   │   ├── agent.rs                 #     Agent session lifecycle
+│   │   ├── channel.rs               #     Channel connection lifecycle
+│   │   ├── tool.rs                  #     Tool execution lifecycle
+│   │   └── scheduler.rs             #     Scheduler job lifecycle
+│   └── mod.rs                       #   Plugin registry + re-exports
+│
 ├── event_bus/                       # ── Event Bus (P1.8) ──
 │   ├── traits.rs                    #   EventBus trait + AppEvent enum
 │   │                                #     Events: ChannelMessage, AgentToolStart,
