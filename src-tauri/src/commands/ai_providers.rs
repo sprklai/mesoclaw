@@ -382,7 +382,7 @@ pub fn update_provider_command(
 /// Uses the appropriate factory method for each provider to ensure
 /// provider-specific headers are included (e.g., anthropic-version for Anthropic,
 /// HTTP-Referer/X-Title for OpenRouter).
-fn create_test_config(
+pub fn create_test_config(
     provider_id: &str,
     api_key: &str,
     base_url: &str,

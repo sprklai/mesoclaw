@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useLLMStore } from "@/stores/llm";
 import {
   getProfileDisplayName,
   getTaskDisplayName,
@@ -43,26 +44,6 @@ const PROFILE_OPTIONS = [
   { value: "premium", label: "Premium (Best Quality)" },
 ];
 
-/**
- * Provider discovery configuration
- */
-const DISCOVERY_PROVIDERS = [
-  { id: "ollama", name: "Ollama", baseUrl: "http://localhost:11434", requiresApiKey: false },
-  { id: "openai", name: "OpenAI", baseUrl: "https://api.openai.com", requiresApiKey: true },
-  { id: "groq", name: "Groq", baseUrl: "https://api.groq.com", requiresApiKey: true },
-  {
-    id: "vercel-ai-gateway",
-    name: "Vercel AI Gateway",
-    baseUrl: "https://api.vercel.ai",
-    requiresApiKey: true,
-  },
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    baseUrl: "https://openrouter.ai/api",
-    requiresApiKey: true,
-  },
-];
 
 /**
  * Get badge variant for cost tier
@@ -101,14 +82,17 @@ export function RouterSettings() {
     clearError,
   } = useRouterStore();
 
+  const { getApiKey, loadApiKeyForProvider, providersWithModels, loadProvidersAndModels } = useLLMStore();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [providerFilter, setProviderFilter] = useState<string>("all");
   const [discoveringProvider, setDiscoveringProvider] = useState<string | null>(null);
 
-  // Initialize on mount - use initialize() which handles loading state properly
+  // Initialize on mount - chain calls to avoid race condition
+  // loadProvidersAndModels needs providers loaded first for discoverModels to work
   useEffect(() => {
-    void initialize();
-  }, [initialize]);
+    initialize().then(() => loadProvidersAndModels());
+  }, [initialize, loadProvidersAndModels]);
 
   // Show error toast if error occurs
   useEffect(() => {
@@ -144,12 +128,30 @@ export function RouterSettings() {
   };
 
   // Handle model discovery
-  const handleDiscoverModels = async (providerId: string, baseUrl: string) => {
+  const handleDiscoverModels = async (providerId: string) => {
     setDiscoveringProvider(providerId);
     try {
-      // Note: API key would need to be fetched from the LLM store or user input
-      // For now, we pass undefined and let the backend handle it
-      const count = await discoverModels(providerId, baseUrl, undefined);
+      // Look up provider configuration from LLM store
+      const provider = providersWithModels.find((p) => p.id === providerId);
+      if (!provider) {
+        toast.error(`Provider ${providerId} not found in settings. Please configure it in Settings > AI Providers.`);
+        return;
+      }
+
+      let apiKey: string | undefined;
+      if (provider.requiresApiKey) {
+        // Load API key from keychain if not already cached
+        await loadApiKeyForProvider(providerId);
+        try {
+          apiKey = await getApiKey(providerId);
+        } catch {
+          toast.error(`API key not configured for ${providerId}. Please add it in Settings > AI Providers.`);
+          return;
+        }
+      }
+
+      // Use the base URL from the provider configuration
+      const count = await discoverModels(providerId, provider.baseUrl, apiKey);
       toast.success(`Discovered ${formatModelCount(count)} from ${providerId}`);
     } catch (err) {
       toast.error(`Failed to discover models from ${providerId}: ${err}`);
@@ -280,19 +282,19 @@ export function RouterSettings() {
         description="Discover available models from each provider's API"
       >
         <div className="space-y-3">
-          {DISCOVERY_PROVIDERS.map((provider) => (
+          {providersWithModels.map((provider) => (
             <div
               key={provider.id}
               className="flex items-center justify-between rounded-lg border border-border bg-card p-3"
             >
               <div className="min-w-0">
-                <div className="font-medium">{provider.name}</div>
+                <div className="font-medium">{provider.name ?? provider.id}</div>
                 <p className="truncate text-sm text-muted-foreground">{provider.baseUrl}</p>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleDiscoverModels(provider.id, provider.baseUrl)}
+                onClick={() => handleDiscoverModels(provider.id)}
                 disabled={isDiscovering && discoveringProvider !== provider.id}
               >
                 {discoveringProvider === provider.id ? "Discovering..." : "Sync Models"}

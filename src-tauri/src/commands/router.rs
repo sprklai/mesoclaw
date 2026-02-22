@@ -20,7 +20,6 @@ pub struct RouterState {
 /// Get the current router configuration
 #[tauri::command]
 pub async fn get_router_config(state: State<'_, RouterState>) -> Result<RouterConfigData, String> {
-    state.router.get_config().await;
     Ok(state.router.get_config().await)
 }
 

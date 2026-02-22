@@ -444,6 +444,24 @@ pub fn run() {
                 let registry = Arc::new(ModelRegistry::new(pool.clone()));
                 let router = Arc::new(RouterService::new(pool.clone(), Arc::clone(&registry)));
 
+                // Bootstrap: load router and registry state from database on startup
+                // This ensures the frontend doesn't need to call initialize_router first
+                let registry_boot = Arc::clone(&registry);
+                let router_boot = Arc::clone(&router);
+                tauri::async_runtime::spawn(async move {
+                    // Load discovered models into registry cache
+                    match registry_boot.load_from_database().await {
+                        Ok(count) => log::info!("boot: loaded {} models into registry cache", count),
+                        Err(e) => log::warn!("boot: failed to load models from database: {}", e),
+                    }
+
+                    // Load router configuration (profile, task overrides)
+                    match router_boot.load_from_database().await {
+                        Ok(()) => log::info!("boot: router configuration loaded from database"),
+                        Err(e) => log::warn!("boot: failed to load router config from database: {}", e),
+                    }
+                });
+
                 app.manage(RouterState {
                     router,
                     registry,
