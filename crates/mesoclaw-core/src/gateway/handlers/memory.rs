@@ -27,6 +27,7 @@ pub struct UpdateMemoryRequest {
 pub struct RecallQuery {
     pub q: Option<String>,
     pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 fn parse_category(cat: Option<&str>) -> MemoryCategory {
@@ -56,7 +57,8 @@ pub async fn recall_memories(
 ) -> crate::Result<impl IntoResponse> {
     let query = params.q.unwrap_or_default();
     let limit = params.limit.unwrap_or(state.config.memory_default_limit);
-    let results = state.memory.recall(&query, limit).await?;
+    let offset = params.offset.unwrap_or(0);
+    let results = state.memory.recall(&query, limit, offset).await?;
     Ok(Json(results))
 }
 
@@ -65,7 +67,7 @@ pub async fn read_memory_by_key(
     State(state): State<Arc<AppState>>,
     Path(key): Path<String>,
 ) -> crate::Result<impl IntoResponse> {
-    let results = state.memory.recall(&key, 100).await?;
+    let results = state.memory.recall(&key, 100, 0).await?;
     let entry = results
         .into_iter()
         .find(|e| e.key == key)
@@ -244,6 +246,37 @@ mod tests {
 
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn memory_recall_with_offset() {
+        let (_dir, state) = test_state().await;
+        let app = app(state.clone());
+
+        // Store 3 entries
+        for i in 0..3 {
+            state
+                .memory
+                .store(
+                    &format!("okey{i}"),
+                    &format!("offset test {i}"),
+                    MemoryCategory::Core,
+                )
+                .await
+                .unwrap();
+        }
+
+        let req = Request::builder()
+            .uri("/memory?q=offset&limit=10&offset=1")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
+        let entries: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(entries.len(), 2);
     }
 
     #[tokio::test]

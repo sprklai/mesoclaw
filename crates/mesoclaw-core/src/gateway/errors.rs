@@ -45,6 +45,7 @@ impl IntoResponse for MesoError {
             MesoError::SkillNotFound(_) => (StatusCode::NOT_FOUND, "MESO_P4_SKILL_NOT_FOUND"),
             MesoError::User(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_P4_USER"),
             MesoError::Yaml(_) => (StatusCode::BAD_REQUEST, "MESO_YAML_PARSE_ERROR"),
+            MesoError::Validation(_) => (StatusCode::BAD_REQUEST, "MESO_VALIDATION"),
             MesoError::Other(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_INTERNAL_ERROR"),
         };
 
@@ -204,6 +205,7 @@ mod tests {
                     serde_yaml::from_str::<serde_yaml::Value>(": bad: yaml:").unwrap_err();
                 MesoError::Yaml(yaml_err)
             },
+            MesoError::Validation("t".into()),
             MesoError::Other("t".into()),
         ];
 
@@ -213,8 +215,8 @@ mod tests {
             assert!(codes.insert(code.clone()), "duplicate error code: {code}");
         }
 
-        // 26 variants tested (Http skipped because reqwest::Error can't be easily constructed)
-        assert_eq!(codes.len(), 26);
+        // 27 variants tested (Http skipped because reqwest::Error can't be easily constructed)
+        assert_eq!(codes.len(), 27);
     }
 
     #[test]

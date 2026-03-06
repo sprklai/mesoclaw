@@ -8,7 +8,7 @@ use crate::identity::SoulLoader;
 use crate::memory::traits::Memory;
 use crate::security::policy::SecurityPolicy;
 use crate::skills::SkillRegistry;
-use crate::tools::traits::Tool;
+use crate::tools::ToolRegistry;
 use crate::user::UserLearner;
 
 #[cfg(feature = "ai")]
@@ -23,7 +23,7 @@ pub struct AppState {
     pub memory: Arc<dyn Memory>,
     pub credentials: Arc<dyn CredentialStore>,
     pub security: Arc<SecurityPolicy>,
-    pub tools: Vec<Arc<dyn Tool>>,
+    pub tools: Arc<ToolRegistry>,
     #[cfg(feature = "ai")]
     pub session_manager: Arc<SessionManager>,
     #[cfg(feature = "ai")]

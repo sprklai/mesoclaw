@@ -30,6 +30,11 @@ impl Default for InMemoryStore {
 #[async_trait]
 impl Memory for InMemoryStore {
     async fn store(&self, key: &str, content: &str, category: MemoryCategory) -> Result<()> {
+        if content.trim().is_empty() {
+            return Err(crate::MesoError::Validation(
+                "content cannot be empty".into(),
+            ));
+        }
         let mut memories = self.memories.lock().await;
         let now = Utc::now().to_rfc3339();
         let id = uuid::Uuid::new_v4().to_string();
@@ -46,18 +51,19 @@ impl Memory for InMemoryStore {
         Ok(())
     }
 
-    async fn recall(&self, query: &str, limit: usize) -> Result<Vec<MemoryEntry>> {
+    async fn recall(&self, query: &str, limit: usize, offset: usize) -> Result<Vec<MemoryEntry>> {
         let memories = self.memories.lock().await;
         let query_lower = query.to_lowercase();
-        let mut results: Vec<MemoryEntry> = memories
+        let results: Vec<MemoryEntry> = memories
             .values()
             .filter(|e| {
                 e.key.to_lowercase().contains(&query_lower)
                     || e.content.to_lowercase().contains(&query_lower)
             })
+            .skip(offset)
+            .take(limit)
             .cloned()
             .collect();
-        results.truncate(limit);
         Ok(results)
     }
 
@@ -97,7 +103,7 @@ mod tests {
             .store("key1", "hello world", MemoryCategory::Core)
             .await
             .unwrap();
-        let results = store.recall("hello", 10).await.unwrap();
+        let results = store.recall("hello", 10, 0).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].content, "hello world");
     }
@@ -105,7 +111,7 @@ mod tests {
     #[tokio::test]
     async fn recall_empty_store_returns_empty() {
         let store = InMemoryStore::new();
-        let results = store.recall("anything", 10).await.unwrap();
+        let results = store.recall("anything", 10, 0).await.unwrap();
         assert!(results.is_empty());
     }
 
@@ -155,7 +161,7 @@ mod tests {
                 .await
                 .unwrap();
         }
-        let results = store.recall("content", 2).await.unwrap();
+        let results = store.recall("content", 2, 0).await.unwrap();
         assert_eq!(results.len(), 2);
     }
 
@@ -170,7 +176,7 @@ mod tests {
             .store("key1", "new", MemoryCategory::Core)
             .await
             .unwrap();
-        let results = store.recall("key1", 10).await.unwrap();
+        let results = store.recall("key1", 10, 0).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].content, "new");
     }
@@ -182,7 +188,7 @@ mod tests {
             .store("key1", "content", MemoryCategory::Conversation)
             .await
             .unwrap();
-        let results = store.recall("content", 10).await.unwrap();
+        let results = store.recall("content", 10, 0).await.unwrap();
         assert_eq!(results[0].category, MemoryCategory::Conversation);
     }
 
@@ -198,6 +204,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn store_empty_content_returns_error() {
+        let store = InMemoryStore::new();
+        let result = store.store("key", "", MemoryCategory::Core).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn store_whitespace_only_returns_error() {
+        let store = InMemoryStore::new();
+        let result = store.store("key", "   \n\t  ", MemoryCategory::Core).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn recall_with_offset_skips_entries() {
+        let store = InMemoryStore::new();
+        for i in 0..5 {
+            store
+                .store(
+                    &format!("key{i}"),
+                    &format!("rust topic {i}"),
+                    MemoryCategory::Core,
+                )
+                .await
+                .unwrap();
+        }
+        let all = store.recall("rust", 10, 0).await.unwrap();
+        let offset = store.recall("rust", 10, 2).await.unwrap();
+        assert_eq!(all.len(), 5);
+        assert_eq!(offset.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn recall_offset_beyond_results_returns_empty() {
+        let store = InMemoryStore::new();
+        store
+            .store("key1", "rust content", MemoryCategory::Core)
+            .await
+            .unwrap();
+        let results = store.recall("rust", 10, 100).await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
     async fn store_creates_unique_ids() {
         let store = InMemoryStore::new();
         store
@@ -208,8 +258,8 @@ mod tests {
             .store("key2", "content2", MemoryCategory::Core)
             .await
             .unwrap();
-        let r1 = store.recall("key1", 1).await.unwrap();
-        let r2 = store.recall("key2", 1).await.unwrap();
+        let r1 = store.recall("key1", 1, 0).await.unwrap();
+        let r2 = store.recall("key2", 1, 0).await.unwrap();
         assert_ne!(r1[0].id, r2[0].id);
     }
 }

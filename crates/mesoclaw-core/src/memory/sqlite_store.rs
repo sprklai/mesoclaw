@@ -81,6 +81,9 @@ impl SqliteMemoryStore {
 #[async_trait]
 impl Memory for SqliteMemoryStore {
     async fn store(&self, key: &str, content: &str, category: MemoryCategory) -> Result<()> {
+        if content.trim().is_empty() {
+            return Err(MesoError::Validation("content cannot be empty".into()));
+        }
         let pool = self.pool.clone();
         let key = key.to_string();
         let content_str = content.to_string();
@@ -108,7 +111,7 @@ impl Memory for SqliteMemoryStore {
         Ok(())
     }
 
-    async fn recall(&self, query: &str, limit: usize) -> Result<Vec<MemoryEntry>> {
+    async fn recall(&self, query: &str, limit: usize, offset: usize) -> Result<Vec<MemoryEntry>> {
         let pool = self.pool.clone();
         let query_str = query.to_string();
         let fts_weight = self.fts_weight;
@@ -124,22 +127,25 @@ impl Memory for SqliteMemoryStore {
                  JOIN memories m ON m.rowid = f.rowid
                  WHERE memories_fts MATCH ?1
                  ORDER BY rank
-                 LIMIT ?2",
+                 LIMIT ?2 OFFSET ?3",
                 )
                 .map_err(MesoError::from)?;
 
             let entries = stmt
-                .query_map(rusqlite::params![query_str, limit as i64], |row| {
-                    Ok(MemoryEntry {
-                        id: row.get(0)?,
-                        key: row.get(1)?,
-                        content: row.get(2)?,
-                        category: MemoryCategory::from(row.get::<_, String>(3)?.as_str()),
-                        score: row.get::<_, f64>(6)? as f32,
-                        created_at: row.get(4)?,
-                        updated_at: row.get(5)?,
-                    })
-                })
+                .query_map(
+                    rusqlite::params![query_str, limit as i64, offset as i64],
+                    |row| {
+                        Ok(MemoryEntry {
+                            id: row.get(0)?,
+                            key: row.get(1)?,
+                            content: row.get(2)?,
+                            category: MemoryCategory::from(row.get::<_, String>(3)?.as_str()),
+                            score: row.get::<_, f64>(6)? as f32,
+                            created_at: row.get(4)?,
+                            updated_at: row.get(5)?,
+                        })
+                    },
+                )
                 .map_err(MesoError::from)?
                 .filter_map(|r| r.ok())
                 .collect::<Vec<_>>();
@@ -217,7 +223,7 @@ impl Memory for SqliteMemoryStore {
                     .partial_cmp(&a.score)
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
-            results.truncate(limit);
+            let results: Vec<MemoryEntry> = results.into_iter().skip(offset).take(limit).collect();
             return Ok(results);
         }
 
@@ -323,7 +329,7 @@ mod tests {
             .store("key1", "hello world", MemoryCategory::Core)
             .await
             .unwrap();
-        let results = store.recall("hello", 10).await.unwrap();
+        let results = store.recall("hello", 10, 0).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].content, "hello world");
     }
@@ -331,7 +337,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn recall_empty_store_returns_empty() {
         let (_dir, store) = setup().await;
-        let results = store.recall("anything", 10).await.unwrap();
+        let results = store.recall("anything", 10, 0).await.unwrap();
         assert!(results.is_empty());
     }
 
@@ -363,7 +369,7 @@ mod tests {
             .await
             .unwrap();
 
-        let results = store.recall("Rust programming", 10).await.unwrap();
+        let results = store.recall("Rust programming", 10, 0).await.unwrap();
         assert!(!results.is_empty());
         let keys: Vec<&str> = results.iter().map(|e| e.key.as_str()).collect();
         assert!(keys.contains(&"rust-lang") || keys.contains(&"rust-book"));
@@ -377,7 +383,7 @@ mod tests {
             .await
             .unwrap();
         assert!(store.forget("key1").await.unwrap());
-        let results = store.recall("content", 10).await.unwrap();
+        let results = store.recall("content", 10, 0).await.unwrap();
         assert!(results.is_empty());
     }
 
@@ -423,7 +429,7 @@ mod tests {
                 .await
                 .unwrap();
         }
-        let results = store.recall("content topic", 2).await.unwrap();
+        let results = store.recall("content topic", 2, 0).await.unwrap();
         assert!(results.len() <= 2);
     }
 
@@ -438,7 +444,7 @@ mod tests {
             .store("key1", "new content", MemoryCategory::Core)
             .await
             .unwrap();
-        let results = store.recall("key1", 10).await.unwrap();
+        let results = store.recall("key1", 10, 0).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].content, "new content");
     }
@@ -485,7 +491,7 @@ mod tests {
             .await
             .unwrap();
 
-        let results = store.recall("rust", 10).await.unwrap();
+        let results = store.recall("rust", 10, 0).await.unwrap();
         assert!(!results.is_empty());
         for entry in &results {
             assert!(entry.score != 0.0 || entry.key == "python");
@@ -503,8 +509,8 @@ mod tests {
             .store("key2", "content2", MemoryCategory::Core)
             .await
             .unwrap();
-        let r1 = store.recall("key1", 1).await.unwrap();
-        let r2 = store.recall("key2", 1).await.unwrap();
+        let r1 = store.recall("key1", 1, 0).await.unwrap();
+        let r2 = store.recall("key2", 1, 0).await.unwrap();
         assert!(!r1.is_empty());
         assert!(!r2.is_empty());
         assert_ne!(r1[0].id, r2[0].id);

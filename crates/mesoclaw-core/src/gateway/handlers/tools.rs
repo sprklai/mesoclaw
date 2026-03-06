@@ -7,7 +7,6 @@ use serde::Deserialize;
 
 use crate::MesoError;
 use crate::gateway::state::AppState;
-use crate::tools::traits::ToolInfo;
 
 #[derive(Deserialize)]
 pub struct ExecuteToolRequest {
@@ -16,16 +15,7 @@ pub struct ExecuteToolRequest {
 
 /// GET /tools — list all registered tools.
 pub async fn list_tools(State(state): State<Arc<AppState>>) -> crate::Result<impl IntoResponse> {
-    let infos: Vec<ToolInfo> = state
-        .tools
-        .iter()
-        .map(|t| ToolInfo {
-            name: t.name().to_string(),
-            description: t.description().to_string(),
-            parameters: t.parameters_schema(),
-        })
-        .collect();
-    Ok(Json(infos))
+    Ok(Json(state.tools.list()))
 }
 
 /// POST /tools/{name}/execute — execute a tool by name.
@@ -36,8 +26,7 @@ pub async fn execute_tool(
 ) -> crate::Result<impl IntoResponse> {
     let tool = state
         .tools
-        .iter()
-        .find(|t| t.name() == name)
+        .get(&name)
         .ok_or_else(|| MesoError::NotFound(format!("tool not found: {name}")))?;
 
     let result = tool.execute(body.args).await?;
@@ -47,6 +36,7 @@ pub async fn execute_tool(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::ToolRegistry;
     use crate::tools::traits::{Tool, ToolResult};
     use async_trait::async_trait;
     use axum::Router;
@@ -86,8 +76,12 @@ mod tests {
         }
     }
 
-    async fn test_state_with_tools(tools: Vec<Arc<dyn Tool>>) -> (TempDir, Arc<AppState>) {
+    async fn test_state_with_tools(tool_list: Vec<Arc<dyn Tool>>) -> (TempDir, Arc<AppState>) {
         let (dir, base_state) = crate::gateway::handlers::tests::test_state().await;
+        let registry = ToolRegistry::new();
+        for tool in tool_list {
+            registry.register(tool).unwrap();
+        }
         let state = Arc::new(AppState {
             config: base_state.config.clone(),
             db: base_state.db.clone(),
@@ -95,7 +89,7 @@ mod tests {
             memory: base_state.memory.clone(),
             credentials: base_state.credentials.clone(),
             security: base_state.security.clone(),
-            tools,
+            tools: Arc::new(registry),
             session_manager: base_state.session_manager.clone(),
             agent: None,
             soul_loader: base_state.soul_loader.clone(),

@@ -65,7 +65,7 @@ sequenceDiagram
     DB->>DB: Run pending migrations
     App->>Cred: Initialize credential store (KeyringStore / InMemoryStore)
     App->>AI: Register providers + load API keys
-    App->>AI: Register agent tools
+    App->>AI: Register 9 agent tools into ToolRegistry (DashMap)
     App->>App: Load identity (SoulLoader from data_dir/identity/)
     App->>App: Load skills (SkillRegistry from data_dir/skills/)
     App->>App: Init user learner (UserLearner from DB pool)
@@ -77,7 +77,7 @@ sequenceDiagram
     else Mobile
         App->>App: Open Tauri mobile view (in-process gateway)
     else CLI
-        App->>App: Enter REPL loop
+        App->>App: Connect to daemon via HTTP/WS (MesoClient)
     else TUI
         App->>App: Render ratatui UI
     else Daemon

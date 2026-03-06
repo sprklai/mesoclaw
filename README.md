@@ -20,7 +20,7 @@ graph TB
 ## Features
 
 - **18 AI providers** via rig-core (OpenAI, Anthropic, Google, Ollama, and more)
-- **Tool calling** with built-in websearch, sysinfo, and file search (ripgrep)
+- **Tool calling** with 9 built-in tools (websearch, sysinfo, shell, file read/write/list/search, patch, process) via DashMap-backed ToolRegistry
 - **Streaming responses** via WebSocket
 - **Semantic memory** with SQLite FTS5 + vector embeddings (sqlite-vec)
 - **Soul / Persona system** -- 3 identity files (SOUL/IDENTITY/USER.md) with dynamic prompt composition
@@ -105,7 +105,9 @@ graph TB
 graph TD
     desktop[mesoclaw-desktop] --> core[mesoclaw-core]
     mobile[mesoclaw-mobile] --> core
-    cli[mesoclaw-cli] --> core
+    cli[mesoclaw-cli]
+    cli --> reqwest["reqwest<br>#40;HTTP client#41;"]
+    cli --> tungstenite["tokio-tungstenite<br>#40;WS#41;"]
     tui[mesoclaw-tui] --> core
     daemon[mesoclaw-daemon] --> core
 
@@ -377,6 +379,23 @@ max_tool_retries = 3
 # agent_max_turns = 20                       # Max tool-calling turns per request
 ```
 
+## CLI Commands
+
+```bash
+mesoclaw daemon start|stop|status     # Manage the daemon process
+mesoclaw chat [--session ID] [--model M]  # Interactive WS streaming chat
+mesoclaw run "prompt" [--session] [--model]  # Single prompt, print response
+mesoclaw memory search "query" [--limit N] [--offset N]  # Search memories
+mesoclaw memory add <key> <content>   # Add memory entry
+mesoclaw memory remove <key>          # Remove memory entry
+mesoclaw config show                  # Show current config
+mesoclaw config set <key> <value>     # Set a config value
+mesoclaw key set <provider> <key>     # Set API key
+mesoclaw key remove <provider>        # Remove API key
+```
+
+Global options: `--host`, `--port`, `--token` (or `MESOCLAW_TOKEN` env var)
+
 ## Gateway Routes (36 implemented)
 
 | Group | Routes | Description |
@@ -406,6 +425,7 @@ Detailed documentation lives in the `docs/` and `plans/` directories:
 - [Phase 2 Plan](plans/phase2_ai_integration.md) -- Memory, security, credentials, and tools
 - [Phase 3 Plan](plans/phase3_gateway_server.md) -- Gateway server, AI agent, boot sequence
 - [Phase 4 Plan](plans/phase4_agent_intelligence.md) -- Identity, skills, user learning
+- [Phase 5 Plan](plans/phase5_combined.md) -- ToolRegistry, memory enhancements, CLI binary
 
 ### Implementation Status
 
@@ -415,7 +435,7 @@ Detailed documentation lives in the `docs/` and `plans/` directories:
 | Phase 2: AI Integration | 5-7 | Complete | 137/137 passing |
 | Phase 3: Gateway Server | 8-10 | Complete | 233/233 passing |
 | Phase 4: Agent Intelligence | 10a-10c | Complete | 327/327 passing |
-| Phase 5: Binary Shells | 11-12 | Not started | -- |
+| Phase 5: Binary Shells + Tools + Memory | 11-12 | Complete | 347/347 passing |
 | Phase 6: Frontend | 13 | Not started | -- |
 | Phase 7: Desktop & Mobile | 14, 14b | Not started | -- |
 | Phase 8: Channels & Scheduler | 15-16 | Not started | -- |

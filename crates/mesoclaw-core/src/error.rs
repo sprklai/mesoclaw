@@ -80,6 +80,9 @@ pub enum MesoError {
     #[error("YAML parse error: {0}")]
     Yaml(#[from] serde_yaml::Error),
 
+    #[error("validation error: {0}")]
+    Validation(String),
+
     #[error("{0}")]
     Other(String),
 }

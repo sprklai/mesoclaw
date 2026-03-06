@@ -10,7 +10,7 @@
   - [Phase 2: AI Integration](#phase-2-ai-integration--complete)
   - [Phase 3: Gateway Server](#phase-3-gateway-server--complete)
   - [Phase 4: Agent Intelligence](#phase-4-agent-intelligence--complete)
-  - [Phase 5: Binary Shells](#phase-5-binary-shells--not-started)
+  - [Phase 5: Binary Shells + Tools + Memory](#phase-5-binary-shells--tools--memory--complete)
   - [Phase 6: Frontend](#phase-6-frontend--not-started)
   - [Phase 7: Desktop & Mobile](#phase-7-desktop--mobile--not-started)
   - [Phase 8: Channels & Scheduler](#phase-8-channels--scheduler--not-started)
@@ -87,7 +87,7 @@ gantt
     section Intelligence
     Phase 4 - Agent Intelligence         :done, p4, after p3, 1
     section Binaries
-    Phase 5 - Binary Shells             :p5, after p4, 1
+    Phase 5 - Binary Shells + Tools + Memory :done, p5, after p4, 1
     section Frontend
     Phase 6 - Frontend                  :p6, after p5, 1
     section Desktop/Mobile
@@ -206,24 +206,31 @@ gantt
 
 ---
 
-### Phase 5: Binary Shells — `[NOT STARTED]`
+### Phase 5: Binary Shells + Tools + Memory — `[COMPLETE]`
 
-**Step 11: Daemon Binary**
-- ~50 lines: config -> init_services() -> gateway -> block on signal
-- Graceful shutdown handling
+**Step 11: ToolRegistry + Memory Enhancements**
+- `ToolRegistry` — DashMap-backed concurrent tool storage with register/get/list/to_vec
+- 9 tools registered at boot: SystemInfoTool, WebSearchTool, FileReadTool, FileWriteTool, FileListTool, FileSearchTool, ShellTool, ProcessTool, PatchTool
+- Memory `recall()` extended with `offset` parameter for pagination
+- Content validation — empty/whitespace content rejected with `MesoError::Validation`
+- `MesoError::Validation(String)` variant mapped to HTTP 400 `MESO_VALIDATION`
 
 **Step 12: CLI Binary**
-- clap-based command structure:
-  - `daemon` -- start/stop the daemon
-  - `chat` -- interactive chat session
-  - `run` -- execute a single prompt
+- clap-based command structure (6 commands):
+  - `daemon` -- start/stop/status
+  - `chat` -- interactive WS streaming chat
+  - `run` -- single prompt via POST /chat
   - `memory` -- search/add/remove memories
-  - `config` -- view/edit configuration
-  - `key` -- manage API keys
-  - `schedule` -- manage scheduled jobs
+  - `config` -- show/set configuration
+  - `key` -- set/remove API keys
+- `MesoClient` — HTTP/WS client wrapper (reqwest + tokio-tungstenite)
+- CLI as thin HTTP client to daemon (no embedded core dependency)
 
-- **Tests**: CLI arg parsing, daemon startup/shutdown, command execution
-- **Plan**: [plans/phase5_binary_shells.md](../plans/phase5_binary_shells.md)
+**New dependencies**: dashmap (workspace), tokio-tungstenite (CLI), futures (CLI)
+- **Tests**: 20 new tests (347 total), all passing. Zero clippy warnings.
+- **Plan**: [plans/phase5_combined.md](../plans/phase5_combined.md)
+- **Design**: [plans/phase5_combined_design.md](../plans/phase5_combined_design.md)
+- **Test plan**: [tests/phase5_combined.md](../tests/phase5_combined.md)
 
 ---
 

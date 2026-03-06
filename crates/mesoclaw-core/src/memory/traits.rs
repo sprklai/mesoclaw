@@ -50,7 +50,7 @@ pub struct MemoryEntry {
 #[async_trait]
 pub trait Memory: Send + Sync {
     async fn store(&self, key: &str, content: &str, category: MemoryCategory) -> Result<()>;
-    async fn recall(&self, query: &str, limit: usize) -> Result<Vec<MemoryEntry>>;
+    async fn recall(&self, query: &str, limit: usize, offset: usize) -> Result<Vec<MemoryEntry>>;
     async fn forget(&self, key: &str) -> Result<bool>;
     async fn store_daily(&self, content: &str) -> Result<()>;
     async fn recall_daily(&self, date: &str) -> Result<Option<String>>;

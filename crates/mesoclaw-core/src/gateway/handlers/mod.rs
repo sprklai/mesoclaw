@@ -54,7 +54,7 @@ pub(crate) mod tests {
             memory: Arc::new(InMemoryStore::new()),
             credentials: Arc::new(InMemoryCredentialStore::new()),
             security: Arc::new(SecurityPolicy::default_policy()),
-            tools: vec![],
+            tools: Arc::new(crate::tools::ToolRegistry::new()),
             session_manager: Arc::new(crate::ai::session::SessionManager::new(pool)),
             agent: None,
             soul_loader,

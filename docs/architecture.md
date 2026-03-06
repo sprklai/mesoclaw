@@ -22,7 +22,7 @@
 ## System Architecture
 
 ```mermaid
-graph TB
+graph LR
     subgraph Clients["Clients"]
         Desktop[Desktop] & Mobile[Mobile] & CLI[CLI] & TUI[TUI] & Daemon[Daemon]
         Web["Frontend<br>Svelte 5"]
@@ -94,7 +94,7 @@ graph TB
 graph TD
     desktop[mesoclaw-desktop] --> core[mesoclaw-core]
     mobile[mesoclaw-mobile] --> core
-    cli[mesoclaw-cli] --> core
+    cli[mesoclaw-cli]
     tui[mesoclaw-tui] --> core
     daemon[mesoclaw-daemon] --> core
 
@@ -109,6 +109,11 @@ graph TD
     core --> lru["lru<br>#40;embedding cache#41;"]
     core --> sqlitevec["sqlite-vec<br>#40;vector search#41;"]
     core --> serdeyaml["serde_yaml<br>#40;YAML frontmatter#41;"]
+    core --> dashmap["dashmap<br>#40;concurrent tool registry#41;"]
+
+    cli --> reqwest["reqwest<br>#40;HTTP client#41;"]
+    cli --> tungstenite["tokio-tungstenite<br>#40;WS client#41;"]
+    cli --> clap["clap<br>#40;arg parsing#41;"]
 ```
 
 ## Project Structure
@@ -135,7 +140,7 @@ mesoclaw/
 │   ├── mesoclaw-core/      # Shared library (NO Tauri dependency)
 │   │   ├── src/
 │   │   │   ├── lib.rs      # Module exports + Result<T> alias
-│   │   │   ├── error.rs    # MesoError enum (22 variants, thiserror)
+│   │   │   ├── error.rs    # MesoError enum (23 variants, thiserror)
 │   │   │   ├── boot.rs     # init_services() -> Services -> AppState, single boot entry point
 │   │   │   ├── config/     # TOML config (schema + load/save + OS paths)
 │   │   │   ├── db/         # rusqlite pool + WAL + migrations + spawn_blocking
@@ -143,9 +148,9 @@ mesoclaw/
 │   │   │   ├── memory/     # Memory trait + SqliteMemoryStore (FTS5 + vectors) + InMemoryStore
 │   │   │   ├── credential/ # CredentialStore trait + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
-│   │   │   ├── tools/      # Tool trait + 8 tools (shell, file ops, web search, sysinfo, etc.)
+│   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 9 tools (shell, file ops, web search, sysinfo, patch, process)
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter
-│   │   │   ├── gateway/    # axum HTTP+WS gateway (36 routes, auth middleware, error mapping)
+│   │   │   ├── gateway/    # axum HTTP+WS gateway (36 routes, auth middleware, error mapping, MESO_VALIDATION)
 │   │   │   ├── identity/   # SoulLoader + PromptComposer + defaults (SOUL/IDENTITY/USER.md)
 │   │   │   ├── skills/     # SkillRegistry + bundled/user skills (markdown + YAML frontmatter)
 │   │   │   ├── user/       # UserLearner + SQLite observations + privacy controls

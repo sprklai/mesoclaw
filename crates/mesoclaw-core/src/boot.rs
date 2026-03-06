@@ -12,7 +12,7 @@ use crate::identity::SoulLoader;
 use crate::memory::in_memory_store::InMemoryStore;
 use crate::security::policy::SecurityPolicy;
 use crate::skills::SkillRegistry;
-use crate::tools::traits::Tool;
+use crate::tools::ToolRegistry;
 use crate::user::UserLearner;
 
 #[cfg(feature = "ai")]
@@ -29,7 +29,7 @@ pub struct Services {
     pub memory: Arc<InMemoryStore>,
     pub credentials: Arc<InMemoryCredentialStore>,
     pub security: Arc<SecurityPolicy>,
-    pub tools: Vec<Arc<dyn Tool>>,
+    pub tools: Arc<ToolRegistry>,
     #[cfg(feature = "ai")]
     pub session_manager: Arc<SessionManager>,
     #[cfg(feature = "ai")]
@@ -70,8 +70,51 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
     // 5. Security
     let security = Arc::new(SecurityPolicy::default_policy());
 
-    // 6. Tools (empty for now — tool registration happens in later phases)
-    let tools: Vec<Arc<dyn Tool>> = vec![];
+    // 6. Tools
+    let tool_registry = ToolRegistry::new();
+    tool_registry
+        .register(Arc::new(crate::tools::system_info::SystemInfoTool::new()))
+        .unwrap();
+    tool_registry
+        .register(Arc::new(crate::tools::web_search::WebSearchTool::new()))
+        .unwrap();
+    tool_registry
+        .register(Arc::new(crate::tools::file_ops::FileReadTool::new(
+            security.clone(),
+        )))
+        .unwrap();
+    tool_registry
+        .register(Arc::new(crate::tools::file_ops::FileWriteTool::new(
+            security.clone(),
+        )))
+        .unwrap();
+    tool_registry
+        .register(Arc::new(crate::tools::file_ops::FileListTool::new(
+            security.clone(),
+        )))
+        .unwrap();
+    tool_registry
+        .register(Arc::new(crate::tools::file_search::FileSearchTool::new(
+            config.tool_file_search_max_results,
+        )))
+        .unwrap();
+    tool_registry
+        .register(Arc::new(crate::tools::shell::ShellTool::new(
+            security.clone(),
+            config.tool_shell_timeout_secs,
+        )))
+        .unwrap();
+    tool_registry
+        .register(Arc::new(crate::tools::process::ProcessTool::new(
+            security.clone(),
+            config.tool_process_list_limit,
+        )))
+        .unwrap();
+    tool_registry
+        .register(Arc::new(crate::tools::patch::PatchTool::new()))
+        .unwrap();
+    let tools = Arc::new(tool_registry);
+    info!("Registered {} tools", tools.len());
 
     // 7. Session manager
     #[cfg(feature = "ai")]
@@ -110,7 +153,8 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
 
     // 11. Agent (may fail if no API key configured — that's OK)
     #[cfg(feature = "ai")]
-    let agent = match MesoAgent::new(&config, credentials.as_ref(), &tools).await {
+    let tool_vec = tools.to_vec();
+    let agent = match MesoAgent::new(&config, credentials.as_ref(), &tool_vec).await {
         Ok(a) => {
             info!(
                 "AI agent initialized with provider '{}'",
@@ -216,13 +260,13 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    // 5.4 — init services builds tools (currently empty)
+    // 5.4 — init services registers all 9 tools
     #[tokio::test]
     async fn init_services_builds_tools() {
         let dir = tempfile::TempDir::new().unwrap();
         let config = test_config(&dir);
         let services = init_services(config).await.unwrap();
-        assert!(services.tools.is_empty());
+        assert_eq!(services.tools.len(), 9);
     }
 
     // 5.5 — agent is None when no API key is configured

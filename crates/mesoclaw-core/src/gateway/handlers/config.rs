@@ -58,7 +58,7 @@ mod tests {
             memory: base_state.memory.clone(),
             credentials: base_state.credentials.clone(),
             security: base_state.security.clone(),
-            tools: vec![],
+            tools: Arc::new(crate::tools::ToolRegistry::new()),
             session_manager: base_state.session_manager.clone(),
             agent: None,
             soul_loader: base_state.soul_loader.clone(),
