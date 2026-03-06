@@ -1,0 +1,10 @@
+[package]
+name = "mesoclaw-desktop"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+mesoclaw-core = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

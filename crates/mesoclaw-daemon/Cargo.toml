@@ -1,0 +1,21 @@
+[package]
+name = "mesoclaw-daemon"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "mesoclaw-daemon"
+path = "src/main.rs"
+
+[dependencies]
+mesoclaw-core = { workspace = true, features = ["gateway"] }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+
+[features]
+default = []
+channels = ["mesoclaw-core/channels"]
+scheduler = ["mesoclaw-core/scheduler"]
+web-dashboard = ["mesoclaw-core/web-dashboard"]

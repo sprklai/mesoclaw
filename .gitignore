@@ -1,0 +1,47 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Frontend
+web/node_modules/
+web/.svelte-kit/
+web/build/
+web/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Tauri
+crates/mesoclaw-desktop/gen/
+
+# Logs
+*.log
+
+# Test databases
+*.test.db
+
+# Claude local settings
+.claude/settings.local.json
+
+# Misc
+no_commit
+node_modules/
+dist/
+build/
+target/
+plans/
+tests/
