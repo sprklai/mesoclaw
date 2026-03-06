@@ -84,6 +84,7 @@ scripts/build.sh            # Cross-platform build script
 10. **Feature flags for optional modules** -- keep default binary lean
 11. **Research before adding dependencies** -- search internet for crates, compare alternatives, document rationale in `plans/`
 12. **Binary size matters** -- prefer lightweight crates, check dependency trees, avoid bloat
+13. **Never skip the workflow** -- ALWAYS write the plan file to `plans/` and test plan file to `tests/` BEFORE writing any implementation code. Even if a plan was discussed or approved verbally in a prior session, the files must exist on disk and be presented to the user for approval before any `.rs` file is created or modified. No exceptions.
 
 ## Conventions
 
@@ -179,6 +180,7 @@ After each phase completion (Gate 3 approved), update all docs before proceeding
 
 - **Mermaid line breaks**: Use `<br>` not `<br/>` — Mermaid 11.x Langium parser rejects self-closing `<br/>` with "Syntax error in text"
 - **Mermaid parentheses**: Use `#40;` and `#41;` for `(` and `)` inside node labels — bare parentheses trigger "Unsupported markdown: list" in Mermaid 11.x. Does NOT apply to subgraph titles or sequence diagram participants — use plain text or dashes there instead.
+- **Mermaid subgraph/node ID collision**: Never use the same ID for a `subgraph` and a node inside it — Mermaid treats them as the same entity and throws "Setting X as parent of X would create a cycle". Use distinct IDs, e.g. `subgraph "Boot"` with node `BootEntry[...]` instead of `Boot[...]`.
 - **Mermaid numbered lists**: Never start node label text with `1.`, `2.`, etc. — Mermaid interprets these as Markdown ordered list items
 - **Directory trees**: Use Unicode box-drawing characters (`├──`, `└──`, `│`) not ASCII `+--` and `|` — the `+` is a valid Markdown list marker and triggers "unsupported list" warnings in renderers
 - **Mermaid styling** (nice-to-have): For simple, non-complex diagrams, add `style` or `classDef` directives to improve readability with color. Use a consistent palette: `#4CAF50` (green/done), `#FF9800` (orange/in-progress), `#2196F3` (blue/info), `#9E9E9E` (gray/not-started), `#F44336` (red/error). Keep styling minimal — don't clutter complex diagrams. Prefer `classDef` for reusable styles over per-node `style` directives.

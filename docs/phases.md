@@ -1,5 +1,25 @@
 # MesoClaw Implementation Phases
 
+## Table of Contents
+
+- [Phase Gate Protocol](#phase-gate-protocol)
+- [Phase Checklist Template](#phase-checklist-template)
+- [Phase Timeline](#phase-timeline)
+- [Phase Details](#phase-details)
+  - [Phase 1: Core Foundation](#phase-1-core-foundation--complete)
+  - [Phase 2: AI Integration](#phase-2-ai-integration--complete)
+  - [Phase 3: Gateway Server](#phase-3-gateway-server--complete)
+  - [Phase 4: Agent Intelligence](#phase-4-agent-intelligence--complete)
+  - [Phase 5: Binary Shells](#phase-5-binary-shells--not-started)
+  - [Phase 6: Frontend](#phase-6-frontend--not-started)
+  - [Phase 7: Desktop & Mobile](#phase-7-desktop--mobile--not-started)
+  - [Phase 8: Channels & Scheduler](#phase-8-channels--scheduler--not-started)
+  - [Phase 9: TUI & Cross-Compilation](#phase-9-tui--cross-compilation--not-started)
+  - [Phase 10: CI/CD & Quality](#phase-10-cicd--quality--not-started)
+  - [Phase 11: Documentation & Community](#phase-11-documentation--community--not-started)
+
+---
+
 ## Phase Gate Protocol
 
 Every implementation phase follows this strict workflow. No phase proceeds without user confirmation at each gate.
@@ -65,7 +85,7 @@ gantt
     section Gateway
     Phase 3 - Gateway Server            :done, p3, after p2, 1
     section Intelligence
-    Phase 4 - Agent Intelligence         :p4, after p3, 1
+    Phase 4 - Agent Intelligence         :done, p4, after p3, 1
     section Binaries
     Phase 5 - Binary Shells             :p5, after p4, 1
     section Frontend
@@ -159,25 +179,30 @@ gantt
 
 ---
 
-### Phase 4: Agent Intelligence — `[NOT STARTED]`
+### Phase 4: Agent Intelligence — `[COMPLETE]`
 
 **Step 10a: Soul / Persona System**
-- Markdown + YAML frontmatter persona definitions
-- `SoulLoader` for parsing persona files (comrak + Tera templating)
-- Hot-reload support for persona changes without restart
+- 3 identity files: SOUL.md, IDENTITY.md, USER.md with YAML frontmatter
+- `SoulLoader` — read/write/reload identity files from disk with `include_str!` bundled defaults
+- `PromptComposer` — assembles dynamic system prompt from identity + skills + observations + config
+- Manual reload via API endpoint (no `notify` dependency)
 
-**Step 10b: Skills / Prompt Templates**
-- `SkillRegistry` for managing prompt templates
-- Parameter substitution in templates
-- Built-in skill overrides for customization
+**Step 10b: Skills System (Claude Code model)**
+- `SkillRegistry` — load, list, CRUD, reload with bundled + user skill tiers
+- 2 bundled skills: `system-prompt`, `summarize` (embedded via `include_str!`)
+- Pure markdown context model (no Tera templating — skills are instructional docs loaded into agent context)
+- User skills override bundled skills with same id
 
 **Step 10c: User Profile + Progressive Learning**
-- `UserLearner` -- learns preferences and patterns from interactions
-- Observation storage and retrieval
-- Privacy controls for what is learned and retained
+- `UserLearner` — observe, query, forget, prune, build_context (SQLite-backed)
+- `user_observations` table (DB migration v2) with category/confidence indexes
+- Privacy controls: `learning_enabled`, `learning_denied_categories`, min confidence threshold, TTL-based expiry
+- 16 new gateway routes: identity (4), skills (6), user (6)
 
-- **Tests**: persona loading/switching, skill registry, template substitution, user learning, privacy controls
+**New dependencies**: serde_yaml 0.9
+- **Tests**: 94 new tests (327 total), all passing. Zero clippy warnings.
 - **Plan**: [plans/phase4_agent_intelligence.md](../plans/phase4_agent_intelligence.md)
+- **Test plan**: [tests/phase4_agent_intelligence.md](../tests/phase4_agent_intelligence.md)
 
 ---
 

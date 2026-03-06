@@ -23,9 +23,9 @@ graph TB
 - **Tool calling** with built-in websearch, sysinfo, and file search (ripgrep)
 - **Streaming responses** via WebSocket
 - **Semantic memory** with SQLite FTS5 + vector embeddings (sqlite-vec)
-- **Soul / Persona system** -- markdown-defined personalities with hot-reload
-- **Skills / Prompt templates** -- reusable templates with parameter substitution (comrak + Tera)
-- **Progressive user learning** -- agent learns preferences over conversations with privacy controls
+- **Soul / Persona system** -- 3 identity files (SOUL/IDENTITY/USER.md) with dynamic prompt composition
+- **Skills system** -- bundled + user markdown skills loaded into agent context (Claude Code model)
+- **Progressive user learning** -- SQLite-backed observations with category filtering, confidence scoring, and privacy controls
 - **Secure credentials** via OS keyring with zeroize memory protection
 - **Messaging channels** -- Telegram, Discord, Slack, Matrix, Signal, WhatsApp (openclaw-channels)
 - **Cron scheduler** -- automated recurring tasks
@@ -46,7 +46,7 @@ graph TB
 | CLI | clap |
 | TUI | ratatui |
 | Channels | openclaw-channels (6 adapters) |
-| Content | comrak (markdown) + serde_yaml (frontmatter) + Tera (templating) |
+| Content | serde_yaml (YAML frontmatter parsing) |
 | i18n | paraglide-js (compile-time, tree-shakeable) |
 
 ---
@@ -72,9 +72,9 @@ graph TB
             Storage["Storage<br>rusqlite + sqlite-vec<br>FTS5 + vectors"]
         end
         subgraph "Domain Layer"
-            Identity["Identity / Soul<br>personas + hot-reload"]
-            Skills["Skills<br>prompt templates + Tera"]
-            UserProfile["User Profile<br>progressive learning"]
+            Identity["Identity / Soul<br>SoulLoader + PromptComposer"]
+            Skills["Skills<br>SkillRegistry + markdown"]
+            UserProfile["User Profile<br>UserLearner + SQLite"]
         end
         subgraph "Support Layer"
             Agent["Agent System<br>tool registry"]
@@ -114,7 +114,7 @@ graph TD
     core --> rigcore["rig-core<br>#40;AI#41;"]
     core --> tokio["tokio<br>#40;async#41;"]
     core --> keyring["keyring<br>#40;credentials#41;"]
-    core --> comrak["comrak<br>#40;markdown#41;"]
+    core --> serdeyaml["serde_yaml<br>#40;YAML frontmatter#41;"]
     core --> openclaw["openclaw-channels<br>#40;messaging#41;"]
 ```
 
@@ -232,11 +232,13 @@ mesoclaw/
 ├── plans/
 │   ├── phase1_core_foundation.md  # Phase 1 implementation plan
 │   ├── phase2_ai_integration.md   # Phase 2 implementation plan
-│   └── phase3_gateway_server.md   # Phase 3 implementation plan
+│   ├── phase3_gateway_server.md   # Phase 3 implementation plan
+│   └── phase4_agent_intelligence.md # Phase 4 implementation plan
 ├── tests/
 │   ├── phase1_core_foundation.md  # Phase 1 test plan + results
 │   ├── phase2_ai_integration.md   # Phase 2 test plan + results (105 tests)
 │   ├── phase3_gateway_server.md  # Phase 3 test plan + results (96 tests)
+│   ├── phase4_agent_intelligence.md # Phase 4 test plan + results (94 tests)
 │   └── ...
 ├── crates/
 │   ├── mesoclaw-core/      # Shared library (NO Tauri dependency)
@@ -375,20 +377,21 @@ max_tool_retries = 3
 # agent_max_turns = 20                       # Max tool-calling turns per request
 ```
 
-## Gateway Routes (~40)
-
-All routes are prefixed with `/api/v1/`:
+## Gateway Routes (36 implemented)
 
 | Group | Routes | Description |
 |-------|--------|-------------|
-| Sessions & Chat | `POST /sessions`, `GET /sessions`, `GET /sessions/:id/messages`, `POST /chat` (SSE), `GET /ws` (WS) | Chat sessions and streaming |
-| Providers | `GET /providers`, `PUT /providers/:id` | AI provider configuration |
-| Memory | `GET /memory`, `POST /memory`, `GET /memory/search`, `GET /memory/daily/:date`, `DELETE /memory/:key` | Semantic memory CRUD |
-| Identity / Soul | `GET /identity`, `PUT /identity`, `GET /identity/personas` | Persona management |
-| Skills | `GET /skills`, `GET /skills/:id`, `POST /skills`, `PUT /skills/:id`, `DELETE /skills/:id` | Prompt template CRUD |
-| User Profile | `GET /user`, `PUT /user`, `GET /user/observations`, `DELETE /user/observations/:id`, `POST /user/reset` | User learning + privacy |
-| Scheduler | `GET /schedule/jobs`, `POST /schedule/jobs`, `PUT /schedule/jobs/:id`, `DELETE /schedule/jobs/:id` | Cron job management |
-| System | `GET /health`, `GET /config`, `PUT /config`, `POST /approval/:action_id` | System administration |
+| Health | `GET /health` | Health check (no auth) |
+| Sessions & Chat | `POST /sessions`, `GET /sessions`, `GET/PUT/DELETE /sessions/{id}`, `GET/POST /sessions/{id}/messages`, `POST /chat` | Chat sessions and messaging |
+| Memory | `POST /memory`, `GET /memory`, `GET/PUT/DELETE /memory/{key}` | Semantic memory CRUD |
+| Config | `GET /config`, `PUT /config` | Configuration management |
+| Providers & Models | `GET /providers`, `GET /providers/{id}`, `GET /models` | AI provider info |
+| Tools | `GET /tools`, `POST /tools/{name}/execute` | Tool listing and execution |
+| System | `GET /system/info` | System information |
+| Identity | `GET /identity`, `GET/PUT /identity/{name}`, `POST /identity/reload` | Persona management |
+| Skills | `GET /skills`, `GET/PUT/DELETE /skills/{id}`, `POST /skills`, `POST /skills/reload` | Skill CRUD |
+| User | `GET/POST/DELETE /user/observations`, `GET/DELETE /user/observations/{key}`, `GET /user/profile` | User learning + privacy |
+| WebSocket | `GET /ws/chat` | Streaming chat |
 
 ---
 
@@ -402,6 +405,7 @@ Detailed documentation lives in the `docs/` and `plans/` directories:
 - [Phase 1 Plan](plans/phase1_core_foundation.md) -- Detailed implementation plan for core foundation
 - [Phase 2 Plan](plans/phase2_ai_integration.md) -- Memory, security, credentials, and tools
 - [Phase 3 Plan](plans/phase3_gateway_server.md) -- Gateway server, AI agent, boot sequence
+- [Phase 4 Plan](plans/phase4_agent_intelligence.md) -- Identity, skills, user learning
 
 ### Implementation Status
 
@@ -410,7 +414,7 @@ Detailed documentation lives in the `docs/` and `plans/` directories:
 | Phase 1: Core Foundation | 1-4 | Complete | 16/16 passing |
 | Phase 2: AI Integration | 5-7 | Complete | 137/137 passing |
 | Phase 3: Gateway Server | 8-10 | Complete | 233/233 passing |
-| Phase 4: Agent Intelligence | 10a-10c | Not started | -- |
+| Phase 4: Agent Intelligence | 10a-10c | Complete | 327/327 passing |
 | Phase 5: Binary Shells | 11-12 | Not started | -- |
 | Phase 6: Frontend | 13 | Not started | -- |
 | Phase 7: Desktop & Mobile | 14, 14b | Not started | -- |

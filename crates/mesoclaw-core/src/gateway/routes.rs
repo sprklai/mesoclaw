@@ -61,6 +61,41 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/system/info", get(handlers::system::system_info))
         // Models
         .route("/models", get(handlers::models::list_models))
+        // Identity (Phase 4)
+        .route("/identity", get(handlers::identity::list_identity))
+        .route(
+            "/identity/reload",
+            post(handlers::identity::reload_identity),
+        )
+        .route(
+            "/identity/{name}",
+            get(handlers::identity::get_identity_file)
+                .put(handlers::identity::update_identity_file),
+        )
+        // Skills (Phase 4)
+        .route(
+            "/skills",
+            get(handlers::skills::list_skills).post(handlers::skills::create_skill),
+        )
+        .route("/skills/reload", post(handlers::skills::reload_skills))
+        .route(
+            "/skills/{id}",
+            get(handlers::skills::get_skill)
+                .put(handlers::skills::update_skill)
+                .delete(handlers::skills::delete_skill),
+        )
+        // User (Phase 4)
+        .route(
+            "/user/observations",
+            get(handlers::user::list_observations)
+                .post(handlers::user::add_observation)
+                .delete(handlers::user::clear_observations),
+        )
+        .route(
+            "/user/observations/{key}",
+            get(handlers::user::get_observation_by_key).delete(handlers::user::delete_observation),
+        )
+        .route("/user/profile", get(handlers::user::get_user_profile))
         // WebSocket
         .route("/ws/chat", get(handlers::ws::ws_chat))
         // Auth middleware
@@ -90,40 +125,12 @@ fn build_cors(origins: &[String]) -> CorsLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai::session::SessionManager;
-    use crate::config::AppConfig;
-    use crate::credential::InMemoryCredentialStore;
-    use crate::memory::in_memory_store::InMemoryStore;
-    use crate::security::policy::SecurityPolicy;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
     use tower::ServiceExt;
 
     async fn test_state() -> (tempfile::TempDir, Arc<AppState>) {
-        let dir = tempfile::TempDir::new().unwrap();
-        let db_path = dir.path().join("test.db");
-        let pool = crate::db::init_pool(&db_path).unwrap();
-        crate::db::with_db(&pool, |conn| crate::db::run_migrations(conn))
-            .await
-            .unwrap();
-
-        let config = AppConfig {
-            // Use wildcard for permissive CORS in tests
-            gateway_cors_origins: vec!["*".into()],
-            ..Default::default()
-        };
-        let state = Arc::new(AppState {
-            config: Arc::new(config),
-            db: pool.clone(),
-            event_bus: Arc::new(crate::event_bus::TokioBroadcastBus::new(16)),
-            memory: Arc::new(InMemoryStore::new()),
-            credentials: Arc::new(InMemoryCredentialStore::new()),
-            security: Arc::new(SecurityPolicy::default_policy()),
-            tools: vec![],
-            session_manager: Arc::new(SessionManager::new(pool)),
-            agent: None,
-        });
-        (dir, state)
+        crate::gateway::handlers::tests::test_state().await
     }
 
     // 4.1.1 — invalid route returns 404

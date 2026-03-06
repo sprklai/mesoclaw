@@ -30,42 +30,9 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
-    use crate::config::AppConfig;
-    use crate::credential::InMemoryCredentialStore;
-    use crate::db;
-    use crate::event_bus::TokioBroadcastBus;
-    use crate::memory::in_memory_store::InMemoryStore;
-    use crate::security::policy::{AutonomyLevel, SecurityPolicy};
 
     async fn test_state() -> (TempDir, Arc<AppState>) {
-        let dir = TempDir::new().unwrap();
-        let db_path = dir.path().join("test.db");
-        let pool = db::init_pool(&db_path).unwrap();
-        db::with_db(&pool, |conn| db::run_migrations(conn))
-            .await
-            .unwrap();
-        let config = AppConfig::default();
-        let state = Arc::new(AppState {
-            config: Arc::new(config),
-            db: pool.clone(),
-            event_bus: Arc::new(TokioBroadcastBus::new(16)),
-            memory: Arc::new(InMemoryStore::new()),
-            credentials: Arc::new(InMemoryCredentialStore::new()),
-            security: Arc::new(SecurityPolicy::new(
-                AutonomyLevel::Supervised,
-                None,
-                vec![],
-                60,
-                60,
-                1000,
-            )),
-            tools: vec![],
-            #[cfg(feature = "ai")]
-            session_manager: Arc::new(crate::ai::session::SessionManager::new(pool)),
-            #[cfg(feature = "ai")]
-            agent: None,
-        });
-        (dir, state)
+        crate::gateway::handlers::tests::test_state().await
     }
 
     #[tokio::test]

@@ -1,107 +1,91 @@
 # MesoClaw Architecture
 
+## Table of Contents
+
+- [System Architecture](#system-architecture)
+- [Data Flow](#data-flow)
+- [Crate Dependency Graph](#crate-dependency-graph)
+- [Project Structure](#project-structure)
+- [Default Paths by OS](#default-paths-by-os)
+- [Feature Flag Composition](#feature-flag-composition)
+- [Trait-Driven Architecture](#trait-driven-architecture)
+- [Credential System](#credential-system)
+- [Identity / Soul System](#identity--soul-system)
+- [Skills System](#skills-system)
+- [User Profile + Progressive Learning](#user-profile--progressive-learning)
+- [Gateway Routes](#gateway-routes)
+- [Concurrency Rules](#concurrency-rules)
+- [Lessons Learned from v1](#lessons-learned-from-v1)
+
+---
+
 ## System Architecture
 
 ```mermaid
 graph TB
-    subgraph "Binary Crates - Thin Shells"
-        Desktop["Desktop<br>#40;Tauri 2#41;"]
-        Mobile["Mobile<br>#40;Tauri 2 iOS + Android#41;"]
-        CLI["CLI<br>#40;clap#41;"]
-        TUI["TUI<br>#40;ratatui#41;"]
-        Daemon["Daemon<br>#40;axum#41;"]
+    subgraph Clients["Clients"]
+        Desktop[Desktop] & Mobile[Mobile] & CLI[CLI] & TUI[TUI] & Daemon[Daemon]
+        Web["Frontend<br>Svelte 5"]
     end
 
-    subgraph "mesoclaw-core - Shared Library"
-        subgraph "Application Layer"
-            AI["AI / LLM Layer<br>rig-core<br>18 providers<br>tool calling + streaming"]
-            Gateway["Gateway<br>axum REST + WS<br>127.0.0.1:18981"]
-            DB["Database<br>rusqlite + sqlite-vec<br>FTS5 + vectors"]
+    subgraph Core["mesoclaw-core"]
+        BootEntry["boot.rs<br>init_services"]
+
+        subgraph App["Application Layer"]
+            Gateway["Gateway<br>axum :18981"]
+            AI["AI Engine<br>rig-core"]
+            DB["Database<br>rusqlite + sqlite-vec"]
         end
-        subgraph "Domain Layer"
-            Identity["Identity / Soul<br>Personas + SoulLoader<br>hot-reload #40;notify#41;"]
-            Skills["Skills System<br>SkillRegistry<br>comrak + Tera"]
-            User["User Profile<br>user.toml + UserLearner<br>progressive learning"]
-            Channels["Channels<br>dyn Channel<br>openclaw-channels"]
+
+        subgraph Domain["Domain Layer"]
+            Identity["Identity<br>SoulLoader"]
+            Skills["Skills<br>SkillRegistry"]
+            UserL["User Profile<br>UserLearner"]
+            Channels["Channels"]
         end
-        subgraph "Support Layer"
-            Tools["Agent Tools<br>8 tools: shell, file ops<br>websearch, sysinfo, patch<br>file search, process"]
-            Security["Security<br>SecurityPolicy + AutonomyLevel<br>rate limiter + audit log"]
-            Creds2["Credentials<br>dyn CredentialStore<br>InMemory + Keyring"]
-            Config["Config<br>TOML + serde"]
-            EventBus["EventBus<br>dyn EventBus<br>tokio::broadcast"]
-        end
-        subgraph "Boot"
-            Boot["boot.rs<br>init_services#40;#41;<br>single entry point"]
+
+        subgraph Support["Support Layer"]
+            Tools["Agent Tools"]
+            Security["Security"]
+            Creds2["Credentials"]
+            Config["Config"]
+            EventBus["EventBus"]
         end
     end
 
-    subgraph "Frontend"
-        Web["Svelte 5 + SvelteKit<br>shadcn-svelte + Tailwind"]
-    end
-
-    Desktop --> AI
-    Mobile --> AI
-    CLI --> AI
-    TUI --> AI
-    Daemon --> Gateway
+    Desktop & Mobile & CLI & TUI & Daemon --> Gateway
     Web -->|HTTP/WS| Gateway
-    Gateway --> AI
-    Gateway --> DB
-    Gateway --> Identity
-    Gateway --> Skills
-    Gateway --> User
-    Gateway --> Channels
-    AI --> Tools
-    AI --> Security
-    AI --> DB
-    AI --> Identity
-    AI --> Skills
-    Boot --> Gateway
-    Boot --> DB
-    Boot --> EventBus
+
+    BootEntry --> Gateway & DB & EventBus
+    Gateway --> AI & DB
+    Gateway --> Identity & Skills & UserL & Channels
+    AI --> Tools & Security & DB
+    AI --> Identity & Skills
 ```
 
 ## Data Flow
 
 ```mermaid
-graph LR
+graph TB
     subgraph Clients
-        D[Desktop]
-        M[Mobile]
-        C[CLI]
-        T[TUI]
-        F[Frontend<br>Svelte]
+        D[Desktop] & M[Mobile] & C[CLI] & T[TUI] & F[Frontend]
     end
 
-    subgraph "mesoclaw-core Gateway :18981"
-        REST["REST Endpoints<br>~40 routes grouped<br>by subsystem"]
-        WS["WebSocket Channels<br>/ws/chat<br>/ws/events<br>/ws/agents"]
+    subgraph "Gateway :18981"
+        REST["REST<br>36 routes"]
+        WS["WebSocket<br>/ws/chat"]
     end
 
     subgraph Backend
-        AIL[AI Layer<br>rig-core]
-        DBL[Database Layer<br>rusqlite + sqlite-vec]
-        IDL[Identity Layer<br>SoulLoader]
-        SKL[Skills Layer<br>SkillRegistry]
-        USL[User Layer<br>UserLearner]
+        AIL[AI Layer] & DBL[Database]
+        IDL[Identity] & SKL[Skills] & USL[User]
     end
 
-    D -->|Rust API| REST
-    M -->|Rust API| REST
-    C -->|Rust API| REST
-    T -->|Rust API| REST
+    D & M & C & T -->|HTTP| REST
     F -->|HTTP/WS| WS
-
-    REST --> AIL
-    WS --> AIL
-    REST --> DBL
-    REST --> IDL
-    REST --> SKL
-    REST --> USL
-    AIL --> DBL
-    AIL --> IDL
-    AIL --> SKL
+    REST & WS --> AIL
+    REST --> DBL & IDL & SKL & USL
+    AIL --> DBL & IDL & SKL
 ```
 
 ## Crate Dependency Graph
@@ -124,9 +108,7 @@ graph TD
     core --> diffy["diffy<br>#40;patch/diff#41;"]
     core --> lru["lru<br>#40;embedding cache#41;"]
     core --> sqlitevec["sqlite-vec<br>#40;vector search#41;"]
-    core --> comrak["comrak<br>#40;markdown parsing#41;"]
-    core --> tera["Tera<br>#40;template rendering#41;"]
-    core --> notify["notify<br>#40;file watching#41;"]
+    core --> serdeyaml["serde_yaml<br>#40;YAML frontmatter#41;"]
 ```
 
 ## Project Structure
@@ -153,7 +135,7 @@ mesoclaw/
 │   ├── mesoclaw-core/      # Shared library (NO Tauri dependency)
 │   │   ├── src/
 │   │   │   ├── lib.rs      # Module exports + Result<T> alias
-│   │   │   ├── error.rs    # MesoError enum (16 variants, thiserror)
+│   │   │   ├── error.rs    # MesoError enum (22 variants, thiserror)
 │   │   │   ├── boot.rs     # init_services() -> Services -> AppState, single boot entry point
 │   │   │   ├── config/     # TOML config (schema + load/save + OS paths)
 │   │   │   ├── db/         # rusqlite pool + WAL + migrations + spawn_blocking
@@ -163,10 +145,10 @@ mesoclaw/
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
 │   │   │   ├── tools/      # Tool trait + 8 tools (shell, file ops, web search, sysinfo, etc.)
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter
-│   │   │   ├── gateway/    # axum HTTP+WS gateway (20 routes, auth middleware, error mapping)
-│   │   │   ├── identity/   # SoulLoader + personas + hot-reload (Phase 4)
-│   │   │   ├── skills/     # SkillRegistry + markdown parsing + Tera (Phase 4)
-│   │   │   ├── user/       # UserProfile + UserLearner + progressive learning (Phase 4)
+│   │   │   ├── gateway/    # axum HTTP+WS gateway (36 routes, auth middleware, error mapping)
+│   │   │   ├── identity/   # SoulLoader + PromptComposer + defaults (SOUL/IDENTITY/USER.md)
+│   │   │   ├── skills/     # SkillRegistry + bundled/user skills (markdown + YAML frontmatter)
+│   │   │   ├── user/       # UserLearner + SQLite observations + privacy controls
 │   │   │   ├── channels/   # Channel trait + implementations (Phase 8)
 │   │   │   └── scheduler/  # Cron + scheduled tasks, feature-gated (Phase 8)
 │   │   └── tests/          # Integration tests
@@ -302,158 +284,133 @@ All credential values are wrapped with `zeroize` for secure memory cleanup.
 
 ## Identity / Soul System
 
-Personas define the AI assistant's personality, tone, and behavior. They are stored as Markdown files with YAML frontmatter.
+Identity defines the AI assistant's personality, tone, and behavior through 3 markdown files with YAML frontmatter. All prompt content comes from `.md` files — zero hardcoded prompt strings in Rust code.
 
 ```mermaid
-graph LR
-    subgraph "~/.mesoclaw/personas/"
-        Default["default.md"]
-        Coder["coder.md"]
-        Writer["writer.md"]
-        Custom["custom personas"]
+graph TB
+    subgraph Files["Identity Files"]
+        SOUL["SOUL.md"] & IDENT["IDENTITY.md"] & USER["USER.md"]
     end
 
-    subgraph "SoulLoader"
-        Loader["Load + parse<br>YAML frontmatter<br>+ Markdown body"]
-        HotReload["notify watcher<br>hot-reload on change"]
+    subgraph SoulLoaderSG["SoulLoader"]
+        Loader["Load + parse<br>YAML frontmatter"]
+        Reload["POST /identity/reload"]
     end
 
-    subgraph "Config"
-        TOML["config.toml<br>active_persona = coder"]
+    subgraph ComposerSG["PromptComposer"]
+        Compose["1. SOUL<br>2. IDENTITY meta<br>3. USER<br>4. Observations<br>5. Active skills<br>6. Config override"]
     end
 
-    Default --> Loader
-    Coder --> Loader
-    Writer --> Loader
-    Custom --> Loader
-    HotReload --> Loader
-    TOML --> Loader
-    Loader --> Agent["Rig Agent<br>system prompt"]
+    SOUL & IDENT & USER --> Loader
+    Reload --> Loader
+    Loader --> Compose
+    Compose --> Agent["Rig Agent"]
 ```
 
-### Persona File Format
+### Identity File Format (IDENTITY.md)
 
 ```markdown
 ---
-name: coder
-description: "Technical coding assistant"
-temperature: 0.3
-tags: [code, technical, rust]
+name: MesoClaw
+version: "2.0"
+description: AI-powered assistant
 ---
 
-You are a precise technical assistant specializing in Rust development...
+# Identity details...
 ```
 
-- **Storage**: `~/.mesoclaw/personas/*.md`
-- **Active persona**: set in `config.toml` via `active_persona` key
-- **Hot-reload**: `notify` crate watches the personas directory; changes are picked up without restart
-- **Multiple personas**: users can create unlimited custom personas
+- **Storage**: `data_dir/identity/` (configurable via `identity_dir` in config.toml)
+- **Bundled defaults**: embedded via `include_str!()` at compile time, written to disk on first run
+- **Reload**: manual via `POST /identity/reload` endpoint (no `notify` dependency)
+- **API**: `GET /identity`, `GET /identity/{name}`, `PUT /identity/{name}`, `POST /identity/reload`
 
 ## Skills System
 
-Skills are reusable prompt templates stored as Markdown with YAML frontmatter and Tera template variables.
+Skills are instructional markdown documents loaded into the agent's context. They follow the Claude Code model — pure markdown with YAML frontmatter metadata, no parameter substitution.
 
 ```mermaid
 graph TB
     subgraph "Skill Sources"
-        BuiltIn["Built-in skills<br>embedded at compile time"]
-        UserDir["User skills directory<br>user-defined skills"]
+        BuiltIn["Bundled skills<br>include_str! at compile time<br>system-prompt, summarize"]
+        UserDir["User skills directory<br>data_dir/skills/*.md"]
     end
 
     subgraph "SkillRegistry"
-        Discover["discover#40;#41;<br>scan directories"]
-        Load["load#40;#41;<br>parse markdown"]
-        Validate["validate#40;#41;<br>check required fields"]
-        Cache["cache#40;#41;<br>in-memory store"]
+        Load["load_all#40;#41;<br>bundled first, then user"]
+        Parse["parse frontmatter<br>serde_yaml metadata"]
+        Store["RwLock HashMap<br>in-memory registry"]
     end
 
-    subgraph "Parsing Pipeline"
-        Comrak["comrak<br>extract YAML frontmatter"]
-        Serde["serde_yaml<br>deserialize metadata"]
-        Tera["Tera<br>render variables"]
-    end
-
-    BuiltIn --> Discover
-    UserDir --> Discover
-    Discover --> Load
-    Load --> Validate
-    Validate --> Cache
-    Cache --> Comrak
-    Comrak --> Serde
-    Serde --> Tera
-    Tera --> Prompt["Final prompt string<br>→ Rig agent"]
+    BuiltIn --> Load
+    UserDir --> Load
+    Load --> Parse
+    Parse --> Store
+    Store --> Compose["PromptComposer<br>enabled skills → agent context"]
 ```
 
-### Skill File Format
+### Skill File Format (Claude Code model)
 
 ```markdown
 ---
-name: code-review
-description: "Review code for bugs and improvements"
-parameters:
-  - name: language
-    type: string
-    required: true
-  - name: focus
-    type: string
-    default: "bugs,performance,readability"
+name: system-prompt
+description: Generates effective system prompts for AI agents
+category: meta
 ---
 
-Review the following {{language}} code, focusing on {{focus}}:
+# System Prompt Generator
 
-{{input}}
+When creating system prompts, follow these principles:
+...
 ```
 
-## Content Format Pipeline
-
-All persona and skill files flow through the same parsing pipeline:
-
-```mermaid
-graph LR
-    A["Skill and Persona files<br>Markdown with YAML frontmatter"] --> B["comrak<br>extract YAML frontmatter<br>from Markdown body"]
-    B --> C["serde_yaml<br>deserialize metadata<br>into typed structs"]
-    C --> D["Tera<br>render template variables<br>e.g. name, language, input"]
-    D --> E["Final prompt string<br>→ Rig agent"]
-```
+- **No Tera/comrak**: Skills are pure markdown context documents, not parameterized templates
+- **2 tiers**: Bundled (compile-time) + User (disk). User skills with same id override bundled.
+- **API**: `GET /skills`, `GET /skills/{id}`, `POST /skills`, `PUT /skills/{id}`, `DELETE /skills/{id}`, `POST /skills/reload`
+- **Bundled skills cannot be deleted** — only user skills support DELETE
 
 ## User Profile + Progressive Learning
 
-MesoClaw learns user preferences over time without explicit configuration.
+MesoClaw learns user preferences over time via explicit observation API. Observations are stored in SQLite with category-based organization and confidence scoring.
 
 ```mermaid
 graph TB
-    subgraph "Baseline"
-        UserToml["user.toml<br>name, timezone, language<br>preferred_models, etc."]
+    subgraph "User Context"
+        UserMd["USER.md<br>static user context template"]
     end
 
-    subgraph "UserLearner"
-        Listener["Listens to AppEvent<br>via EventBus"]
-        Analyzer["Analyze patterns<br>preferred languages<br>coding style, tone"]
-        Store["Store observations<br>as tagged memory entries"]
+    subgraph "UserLearner - SQLite backed"
+        Observe["observe#40;#41;<br>add/update observation"]
+        Query["get_observations#40;#41;<br>filter by category"]
+        Build["build_context#40;#41;<br>format for prompt"]
+        Prune["prune_expired#40;#41;<br>TTL-based cleanup"]
     end
 
     subgraph "Privacy Controls"
         Toggle["learning_enabled = true/false"]
-        Clear["clear_observations#40;#41;"]
-        Export["export_profile#40;#41;"]
+        Denied["learning_denied_categories"]
+        MinConf["learning_min_confidence = 0.5"]
+        TTL["learning_observation_ttl_days = 365"]
+        Clear["DELETE /user/observations"]
     end
 
-    UserToml --> Listener
-    Listener --> Analyzer
-    Analyzer --> Store
-    Store --> Agent["Rig Agent context<br>personalized responses"]
-    Toggle --> Listener
-    Clear --> Store
+    UserMd --> Compose["PromptComposer"]
+    Build --> Compose
+    Compose --> Agent["Rig Agent context<br>personalized responses"]
+    Toggle --> Observe
+    Denied --> Observe
+    MinConf --> Build
+    TTL --> Prune
 ```
 
-- **user.toml**: baseline profile with explicit user preferences
-- **UserLearner**: subscribes to `AppEvent` stream via `EventBus`, extracts patterns from conversations
-- **Observations**: stored as tagged memory entries in SQLite (searchable via FTS5)
-- **Privacy**: learning can be toggled off, observations can be cleared or exported at any time
+- **USER.md**: static user context template (part of identity system)
+- **UserLearner**: SQLite-backed observation store with CRUD operations
+- **Observations**: stored in `user_observations` table with category, key, value, confidence, timestamps
+- **Privacy**: learning toggled via config, denied categories block specific observation types, TTL auto-expires old observations
+- **API**: `GET /user/observations`, `POST /user/observations`, `GET /user/observations/{key}`, `DELETE /user/observations/{key}`, `DELETE /user/observations`, `GET /user/profile`
 
 ## Gateway Routes
 
-All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Routes are grouped by subsystem (20 implemented in Phase 3).
+All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Routes are grouped by subsystem (36 implemented through Phase 4).
 
 ### Health (1 route, no auth)
 
@@ -523,18 +480,44 @@ All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Rou
 |---|---|
 | `/ws/chat` | Streaming chat responses |
 
-### Phase 4+ (not yet implemented)
+### Identity (4 routes)
 
-The following route groups are planned for future phases:
+| Method | Path | Description |
+|---|---|---|
+| GET | `/identity` | List all identity files |
+| GET | `/identity/{name}` | Get identity file content |
+| PUT | `/identity/{name}` | Update identity file content |
+| POST | `/identity/reload` | Force reload all identity files |
+
+### Skills (6 routes)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/skills` | List all skills (optional `?category=` filter) |
+| GET | `/skills/{id}` | Get full skill definition |
+| POST | `/skills` | Create user skill |
+| PUT | `/skills/{id}` | Update skill content |
+| DELETE | `/skills/{id}` | Delete user skill (bundled cannot be deleted) |
+| POST | `/skills/reload` | Force reload all skills |
+
+### User Profile + Learning (6 routes)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/user/observations` | List observations (optional `?category=` filter) |
+| POST | `/user/observations` | Add observation |
+| GET | `/user/observations/{key}` | Get observation by key |
+| DELETE | `/user/observations/{key}` | Delete observation by key |
+| DELETE | `/user/observations` | Clear all observations |
+| GET | `/user/profile` | Get computed user context string |
+
+### Future Phases (not yet implemented)
 
 | Group | Routes | Phase |
 |---|---|---|
-| Identity / Soul (personas) | 3 routes | Phase 4 |
-| Skills | 5 routes | Phase 4 |
-| User Profile + Learning | 5 routes | Phase 4 |
 | Scheduler | 4 routes (feature-gated) | Phase 8 |
 | Web Dashboard | 1 route (feature-gated) | Phase 6 |
-| WebSocket `/ws/events`, `/ws/agents` | 2 channels | Phase 4+ |
+| WebSocket `/ws/events`, `/ws/agents` | 2 channels | Phase 5+ |
 
 ## Concurrency Rules
 

@@ -3,9 +3,12 @@ pub mod credential;
 pub mod db;
 pub mod error;
 pub mod event_bus;
+pub mod identity;
 pub mod memory;
 pub mod security;
+pub mod skills;
 pub mod tools;
+pub mod user;
 
 #[cfg(feature = "ai")]
 pub mod ai;

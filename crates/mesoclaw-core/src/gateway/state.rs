@@ -4,9 +4,12 @@ use crate::config::AppConfig;
 use crate::credential::CredentialStore;
 use crate::db::DbPool;
 use crate::event_bus::EventBus;
+use crate::identity::SoulLoader;
 use crate::memory::traits::Memory;
 use crate::security::policy::SecurityPolicy;
+use crate::skills::SkillRegistry;
 use crate::tools::traits::Tool;
+use crate::user::UserLearner;
 
 #[cfg(feature = "ai")]
 use crate::ai::agent::MesoAgent;
@@ -25,6 +28,9 @@ pub struct AppState {
     pub session_manager: Arc<SessionManager>,
     #[cfg(feature = "ai")]
     pub agent: Option<Arc<MesoAgent>>,
+    pub soul_loader: Arc<SoulLoader>,
+    pub skill_registry: Arc<SkillRegistry>,
+    pub user_learner: Arc<UserLearner>,
 }
 
 #[cfg(test)]

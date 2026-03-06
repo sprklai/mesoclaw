@@ -8,9 +8,12 @@ use crate::config::AppConfig;
 use crate::credential::InMemoryCredentialStore;
 use crate::db::{self, DbPool};
 use crate::event_bus::TokioBroadcastBus;
+use crate::identity::SoulLoader;
 use crate::memory::in_memory_store::InMemoryStore;
 use crate::security::policy::SecurityPolicy;
+use crate::skills::SkillRegistry;
 use crate::tools::traits::Tool;
+use crate::user::UserLearner;
 
 #[cfg(feature = "ai")]
 use crate::ai::{agent::MesoAgent, session::SessionManager};
@@ -31,6 +34,9 @@ pub struct Services {
     pub session_manager: Arc<SessionManager>,
     #[cfg(feature = "ai")]
     pub agent: Option<Arc<MesoAgent>>,
+    pub soul_loader: Arc<SoulLoader>,
+    pub skill_registry: Arc<SkillRegistry>,
+    pub user_learner: Arc<UserLearner>,
 }
 
 /// Initialize all services from config.
@@ -71,7 +77,38 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
     #[cfg(feature = "ai")]
     let session_manager = Arc::new(SessionManager::new(pool.clone()));
 
-    // 8. Agent (may fail if no API key configured — that's OK)
+    // 8. Identity (SoulLoader)
+    let data_dir = config
+        .data_dir
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(crate::config::default_data_dir);
+
+    let identity_dir = config
+        .identity_dir
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| data_dir.join("identity"));
+    let soul_loader = Arc::new(SoulLoader::new(&identity_dir)?);
+    info!("Identity loaded from {}", identity_dir.display());
+
+    // 9. Skills (SkillRegistry)
+    let skills_dir = config
+        .skills_dir
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| data_dir.join("skills"));
+    let skill_registry = Arc::new(SkillRegistry::new(
+        &skills_dir,
+        config.skill_max_content_size,
+    )?);
+    info!("Skills loaded from {}", skills_dir.display());
+
+    // 10. User learner
+    let user_learner = Arc::new(UserLearner::new(pool.clone(), &config));
+    info!("User learner initialized");
+
+    // 11. Agent (may fail if no API key configured — that's OK)
     #[cfg(feature = "ai")]
     let agent = match MesoAgent::new(&config, credentials.as_ref(), &tools).await {
         Ok(a) => {
@@ -101,6 +138,9 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         session_manager,
         #[cfg(feature = "ai")]
         agent,
+        soul_loader,
+        skill_registry,
+        user_learner,
     })
 }
 
@@ -120,6 +160,9 @@ impl From<Services> for AppState {
             session_manager: s.session_manager,
             #[cfg(feature = "ai")]
             agent: s.agent,
+            soul_loader: s.soul_loader,
+            skill_registry: s.skill_registry,
+            user_learner: s.user_learner,
         }
     }
 }
@@ -128,14 +171,20 @@ impl From<Services> for AppState {
 mod tests {
     use super::*;
 
+    fn test_config(dir: &tempfile::TempDir) -> AppConfig {
+        AppConfig {
+            db_path: Some(dir.path().join("test.db").to_string_lossy().into()),
+            identity_dir: Some(dir.path().join("identity").to_string_lossy().into()),
+            skills_dir: Some(dir.path().join("skills").to_string_lossy().into()),
+            ..Default::default()
+        }
+    }
+
     // 5.1 — init services with default config
     #[tokio::test]
     async fn init_services_default_config() {
         let dir = tempfile::TempDir::new().unwrap();
-        let config = AppConfig {
-            db_path: Some(dir.path().join("test.db").to_string_lossy().into()),
-            ..Default::default()
-        };
+        let config = test_config(&dir);
         let services = init_services(config).await;
         assert!(services.is_ok());
     }
@@ -145,10 +194,7 @@ mod tests {
     async fn init_services_creates_db() {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("test.db");
-        let config = AppConfig {
-            db_path: Some(db_path.to_string_lossy().into()),
-            ..Default::default()
-        };
+        let config = test_config(&dir);
         init_services(config).await.unwrap();
         assert!(db_path.exists());
     }
@@ -157,11 +203,7 @@ mod tests {
     #[tokio::test]
     async fn init_services_runs_migrations() {
         let dir = tempfile::TempDir::new().unwrap();
-        let db_path = dir.path().join("test.db");
-        let config = AppConfig {
-            db_path: Some(db_path.to_string_lossy().into()),
-            ..Default::default()
-        };
+        let config = test_config(&dir);
         let services = init_services(config).await.unwrap();
 
         // Verify sessions table exists
@@ -178,12 +220,8 @@ mod tests {
     #[tokio::test]
     async fn init_services_builds_tools() {
         let dir = tempfile::TempDir::new().unwrap();
-        let config = AppConfig {
-            db_path: Some(dir.path().join("test.db").to_string_lossy().into()),
-            ..Default::default()
-        };
+        let config = test_config(&dir);
         let services = init_services(config).await.unwrap();
-        // Tools are empty for now — registration happens later
         assert!(services.tools.is_empty());
     }
 
@@ -192,10 +230,7 @@ mod tests {
     #[tokio::test]
     async fn init_services_agent_none_without_key() {
         let dir = tempfile::TempDir::new().unwrap();
-        let config = AppConfig {
-            db_path: Some(dir.path().join("test.db").to_string_lossy().into()),
-            ..Default::default()
-        };
+        let config = test_config(&dir);
         let services = init_services(config).await.unwrap();
         assert!(
             services.agent.is_none(),
@@ -211,4 +246,46 @@ mod tests {
             assert_send_sync::<Services>();
         }
     };
+
+    // Phase 4 boot tests
+    #[tokio::test]
+    async fn boot_initializes_soul_loader() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let config = test_config(&dir);
+        let services = init_services(config).await.unwrap();
+        let identity = services.soul_loader.get().await;
+        assert_eq!(identity.files.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn boot_initializes_skill_registry() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let config = test_config(&dir);
+        let services = init_services(config).await.unwrap();
+        let skills = services.skill_registry.list().await;
+        assert_eq!(skills.len(), 2); // 2 bundled
+    }
+
+    #[tokio::test]
+    async fn boot_initializes_user_learner() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let config = test_config(&dir);
+        let services = init_services(config).await.unwrap();
+        let count = services.user_learner.count().await.unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[cfg(feature = "gateway")]
+    #[tokio::test]
+    async fn boot_services_to_appstate_includes_phase4() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let config = test_config(&dir);
+        let services = init_services(config).await.unwrap();
+        let state: AppState = services.into();
+        // Verify Phase 4 fields are accessible
+        let identity = state.soul_loader.get().await;
+        assert_eq!(identity.meta.name, "MesoClaw");
+        let skills = state.skill_registry.list().await;
+        assert_eq!(skills.len(), 2);
+    }
 }

@@ -63,13 +63,7 @@ pub async fn delete_session(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai::session::SessionManager;
-    use crate::config::AppConfig;
-    use crate::credential::InMemoryCredentialStore;
-    use crate::db;
-    use crate::event_bus::TokioBroadcastBus;
     use crate::gateway::errors::ErrorResponse;
-    use crate::security::policy::SecurityPolicy;
 
     use axum::Router;
     use axum::body::Body;
@@ -79,25 +73,7 @@ mod tests {
     use tower::ServiceExt;
 
     async fn test_state() -> (TempDir, Arc<AppState>) {
-        let dir = TempDir::new().unwrap();
-        let db_path = dir.path().join("test.db");
-        let pool = db::init_pool(&db_path).unwrap();
-        db::with_db(&pool, |conn| db::run_migrations(conn))
-            .await
-            .unwrap();
-        let config = AppConfig::default();
-        let state = Arc::new(AppState {
-            config: Arc::new(config),
-            db: pool.clone(),
-            event_bus: Arc::new(TokioBroadcastBus::new(16)),
-            memory: Arc::new(crate::memory::in_memory_store::InMemoryStore::new()),
-            credentials: Arc::new(InMemoryCredentialStore::new()),
-            security: Arc::new(SecurityPolicy::default_policy()),
-            tools: vec![],
-            session_manager: Arc::new(SessionManager::new(pool)),
-            agent: None,
-        });
-        (dir, state)
+        crate::gateway::handlers::tests::test_state().await
     }
 
     fn app(state: Arc<AppState>) -> Router {

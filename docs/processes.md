@@ -1,5 +1,21 @@
 # MesoClaw Process Flows
 
+## Table of Contents
+
+- [Chat Request Flow](#chat-request-flow)
+- [Startup Sequence](#startup-sequence)
+- [Default Paths by OS](#default-paths-by-os)
+- [Error Handling Flow](#error-handling-flow)
+- [Database Operation Flow](#database-operation-flow-async-safe)
+- [WebSocket Message Flow](#websocket-message-flow)
+- [Identity Loading Flow](#identity-loading-flow)
+- [Skill Loading Flow](#skill-loading-flow)
+- [User Learning Flow](#user-learning-flow)
+- [Channel Message Flow](#channel-message-flow)
+- [Credential Flow](#credential-flow)
+
+---
+
 ## Chat Request Flow
 
 ```mermaid
@@ -50,9 +66,9 @@ sequenceDiagram
     App->>Cred: Initialize credential store (KeyringStore / InMemoryStore)
     App->>AI: Register providers + load API keys
     App->>AI: Register agent tools
-    App->>App: Load persona (SoulLoader from ~/.mesoclaw/personas/*.md)
-    App->>App: Load skills (SkillRegistry)
-    App->>App: Load user profile (~/.mesoclaw/user.toml)
+    App->>App: Load identity (SoulLoader from data_dir/identity/)
+    App->>App: Load skills (SkillRegistry from data_dir/skills/)
+    App->>App: Init user learner (UserLearner from DB pool)
     App->>App: Bundle into Services struct
     App->>GW: Start axum server (127.0.0.1:18981)
 
@@ -133,103 +149,105 @@ sequenceDiagram
     S-->>C: { "type": "error", "error": "no agent configured" }
 ```
 
-## Persona Loading Flow
+## Identity Loading Flow
 
 ```mermaid
 sequenceDiagram
     participant App as Application
     participant FS as Filesystem
     participant SL as SoulLoader
-    participant CM as comrak
     participant SY as serde_yaml
-    participant TR as Tera
+    participant PC as PromptComposer
     participant AG as Rig Agent
-    participant NW as notify (watcher)
 
-    App->>FS: Read ~/.mesoclaw/personas/*.md
-    FS-->>SL: Raw markdown file(s)
-    SL->>CM: Extract YAML frontmatter
-    CM-->>SL: Frontmatter string + body
-    SL->>SY: Deserialize frontmatter metadata
-    SY-->>SL: PersonaMetadata struct
-    SL->>TR: Render {{variables}} in body
-    TR-->>SL: Rendered preamble text
-    SL->>AG: Inject via agent.preamble()
-    AG-->>App: Agent ready with persona
+    App->>SL: SoulLoader::new(identity_dir)
+    SL->>FS: Check for SOUL.md, IDENTITY.md, USER.md
+    alt Files missing
+        SL->>FS: Write bundled defaults (include_str!)
+    end
+    SL->>FS: Read all identity files
+    FS-->>SL: Raw markdown content
+    SL->>SY: Parse IDENTITY.md YAML frontmatter
+    SY-->>SL: IdentityMeta (name, version, description)
+    SL->>SL: Store Identity in RwLock
 
-    Note over NW,SL: Hot-reload loop
-    NW->>NW: Watch ~/.mesoclaw/personas/ for changes
-    NW->>SL: File change detected
-    SL->>CM: Re-parse changed file
-    CM-->>SL: Updated frontmatter + body
-    SL->>SY: Deserialize updated metadata
-    SY-->>SL: Updated PersonaMetadata
-    SL->>TR: Re-render body
-    TR-->>SL: Updated preamble
-    SL->>AG: Update active preamble
+    Note over PC,AG: Prompt composition at chat time
+    PC->>SL: Get identity files
+    SL-->>PC: Identity (soul + meta + user)
+    PC->>PC: Compose: SOUL + meta + USER + observations + skills + config
+    PC-->>AG: Final system prompt string
+
+    Note over SL: Manual reload via API
+    Note over SL: POST /identity/reload triggers SoulLoader::reload()
 ```
 
-## Skill Invocation Flow
+## Skill Loading Flow
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant UI as Frontend / CLI
+    participant App as Application
     participant SR as SkillRegistry
     participant FS as Filesystem
-    participant TR as Tera
+    participant SY as serde_yaml
+    participant PC as PromptComposer
     participant AG as Rig Agent
-    participant LLM as LLM Provider
 
-    U->>UI: Select skill
-    UI->>SR: Request skill definition
-    SR->>FS: Load skill .md file
-    FS-->>SR: Raw skill template
-    SR-->>UI: Skill metadata + parameter schema
-    UI->>U: Prompt for parameter values
-    U->>UI: Provide parameter values
-    UI->>SR: Invoke skill with parameters
-    SR->>TR: Render template with parameters
-    TR-->>SR: Rendered skill prompt
-    SR->>AG: Prepend rendered prompt to user message
-    AG->>LLM: Send combined prompt
-    LLM-->>AG: Response tokens
-    AG-->>UI: Stream response
-    UI-->>U: Display result
+    App->>SR: SkillRegistry::new(skills_dir)
+    SR->>SR: Load bundled skills (include_str!)
+    SR->>FS: Scan skills_dir/*.md
+    FS-->>SR: User skill files
+    SR->>SY: Parse YAML frontmatter per file
+    SY-->>SR: SkillFrontmatter (name, description, category)
+    SR->>SR: User skills override bundled (same id)
+    SR->>SR: Store in RwLock HashMap
+
+    Note over SR,AG: At prompt composition time
+    SR->>SR: active_skills() — filter enabled skills
+    SR-->>PC: Vec of (name, content) pairs
+    PC->>PC: Include skill content in system prompt
+    PC-->>AG: Final system prompt with skills
+
+    Note over SR: CRUD via API
+    Note over SR: POST /skills — create user skill
+    Note over SR: PUT /skills/id — update content
+    Note over SR: DELETE /skills/id — remove user skill
+    Note over SR: POST /skills/reload — re-scan disk
 ```
 
 ## User Learning Flow
 
 ```mermaid
 sequenceDiagram
-    participant EB as EventBus
+    participant API as Gateway API
     participant UL as UserLearner
-    participant DB as SQLite (memory)
-    participant FS as ~/.mesoclaw/user.toml
+    participant DB as SQLite (user_observations)
+    participant PC as PromptComposer
     participant AG as Rig Agent
 
-    Note over EB,UL: Observation collection
-    EB->>UL: AppEvent::MessageSent
-    UL->>UL: Extract preferences, patterns, corrections
-    UL->>DB: Store observation (memory_type = "user_observation", tags)
-    EB->>UL: AppEvent::SessionEnded
-    UL->>UL: Summarize session observations
-    UL->>DB: Store summary observation
+    Note over API,UL: Observation management via API
+    API->>UL: POST /user/observations (category, key, value, confidence)
+    UL->>UL: Check learning_enabled and denied_categories
+    UL->>DB: INSERT OR REPLACE into user_observations
+    DB-->>UL: Stored observation
 
-    Note over UL,FS: Periodic consolidation
-    UL->>DB: Query recent observations
-    DB-->>UL: Observation entries
-    UL->>UL: Summarize into user profile
-    UL->>FS: Write updated ~/.mesoclaw/user.toml
+    Note over UL,DB: Query and context building
+    API->>UL: GET /user/profile
+    UL->>DB: Query observations where confidence >= min_confidence
+    DB-->>UL: Matching observations
+    UL->>UL: build_context() — format as "key: value (confidence: X)"
+    UL-->>API: Context string
 
-    Note over AG,DB: Session start recall
-    AG->>DB: Recall relevant observations for context
-    DB-->>AG: Matching observations
-    AG->>AG: Inject observations into agent context
+    Note over PC,AG: At prompt composition time
+    PC->>UL: build_context()
+    UL-->>PC: Formatted observations string
+    PC->>PC: Include as "Known Preferences" section
+    PC-->>AG: System prompt with user context
 
     Note over UL: Privacy controls
-    Note over UL: Learning can be disabled via config
-    Note over UL: Observations can be viewed / deleted / reset
+    Note over UL: learning_enabled = false blocks new observations
+    Note over UL: learning_denied_categories blocks specific categories
+    Note over UL: prune_expired() removes observations older than TTL
+    Note over UL: DELETE /user/observations clears all
 ```
 
 ## Channel Message Flow

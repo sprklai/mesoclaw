@@ -39,6 +39,12 @@ impl IntoResponse for MesoError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "MESO_TOML_SERIALIZE_ERROR",
             ),
+            MesoError::Identity(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_P4_IDENTITY"),
+            MesoError::IdentityNotFound(_) => (StatusCode::NOT_FOUND, "MESO_P4_IDENTITY_NOT_FOUND"),
+            MesoError::Skill(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_P4_SKILL"),
+            MesoError::SkillNotFound(_) => (StatusCode::NOT_FOUND, "MESO_P4_SKILL_NOT_FOUND"),
+            MesoError::User(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_P4_USER"),
+            MesoError::Yaml(_) => (StatusCode::BAD_REQUEST, "MESO_YAML_PARSE_ERROR"),
             MesoError::Other(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_INTERNAL_ERROR"),
         };
 
@@ -188,6 +194,16 @@ mod tests {
                 use serde::ser::Error as _;
                 MesoError::TomlSerialize(toml::ser::Error::custom("t"))
             },
+            MesoError::Identity("t".into()),
+            MesoError::IdentityNotFound("t".into()),
+            MesoError::Skill("t".into()),
+            MesoError::SkillNotFound("t".into()),
+            MesoError::User("t".into()),
+            {
+                let yaml_err =
+                    serde_yaml::from_str::<serde_yaml::Value>(": bad: yaml:").unwrap_err();
+                MesoError::Yaml(yaml_err)
+            },
             MesoError::Other("t".into()),
         ];
 
@@ -197,7 +213,50 @@ mod tests {
             assert!(codes.insert(code.clone()), "duplicate error code: {code}");
         }
 
-        // 20 variants tested (Http skipped because reqwest::Error can't be easily constructed)
-        assert_eq!(codes.len(), 20);
+        // 26 variants tested (Http skipped because reqwest::Error can't be easily constructed)
+        assert_eq!(codes.len(), 26);
+    }
+
+    #[test]
+    fn identity_maps_to_500() {
+        let (status, code) = response_parts(MesoError::Identity("broken".into()));
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(code, "MESO_P4_IDENTITY");
+    }
+
+    #[test]
+    fn identity_not_found_maps_to_404() {
+        let (status, code) = response_parts(MesoError::IdentityNotFound("missing".into()));
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(code, "MESO_P4_IDENTITY_NOT_FOUND");
+    }
+
+    #[test]
+    fn skill_maps_to_500() {
+        let (status, code) = response_parts(MesoError::Skill("broken".into()));
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(code, "MESO_P4_SKILL");
+    }
+
+    #[test]
+    fn skill_not_found_maps_to_404() {
+        let (status, code) = response_parts(MesoError::SkillNotFound("missing".into()));
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(code, "MESO_P4_SKILL_NOT_FOUND");
+    }
+
+    #[test]
+    fn user_error_maps_to_500() {
+        let (status, code) = response_parts(MesoError::User("broken".into()));
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(code, "MESO_P4_USER");
+    }
+
+    #[test]
+    fn yaml_error_maps_to_400() {
+        let yaml_err = serde_yaml::from_str::<serde_yaml::Value>(": bad").unwrap_err();
+        let (status, code) = response_parts(MesoError::Yaml(yaml_err));
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(code, "MESO_YAML_PARSE_ERROR");
     }
 }

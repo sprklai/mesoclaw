@@ -42,6 +42,9 @@ rig-core = { workspace = true, optional = true }
 tokio-stream = { workspace = true }
 futures = { workspace = true }
 
+# Phase 4: Agent Intelligence
+serde_yaml = { workspace = true }
+
 [features]
 default = ["gateway", "ai"]
 gateway = ["dep:axum", "dep:tower-http"]

@@ -130,37 +130,11 @@ mod tests {
     use futures::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite;
 
-    use crate::ai::session::SessionManager;
-    use crate::config::AppConfig;
-    use crate::credential::InMemoryCredentialStore;
     use crate::gateway::routes::build_router;
     use crate::gateway::state::AppState;
-    use crate::memory::in_memory_store::InMemoryStore;
-    use crate::security::policy::SecurityPolicy;
 
     async fn test_state() -> (tempfile::TempDir, Arc<AppState>) {
-        let dir = tempfile::TempDir::new().unwrap();
-        let db_path = dir.path().join("test.db");
-        let pool = crate::db::init_pool(&db_path).unwrap();
-        crate::db::with_db(&pool, crate::db::run_migrations)
-            .await
-            .unwrap();
-        let config = AppConfig {
-            gateway_cors_origins: vec!["*".into()],
-            ..Default::default()
-        };
-        let state = Arc::new(AppState {
-            config: Arc::new(config),
-            db: pool.clone(),
-            event_bus: Arc::new(crate::event_bus::TokioBroadcastBus::new(16)),
-            memory: Arc::new(InMemoryStore::new()),
-            credentials: Arc::new(InMemoryCredentialStore::new()),
-            security: Arc::new(SecurityPolicy::default_policy()),
-            tools: vec![],
-            session_manager: Arc::new(SessionManager::new(pool)),
-            agent: None,
-        });
-        (dir, state)
+        crate::gateway::handlers::tests::test_state().await
     }
 
     /// Spawn an axum server on a random port and return the port number.

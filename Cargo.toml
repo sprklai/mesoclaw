@@ -73,6 +73,9 @@ rig-core = "0.31"
 tokio-stream = "0.1.17"
 futures = "0.3"
 
+# Phase 4: Agent Intelligence
+serde_yaml = "0.9"
+
 [profile.release]
 lto = "thin"
 strip = "debuginfo"

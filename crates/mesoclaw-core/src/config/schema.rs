@@ -48,6 +48,20 @@ pub struct AppConfig {
     pub agent_max_turns: usize,
     pub agent_max_tokens: usize,
     pub agent_system_prompt: Option<String>,
+
+    // Phase 4: Identity
+    pub identity_dir: Option<String>,
+
+    // Phase 4: Skills
+    pub skills_dir: Option<String>,
+    pub skill_max_content_size: usize,
+
+    // Phase 4: User Learning
+    pub learning_enabled: bool,
+    pub learning_denied_categories: Vec<String>,
+    pub learning_max_observations: usize,
+    pub learning_observation_ttl_days: u32,
+    pub learning_min_confidence: f32,
 }
 
 impl Default for AppConfig {
@@ -96,6 +110,20 @@ impl Default for AppConfig {
             agent_max_turns: 20,
             agent_max_tokens: 4096,
             agent_system_prompt: None,
+
+            // Identity
+            identity_dir: None,
+
+            // Skills
+            skills_dir: None,
+            skill_max_content_size: 100_000,
+
+            // User Learning
+            learning_enabled: true,
+            learning_denied_categories: vec![],
+            learning_max_observations: 10_000,
+            learning_observation_ttl_days: 365,
+            learning_min_confidence: 0.5,
         }
     }
 }

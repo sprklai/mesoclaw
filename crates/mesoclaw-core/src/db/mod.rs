@@ -85,6 +85,27 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    if version < 2 {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS user_observations (
+                id TEXT PRIMARY KEY,
+                category TEXT NOT NULL,
+                key TEXT NOT NULL UNIQUE,
+                value TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 0.5,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_observations_category
+                ON user_observations(category);
+            CREATE INDEX IF NOT EXISTS idx_observations_confidence
+                ON user_observations(confidence DESC);
+
+            PRAGMA user_version = 2;",
+        )?;
+    }
+
     Ok(())
 }
 
@@ -134,7 +155,44 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 1);
+        assert_eq!(version, 2);
+    }
+
+    #[test]
+    fn migration_v2_creates_observations_table() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test.db");
+        let conn = Connection::open(&path).unwrap();
+        run_migrations(&conn).unwrap();
+
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert!(tables.contains(&"user_observations".to_string()));
+    }
+
+    #[test]
+    fn migration_v2_creates_indexes() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test.db");
+        let conn = Connection::open(&path).unwrap();
+        run_migrations(&conn).unwrap();
+
+        let indexes: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='index' ORDER BY name")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert!(indexes.contains(&"idx_observations_category".to_string()));
+        assert!(indexes.contains(&"idx_observations_confidence".to_string()));
     }
 
     #[tokio::test]

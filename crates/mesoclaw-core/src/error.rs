@@ -62,6 +62,24 @@ pub enum MesoError {
     #[error("reqwest error: {0}")]
     Http(#[from] reqwest::Error),
 
+    #[error("identity error: {0}")]
+    Identity(String),
+
+    #[error("identity not found: {0}")]
+    IdentityNotFound(String),
+
+    #[error("skill error: {0}")]
+    Skill(String),
+
+    #[error("skill not found: {0}")]
+    SkillNotFound(String),
+
+    #[error("user error: {0}")]
+    User(String),
+
+    #[error("YAML parse error: {0}")]
+    Yaml(#[from] serde_yaml::Error),
+
     #[error("{0}")]
     Other(String),
 }

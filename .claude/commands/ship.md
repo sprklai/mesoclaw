@@ -2,10 +2,11 @@
 
 This command formats the code, scans for leaked secrets, commits, and pushes to the remote main branch.
 **It will REFUSE to proceed if any secrets or tokens are detected.**
+**It runs fully automatically with NO user prompts unless secrets are found.**
 
 ## Instructions
 
-Follow these steps strictly and sequentially. Stop immediately if any step fails.
+Follow these steps strictly and sequentially. Stop immediately if any step fails. Do NOT ask the user for confirmation between steps — proceed automatically unless a secret is detected.
 
 ### Step 1: Verify branch
 
@@ -25,7 +26,7 @@ cd web && bun run format 2>/dev/null || npx prettier --write . 2>/dev/null; cd -
 
 ### Step 3: Run lints
 
-Run `cargo clippy --workspace` to catch lint issues. If there are warnings or errors, fix them before proceeding.
+Run `cargo clippy --workspace` to catch lint issues. If there are warnings or errors, fix them before proceeding. Do NOT ask the user — just fix and re-run.
 
 ### Step 4: Secret scan (BLOCKING)
 
@@ -77,15 +78,16 @@ ACTION REQUIRED:
 ```
 
 - STOP. Do NOT commit. Do NOT push. This is non-negotiable.
+- This is the ONLY case where user input is required before proceeding.
 
 #### 4e. If scan is clean:
 Print: "Secret scan passed - no leaked credentials detected."
+Proceed immediately to Step 5 without asking for confirmation.
 
 ### Step 5: Commit
 
-- Run `git status` to review what will be committed
 - Run `git diff --cached --stat` for a summary
-- Create a commit with a descriptive message based on the actual changes:
+- Create a commit with a descriptive message based on the actual changes. Do NOT ask the user for a commit message — generate one automatically:
 
 ```
 git commit -m "$(cat <<'EOF'
@@ -100,7 +102,7 @@ EOF
 
 - First run `git pull --rebase origin main` to sync
 - Then run `git push origin main`
-- Report the result to the user
+- Do NOT ask for confirmation — just push.
 
 ### Step 7: Summary
 

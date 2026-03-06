@@ -179,6 +179,38 @@ provider_api_key_env = "ANTHROPIC_API_KEY"
     }
 
     #[test]
+    fn phase4_config_defaults() {
+        let config = AppConfig::default();
+        assert!(config.identity_dir.is_none());
+        assert!(config.skills_dir.is_none());
+        assert_eq!(config.skill_max_content_size, 100_000);
+        assert!(config.learning_enabled);
+        assert!(config.learning_denied_categories.is_empty());
+        assert_eq!(config.learning_max_observations, 10_000);
+        assert_eq!(config.learning_observation_ttl_days, 365);
+        assert_eq!(config.learning_min_confidence, 0.5);
+    }
+
+    #[test]
+    fn phase4_config_roundtrip() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("config.toml");
+
+        let config = AppConfig {
+            learning_enabled: false,
+            learning_denied_categories: vec!["personal".into()],
+            skill_max_content_size: 50_000,
+            ..Default::default()
+        };
+
+        save_config(&path, &config).unwrap();
+        let loaded = load_config(&path).unwrap();
+        assert!(!loaded.learning_enabled);
+        assert_eq!(loaded.learning_denied_categories, vec!["personal"]);
+        assert_eq!(loaded.skill_max_content_size, 50_000);
+    }
+
+    #[test]
     fn backwards_compat_aliases() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("config.toml");
