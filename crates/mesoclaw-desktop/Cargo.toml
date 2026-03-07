@@ -3,8 +3,24 @@ name = "mesoclaw-desktop"
 version.workspace = true
 edition.workspace = true
 
+[build-dependencies]
+tauri-build = { version = "2.5", features = [] }
+
 [dependencies]
 mesoclaw-core = { workspace = true }
+tauri = { version = "2.10", features = ["tray-icon"] }
+tauri-plugin-window-state = "2.4"
+tauri-plugin-single-instance = "2.4"
+tauri-plugin-opener = "2.5"
+tauri-plugin-devtools = { version = "2.0", optional = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+url = "2"
+opener = "0.8"
+
+[features]
+default = ["devtools"]
+devtools = ["dep:tauri-plugin-devtools"]

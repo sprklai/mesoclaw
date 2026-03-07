@@ -12,11 +12,12 @@
   - [Phase 4: Agent Intelligence](#phase-4-agent-intelligence--complete)
   - [Phase 5: Binary Shells + Tools + Memory](#phase-5-binary-shells--tools--memory--complete)
   - [Phase 6: Frontend](#phase-6-frontend--complete)
-  - [Phase 7: Desktop & Mobile](#phase-7-desktop--mobile--not-started)
+  - [Phase 7: Desktop App](#phase-7-desktop-app--complete)
   - [Phase 8: Channels & Scheduler](#phase-8-channels--scheduler--not-started)
   - [Phase 9: TUI & Cross-Compilation](#phase-9-tui--cross-compilation--not-started)
   - [Phase 10: CI/CD & Quality](#phase-10-cicd--quality--not-started)
   - [Phase 11: Documentation & Community](#phase-11-documentation--community--not-started)
+  - [Phase 12: Mobile App](#phase-12-mobile-app--not-started)
 
 ---
 
@@ -74,7 +75,7 @@ Each phase has **3 user gates** (plan, tests, completion). All must pass before 
 
 ```mermaid
 gantt
-    title MesoClaw Implementation Phases (22 Steps / 11 Phases)
+    title MesoClaw Implementation Phases (23 Steps / 12 Phases)
     dateFormat X
     axisFormat %s
 
@@ -90,8 +91,8 @@ gantt
     Phase 5 - Binary Shells + Tools + Memory :done, p5, after p4, 1
     section Frontend
     Phase 6 - Frontend                  :done, p6, after p5, 1
-    section Desktop/Mobile
-    Phase 7 - Desktop & Mobile          :p7, after p6, 1
+    section Desktop
+    Phase 7 - Desktop App               :done, p7, after p6, 1
     section Channels
     Phase 8 - Channels & Scheduler      :p8, after p7, 1
     section TUI/Cross
@@ -100,6 +101,8 @@ gantt
     Phase 10 - CI/CD & Quality          :p10, after p9, 1
     section Docs
     Phase 11 - Documentation & Community :p11, after p10, 1
+    section Mobile
+    Phase 12 - Mobile App               :p12, after p11, 1
 ```
 
 ## Phase Details
@@ -255,20 +258,25 @@ gantt
 
 ---
 
-### Phase 7: Desktop & Mobile — `[NOT STARTED]`
+### Phase 7: Desktop App — `[COMPLETE]`
 
-**Step 14: Desktop Binary**
-- Tauri 2 shell wrapping the Svelte frontend
-- Window management IPC commands
-- `TauriBridge` for native OS integration (notifications, file dialogs, system tray)
+**Step 14: Desktop Binary (Tauri 2.10)**
+- Tauri 2.10.3 shell wrapping the SvelteKit SPA frontend
+- 5 plugins: tray-icon (built-in), window-state 2.4.1, single-instance 2.4.0, opener 2.5.3, devtools 2.0.1 (feature-gated)
+- 4 IPC commands: `close_to_tray`, `show_window`, `get_app_version`, `open_data_dir`
+- Hybrid daemon: embedded gateway by default, external via `MESOCLAW_GATEWAY_URL` env var
+- System tray with Show/Hide/Quit menu, left-click toggles visibility
+- Close-to-tray behavior (close button hides window, quit via tray menu)
+- Window state persistence (size, position, maximized state across restarts)
+- Single-instance enforcement (second launch focuses existing window)
+- Frontend integration: `@tauri-apps/api` 2.10.1, `web/src/lib/tauri.ts` wrapper with `isTauri` detection
+- Linux WebKit DMA-BUF renderer fix in `main.rs`
+- Mobile deferred to Phase 12
 
-**Step 14b: Mobile App**
-- Tauri 2 iOS + Android targets
-- In-process gateway (no separate daemon needed)
-- Responsive layout adapting to mobile screens
-
-- **Tests**: Tauri command invocation, frontend build, window management, mobile build
-- **Plan**: [plans/phase7_desktop_mobile.md](../plans/phase7_desktop_mobile.md)
+**New dependencies**: tauri 2.10.3, tauri-build 2.5.6, tauri-plugin-window-state 2.4.1, tauri-plugin-single-instance 2.4.0, tauri-plugin-opener 2.5.3, tauri-plugin-devtools 2.0.1, url 2, opener 0.8, @tauri-apps/api 2.10.1, @tauri-apps/cli 2.10.1
+- **Tests**: 7 unit tests (gateway mode resolution, data dir, tray menu), 354 total Rust workspace tests. Zero clippy warnings.
+- **Plan**: [plans/phase7_desktop.md](../plans/phase7_desktop.md)
+- **Test plan**: [tests/phase7_desktop.md](../tests/phase7_desktop.md)
 
 ---
 
@@ -344,3 +352,15 @@ gantt
 
 - **Tests**: link validation, markdown lint
 - **Plan**: [plans/phase11_docs_community.md](../plans/phase11_docs_community.md)
+
+---
+
+### Phase 12: Mobile App — `[NOT STARTED]`
+
+**Step 23: Mobile Binary**
+- Tauri 2 iOS + Android targets
+- In-process gateway (no separate daemon needed)
+- Responsive layout adapting to mobile screens
+
+- **Tests**: mobile build, responsive layout, in-process gateway
+- **Plan**: [plans/phase12_mobile.md](../plans/phase12_mobile.md)

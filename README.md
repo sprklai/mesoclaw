@@ -222,7 +222,7 @@ graph TD
 
 ```
 mesoclaw/
-├── Cargo.toml              # Workspace root (7 members)
+├── Cargo.toml              # Workspace root (5 members)
 ├── CLAUDE.md               # AI assistant instructions
 ├── README.md               # This file
 ├── scripts/
@@ -247,8 +247,8 @@ mesoclaw/
 │   └── phase6_frontend.md           # Phase 6 test plan + results (26 tests)
 ├── crates/
 │   ├── mesoclaw-core/      # Shared library (NO Tauri dependency)
-│   ├── mesoclaw-desktop/   # Tauri 2 shell (macOS, Windows, Linux)
-│   ├── mesoclaw-mobile/    # Tauri 2 shell (iOS, Android)
+│   ├── mesoclaw-desktop/   # Tauri 2.10 shell (macOS, Windows, Linux)
+│   ├── mesoclaw-mobile/    # Tauri 2 shell (iOS, Android, deferred to Phase 12)
 │   ├── mesoclaw-cli/       # clap CLI
 │   ├── mesoclaw-tui/       # ratatui TUI
 │   └── mesoclaw-daemon/    # Headless daemon
@@ -304,9 +304,11 @@ cargo run -p mesoclaw-cli -- chat
 # Start the TUI
 cargo run -p mesoclaw-tui
 
-# Start the desktop app
-cd web && bun install && bun run build && cd ..
+# Start the desktop app (dev mode with hot reload)
 cd crates/mesoclaw-desktop && cargo tauri dev
+
+# Start the desktop app connecting to external daemon
+MESOCLAW_GATEWAY_URL=http://localhost:18981 cd crates/mesoclaw-desktop && cargo tauri dev
 
 # Frontend dev server (hot reload)
 cd web && bun run dev
@@ -430,6 +432,7 @@ Detailed documentation lives in the `docs/` and `plans/` directories:
 - [Phase 4 Plan](plans/phase4_agent_intelligence.md) -- Identity, skills, user learning
 - [Phase 5 Plan](plans/phase5_combined.md) -- ToolRegistry, memory enhancements, CLI binary
 - [Phase 6 Plan](plans/phase6_frontend.md) -- Svelte 5 SPA frontend
+- [Phase 7 Plan](plans/phase7_desktop.md) -- Tauri 2 desktop app
 
 ### Implementation Status
 
@@ -441,7 +444,7 @@ Detailed documentation lives in the `docs/` and `plans/` directories:
 | Phase 4: Agent Intelligence | 10a-10c | Complete | 327/327 passing |
 | Phase 5: Binary Shells + Tools + Memory | 11-12 | Complete | 347/347 passing |
 | Phase 6: Frontend | 13 | Complete | 347 Rust + 26 JS passing |
-| Phase 7: Desktop & Mobile | 14, 14b | Not started | -- |
+| Phase 7: Desktop App | 14 | Complete | 354/354 Rust + 26 JS passing |
 | Phase 8: Channels & Scheduler | 15-16 | Not started | -- |
 | Phase 9: TUI & Cross-Compilation | 17-18 | Not started | -- |
 | Phase 10: CI/CD & Quality | 19-20 | Not started | -- |

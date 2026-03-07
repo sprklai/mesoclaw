@@ -12,6 +12,7 @@
 - [Skill Loading Flow](#skill-loading-flow)
 - [User Learning Flow](#user-learning-flow)
 - [Channel Message Flow](#channel-message-flow)
+- [Desktop Boot Flow](#desktop-boot-flow)
 - [Credential Flow](#credential-flow)
 
 ---
@@ -73,6 +74,8 @@ sequenceDiagram
     App->>GW: Start axum server (127.0.0.1:18981)
 
     alt Desktop
+        App->>App: Setup tray + resolve gateway mode
+        App->>App: Boot embedded gateway or connect to external
         App->>App: Open Tauri window
     else Mobile
         App->>App: Open Tauri mobile view (in-process gateway)
@@ -271,6 +274,49 @@ sequenceDiagram
     CO->>Ext2: send_text() → platform-specific delivery
     Ext2-->>CO: Delivery confirmation
     CO->>CO: acknowledge(msg_id) → mark as handled
+```
+
+## Desktop Boot Flow
+
+The desktop app uses a hybrid gateway model. By default it starts an embedded gateway; if `MESOCLAW_GATEWAY_URL` is set, it connects to an external daemon instead.
+
+```mermaid
+sequenceDiagram
+    participant Main as main.rs
+    participant Lib as lib.rs Builder
+    participant Tray as tray.rs
+    participant Cmd as commands.rs
+    participant Core as mesoclaw-core
+    participant GW as Gateway
+
+    Main->>Main: Linux: set WEBKIT_DISABLE_DMABUF_RENDERER
+    Main->>Lib: run#40;#41;
+
+    Lib->>Lib: Register plugins<br>window-state, single-instance, opener
+    Note over Lib: devtools plugin if feature enabled
+
+    Lib->>Lib: setup#40;#41; hook
+    Lib->>Tray: setup_tray#40;app#41;
+    Tray->>Tray: Create menu: Show / Hide / Separator / Quit
+    Tray->>Tray: Register tray icon with menu + click handlers
+
+    Lib->>Cmd: boot_gateway#40;app#41;
+    Cmd->>Cmd: resolve_gateway_mode#40;#41;
+
+    alt MESOCLAW_GATEWAY_URL set
+        Cmd->>Cmd: Validate URL, store external mode
+    else No env var or empty
+        Cmd->>Core: load_or_create_config#40;#41;
+        Core-->>Cmd: AppConfig
+        Cmd->>Core: init_services#40;config#41;
+        Core-->>Cmd: Services
+        Cmd->>GW: Start axum on host:port in background task
+        Cmd->>Cmd: Store shutdown_tx in managed state
+    end
+
+    Lib->>Lib: Register IPC handlers
+    Lib->>Lib: Register on_window_event: close hides to tray
+    Lib->>Lib: run#40;generate_context!#41;
 ```
 
 ## Credential Flow

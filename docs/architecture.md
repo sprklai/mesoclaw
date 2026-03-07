@@ -14,6 +14,7 @@
 - [Skills System](#skills-system)
 - [User Profile + Progressive Learning](#user-profile--progressive-learning)
 - [Gateway Routes](#gateway-routes)
+- [Desktop App Architecture](#desktop-app-architecture)
 - [Concurrency Rules](#concurrency-rules)
 - [Lessons Learned from v1](#lessons-learned-from-v1)
 
@@ -53,7 +54,8 @@ graph LR
         end
     end
 
-    Desktop & Mobile & CLI & TUI & Daemon --> Gateway
+    Desktop -->|embedded gateway| Gateway
+    Mobile & CLI & TUI & Daemon --> Gateway
     Web -->|HTTP/WS| Gateway
 
     BootEntry --> Gateway & DB & EventBus
@@ -93,6 +95,12 @@ graph TB
 ```mermaid
 graph TD
     desktop[mesoclaw-desktop] --> core[mesoclaw-core]
+    desktop --> tauri["tauri 2.10<br>#40;app framework#41;"]
+    desktop --> winstate["tauri-plugin-window-state<br>#40;persist size/position#41;"]
+    desktop --> singleinst["tauri-plugin-single-instance<br>#40;enforce one instance#41;"]
+    desktop --> opnr["tauri-plugin-opener<br>#40;open data dir#41;"]
+    desktop -.-> devtools["tauri-plugin-devtools<br>#40;feature-gated#41;"]
+
     mobile[mesoclaw-mobile] --> core
     cli[mesoclaw-cli]
     tui[mesoclaw-tui] --> core
@@ -120,7 +128,7 @@ graph TD
 
 ```
 mesoclaw/
-├── Cargo.toml              # Workspace root (7 members)
+├── Cargo.toml              # Workspace root (5 members)
 ├── CLAUDE.md               # AI assistant instructions
 ├── README.md               # Project documentation
 ├── scripts/
@@ -157,8 +165,18 @@ mesoclaw/
 │   │   │   ├── channels/   # Channel trait + implementations (Phase 8)
 │   │   │   └── scheduler/  # Cron + scheduled tasks, feature-gated (Phase 8)
 │   │   └── tests/          # Integration tests
-│   ├── mesoclaw-desktop/   # Tauri 2 shell (desktop)
-│   ├── mesoclaw-mobile/    # Tauri 2 shell (iOS + Android)
+│   ├── mesoclaw-desktop/   # Tauri 2.10 shell (desktop)
+│   │   ├── Cargo.toml      # tauri 2.10, 4 plugins, devtools feature
+│   │   ├── build.rs         # tauri_build::build()
+│   │   ├── tauri.conf.json  # 1280x720, CSP, com.sprklai.mesoclaw
+│   │   ├── capabilities/default.json
+│   │   ├── icons/           # 7 icon files
+│   │   └── src/
+│   │       ├── main.rs      # Entry + Linux WebKit DMA-BUF fix
+│   │       ├── lib.rs       # Builder: plugins, tray, IPC, close-to-tray
+│   │       ├── commands.rs  # 4 IPC + boot_gateway() + 7 tests
+│   │       └── tray.rs      # Show/Hide/Quit menu + 1 test
+│   ├── mesoclaw-mobile/    # Tauri 2 shell (iOS + Android, deferred to Phase 12)
 │   ├── mesoclaw-cli/       # clap CLI
 │   ├── mesoclaw-tui/       # ratatui TUI
 │   └── mesoclaw-daemon/    # Headless daemon (full gateway server)
@@ -168,6 +186,7 @@ mesoclaw/
     │   ├── app.html         # SPA shell
     │   ├── lib/
     │   │   ├── api/         # HTTP client + WebSocket manager
+│   │   ├── tauri.ts     # isTauri detection + 4 invoke wrappers
     │   │   ├── components/
     │   │   │   ├── ai-elements/  # svelte-ai-elements (9 component sets)
     │   │   │   ├── ui/      # shadcn-svelte primitives (14 component sets)
@@ -547,6 +566,79 @@ All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Rou
 |---|---|---|
 | Scheduler | 4 routes (feature-gated) | Phase 8 |
 | WebSocket `/ws/events`, `/ws/agents` | 2 channels | Phase 8+ |
+
+## Desktop App Architecture
+
+The desktop app is a Tauri 2.10 shell wrapping the SvelteKit SPA frontend. It embeds the gateway server by default, so no separate daemon process is required.
+
+### Tauri Plugins
+
+| Plugin | Version | Purpose |
+|---|---|---|
+| tray-icon | built-in | System tray with Show/Hide/Quit menu |
+| window-state | 2.4.1 | Persist window size, position, maximized state |
+| single-instance | 2.4.0 | Enforce single running instance, focus existing |
+| opener | 2.5.3 | Open data directory in OS file manager |
+| devtools | 2.0.1 | WebView inspector (feature-gated, dev only) |
+
+### IPC Commands
+
+| Command | Description |
+|---|---|
+| `close_to_tray` | Hide window to system tray |
+| `show_window` | Show and focus the main window |
+| `get_app_version` | Return app version string |
+| `open_data_dir` | Open MesoClaw data directory in OS file manager |
+
+### Desktop Boot Flow
+
+```mermaid
+flowchart TD
+    Start([main.rs]) --> LinuxFix{"Linux?"}
+    LinuxFix -->|Yes| SetEnv["Set WEBKIT_DISABLE_DMABUF_RENDERER=1"]
+    LinuxFix -->|No| Builder
+    SetEnv --> Builder
+
+    Builder["Tauri Builder"] --> Plugins["Register plugins<br>window-state, single-instance, opener"]
+    Plugins --> DevCheck{"devtools feature?"}
+    DevCheck -->|Yes| DevPlugin["Register devtools plugin"]
+    DevCheck -->|No| Setup
+    DevPlugin --> Setup
+
+    Setup["setup#40;#41; hook"] --> Tray["Setup system tray<br>Show / Hide / Quit menu"]
+    Tray --> GWMode{"MESOCLAW_GATEWAY_URL<br>env var set?"}
+
+    GWMode -->|Yes, valid URL| External["Use external gateway<br>Store URL in state"]
+    GWMode -->|No| Embedded["Boot embedded gateway"]
+
+    Embedded --> LoadCfg["Load config.toml"]
+    LoadCfg --> InitSvc["init_services#40;config#41;"]
+    InitSvc --> StartGW["Start axum on host:port<br>with shutdown channel"]
+    StartGW --> Ready["App ready"]
+    External --> Ready
+
+    Ready --> Events["Window events:<br>close button hides to tray"]
+```
+
+### Hybrid Gateway Architecture
+
+The desktop app supports two gateway modes:
+
+1. **Embedded** (default): The gateway server starts in a background Tokio task during `setup()`. A `oneshot` channel provides graceful shutdown. This is the zero-configuration path -- users launch the desktop app and everything works.
+
+2. **External**: If `MESOCLAW_GATEWAY_URL` is set to a valid URL, the desktop app connects to an external daemon instead of starting its own gateway. Useful for multi-device setups or when running the daemon as a system service.
+
+### Frontend Integration
+
+The frontend detects the Tauri environment via `window.__TAURI__` and provides typed wrappers in `web/src/lib/tauri.ts`:
+
+- `isTauri` -- boolean flag for environment detection
+- `closeToTray()` -- invoke `close_to_tray` IPC command
+- `showWindow()` -- invoke `show_window` IPC command
+- `getAppVersion()` -- invoke `get_app_version` IPC command
+- `openDataDir()` -- invoke `open_data_dir` IPC command
+
+All wrappers are no-ops when running in a browser (non-Tauri) context, so the same frontend works for both desktop and web.
 
 ## Concurrency Rules
 

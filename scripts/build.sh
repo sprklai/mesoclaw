@@ -10,6 +10,7 @@
 #   --all-features        Enable all features
 #   --list-targets        List available build targets and exit
 #   --install-toolchain   Install the required Rust target toolchain
+#   --dev                 Start dev mode (Vite + Tauri dev server)
 #   --help                Show this help message
 
 set -euo pipefail
@@ -37,6 +38,7 @@ CRATES=""
 FEATURES=""
 ALL_FEATURES=false
 INSTALL_TOOLCHAIN=false
+DEV_MODE=false
 
 # ── Colors ─────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -247,6 +249,10 @@ while [[ $# -gt 0 ]]; do
             ALL_FEATURES=true
             shift
             ;;
+        --dev)
+            DEV_MODE=true
+            shift
+            ;;
         --install-toolchain)
             INSTALL_TOOLCHAIN=true
             shift
@@ -267,10 +273,65 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+run_dev() {
+    info "Starting dev mode..."
+
+    # Check bun is available
+    if ! command -v bun &> /dev/null; then
+        err "bun is not installed. Install it from https://bun.sh"
+        exit 1
+    fi
+
+    # Install web dependencies if needed
+    if [ ! -d "${WORKSPACE_ROOT}/web/node_modules" ]; then
+        info "Installing web dependencies..."
+        (cd "${WORKSPACE_ROOT}/web" && bun install)
+    fi
+
+    # Cleanup on exit/interrupt
+    cleanup() {
+        info "Shutting down..."
+        kill "$VITE_PID" 2>/dev/null
+        wait "$VITE_PID" 2>/dev/null
+    }
+    trap cleanup EXIT INT TERM
+
+    # Start Vite dev server in background
+    info "Starting Vite dev server on http://localhost:5173..."
+    (cd "${WORKSPACE_ROOT}/web" && bun run dev) &
+    VITE_PID=$!
+
+    # Wait for Vite to be ready
+    info "Waiting for Vite to start..."
+    for i in $(seq 1 30); do
+        if curl -s http://localhost:5173 > /dev/null 2>&1; then
+            ok "Vite dev server is ready"
+            break
+        fi
+        if [ "$i" -eq 30 ]; then
+            err "Vite dev server failed to start within 30 seconds"
+            kill "$VITE_PID" 2>/dev/null
+            exit 1
+        fi
+        sleep 1
+    done
+
+    # Start Tauri dev without its own dev server (cleanup handled by trap)
+    # --no-watch: prevent file watcher from interrupting the initial build
+    info "Starting Tauri dev server..."
+    (cd "${WORKSPACE_ROOT}/crates/mesoclaw-desktop" && cargo tauri dev --no-dev-server --no-watch)
+    exit $?
+}
+
 # ── Main ───────────────────────────────────────────────────────────────
 
 cd "$WORKSPACE_ROOT"
 detect_os
+
+# Handle dev mode early
+if [ "$DEV_MODE" = true ]; then
+    run_dev
+fi
 
 echo ""
 echo "========================================"
