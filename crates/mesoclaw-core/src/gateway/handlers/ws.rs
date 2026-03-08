@@ -4,7 +4,10 @@ use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast;
+use tracing::warn;
 
+use crate::ai::adapter::{ToolCallEvent, ToolCallPhase};
 use crate::ai::resolve_agent;
 use crate::gateway::state::AppState;
 
@@ -15,11 +18,30 @@ struct WsRequest {
     model: Option<String>,
 }
 
+/// Tagged enum for all outbound WebSocket messages.
 #[derive(Debug, Serialize)]
-struct WsChunk {
-    r#type: String,
-    content: Option<String>,
-    error: Option<String>,
+#[serde(tag = "type")]
+pub(crate) enum WsOutbound {
+    #[serde(rename = "text")]
+    Text { content: String },
+    #[serde(rename = "tool_call")]
+    ToolCall {
+        call_id: String,
+        tool_name: String,
+        args: serde_json::Value,
+    },
+    #[serde(rename = "tool_result")]
+    ToolResult {
+        call_id: String,
+        tool_name: String,
+        output: String,
+        success: bool,
+        duration_ms: u64,
+    },
+    #[serde(rename = "done")]
+    Done,
+    #[serde(rename = "error")]
+    Error { error: String },
 }
 
 pub async fn ws_chat(
@@ -27,6 +49,11 @@ pub async fn ws_chat(
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_ws(socket, state))
+}
+
+async fn send_outbound(socket: &mut WebSocket, msg: &WsOutbound) {
+    let json = serde_json::to_string(msg).unwrap();
+    let _ = socket.send(Message::Text(json.into())).await;
 }
 
 async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
@@ -40,86 +67,130 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
         let request: WsRequest = match serde_json::from_str(&text) {
             Ok(r) => r,
             Err(e) => {
-                let err_chunk = WsChunk {
-                    r#type: "error".into(),
-                    content: None,
-                    error: Some(format!("invalid JSON: {e}")),
-                };
-                let _ = socket
-                    .send(Message::Text(
-                        serde_json::to_string(&err_chunk).unwrap().into(),
-                    ))
-                    .await;
+                send_outbound(
+                    &mut socket,
+                    &WsOutbound::Error {
+                        error: format!("invalid JSON: {e}"),
+                    },
+                )
+                .await;
                 continue;
             }
         };
 
-        let agent = match resolve_agent(request.model.as_deref(), &state).await {
+        // Create per-request broadcast channel for tool events
+        let (tool_tx, mut tool_rx) = broadcast::channel::<ToolCallEvent>(32);
+
+        let agent = match resolve_agent(request.model.as_deref(), &state, Some(tool_tx)).await {
             Ok(a) => a,
             Err(e) => {
-                let err_chunk = WsChunk {
-                    r#type: "error".into(),
-                    content: None,
-                    error: Some(e.to_string()),
-                };
-                let _ = socket
-                    .send(Message::Text(
-                        serde_json::to_string(&err_chunk).unwrap().into(),
-                    ))
-                    .await;
+                send_outbound(
+                    &mut socket,
+                    &WsOutbound::Error {
+                        error: e.to_string(),
+                    },
+                )
+                .await;
                 continue;
             }
         };
 
-        // Store user message if session provided
-        if let Some(ref sid) = request.session_id {
-            let _ = state
-                .session_manager
-                .append_message(sid, "user", &request.prompt)
-                .await;
-        }
+        // Note: user message is stored by the frontend via POST /sessions/{id}/messages
+        // before the WS stream starts. Do not duplicate here.
 
-        // For Phase 3, we use prompt() (non-streaming) and send as single chunk + done.
-        // True streaming will use rig's stream() in a future iteration.
-        match agent.prompt(&request.prompt).await {
-            Ok(response) => {
-                let chunk = WsChunk {
-                    r#type: "text".into(),
-                    content: Some(response.clone()),
-                    error: None,
-                };
-                let _ = socket
-                    .send(Message::Text(serde_json::to_string(&chunk).unwrap().into()))
-                    .await;
+        // Spawn agent work in background
+        let prompt = request.prompt.clone();
+        let (result_tx, mut result_rx) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let result = agent.prompt(&prompt).await;
+            let _ = result_tx.send(result);
+        });
 
-                // Store assistant response
-                if let Some(ref sid) = request.session_id {
-                    let _ = state
-                        .session_manager
-                        .append_message(sid, "assistant", &response)
-                        .await;
+        // Collect tool events for DB persistence
+        let mut tool_events = Vec::new();
+
+        // Concurrently forward tool events and wait for agent result
+        loop {
+            tokio::select! {
+                event = tool_rx.recv() => {
+                    match event {
+                        Ok(evt) => {
+                            let outbound = match &evt.phase {
+                                ToolCallPhase::Started { args } => WsOutbound::ToolCall {
+                                    call_id: evt.call_id.clone(),
+                                    tool_name: evt.tool_name.clone(),
+                                    args: args.clone(),
+                                },
+                                ToolCallPhase::Completed { output, success, duration_ms } => WsOutbound::ToolResult {
+                                    call_id: evt.call_id.clone(),
+                                    tool_name: evt.tool_name.clone(),
+                                    output: output.clone(),
+                                    success: *success,
+                                    duration_ms: *duration_ms,
+                                },
+                            };
+                            send_outbound(&mut socket, &outbound).await;
+                            tool_events.push(evt);
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            // All senders dropped — agent is done, wait for result
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            warn!("tool event receiver lagged by {n} messages");
+                        }
+                    }
                 }
+                result = &mut result_rx => {
+                    // Drain any remaining tool events that arrived before/during result
+                    while let Ok(evt) = tool_rx.try_recv() {
+                        let outbound = match &evt.phase {
+                            ToolCallPhase::Started { args } => WsOutbound::ToolCall {
+                                call_id: evt.call_id.clone(),
+                                tool_name: evt.tool_name.clone(),
+                                args: args.clone(),
+                            },
+                            ToolCallPhase::Completed { output, success, duration_ms } => WsOutbound::ToolResult {
+                                call_id: evt.call_id.clone(),
+                                tool_name: evt.tool_name.clone(),
+                                output: output.clone(),
+                                success: *success,
+                                duration_ms: *duration_ms,
+                            },
+                        };
+                        send_outbound(&mut socket, &outbound).await;
+                        tool_events.push(evt);
+                    }
 
-                let done = WsChunk {
-                    r#type: "done".into(),
-                    content: None,
-                    error: None,
-                };
-                let _ = socket
-                    .send(Message::Text(serde_json::to_string(&done).unwrap().into()))
-                    .await;
-            }
-            Err(e) => {
-                let err_chunk = WsChunk {
-                    r#type: "error".into(),
-                    content: None,
-                    error: Some(e.to_string()),
-                };
-                let _ = socket
-                    .send(Message::Text(
-                        serde_json::to_string(&err_chunk).unwrap().into(),
-                    ))
-                    .await;
+                    match result {
+                        Ok(Ok(response)) => {
+                            send_outbound(&mut socket, &WsOutbound::Text { content: response.clone() }).await;
+
+                            // Store assistant response and tool calls
+                            if let Some(ref sid) = request.session_id {
+                                let msg = state
+                                    .session_manager
+                                    .append_message(sid, "assistant", &response)
+                                    .await;
+
+                                if let Ok(msg) = msg && !tool_events.is_empty() {
+                                    let _ = state
+                                        .session_manager
+                                        .store_tool_calls(&msg.id, sid, &tool_events)
+                                        .await;
+                                }
+                            }
+
+                            send_outbound(&mut socket, &WsOutbound::Done).await;
+                        }
+                        Ok(Err(e)) => {
+                            send_outbound(&mut socket, &WsOutbound::Error { error: e.to_string() }).await;
+                        }
+                        Err(_) => {
+                            send_outbound(&mut socket, &WsOutbound::Error { error: "agent task cancelled".into() }).await;
+                        }
+                    }
+                    break;
+                }
             }
         }
     }
@@ -130,8 +201,10 @@ mod tests {
     use std::sync::Arc;
 
     use futures::{SinkExt, StreamExt};
+    use serde_json::json;
     use tokio_tungstenite::tungstenite;
 
+    use super::*;
     use crate::gateway::routes::build_router;
     use crate::gateway::state::AppState;
 
@@ -150,7 +223,71 @@ mod tests {
         port
     }
 
-    // 4.2.1 — WS upgrade succeeds
+    // TV.11 — WsOutbound::Text serializes to {"type":"text","content":"..."}
+    #[test]
+    fn ws_outbound_text_serializes() {
+        let msg = WsOutbound::Text {
+            content: "hello".into(),
+        };
+        let json = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["type"], "text");
+        assert_eq!(json["content"], "hello");
+    }
+
+    // TV.12 — WsOutbound::ToolCall serializes with call_id, tool_name, args
+    #[test]
+    fn ws_outbound_tool_call_serializes() {
+        let msg = WsOutbound::ToolCall {
+            call_id: "abc".into(),
+            tool_name: "WebSearch".into(),
+            args: json!({"query": "rust"}),
+        };
+        let json = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["type"], "tool_call");
+        assert_eq!(json["call_id"], "abc");
+        assert_eq!(json["tool_name"], "WebSearch");
+        assert_eq!(json["args"]["query"], "rust");
+    }
+
+    // TV.13 — WsOutbound::ToolResult serializes with all fields
+    #[test]
+    fn ws_outbound_tool_result_serializes() {
+        let msg = WsOutbound::ToolResult {
+            call_id: "abc".into(),
+            tool_name: "WebSearch".into(),
+            output: "results".into(),
+            success: true,
+            duration_ms: 150,
+        };
+        let json = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["type"], "tool_result");
+        assert_eq!(json["call_id"], "abc");
+        assert_eq!(json["tool_name"], "WebSearch");
+        assert_eq!(json["output"], "results");
+        assert_eq!(json["success"], true);
+        assert_eq!(json["duration_ms"], 150);
+    }
+
+    // TV.14 — WsOutbound::Done serializes to {"type":"done"}
+    #[test]
+    fn ws_outbound_done_serializes() {
+        let msg = WsOutbound::Done;
+        let json = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["type"], "done");
+    }
+
+    // TV.15 — WsOutbound::Error serializes with error field
+    #[test]
+    fn ws_outbound_error_serializes() {
+        let msg = WsOutbound::Error {
+            error: "oops".into(),
+        };
+        let json = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["type"], "error");
+        assert_eq!(json["error"], "oops");
+    }
+
+    // TV.16 — WS upgrade still succeeds
     #[tokio::test]
     async fn ws_upgrade_succeeds() {
         let (_dir, state) = test_state().await;
@@ -161,7 +298,7 @@ mod tests {
         assert!(result.is_ok(), "WebSocket upgrade should succeed");
     }
 
-    // 4.2.2 — WS invalid JSON returns error
+    // TV.17 — WS invalid JSON still returns error
     #[tokio::test]
     async fn ws_invalid_json_returns_error() {
         let (_dir, state) = test_state().await;

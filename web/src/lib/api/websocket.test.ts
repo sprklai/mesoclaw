@@ -127,4 +127,64 @@ describe("WebSocket chat streaming", () => {
     expect(ws.url).not.toContain("token=");
     expect(ws.url).toContain("/ws/chat");
   });
+
+  // TV.23 — onToolCall callback fires for tool_call message
+  it("calls onToolCall for tool_call messages", () => {
+    const onToolCall = vi.fn();
+    createChatStream("hello", "sess-1", { ...callbacks, onToolCall });
+
+    const ws = MockWebSocket.instances[0];
+    ws.onmessage!({
+      data: JSON.stringify({
+        type: "tool_call",
+        call_id: "tc-1",
+        tool_name: "WebSearch",
+        args: { query: "rust" },
+      }),
+    });
+
+    expect(onToolCall).toHaveBeenCalledWith("tc-1", "WebSearch", {
+      query: "rust",
+    });
+  });
+
+  // TV.24 — onToolResult callback fires for tool_result message
+  it("calls onToolResult for tool_result messages", () => {
+    const onToolResult = vi.fn();
+    createChatStream("hello", "sess-1", { ...callbacks, onToolResult });
+
+    const ws = MockWebSocket.instances[0];
+    ws.onmessage!({
+      data: JSON.stringify({
+        type: "tool_result",
+        call_id: "tc-1",
+        tool_name: "WebSearch",
+        output: "found results",
+        success: true,
+        duration_ms: 150,
+      }),
+    });
+
+    expect(onToolResult).toHaveBeenCalledWith(
+      "tc-1",
+      "WebSearch",
+      "found results",
+      true,
+      150,
+    );
+  });
+
+  // TV.25 — Unknown message types are ignored gracefully
+  it("ignores unknown message types gracefully", () => {
+    createChatStream("hello", "sess-1", callbacks);
+
+    const ws = MockWebSocket.instances[0];
+    ws.onmessage!({
+      data: JSON.stringify({ type: "unknown_type", data: "something" }),
+    });
+
+    expect(callbacks.onToken).not.toHaveBeenCalled();
+    expect(callbacks.onDone).not.toHaveBeenCalled();
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
 });

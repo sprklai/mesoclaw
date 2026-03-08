@@ -211,6 +211,17 @@ provider_api_key_env = "ANTHROPIC_API_KEY"
     }
 
     #[test]
+    fn channel_config_defaults() {
+        let config = AppConfig::default();
+        assert!(config.channels_enabled.is_empty());
+        assert_eq!(config.telegram_polling_timeout_secs, 30);
+        assert_eq!(config.telegram_dm_policy, "allowlist");
+        assert_eq!(config.telegram_retry_min_ms, 1000);
+        assert_eq!(config.telegram_retry_max_ms, 60_000);
+        assert!(config.telegram_require_group_mention);
+    }
+
+    #[test]
     fn backwards_compat_aliases() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("config.toml");

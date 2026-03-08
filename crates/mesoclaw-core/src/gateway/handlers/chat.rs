@@ -26,7 +26,7 @@ pub async fn chat(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatRequest>,
 ) -> Result<impl IntoResponse> {
-    let agent = resolve_agent(req.model.as_deref(), &state).await?;
+    let agent = resolve_agent(req.model.as_deref(), &state, None).await?;
 
     // If session_id provided, store the user message
     if let Some(ref sid) = req.session_id {

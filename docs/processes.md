@@ -12,8 +12,10 @@
 - [Skill Loading Flow](#skill-loading-flow)
 - [User Learning Flow](#user-learning-flow)
 - [Channel Message Flow](#channel-message-flow)
+- [Channel Registration Flow](#channel-registration-flow)
 - [Desktop Boot Flow](#desktop-boot-flow)
 - [Credential Flow](#credential-flow)
+- [Provider Management Flow](#provider-management-flow)
 
 ---
 
@@ -70,6 +72,10 @@ sequenceDiagram
     App->>App: Load identity (SoulLoader from data_dir/identity/)
     App->>App: Load skills (SkillRegistry from data_dir/skills/)
     App->>App: Init user learner (UserLearner from DB pool)
+    opt channels feature enabled
+        App->>App: Init ChannelRegistry (DashMap)
+        App->>App: Register configured channels (Telegram/Slack/Discord)
+    end
     App->>App: Bundle into Services struct
     App->>GW: Start axum server (127.0.0.1:18981)
 
@@ -257,23 +263,53 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Ext as External Platform (Telegram, Discord, etc.)
-    participant CA as Channel Adapter
-    participant CI as ChannelInbound
+    participant Ext as External Platform
+    participant Ch as Channel (Telegram/Slack/Discord)
+    participant CR as ChannelRegistry
+    participant GW as Gateway
     participant AG as Rig Agent
-    participant CO as ChannelOutbound
-    participant Ext2 as External Platform
 
-    Ext->>CA: Raw platform message arrives
-    CA->>CI: Pass raw message
-    CI->>CI: normalize() → standardized Message
-    CI->>AG: Route normalized message
-    AG->>AG: Process message + generate response
-    AG-->>CO: Response text
-    CO->>CO: Format for platform
-    CO->>Ext2: send_text() → platform-specific delivery
-    Ext2-->>CO: Delivery confirmation
-    CO->>CO: acknowledge(msg_id) → mark as handled
+    Note over Ch,CR: Channel lifecycle
+    GW->>CR: register(channel)
+    GW->>Ch: connect() via ChannelLifecycle
+    Ch->>Ext: Establish connection
+
+    Note over Ext,AG: Message handling
+    Ext->>Ch: Platform message arrives
+    Ch->>Ch: Normalize to ChannelMessage
+    Ch->>AG: Route normalized message
+    AG->>AG: Process + generate response
+    AG-->>Ch: Response text
+    Ch->>Ch: Format for platform (MarkdownV2 / mrkdwn / etc.)
+    Ch->>Ext: send_text() via ChannelSender
+
+    Note over GW,Ch: Health monitoring
+    GW->>Ch: health_check() via ChannelLifecycle
+    Ch-->>GW: ChannelStatus (Connected/Disconnected/Error)
+```
+
+## Channel Registration Flow
+
+```mermaid
+flowchart TD
+    Boot([Boot with channels feature]) --> Init["Initialize ChannelRegistry<br>DashMap-backed"]
+    Init --> Check{"channels_enabled<br>config list"}
+
+    Check -->|telegram| TG["Create TelegramChannel<br>Load config: DmPolicy, polling timeout"]
+    Check -->|slack| SL["Create SlackChannel<br>Load config: bot token"]
+    Check -->|discord| DC["Create DiscordChannel<br>Load config: guild/channel allowlists"]
+
+    TG --> Reg["Register in ChannelRegistry"]
+    SL --> Reg
+    DC --> Reg
+
+    Reg --> Creds{"Credentials<br>available?"}
+    Creds -->|Yes| Connect["connect() → platform API"]
+    Creds -->|No| Wait["Status: Disconnected<br>Awaiting credentials"]
+
+    Connect --> Ready["Status: Connected<br>Ready for messages"]
+    Wait --> UI["User sets credentials<br>via Settings UI or CLI"]
+    UI --> Connect
 ```
 
 ## Desktop Boot Flow
@@ -354,4 +390,48 @@ sequenceDiagram
 
     Note over KS: All binaries share same keyring namespace (same OS user)
     Note over KS: CI/test: InMemoryStore used instead of keyring
+```
+
+## Provider Management Flow
+
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant UI as Settings UI / CLI
+    participant GW as Gateway
+    participant PR as ProviderRegistry
+    participant DB as SQLite (ai_providers + ai_models)
+    participant KS as KeyringStore
+
+    Note over User,DB: First boot — seed providers
+    GW->>PR: ProviderRegistry::new(db_pool)
+    PR->>DB: Seed 6 built-in providers if empty
+    DB-->>PR: Provider configs
+
+    Note over User,KS: Configure provider API key
+    User->>UI: Enter API key for provider
+    UI->>GW: POST /credentials { key: "api_key:openai", value: "sk-..." }
+    GW->>KS: Store in OS keyring
+
+    Note over User,DB: Test connection
+    User->>UI: Click "Test Connection"
+    UI->>GW: POST /providers/openai/test
+    GW->>PR: test_connection(provider_id)
+    PR->>KS: Resolve API key
+    KS-->>PR: API key value
+    PR->>PR: Build client + send test request
+    PR-->>GW: TestResult { success, latency_ms }
+    GW-->>UI: Display result + latency
+
+    Note over User,DB: Manage models
+    User->>UI: Add custom model
+    UI->>GW: POST /providers/openai/models { id: "gpt-4o-mini" }
+    GW->>PR: add_model(provider_id, model)
+    PR->>DB: INSERT into ai_models
+
+    Note over User,DB: Set default model
+    User->>UI: Select default model
+    UI->>GW: PUT /providers/default { provider_id: "openai", model_id: "gpt-4o" }
+    GW->>PR: set_default_model()
+    PR->>DB: Upsert _default_model row
 ```

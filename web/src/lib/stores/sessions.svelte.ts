@@ -40,6 +40,9 @@ function createSessionsStore() {
 
     async get(id: string) {
       active = await apiGet<Session>(`/sessions/${encodeURIComponent(id)}`);
+      sessions = sessions.map((s) =>
+        s.id === id ? { ...s, title: active!.title } : s,
+      );
       return active;
     },
 
@@ -73,18 +76,18 @@ function createSessionsStore() {
       if (active?.id === id) active = null;
     },
 
-    async generateTitle(id: string) {
+    async generateTitle(id: string, model?: string) {
       try {
         const session = await apiPost<Session>(
           `/sessions/${encodeURIComponent(id)}/generate-title`,
-          {},
+          model ? { model } : {},
         );
         sessions = sessions.map((s) =>
           s.id === id ? { ...s, title: session.title } : s,
         );
         if (active?.id === id) active = session;
-      } catch {
-        // Non-critical — keep existing title on failure
+      } catch (e) {
+        console.warn("generateTitle failed:", e);
       }
     },
 

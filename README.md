@@ -27,7 +27,7 @@ graph TB
 - **Skills system** -- bundled + user markdown skills loaded into agent context (Claude Code model)
 - **Progressive user learning** -- SQLite-backed observations with category filtering, confidence scoring, and privacy controls
 - **Secure credentials** via OS keyring with zeroize memory protection
-- **Messaging channels** -- Telegram, Discord, Slack, Matrix, Signal, WhatsApp (openclaw-channels)
+- **Messaging channels** -- Telegram, Slack, Discord (feature-gated, trait-based with DashMap registry)
 - **Cron scheduler** -- automated recurring tasks
 - **Cross-platform** -- Linux, macOS, Windows, ARM (Raspberry Pi), iOS, Android
 
@@ -45,7 +45,7 @@ graph TB
 | Mobile | Tauri 2 (iOS + Android) |
 | CLI | clap |
 | TUI | ratatui |
-| Channels | openclaw-channels (6 adapters) |
+| Channels | Telegram (teloxide), Slack, Discord (serenity) -- feature-gated |
 | Content | serde_yaml (YAML frontmatter parsing) |
 | i18n | paraglide-js (compile-time, tree-shakeable) |
 
@@ -117,7 +117,8 @@ graph TD
     core --> tokio["tokio<br>#40;async#41;"]
     core --> keyring["keyring<br>#40;credentials#41;"]
     core --> serdeyaml["serde_yaml<br>#40;YAML frontmatter#41;"]
-    core --> openclaw["openclaw-channels<br>#40;messaging#41;"]
+    core -.-> teloxide["teloxide<br>#40;Telegram, feature-gated#41;"]
+    core -.-> serenity["serenity<br>#40;Discord, feature-gated#41;"]
 ```
 
 ### Chat Request Flow
@@ -335,8 +336,11 @@ See [scripts/build.sh](scripts/build.sh) for full options.
 ## Feature Flags
 
 ```bash
-cargo build -p mesoclaw-daemon                          # Core only
-cargo build -p mesoclaw-daemon --features channels      # + messaging channels
+cargo build -p mesoclaw-daemon                          # Core only (gateway + ai + keyring)
+cargo build -p mesoclaw-daemon --features channels      # + channel core traits + registry
+cargo build -p mesoclaw-daemon --features channels-telegram  # + Telegram (teloxide)
+cargo build -p mesoclaw-daemon --features channels-slack     # + Slack
+cargo build -p mesoclaw-daemon --features channels-discord   # + Discord (serenity)
 cargo build -p mesoclaw-daemon --features scheduler     # + cron jobs
 cargo build -p mesoclaw-daemon --features web-dashboard # + embedded web UI
 cargo build -p mesoclaw-daemon --all-features           # Everything
@@ -397,24 +401,32 @@ mesoclaw config show                  # Show current config
 mesoclaw config set <key> <value>     # Set a config value
 mesoclaw key set <provider> <key>     # Set API key
 mesoclaw key remove <provider>        # Remove API key
+mesoclaw key list                     # List stored keys
+mesoclaw provider list                # List AI providers
+mesoclaw provider test <id>           # Test provider connection
+mesoclaw provider add <id> <name> <base_url>  # Add custom provider
+mesoclaw provider remove <id>         # Remove user-defined provider
+mesoclaw provider default <provider> <model>  # Set default model
 ```
 
 Global options: `--host`, `--port`, `--token` (or `MESOCLAW_TOKEN` env var)
 
-## Gateway Routes (36 implemented)
+## Gateway Routes (55 base + 6 feature-gated = 61 total)
 
 | Group | Routes | Description |
 |-------|--------|-------------|
 | Health | `GET /health` | Health check (no auth) |
-| Sessions & Chat | `POST /sessions`, `GET /sessions`, `GET/PUT/DELETE /sessions/{id}`, `GET/POST /sessions/{id}/messages`, `POST /chat` | Chat sessions and messaging |
+| Sessions & Chat | `POST /sessions`, `GET /sessions`, `GET/PUT/DELETE /sessions/{id}`, `POST /sessions/{id}/generate-title`, `GET/POST /sessions/{id}/messages`, `POST /chat` | Chat sessions and messaging |
 | Memory | `POST /memory`, `GET /memory`, `GET/PUT/DELETE /memory/{key}` | Semantic memory CRUD |
 | Config | `GET /config`, `PUT /config` | Configuration management |
-| Providers & Models | `GET /providers`, `GET /providers/{id}`, `GET /models` | AI provider info |
+| Credentials | `POST/GET /credentials`, `DELETE /credentials/{key}`, `GET /credentials/{key}/value`, `GET /credentials/{key}/exists` | Credential management (keyring) |
+| Providers & Models | `GET/POST /providers`, `GET /providers/with-key-status`, `GET/PUT /providers/default`, `GET/PUT/DELETE /providers/{id}`, `POST /providers/{id}/test`, `POST /providers/{id}/models`, `DELETE /providers/{id}/models/{model_id}`, `GET /models` | Multi-provider AI management |
 | Tools | `GET /tools`, `POST /tools/{name}/execute` | Tool listing and execution |
 | System | `GET /system/info` | System information |
 | Identity | `GET /identity`, `GET/PUT /identity/{name}`, `POST /identity/reload` | Persona management |
 | Skills | `GET /skills`, `GET/PUT/DELETE /skills/{id}`, `POST /skills`, `POST /skills/reload` | Skill CRUD |
 | User | `GET/POST/DELETE /user/observations`, `GET/DELETE /user/observations/{key}`, `GET /user/profile` | User learning + privacy |
+| Channels | `POST /channels/{name}/test` (always), `GET /channels`, `GET /channels/{name}/status`, `POST /channels/{name}/send`, `POST /channels/{name}/connect/disconnect`, `GET /channels/{name}/health` (feature-gated) | Messaging channels |
 | WebSocket | `GET /ws/chat` | Streaming chat |
 
 ---
@@ -433,6 +445,7 @@ Detailed documentation lives in the `docs/` and `plans/` directories:
 - [Phase 5 Plan](plans/phase5_combined.md) -- ToolRegistry, memory enhancements, CLI binary
 - [Phase 6 Plan](plans/phase6_frontend.md) -- Svelte 5 SPA frontend
 - [Phase 7 Plan](plans/phase7_desktop.md) -- Tauri 2 desktop app
+- [Phase 8 Plans](plans/phase8_credentials.md) -- Credentials, channels, scheduler
 
 ### Implementation Status
 
@@ -445,7 +458,8 @@ Detailed documentation lives in the `docs/` and `plans/` directories:
 | Phase 5: Binary Shells + Tools + Memory | 11-12 | Complete | 347/347 passing |
 | Phase 6: Frontend | 13 | Complete | 347 Rust + 26 JS passing |
 | Phase 7: Desktop App | 14 | Complete | 354/354 Rust + 26 JS passing |
-| Phase 8: Channels & Scheduler | 15-16 | Not started | -- |
+| Phase 8: Credentials & Channels | 15.1-15.2 | Complete | 434/434 Rust + 26 JS passing |
+| Phase 8: Scheduler | 16 | Not started | -- |
 | Phase 9: TUI & Cross-Compilation | 17-18 | Not started | -- |
 | Phase 10: CI/CD & Quality | 19-20 | Not started | -- |
 | Phase 11: Documentation & Community | 21-22 | Not started | -- |

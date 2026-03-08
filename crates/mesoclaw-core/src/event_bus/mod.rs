@@ -16,6 +16,9 @@ pub enum AppEvent {
     MemoryStored { key: String },
     ConfigUpdated,
     GatewayStarted { port: u16 },
+    ChannelConnected { channel: String },
+    ChannelDisconnected { channel: String, reason: String },
+    ChannelMessageReceived { channel: String, sender: String },
     Shutdown,
 }
 
@@ -76,6 +79,20 @@ mod tests {
         let e2 = rx2.recv().await.unwrap();
         assert!(matches!(e1, AppEvent::Shutdown));
         assert!(matches!(e2, AppEvent::Shutdown));
+    }
+
+    #[tokio::test]
+    async fn channel_connected_event() {
+        let bus = TokioBroadcastBus::new(16);
+        let mut rx = bus.subscribe();
+
+        bus.publish(AppEvent::ChannelConnected {
+            channel: "telegram".into(),
+        })
+        .unwrap();
+
+        let event = rx.recv().await.unwrap();
+        assert!(matches!(event, AppEvent::ChannelConnected { channel } if channel == "telegram"));
     }
 
     #[tokio::test]

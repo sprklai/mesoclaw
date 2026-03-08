@@ -7,6 +7,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Separator } from '$lib/components/ui/separator';
+	import { goto } from '$app/navigation';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -92,7 +93,12 @@
 </script>
 
 <div class="max-w-2xl mx-auto space-y-6">
-	<h1 class="text-2xl font-bold">Persona & Skills</h1>
+	<div class="flex items-center gap-3">
+		<Button variant="ghost" size="sm" onclick={() => goto('/settings')}>
+			&larr; Back
+		</Button>
+		<h1 class="text-2xl font-bold">Persona & Skills</h1>
+	</div>
 
 	{#if loading}
 		<div class="space-y-2">

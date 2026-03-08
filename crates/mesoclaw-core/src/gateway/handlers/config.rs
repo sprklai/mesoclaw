@@ -7,11 +7,62 @@ use axum::response::IntoResponse;
 
 use crate::gateway::state::AppState;
 
-/// GET /config — return the current AppConfig with secrets redacted.
+/// GET /config — return the current AppConfig with secrets redacted and paths resolved.
 pub async fn get_config(State(state): State<Arc<AppState>>) -> crate::Result<impl IntoResponse> {
     let mut config_value = serde_json::to_value(state.config.as_ref())?;
     if let Some(obj) = config_value.as_object_mut() {
+        // Redact secrets
         obj.insert("gateway_auth_token".to_string(), serde_json::Value::Null);
+
+        // Resolve None paths to their actual defaults so the UI shows real values
+        let default_data_dir = crate::config::default_data_dir();
+        let data_dir = state
+            .config
+            .data_dir
+            .as_ref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| default_data_dir.clone());
+
+        if state.config.data_dir.is_none() {
+            obj.insert(
+                "data_dir".to_string(),
+                serde_json::Value::String(default_data_dir.to_string_lossy().into()),
+            );
+        }
+        if state.config.db_path.is_none() {
+            obj.insert(
+                "db_path".to_string(),
+                serde_json::Value::String(
+                    default_data_dir
+                        .join("mesoclaw.db")
+                        .to_string_lossy()
+                        .into(),
+                ),
+            );
+        }
+        if state.config.memory_db_path.is_none() {
+            obj.insert(
+                "memory_db_path".to_string(),
+                serde_json::Value::String(
+                    default_data_dir
+                        .join("memory_vec.db")
+                        .to_string_lossy()
+                        .into(),
+                ),
+            );
+        }
+        if state.config.identity_dir.is_none() {
+            obj.insert(
+                "identity_dir".to_string(),
+                serde_json::Value::String(data_dir.join("identity").to_string_lossy().into()),
+            );
+        }
+        if state.config.skills_dir.is_none() {
+            obj.insert(
+                "skills_dir".to_string(),
+                serde_json::Value::String(data_dir.join("skills").to_string_lossy().into()),
+            );
+        }
     }
     Ok(Json(config_value))
 }
@@ -65,6 +116,8 @@ mod tests {
             soul_loader: base_state.soul_loader.clone(),
             skill_registry: base_state.skill_registry.clone(),
             user_learner: base_state.user_learner.clone(),
+            #[cfg(feature = "channels")]
+            channel_registry: base_state.channel_registry.clone(),
         });
         (dir, state)
     }

@@ -136,6 +136,27 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    if version < 4 {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS tool_calls (
+                id TEXT PRIMARY KEY,
+                message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+                session_id TEXT NOT NULL,
+                tool_name TEXT NOT NULL,
+                args TEXT NOT NULL,
+                output TEXT,
+                success INTEGER,
+                duration_ms INTEGER,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_tool_calls_message
+                ON tool_calls(message_id);
+
+            PRAGMA user_version = 4;",
+        )?;
+    }
+
     Ok(())
 }
 
@@ -185,7 +206,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 3);
+        assert_eq!(version, 4);
     }
 
     #[test]
@@ -259,6 +280,30 @@ mod tests {
             .collect();
 
         assert!(tables.contains(&"ai_models".to_string()));
+    }
+
+    // TV.18 — Migration v4 creates tool_calls table
+    #[test]
+    fn migration_v4_creates_tool_calls() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test.db");
+        let conn = Connection::open(&path).unwrap();
+        run_migrations(&conn).unwrap();
+
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert!(tables.contains(&"tool_calls".to_string()));
+
+        let version: u32 = conn
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, 4);
     }
 
     #[tokio::test]

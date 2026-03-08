@@ -5,6 +5,7 @@ use rig::completion::{Chat, Prompt};
 use rig::message::Message;
 use rig::prelude::CompletionClient;
 use rig::providers::{anthropic, openai};
+use tokio::sync::broadcast;
 
 use crate::config::AppConfig;
 use crate::credential::CredentialStore;
@@ -15,7 +16,7 @@ use crate::{MesoError, Result};
 #[cfg(feature = "ai")]
 use crate::gateway::state::AppState;
 
-use super::adapter::RigToolAdapter;
+use super::adapter::{RigToolAdapter, ToolCallEvent};
 use super::providers;
 
 type OpenAIAgent = Agent<openai::completion::CompletionModel>;
@@ -142,6 +143,53 @@ impl MesoAgent {
         Ok(Self { inner })
     }
 
+    /// Build a new MesoAgent from provider details with tool event broadcasting.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn from_provider_with_events(
+        provider_id: &str,
+        base_url: &str,
+        model_id: &str,
+        requires_api_key: bool,
+        credentials: &dyn CredentialStore,
+        tools: &[Arc<dyn Tool>],
+        config: &AppConfig,
+        tool_event_tx: broadcast::Sender<ToolCallEvent>,
+    ) -> Result<Self> {
+        let api_key =
+            providers::resolve_api_key_for_provider(provider_id, requires_api_key, credentials)
+                .await?;
+        let rig_tools = RigToolAdapter::from_tools_with_events(tools, tool_event_tx);
+
+        let preamble = config
+            .agent_system_prompt
+            .as_deref()
+            .unwrap_or("You are MesoClaw, a helpful AI assistant.");
+
+        let inner = if provider_id == "anthropic" {
+            let client = providers::build_anthropic_client(&api_key)?;
+            let agent = client
+                .agent(model_id)
+                .preamble(preamble)
+                .max_tokens(config.agent_max_tokens as u64)
+                .default_max_turns(config.agent_max_turns)
+                .tools(rig_tools)
+                .build();
+            AgentInner::Anthropic(agent)
+        } else {
+            let client = providers::build_openai_client(&api_key, Some(base_url))?;
+            let agent = client
+                .agent(model_id)
+                .preamble(preamble)
+                .max_tokens(config.agent_max_tokens as u64)
+                .default_max_turns(config.agent_max_turns)
+                .tools(rig_tools)
+                .build();
+            AgentInner::OpenAI(agent)
+        };
+
+        Ok(Self { inner })
+    }
+
     /// Send a simple prompt and get a response.
     pub async fn prompt(&self, input: &str) -> Result<String> {
         match &self.inner {
@@ -178,10 +226,14 @@ impl MesoAgent {
 /// 2. If None → check default model in provider registry → build agent
 /// 3. If no default → use `state.agent` boot-time fallback
 /// 4. If no fallback → error
+///
+/// When `tool_event_tx` is provided, a fresh agent is always built with event-emitting adapters
+/// so tool calls are visible to the caller.
 #[cfg(feature = "ai")]
 pub async fn resolve_agent(
     requested_model: Option<&str>,
     state: &AppState,
+    tool_event_tx: Option<broadcast::Sender<ToolCallEvent>>,
 ) -> Result<Arc<MesoAgent>> {
     // Try requested model first, then default model
     let model_spec = if let Some(spec) = requested_model {
@@ -202,16 +254,30 @@ pub async fn resolve_agent(
         let provider = state.provider_registry.get_provider(provider_id).await?;
         let tools = state.tools.to_vec();
 
-        let agent = MesoAgent::from_provider(
-            provider_id,
-            &provider.provider.base_url,
-            model_id,
-            provider.provider.requires_api_key,
-            state.credentials.as_ref(),
-            &tools,
-            &state.config,
-        )
-        .await?;
+        let agent = if let Some(tx) = tool_event_tx {
+            MesoAgent::from_provider_with_events(
+                provider_id,
+                &provider.provider.base_url,
+                model_id,
+                provider.provider.requires_api_key,
+                state.credentials.as_ref(),
+                &tools,
+                &state.config,
+                tx,
+            )
+            .await?
+        } else {
+            MesoAgent::from_provider(
+                provider_id,
+                &provider.provider.base_url,
+                model_id,
+                provider.provider.requires_api_key,
+                state.credentials.as_ref(),
+                &tools,
+                &state.config,
+            )
+            .await?
+        };
 
         return Ok(Arc::new(agent));
     }

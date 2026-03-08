@@ -44,6 +44,18 @@ pub async fn delete_credential(
     Ok(Json(serde_json::json!({ "deleted": deleted })))
 }
 
+/// GET /credentials/{key}/value -- get a credential value (for local UI reveal).
+pub async fn get_credential_value(
+    State(state): State<Arc<AppState>>,
+    Path(key): Path<String>,
+) -> crate::Result<impl IntoResponse> {
+    let value = state.credentials.get(&key).await?;
+    match value {
+        Some(v) => Ok(Json(serde_json::json!({ "key": key, "value": v }))),
+        None => Err(crate::MesoError::NotFound(format!("credential '{key}'"))),
+    }
+}
+
 /// GET /credentials/{key}/exists -- check if a credential exists (bool, no value).
 pub async fn credential_exists(
     State(state): State<Arc<AppState>>,

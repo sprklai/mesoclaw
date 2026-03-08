@@ -130,19 +130,47 @@ enum ConfigAction {
 
 #[derive(Subcommand)]
 enum KeyAction {
-    /// Set an API key for a provider
+    /// Set an API key for a provider or service (e.g. openai, tavily, brave)
     Set {
-        /// Provider name (e.g. openai, anthropic)
+        /// Provider/service name (e.g. openai, anthropic, tavily, brave)
         provider: String,
         /// API key value
         key: String,
     },
-    /// Remove an API key for a provider
+    /// Remove an API key for a provider or service
     Remove {
-        /// Provider name
+        /// Provider/service name
         provider: String,
     },
-    /// List all stored credential keys
+    /// Set a channel credential field (e.g. telegram token, slack bot_token)
+    SetChannel {
+        /// Channel name (e.g. telegram, slack, discord, matrix)
+        channel: String,
+        /// Credential field (e.g. token, bot_token, access_token)
+        field: String,
+        /// Credential value
+        value: String,
+    },
+    /// Remove a channel credential field
+    RemoveChannel {
+        /// Channel name
+        channel: String,
+        /// Credential field
+        field: String,
+    },
+    /// Set a raw credential key (advanced: full key like channel:telegram:token)
+    SetRaw {
+        /// Full credential key
+        key: String,
+        /// Credential value
+        value: String,
+    },
+    /// Remove a raw credential key
+    RemoveRaw {
+        /// Full credential key
+        key: String,
+    },
+    /// List all stored credential keys (grouped by type)
     List,
 }
 
@@ -219,6 +247,16 @@ async fn main() {
         Commands::Key { action } => match action {
             KeyAction::Set { provider, key } => commands::key::set(&client, &provider, &key).await,
             KeyAction::Remove { provider } => commands::key::remove(&client, &provider).await,
+            KeyAction::SetChannel {
+                channel,
+                field,
+                value,
+            } => commands::key::set_channel(&client, &channel, &field, &value).await,
+            KeyAction::RemoveChannel { channel, field } => {
+                commands::key::remove_channel(&client, &channel, &field).await
+            }
+            KeyAction::SetRaw { key, value } => commands::key::set_raw(&client, &key, &value).await,
+            KeyAction::RemoveRaw { key } => commands::key::remove_raw(&client, &key).await,
             KeyAction::List => commands::key::list(&client).await,
         },
         Commands::Provider { action } => match action {
@@ -373,6 +411,75 @@ mod tests {
                 action: KeyAction::List
             }
         ));
+    }
+
+    #[test]
+    fn parse_key_set() {
+        let cli = parse(&["mesoclaw", "key", "set", "tavily", "tvly-123"]);
+        match cli.command {
+            Commands::Key {
+                action: KeyAction::Set { provider, key },
+            } => {
+                assert_eq!(provider, "tavily");
+                assert_eq!(key, "tvly-123");
+            }
+            _ => panic!("expected Key Set"),
+        }
+    }
+
+    #[test]
+    fn parse_key_set_channel() {
+        let cli = parse(&[
+            "mesoclaw",
+            "key",
+            "set-channel",
+            "telegram",
+            "token",
+            "bot123:abc",
+        ]);
+        match cli.command {
+            Commands::Key {
+                action:
+                    KeyAction::SetChannel {
+                        channel,
+                        field,
+                        value,
+                    },
+            } => {
+                assert_eq!(channel, "telegram");
+                assert_eq!(field, "token");
+                assert_eq!(value, "bot123:abc");
+            }
+            _ => panic!("expected Key SetChannel"),
+        }
+    }
+
+    #[test]
+    fn parse_key_remove_channel() {
+        let cli = parse(&["mesoclaw", "key", "remove-channel", "slack", "bot_token"]);
+        match cli.command {
+            Commands::Key {
+                action: KeyAction::RemoveChannel { channel, field },
+            } => {
+                assert_eq!(channel, "slack");
+                assert_eq!(field, "bot_token");
+            }
+            _ => panic!("expected Key RemoveChannel"),
+        }
+    }
+
+    #[test]
+    fn parse_key_set_raw() {
+        let cli = parse(&["mesoclaw", "key", "set-raw", "custom:key", "val"]);
+        match cli.command {
+            Commands::Key {
+                action: KeyAction::SetRaw { key, value },
+            } => {
+                assert_eq!(key, "custom:key");
+                assert_eq!(value, "val");
+            }
+            _ => panic!("expected Key SetRaw"),
+        }
     }
 
     #[test]

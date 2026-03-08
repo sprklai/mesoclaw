@@ -13,7 +13,7 @@
   - [Phase 5: Binary Shells + Tools + Memory](#phase-5-binary-shells--tools--memory--complete)
   - [Phase 6: Frontend](#phase-6-frontend--complete)
   - [Phase 7: Desktop App](#phase-7-desktop-app--complete)
-  - [Phase 8: Credentials, Channels & Scheduler](#phase-8-credentials-channels--scheduler--not-started)
+  - [Phase 8: Credentials, Channels & Scheduler](#phase-8-credentials-channels--scheduler--in-progress)
   - [Phase 9: TUI & Cross-Compilation](#phase-9-tui--cross-compilation--not-started)
   - [Phase 10: CI/CD & Quality](#phase-10-cicd--quality--not-started)
   - [Phase 11: Documentation & Community](#phase-11-documentation--community--not-started)
@@ -126,7 +126,7 @@ gantt
     section Desktop
     Phase 7 - Desktop App               :done, p7, after p6, 1
     section Credentials/Channels
-    Phase 8 - Credentials, Channels & Scheduler :p8, after p7, 1
+    Phase 8 - Credentials, Channels & Scheduler :active, p8, after p7, 1
     section TUI/Cross
     Phase 9 - TUI & Cross-Compilation   :p9, after p8, 1
     section CI/CD
@@ -312,35 +312,45 @@ gantt
 
 ---
 
-### Phase 8: Credentials, Channels & Scheduler — `[NOT STARTED]`
+### Phase 8: Credentials, Channels & Scheduler — `[IN PROGRESS]`
 
-**Step 15.1: Credential & Provider Management**
-- `KeyringStore` -- OS-native credential storage (keyring crate v3), replaces InMemoryCredentialStore
-- `ProviderRegistry` -- multi-provider AI management with DB-backed CRUD (OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Ollama, custom OpenAI-compatible)
-- Gateway routes: 4 credential + 11 provider routes (CRUD, connection testing, default model)
-- Desktop settings page: provider cards, API key show/hide, model management, connection testing
+**Step 15.1: Credential & Provider Management — `[COMPLETE]`**
+- `KeyringStore` -- OS-native credential storage (keyring crate v3) with async probe fallback to InMemoryCredentialStore
+- `ProviderRegistry` -- DB-backed multi-provider CRUD with 6 built-in providers (OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Ollama)
+- DB migration v3: `ai_providers` + `ai_models` tables
+- Gateway routes: 5 credential routes + 11 provider routes (CRUD, connection testing, default model, model management)
+- Desktop settings page: provider cards, API key show/hide, model management, connection testing with latency
 - CLI: `mesoclaw key set/remove/list`, `mesoclaw provider list/test/add/remove/default`
 - Boot: KeyringStore with InMemory fallback, ProviderRegistry seeding, MesoAgent refactor for multi-provider
-- Cross-binary: CLI, TUI, Desktop, Mobile, Daemon all share same OS keyring
+- Config: `keyring_service_id` field (default "com.sprklai.mesoclaw")
+- Default model: stored as special row in `ai_models` with id `_default_model`
 
-**Step 15.2: Channels**
-- Trait-based messaging: `ChannelLifecycle` + `ChannelSender` split (from opencrust, improved)
-- `ChannelRegistry` -- DashMap-backed concurrent channel management
-- `ConnectorFrame` -- JSON wire protocol for external connector processes
-- Telegram (teloxide): DmPolicy, message splitting, MarkdownV2, bot commands, approval flow
-- Slack (tokio-tungstenite): Raw Socket Mode WebSocket, auto-reconnect, mrkdwn formatting
-- Discord (serenity): Gateway WebSocket, guild/channel allowlists, bot filtering
+**Step 15.2: Channels — `[COMPLETE]`**
+- Trait-based messaging: `Channel`, `ChannelLifecycle`, `ChannelSender` async traits with `ChannelStatus` enum
+- `ChannelRegistry` -- DashMap-backed concurrent channel management with CRUD + health check (11 tests)
+- `ChannelMessage` -- builder pattern message struct (2 tests)
+- `ConnectorFrame` -- JSON wire protocol for external connector processes with `ConnectorHandshake` (5 tests)
+- Telegram (`channels-telegram`): `TelegramChannel` with DmPolicy (Allowlist/Open/Disabled), `RetryPolicy`, `BotCommand` enum, message splitting, MarkdownV2 escaping (12 tests)
+- Slack (`channels-slack`): `SlackChannel` with DM/channel detection, mrkdwn formatting, REST helpers (4 tests)
+- Discord (`channels-discord`): `DiscordChannel` with guild/channel allowlists, bot message filtering (8 tests)
 - Feature-gated: `channels`, `channels-telegram`, `channels-slack`, `channels-discord`
-- Credentials from keyring: tokens, allowlists stored as JSON arrays
+- 6 gateway routes (feature-gated): list channels, status, send, connect, disconnect, health
+- 1 always-available route: `POST /channels/{name}/test` (credential testing)
+- Frontend: channels settings page with credential management, connection testing, latency display
+- `MesoError::Channel(String)` variant added
+- Config: `channels_enabled`, Telegram-specific settings (polling timeout, DM policy, retry, group mention)
+- `WebSearchTool` refactored to use `websearch` crate with Tavily → Brave → DuckDuckGo provider cascade
 
-**Step 16: Scheduler**
+**Step 16: Scheduler — `[NOT STARTED]`**
 - Cron/interval job system with SQLite persistence (`cron` crate 0.15)
 - `TokioScheduler` -- 1s tick, DashMap job registry, error backoff, stuck detection
 - Job payloads: Heartbeat, AgentTurn, Notify, SendViaChannel
 - Active hours gate, one-shot jobs, graceful shutdown
 - Feature-gated behind `scheduler` feature flag
 
-- **Tests**: ~153 new tests (34 credentials, 86 channels, 34 scheduler)
+**New dependencies (15.1)**: keyring 3, websearch (workspace)
+**New dependencies (15.2)**: teloxide 0.13+ (channels-telegram), serenity 0.12+ (channels-discord)
+- **Tests**: 80 new tests across steps 15.1 + 15.2 (434 total Rust), all passing. Zero clippy warnings.
 - **Plans**: [plans/phase8_credentials.md](../plans/phase8_credentials.md), [plans/phase8_channels.md](../plans/phase8_channels.md), [plans/phase8_scheduler.md](../plans/phase8_scheduler.md)
 
 ---

@@ -11,6 +11,9 @@ use crate::skills::SkillRegistry;
 use crate::tools::ToolRegistry;
 use crate::user::UserLearner;
 
+#[cfg(feature = "channels")]
+use crate::channels::registry::ChannelRegistry;
+
 #[cfg(feature = "ai")]
 use crate::ai::agent::MesoAgent;
 #[cfg(feature = "ai")]
@@ -35,6 +38,8 @@ pub struct AppState {
     pub soul_loader: Arc<SoulLoader>,
     pub skill_registry: Arc<SkillRegistry>,
     pub user_learner: Arc<UserLearner>,
+    #[cfg(feature = "channels")]
+    pub channel_registry: Arc<ChannelRegistry>,
 }
 
 #[cfg(test)]

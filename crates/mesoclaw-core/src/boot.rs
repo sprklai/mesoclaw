@@ -15,6 +15,9 @@ use crate::skills::SkillRegistry;
 use crate::tools::ToolRegistry;
 use crate::user::UserLearner;
 
+#[cfg(feature = "channels")]
+use crate::channels::registry::ChannelRegistry;
+
 #[cfg(feature = "ai")]
 use crate::ai::{agent::MesoAgent, provider_registry::ProviderRegistry, session::SessionManager};
 
@@ -39,6 +42,8 @@ pub struct Services {
     pub soul_loader: Arc<SoulLoader>,
     pub skill_registry: Arc<SkillRegistry>,
     pub user_learner: Arc<UserLearner>,
+    #[cfg(feature = "channels")]
+    pub channel_registry: Arc<ChannelRegistry>,
 }
 
 /// Initialize all services from config.
@@ -83,7 +88,11 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         .register(Arc::new(crate::tools::system_info::SystemInfoTool::new()))
         .unwrap();
     tool_registry
-        .register(Arc::new(crate::tools::web_search::WebSearchTool::new()))
+        .register(Arc::new(crate::tools::web_search::WebSearchTool::new(
+            credentials.clone(),
+            config.web_search_timeout_secs,
+            config.web_search_max_results,
+        )))
         .unwrap();
     tool_registry
         .register(Arc::new(crate::tools::file_ops::FileReadTool::new(
@@ -183,6 +192,12 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         }
     };
 
+    // 13. Channel registry
+    #[cfg(feature = "channels")]
+    let channel_registry = Arc::new(ChannelRegistry::new());
+    #[cfg(feature = "channels")]
+    info!("Channel registry initialized");
+
     info!("All services initialized");
 
     Ok(Services {
@@ -202,6 +217,8 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         soul_loader,
         skill_registry,
         user_learner,
+        #[cfg(feature = "channels")]
+        channel_registry,
     })
 }
 
@@ -226,6 +243,8 @@ impl From<Services> for AppState {
             soul_loader: s.soul_loader,
             skill_registry: s.skill_registry,
             user_learner: s.user_learner,
+            #[cfg(feature = "channels")]
+            channel_registry: s.channel_registry,
         }
     }
 }
@@ -286,6 +305,16 @@ mod tests {
         let config = test_config(&dir);
         let services = init_services(config).await.unwrap();
         assert_eq!(services.tools.len(), 9);
+    }
+
+    // WS.12 — WebSearchTool registered with credential store access
+    #[tokio::test]
+    async fn web_search_tool_registered_with_credentials() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let config = test_config(&dir);
+        let services = init_services(config).await.unwrap();
+        let ws = services.tools.get("web_search");
+        assert!(ws.is_some(), "web_search tool must be registered");
     }
 
     // 5.5 — agent is None when no API key is configured

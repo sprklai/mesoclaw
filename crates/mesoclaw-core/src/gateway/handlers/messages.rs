@@ -4,15 +4,27 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::Result;
+use crate::ai::session::ToolCallRecord;
 use crate::gateway::state::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct SendMessageRequest {
     pub role: String,
     pub content: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MessageWithToolCalls {
+    pub id: String,
+    pub session_id: String,
+    pub role: String,
+    pub content: String,
+    pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCallRecord>>,
 }
 
 pub async fn get_messages(
@@ -22,7 +34,27 @@ pub async fn get_messages(
     // Verify session exists first so we get a 404 for invalid sessions
     state.session_manager.get_session(&session_id).await?;
     let messages = state.session_manager.get_messages(&session_id).await?;
-    Ok(Json(messages))
+
+    let mut result = Vec::with_capacity(messages.len());
+    for msg in messages {
+        let tool_calls = if msg.role == "assistant" {
+            let tcs = state.session_manager.get_tool_calls(&msg.id).await?;
+            if tcs.is_empty() { None } else { Some(tcs) }
+        } else {
+            None
+        };
+
+        result.push(MessageWithToolCalls {
+            id: msg.id,
+            session_id: msg.session_id,
+            role: msg.role,
+            content: msg.content,
+            created_at: msg.created_at,
+            tool_calls,
+        });
+    }
+
+    Ok(Json(result))
 }
 
 pub async fn send_message(

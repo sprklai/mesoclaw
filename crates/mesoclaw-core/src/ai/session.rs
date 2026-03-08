@@ -1,3 +1,4 @@
+use crate::ai::adapter::{ToolCallEvent, ToolCallPhase};
 use crate::db::{self, DbPool};
 use crate::{MesoError, Result};
 
@@ -26,6 +27,19 @@ pub struct Message {
     pub session_id: String,
     pub role: String,
     pub content: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallRecord {
+    pub id: String,
+    pub message_id: String,
+    pub session_id: String,
+    pub tool_name: String,
+    pub args: serde_json::Value,
+    pub output: Option<String>,
+    pub success: Option<bool>,
+    pub duration_ms: Option<u64>,
     pub created_at: String,
 }
 
@@ -205,6 +219,136 @@ impl SessionManager {
             content,
             created_at: now,
         })
+    }
+
+    /// Store tool call events linked to an assistant message.
+    pub async fn store_tool_calls(
+        &self,
+        message_id: &str,
+        session_id: &str,
+        events: &[ToolCallEvent],
+    ) -> Result<()> {
+        // Pair Started+Completed events by call_id to build complete records
+        let mut started: std::collections::HashMap<String, serde_json::Value> =
+            std::collections::HashMap::new();
+        // (call_id, tool_name, args_json, _uuid, output, success, duration_ms)
+        type ToolRecord = (
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<bool>,
+            Option<u64>,
+        );
+        let mut records: Vec<ToolRecord> = Vec::new();
+
+        for evt in events {
+            match &evt.phase {
+                ToolCallPhase::Started { args } => {
+                    started.insert(evt.call_id.clone(), args.clone());
+                }
+                ToolCallPhase::Completed {
+                    output,
+                    success,
+                    duration_ms,
+                } => {
+                    let args = started
+                        .remove(&evt.call_id)
+                        .unwrap_or(serde_json::Value::Null);
+                    records.push((
+                        evt.call_id.clone(),
+                        evt.tool_name.clone(),
+                        serde_json::to_string(&args).unwrap_or_default(),
+                        uuid::Uuid::new_v4().to_string(),
+                        Some(output.clone()),
+                        Some(*success),
+                        Some(*duration_ms),
+                    ));
+                }
+            }
+        }
+
+        // Also store any Started events that never got a Completed (shouldn't happen but be safe)
+        for (call_id, args) in started {
+            let tool_name = events
+                .iter()
+                .find(|e| e.call_id == call_id)
+                .map(|e| e.tool_name.clone())
+                .unwrap_or_default();
+            records.push((
+                call_id,
+                tool_name,
+                serde_json::to_string(&args).unwrap_or_default(),
+                uuid::Uuid::new_v4().to_string(),
+                None,
+                None,
+                None,
+            ));
+        }
+
+        let message_id = message_id.to_string();
+        let session_id = session_id.to_string();
+
+        db::with_db(&self.db, move |conn| {
+            for (call_id, tool_name, args, _uuid, output, success, duration_ms) in &records {
+                conn.execute(
+                    "INSERT INTO tool_calls (id, message_id, session_id, tool_name, args, output, success, duration_ms)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    rusqlite::params![
+                        call_id,
+                        message_id,
+                        session_id,
+                        tool_name,
+                        args,
+                        output,
+                        success.map(|b| b as i32),
+                        duration_ms.map(|d| d as i64),
+                    ],
+                )?;
+            }
+            Ok(())
+        })
+        .await
+    }
+
+    /// Retrieve tool call records for a given message.
+    pub async fn get_tool_calls(&self, message_id: &str) -> Result<Vec<ToolCallRecord>> {
+        let message_id = message_id.to_string();
+
+        db::with_db(&self.db, move |conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, message_id, session_id, tool_name, args, output, success, duration_ms, created_at
+                 FROM tool_calls
+                 WHERE message_id = ?1
+                 ORDER BY created_at ASC",
+            )?;
+
+            let rows = stmt
+                .query_map(rusqlite::params![message_id], |row| {
+                    let args_str: String = row.get(4)?;
+                    let args: serde_json::Value =
+                        serde_json::from_str(&args_str).unwrap_or(serde_json::Value::Null);
+                    let success_int: Option<i32> = row.get(6)?;
+                    let duration: Option<i64> = row.get(7)?;
+
+                    Ok(ToolCallRecord {
+                        id: row.get(0)?,
+                        message_id: row.get(1)?,
+                        session_id: row.get(2)?,
+                        tool_name: row.get(3)?,
+                        args,
+                        output: row.get(5)?,
+                        success: success_int.map(|i| i != 0),
+                        duration_ms: duration.map(|d| d as u64),
+                        created_at: row.get(8)?,
+                    })
+                })?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+
+            Ok(rows)
+        })
+        .await
     }
 
     pub async fn get_messages(&self, session_id: &str) -> Result<Vec<Message>> {
@@ -400,5 +544,155 @@ mod tests {
             .await;
 
         assert!(result.is_err());
+    }
+
+    // TV.19 — store_tool_calls inserts records linked to message
+    #[tokio::test]
+    async fn store_tool_calls_inserts() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr.create_session("Chat").await.unwrap();
+        let msg = mgr
+            .append_message(&session.id, "assistant", "Using tools...")
+            .await
+            .unwrap();
+
+        let events = vec![
+            ToolCallEvent {
+                call_id: "tc-1".into(),
+                tool_name: "WebSearch".into(),
+                phase: ToolCallPhase::Started {
+                    args: serde_json::json!({"query": "rust"}),
+                },
+            },
+            ToolCallEvent {
+                call_id: "tc-1".into(),
+                tool_name: "WebSearch".into(),
+                phase: ToolCallPhase::Completed {
+                    output: "results found".into(),
+                    success: true,
+                    duration_ms: 150,
+                },
+            },
+        ];
+
+        mgr.store_tool_calls(&msg.id, &session.id, &events)
+            .await
+            .unwrap();
+
+        let records = mgr.get_tool_calls(&msg.id).await.unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].tool_name, "WebSearch");
+        assert_eq!(records[0].success, Some(true));
+        assert_eq!(records[0].duration_ms, Some(150));
+    }
+
+    // TV.20 — get_tool_calls returns stored records for message
+    #[tokio::test]
+    async fn get_tool_calls_returns_stored() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr.create_session("Chat").await.unwrap();
+        let msg = mgr
+            .append_message(&session.id, "assistant", "Done")
+            .await
+            .unwrap();
+
+        let events = vec![
+            ToolCallEvent {
+                call_id: "tc-a".into(),
+                tool_name: "FileRead".into(),
+                phase: ToolCallPhase::Started {
+                    args: serde_json::json!({"path": "/tmp/test"}),
+                },
+            },
+            ToolCallEvent {
+                call_id: "tc-a".into(),
+                tool_name: "FileRead".into(),
+                phase: ToolCallPhase::Completed {
+                    output: "file contents".into(),
+                    success: true,
+                    duration_ms: 5,
+                },
+            },
+            ToolCallEvent {
+                call_id: "tc-b".into(),
+                tool_name: "Shell".into(),
+                phase: ToolCallPhase::Started {
+                    args: serde_json::json!({"command": "ls"}),
+                },
+            },
+            ToolCallEvent {
+                call_id: "tc-b".into(),
+                tool_name: "Shell".into(),
+                phase: ToolCallPhase::Completed {
+                    output: "error".into(),
+                    success: false,
+                    duration_ms: 10,
+                },
+            },
+        ];
+
+        mgr.store_tool_calls(&msg.id, &session.id, &events)
+            .await
+            .unwrap();
+
+        let records = mgr.get_tool_calls(&msg.id).await.unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].tool_name, "FileRead");
+        assert_eq!(records[1].tool_name, "Shell");
+        assert_eq!(records[1].success, Some(false));
+    }
+
+    // TV.21 — get_tool_calls for message with no tools returns empty
+    #[tokio::test]
+    async fn get_tool_calls_empty() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr.create_session("Chat").await.unwrap();
+        let msg = mgr
+            .append_message(&session.id, "assistant", "No tools")
+            .await
+            .unwrap();
+
+        let records = mgr.get_tool_calls(&msg.id).await.unwrap();
+        assert!(records.is_empty());
+    }
+
+    // TV.22 — Deleting message cascades to tool_calls
+    #[tokio::test]
+    async fn delete_message_cascades_tool_calls() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr.create_session("Chat").await.unwrap();
+        let msg = mgr
+            .append_message(&session.id, "assistant", "Using tools")
+            .await
+            .unwrap();
+
+        let events = vec![
+            ToolCallEvent {
+                call_id: "tc-del".into(),
+                tool_name: "Shell".into(),
+                phase: ToolCallPhase::Started {
+                    args: serde_json::json!({}),
+                },
+            },
+            ToolCallEvent {
+                call_id: "tc-del".into(),
+                tool_name: "Shell".into(),
+                phase: ToolCallPhase::Completed {
+                    output: "ok".into(),
+                    success: true,
+                    duration_ms: 1,
+                },
+            },
+        ];
+
+        mgr.store_tool_calls(&msg.id, &session.id, &events)
+            .await
+            .unwrap();
+
+        // Delete the session (cascades to messages, which cascades to tool_calls)
+        mgr.delete_session(&session.id).await.unwrap();
+
+        let records = mgr.get_tool_calls(&msg.id).await.unwrap();
+        assert!(records.is_empty());
     }
 }

@@ -99,6 +99,7 @@ scripts/build.sh            # Cross-platform build script
 - Paths: absolute in code, relative when referencing to user
 - SQL: parameterized queries only, WAL mode, migrations in transactions
 - Security: never log credentials, use zeroize for sensitive data, keyring for storage
+- **Credential key naming**: Use colon-separated namespacing for all credential keys. AI provider API keys: `api_key:{provider_id}` (e.g., `api_key:openai`, `api_key:tavily`, `api_key:brave`). Channel credentials: `channel:{channel_id}:{field}` (e.g., `channel:telegram:token`, `channel:slack:bot_token`). Never use underscore-separated names like `tavily_api_key`.
 - Structs: derive `Debug, Clone, Serialize, Deserialize` on all public structs
 - Enums: `#[non_exhaustive]` on public enums that may grow
 - Async locks: never hold across `.await` points

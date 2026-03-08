@@ -10,6 +10,8 @@
 - [Feature Flag Composition](#feature-flag-composition)
 - [Trait-Driven Architecture](#trait-driven-architecture)
 - [Credential System](#credential-system)
+- [Provider Registry](#provider-registry)
+- [Messaging Channels System](#messaging-channels-system)
 - [Identity / Soul System](#identity--soul-system)
 - [Skills System](#skills-system)
 - [User Profile + Progressive Learning](#user-profile--progressive-learning)
@@ -74,7 +76,7 @@ graph TB
     end
 
     subgraph "Gateway :18981"
-        REST["REST<br>36 routes"]
+        REST["REST<br>55 routes + 6 feature-gated"]
         WS["WebSocket<br>/ws/chat"]
     end
 
@@ -117,7 +119,10 @@ graph TD
     core --> lru["lru<br>#40;embedding cache#41;"]
     core --> sqlitevec["sqlite-vec<br>#40;vector search#41;"]
     core --> serdeyaml["serde_yaml<br>#40;YAML frontmatter#41;"]
-    core --> dashmap["dashmap<br>#40;concurrent tool registry#41;"]
+    core --> dashmap["dashmap<br>#40;concurrent registries#41;"]
+    core --> websearch["websearch<br>#40;web search providers#41;"]
+    core -.-> teloxide["teloxide<br>#40;Telegram, feature-gated#41;"]
+    core -.-> serenity["serenity<br>#40;Discord, feature-gated#41;"]
 
     cli --> reqwest["reqwest<br>#40;HTTP client#41;"]
     cli --> tungstenite["tokio-tungstenite<br>#40;WS client#41;"]
@@ -148,21 +153,29 @@ mesoclaw/
 │   ├── mesoclaw-core/      # Shared library (NO Tauri dependency)
 │   │   ├── src/
 │   │   │   ├── lib.rs      # Module exports + Result<T> alias
-│   │   │   ├── error.rs    # MesoError enum (23 variants, thiserror)
+│   │   │   ├── error.rs    # MesoError enum (28 variants, thiserror)
 │   │   │   ├── boot.rs     # init_services() -> Services -> AppState, single boot entry point
 │   │   │   ├── config/     # TOML config (schema + load/save + OS paths)
 │   │   │   ├── db/         # rusqlite pool + WAL + migrations + spawn_blocking
 │   │   │   ├── event_bus/  # EventBus trait + TokioBroadcastBus (12 events)
 │   │   │   ├── memory/     # Memory trait + SqliteMemoryStore (FTS5 + vectors) + InMemoryStore
-│   │   │   ├── credential/ # CredentialStore trait + InMemoryCredentialStore
+│   │   │   ├── credential/ # CredentialStore trait + KeyringStore + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
 │   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 9 tools (shell, file ops, web search, sysinfo, patch, process)
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter
-│   │   │   ├── gateway/    # axum HTTP+WS gateway (36 routes, auth middleware, error mapping, MESO_VALIDATION)
+│   │   │   ├── gateway/    # axum HTTP+WS gateway (55+6 routes, auth middleware, error mapping, MESO_VALIDATION)
 │   │   │   ├── identity/   # SoulLoader + PromptComposer + defaults (SOUL/IDENTITY/USER.md)
 │   │   │   ├── skills/     # SkillRegistry + bundled/user skills (markdown + YAML frontmatter)
 │   │   │   ├── user/       # UserLearner + SQLite observations + privacy controls
-│   │   │   ├── channels/   # Channel trait + implementations (Phase 8)
+│   │   │   ├── channels/   # Channel traits + registry + 3 adapters (Telegram/Slack/Discord, feature-gated)
+│   │   │   │   ├── mod.rs         # Module exports with feature gates
+│   │   │   │   ├── traits.rs      # Channel, ChannelLifecycle, ChannelSender traits
+│   │   │   │   ├── message.rs     # ChannelMessage with builder pattern
+│   │   │   │   ├── registry.rs    # ChannelRegistry (DashMap-backed)
+│   │   │   │   ├── protocol.rs    # ConnectorFrame wire protocol
+│   │   │   │   ├── telegram/      # TelegramChannel + config + formatting
+│   │   │   │   ├── slack/         # SlackChannel + API helpers + formatting
+│   │   │   │   └── discord/       # DiscordChannel + config
 │   │   │   └── scheduler/  # Cron + scheduled tasks, feature-gated (Phase 8)
 │   │   └── tests/          # Integration tests
 │   ├── mesoclaw-desktop/   # Tauri 2.10 shell (desktop)
@@ -195,10 +208,10 @@ mesoclaw/
     │   │   │   ├── Markdown.svelte
     │   │   │   ├── SessionList.svelte
     │   │   │   └── ThemeToggle.svelte
-    │   │   ├── stores/      # 6 Svelte 5 rune stores ($state)
+    │   │   ├── stores/      # 7 Svelte 5 rune stores ($state, includes channels)
     │   │   ├── paraglide/   # i18n (paraglide-js, EN only, 24 keys)
     │   │   └── utils.ts     # shadcn utility helpers
-    │   └── routes/          # 8 SPA routes
+    │   └── routes/          # 9 SPA routes
     │       ├── +page.svelte           # Home
     │       ├── chat/+page.svelte      # New chat
     │       ├── chat/[id]/+page.svelte # Existing session
@@ -206,6 +219,7 @@ mesoclaw/
     │       ├── schedule/+page.svelte  # Placeholder (Phase 8)
     │       ├── settings/+page.svelte  # General settings
     │       ├── settings/providers/    # Provider config
+    │       ├── settings/channels/     # Channel credential + connection management
     │       └── settings/persona/      # Identity + skills editor
     ├── package.json
     └── vitest.config.ts     # 26 unit tests (vitest)
@@ -235,13 +249,21 @@ db_path = "/custom/path/mesoclaw.db"  # overrides database file directly
 graph TD
     Daemon[mesoclaw-daemon binary] --> Default[default - no flags]
     Daemon --> Channels["--features channels"]
+    Daemon --> ChTG["--features channels-telegram"]
+    Daemon --> ChSL["--features channels-slack"]
+    Daemon --> ChDC["--features channels-discord"]
     Daemon --> Scheduler["--features scheduler"]
     Daemon --> Dashboard["--features web-dashboard"]
 
-    Default --> CoreGW["mesoclaw-core<br>#40;gateway feature#41;"]
+    Default --> CoreGW["mesoclaw-core<br>#40;gateway + ai + keyring#41;"]
     CoreGW --> Axum[axum + tower-http]
 
     Channels --> CoreCH[mesoclaw-core/channels]
+    ChTG --> CoreCH
+    ChTG --> Teloxide[teloxide]
+    ChSL --> CoreCH
+    ChDC --> CoreCH
+    ChDC --> Serenity[serenity]
     Scheduler --> CoreSC[mesoclaw-core/scheduler]
     Dashboard --> CoreWD[mesoclaw-core/web-dashboard]
     CoreWD --> CoreGW
@@ -264,7 +286,9 @@ graph TB
     subgraph "Current Implementations"
         SQLite["SqliteMemory"]
         Keyring["KeyringStore"]
-        LocalCh["LocalChannel"]
+        TGCh["TelegramChannel"]
+        SlackCh["SlackChannel"]
+        DiscordCh["DiscordChannel"]
         TokioBus["TokioBroadcastBus"]
         RigProviders["OpenAI / Anthropic / etc."]
     end
@@ -281,7 +305,9 @@ graph TB
     Memory -.-> PgVec
     CredStore --> Keyring
     CredStore -.-> Vault
-    Channel --> LocalCh
+    Channel --> TGCh
+    Channel --> SlackCh
+    Channel --> DiscordCh
     Channel -.-> NatsCh
     EvBus --> TokioBus
     EvBus -.-> RedisBus
@@ -330,6 +356,108 @@ graph TB
 | **Daemon** | Direct | Headless, runs as service |
 
 All credential values are wrapped with `zeroize` for secure memory cleanup.
+
+## Provider Registry
+
+The `ProviderRegistry` manages AI provider configurations (OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Ollama, and custom providers). It is DB-backed with 6 built-in providers seeded on first boot.
+
+```mermaid
+graph TB
+    subgraph "ProviderRegistry - DB-backed"
+        Seed["Seed 6 built-in providers<br>on first boot"]
+        CRUD["CRUD operations<br>add, update, delete, list"]
+        Models["Model management<br>add/remove models per provider"]
+        Default["Default model<br>stored as _default_model row"]
+        Test["Connection testing<br>with latency measurement"]
+    end
+
+    subgraph "Built-in Providers"
+        OAI["OpenAI"] & ANT["Anthropic"] & GEM["Gemini"]
+        OR["OpenRouter"] & VAI["Vercel AI"] & OLL["Ollama"]
+    end
+
+    subgraph "Storage"
+        DBP["ai_providers table"]
+        DBM["ai_models table"]
+    end
+
+    subgraph "Consumers"
+        Agent["MesoAgent<br>multi-provider dispatch"]
+        GW["Gateway<br>11 provider routes"]
+        Settings["Desktop Settings UI<br>provider cards + key management"]
+    end
+
+    Seed --> DBP
+    CRUD --> DBP
+    Models --> DBM
+    Default --> DBM
+    DBP --> Agent
+    DBM --> Agent
+    Test --> Agent
+    CRUD --> GW
+    Models --> GW
+    GW --> Settings
+```
+
+### Credential Key Naming Convention
+
+| Scope | Pattern | Examples |
+|---|---|---|
+| AI Provider API Keys | `api_key:{provider_id}` | `api_key:openai`, `api_key:tavily`, `api_key:brave` |
+| Channel Credentials | `channel:{channel_id}:{field}` | `channel:telegram:token`, `channel:slack:bot_token` |
+
+## Messaging Channels System
+
+The channels module provides trait-based messaging integration with external platforms. Each channel is feature-gated and managed through a concurrent `ChannelRegistry`.
+
+```mermaid
+graph TB
+    subgraph "Channel Traits"
+        ChTrait["Channel<br>id, name, platform"]
+        LC["ChannelLifecycle<br>connect, disconnect, health"]
+        CS["ChannelSender<br>send_text, send_reply"]
+    end
+
+    subgraph "Registry"
+        CR["ChannelRegistry<br>DashMap-backed<br>register, get, list, health_check"]
+    end
+
+    subgraph "Implementations - feature-gated"
+        TG["TelegramChannel<br>channels-telegram<br>DmPolicy, MarkdownV2, BotCommand"]
+        SL["SlackChannel<br>channels-slack<br>DM detection, mrkdwn formatting"]
+        DC["DiscordChannel<br>channels-discord<br>guild/channel allowlists"]
+    end
+
+    subgraph "Wire Protocol"
+        CF["ConnectorFrame<br>JSON wire protocol<br>for external connectors"]
+        HS["ConnectorHandshake<br>auth + capabilities"]
+    end
+
+    subgraph "Gateway"
+        Routes["6 feature-gated routes<br>+ 1 always-available test route"]
+    end
+
+    subgraph "Frontend"
+        UI["Settings / Channels page<br>credential management<br>connection testing<br>latency display"]
+    end
+
+    ChTrait --> TG & SL & DC
+    LC --> TG & SL & DC
+    CS --> TG & SL & DC
+    TG & SL & DC --> CR
+    CR --> Routes
+    Routes --> UI
+    CF --> HS
+```
+
+### Feature Flags
+
+| Feature | Depends On | Adds |
+|---|---|---|
+| `channels` | (none) | Core channel traits + registry + gateway routes |
+| `channels-telegram` | `channels` | TelegramChannel + teloxide dependency |
+| `channels-slack` | `channels` | SlackChannel (uses existing reqwest/tungstenite) |
+| `channels-discord` | `channels` | DiscordChannel + serenity dependency |
 
 ## Identity / Soul System
 
@@ -459,7 +587,7 @@ graph TB
 
 ## Gateway Routes
 
-All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Routes are grouped by subsystem (36 implemented through Phase 4).
+All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Routes are grouped by subsystem (55 base + 6 feature-gated = 61 total through Phase 8).
 
 ### Health (1 route, no auth)
 
@@ -467,7 +595,7 @@ All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Rou
 |---|---|---|
 | GET | `/health` | Health check |
 
-### Sessions & Chat (7 routes)
+### Sessions & Chat (9 routes)
 
 | Method | Path | Description |
 |---|---|---|
@@ -476,6 +604,7 @@ All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Rou
 | GET | `/sessions/{id}` | Get session details |
 | PUT | `/sessions/{id}` | Update session |
 | DELETE | `/sessions/{id}` | Delete session |
+| POST | `/sessions/{id}/generate-title` | Auto-generate session title via AI |
 | GET | `/sessions/{id}/messages` | Get messages for a session |
 | POST | `/sessions/{id}/messages` | Send message to session |
 
@@ -502,13 +631,32 @@ All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Rou
 | GET | `/config` | Get current configuration (auth token redacted) |
 | PUT | `/config` | Update configuration |
 
-### Providers & Models (3 routes)
+### Credentials (5 routes)
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/providers` | List configured AI providers |
+| POST | `/credentials` | Set a credential (key + value) |
+| GET | `/credentials` | List all credential keys (values hidden) |
+| DELETE | `/credentials/{key}` | Delete a credential |
+| GET | `/credentials/{key}/value` | Get credential value (explicit retrieval) |
+| GET | `/credentials/{key}/exists` | Check if credential exists |
+
+### Providers & Models (12 routes)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/providers` | List all providers |
+| POST | `/providers` | Create user-defined provider |
+| GET | `/providers/with-key-status` | List providers with API key status |
+| GET | `/providers/default` | Get default model |
+| PUT | `/providers/default` | Set default model |
 | GET | `/providers/{id}` | Get provider details |
-| GET | `/models` | List available models |
+| PUT | `/providers/{id}` | Update provider |
+| DELETE | `/providers/{id}` | Delete user-defined provider |
+| POST | `/providers/{id}/test` | Test provider connection (with latency) |
+| POST | `/providers/{id}/models` | Add model to provider |
+| DELETE | `/providers/{id}/models/{model_id}` | Delete model from provider |
+| GET | `/models` | List all available models across providers |
 
 ### Tools (2 routes)
 
@@ -559,6 +707,18 @@ All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Rou
 | DELETE | `/user/observations/{key}` | Delete observation by key |
 | DELETE | `/user/observations` | Clear all observations |
 | GET | `/user/profile` | Get computed user context string |
+
+### Channels (7 routes, 6 feature-gated)
+
+| Method | Path | Feature | Description |
+|---|---|---|---|
+| POST | `/channels/{name}/test` | always | Test channel credentials |
+| GET | `/channels` | `channels` | List registered channels with status |
+| GET | `/channels/{name}/status` | `channels` | Get channel status |
+| POST | `/channels/{name}/send` | `channels` | Send message via channel |
+| POST | `/channels/{name}/connect` | `channels` | Connect channel |
+| POST | `/channels/{name}/disconnect` | `channels` | Disconnect channel |
+| GET | `/channels/{name}/health` | `channels` | Health check |
 
 ### Future Phases (not yet implemented)
 

@@ -10,6 +10,8 @@
 #   --all-features        Enable all features
 #   --list-targets        List available build targets and exit
 #   --install-toolchain   Install the required Rust target toolchain
+#   --tauri               Build Tauri desktop app (native platform only)
+#   --bundle <FORMATS>    Comma-separated bundle formats (e.g., deb,appimage,dmg,msi,nsis)
 #   --dev                 Start dev mode (Vite + Tauri dev server)
 #   --help                Show this help message
 
@@ -45,6 +47,8 @@ FEATURES=""
 ALL_FEATURES=false
 INSTALL_TOOLCHAIN=false
 DEV_MODE=false
+TAURI_MODE=false
+BUNDLE_FORMATS=""
 
 # ── Colors ─────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -255,6 +259,14 @@ while [[ $# -gt 0 ]]; do
             ALL_FEATURES=true
             shift
             ;;
+        --tauri)
+            TAURI_MODE=true
+            shift
+            ;;
+        --bundle)
+            BUNDLE_FORMATS="$2"
+            shift 2
+            ;;
         --dev)
             DEV_MODE=true
             shift
@@ -278,6 +290,86 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+run_tauri_build() {
+    info "Building Tauri desktop app..."
+
+    # Tauri cannot cross-compile — must build on the target OS
+    if [ "$TARGET" != "native" ]; then
+        err "Tauri builds only support --target native."
+        echo "  Cross-platform Tauri builds require CI/CD (GitHub Actions)."
+        echo "  Each platform (Linux/macOS/Windows) must build on its native runner."
+        exit 1
+    fi
+
+    # Check cargo-tauri is installed
+    if ! cargo tauri --version &> /dev/null; then
+        err "cargo-tauri CLI is not installed."
+        echo "  Install it with: cargo install tauri-cli"
+        exit 1
+    fi
+
+    # Build frontend first
+    if ! command -v bun &> /dev/null; then
+        err "bun is not installed. Install it from https://bun.sh"
+        exit 1
+    fi
+
+    info "Building frontend assets..."
+    (cd "${WORKSPACE_ROOT}/web" && bun install && bun run build)
+
+    # Assemble cargo tauri build args
+    local tauri_args=()
+
+    if [ "$PROFILE" = "debug" ]; then
+        tauri_args+=("--debug")
+    fi
+
+    if [ "$ALL_FEATURES" = true ]; then
+        tauri_args+=("--" "--all-features")
+    elif [ -n "$FEATURES" ]; then
+        tauri_args+=("--" "--features" "$FEATURES")
+    fi
+
+    # Bundle format selection
+    if [ -n "$BUNDLE_FORMATS" ]; then
+        # Convert comma-separated to space-separated for multiple --bundles flags
+        IFS=',' read -ra FORMATS <<< "$BUNDLE_FORMATS"
+        for fmt in "${FORMATS[@]}"; do
+            tauri_args=("--bundles" "$fmt" "${tauri_args[@]}")
+        done
+    fi
+
+    info "Running: cargo tauri build ${tauri_args[*]}"
+    (cd "${WORKSPACE_ROOT}/crates/mesoclaw-desktop" && cargo tauri build "${tauri_args[@]}")
+
+    if [ $? -eq 0 ]; then
+        ok "Tauri build complete!"
+        echo ""
+        info "Bundle outputs:"
+        local bundle_dir="${WORKSPACE_ROOT}/target/release/bundle"
+        if [ -d "$bundle_dir" ]; then
+            find "$bundle_dir" -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.app" -o -name "*.msi" -o -name "*.exe" -o -name "*.rpm" \) 2>/dev/null | sort | while read -r f; do
+                local_path="${f#"$WORKSPACE_ROOT"/}"
+                size=$(du -h "$f" | awk '{print $1}')
+                echo "  $local_path ($size)"
+            done
+        fi
+        if [ "$PROFILE" = "debug" ]; then
+            bundle_dir="${WORKSPACE_ROOT}/target/debug/bundle"
+            if [ -d "$bundle_dir" ]; then
+                find "$bundle_dir" -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.app" -o -name "*.msi" -o -name "*.exe" -o -name "*.rpm" \) 2>/dev/null | sort | while read -r f; do
+                    local_path="${f#"$WORKSPACE_ROOT"/}"
+                    size=$(du -h "$f" | awk '{print $1}')
+                    echo "  $local_path ($size)"
+                done
+            fi
+        fi
+    else
+        err "Tauri build failed!"
+        exit 1
+    fi
+}
 
 run_dev() {
     info "Starting dev mode..."
@@ -334,9 +426,14 @@ run_dev() {
 cd "$WORKSPACE_ROOT"
 detect_os
 
-# Handle dev mode early
+# Handle special modes early
 if [ "$DEV_MODE" = true ]; then
     run_dev
+fi
+
+if [ "$TAURI_MODE" = true ]; then
+    run_tauri_build
+    exit 0
 fi
 
 echo ""

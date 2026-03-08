@@ -83,6 +83,29 @@ pub async fn run(
                                 println!("{content}");
                             }
                         }
+                        "tool_call" => {
+                            let name = chunk
+                                .get("tool_name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("?");
+                            eprintln!("\x1b[33m  \u{26A1} {name}...\x1b[0m");
+                        }
+                        "tool_result" => {
+                            let name = chunk
+                                .get("tool_name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("?");
+                            let ok = chunk
+                                .get("success")
+                                .and_then(|v| v.as_bool())
+                                .unwrap_or(false);
+                            let ms = chunk
+                                .get("duration_ms")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            let icon = if ok { "\u{2713}" } else { "\u{2717}" };
+                            eprintln!("\x1b[33m  {icon} {name} ({ms}ms)\x1b[0m");
+                        }
                         "done" => break,
                         "error" => {
                             if let Some(err) = chunk.get("error").and_then(|v| v.as_str()) {

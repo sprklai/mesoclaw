@@ -9,6 +9,13 @@
 	import { Response } from '$lib/components/ai-elements/response';
 	import { Loader } from '$lib/components/ai-elements/loader';
 	import {
+		Tool,
+		ToolHeader,
+		ToolContent,
+		ToolInput,
+		ToolOutput
+	} from '$lib/components/ai-elements/tool';
+	import {
 		PromptInput,
 		PromptInputTextarea,
 		PromptInputToolbar,
@@ -57,6 +64,7 @@
 		messagesStore.startStream();
 
 		const capturedSessionId = currentSessionId;
+		const capturedModel = providersStore.selectedModel || undefined;
 		createChatStream(
 			prompt,
 			currentSessionId,
@@ -64,10 +72,16 @@
 				onToken(content) {
 					messagesStore.appendToken(content);
 				},
+				onToolCall(callId, toolName, args) {
+					messagesStore.addToolCall(callId, toolName, args);
+				},
+				onToolResult(callId, _toolName, output, success, durationMs) {
+					messagesStore.completeToolCall(callId, output, success, durationMs);
+				},
 				onDone() {
 					messagesStore.finishStream(capturedSessionId);
 					if (isFirstMessage) {
-						sessionsStore.generateTitle(capturedSessionId);
+						sessionsStore.generateTitle(capturedSessionId, capturedModel);
 					}
 				},
 				onError(error) {
@@ -97,6 +111,22 @@
 								{#if msg.role === 'user'}
 									<p class="whitespace-pre-wrap">{msg.content}</p>
 								{:else}
+									{#if msg.tool_calls && msg.tool_calls.length > 0}
+										{#each msg.tool_calls as tc (tc.id)}
+											<Tool>
+												<ToolHeader
+													type={tc.tool_name}
+													state={tc.success === false ? 'output-error' : tc.success === true ? 'output-available' : 'input-available'}
+												/>
+												<ToolContent>
+													<ToolInput input={tc.args} />
+													{#if tc.output !== undefined}
+														<ToolOutput output={tc.output} />
+													{/if}
+												</ToolContent>
+											</Tool>
+										{/each}
+									{/if}
 									<Response content={msg.content} />
 								{/if}
 							</MessageContent>
@@ -106,9 +136,20 @@
 					{#if messagesStore.streaming}
 						<Message from="assistant">
 							<MessageContent variant="flat">
+								{#each messagesStore.activeToolCalls as tc (tc.callId)}
+									<Tool>
+										<ToolHeader type={tc.toolName} state={tc.state} />
+										<ToolContent>
+											<ToolInput input={tc.args} />
+											{#if tc.output !== undefined}
+												<ToolOutput output={tc.output} />
+											{/if}
+										</ToolContent>
+									</Tool>
+								{/each}
 								{#if messagesStore.streamContent}
 									<Response content={messagesStore.streamContent} />
-								{:else}
+								{:else if messagesStore.activeToolCalls.length === 0}
 									<Loader />
 								{/if}
 							</MessageContent>

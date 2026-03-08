@@ -96,6 +96,8 @@ mod tests {
             soul_loader: base_state.soul_loader.clone(),
             skill_registry: base_state.skill_registry.clone(),
             user_learner: base_state.user_learner.clone(),
+            #[cfg(feature = "channels")]
+            channel_registry: base_state.channel_registry.clone(),
         });
         (dir, state)
     }

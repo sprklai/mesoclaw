@@ -38,7 +38,7 @@
 	let customServices = $state<ServiceDef[]>([]);
 
 	function credentialKey(id: string): string {
-		return `service_key:${id}`;
+		return `api_key:${id}`;
 	}
 
 	function loadCustomServices(): ServiceDef[] {
@@ -62,7 +62,7 @@
 	async function refreshKeys() {
 		try {
 			const keys = await apiGet<string[]>('/credentials');
-			configuredKeys = new Set(keys.filter((k) => k.startsWith('service_key:')));
+			configuredKeys = new Set(keys.filter((k) => k.startsWith('api_key:')));
 		} catch {
 			configuredKeys = new Set();
 		}

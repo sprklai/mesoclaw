@@ -36,6 +36,8 @@ ignore = { workspace = true }
 diffy = { workspace = true }
 lru = { workspace = true }
 sqlite-vec = { workspace = true }
+urlencoding = { workspace = true }
+websearch = { workspace = true }
 
 # Phase 3: AI Agent + Gateway
 rig-core = { workspace = true, optional = true }
@@ -45,12 +47,19 @@ futures = { workspace = true }
 # Phase 4: Agent Intelligence
 serde_yaml = { workspace = true }
 
+# Phase 8: Channels (optional)
+teloxide = { workspace = true, optional = true }
+serenity = { workspace = true, optional = true }
+
 [features]
 default = ["gateway", "ai", "keyring"]
 gateway = ["dep:axum", "dep:tower-http"]
 ai = ["dep:rig-core"]
 web-dashboard = ["gateway"]
 channels = []
+channels-telegram = ["channels", "dep:teloxide"]
+channels-slack = ["channels"]
+channels-discord = ["channels", "dep:serenity"]
 scheduler = []
 keyring = ["dep:keyring"]
 

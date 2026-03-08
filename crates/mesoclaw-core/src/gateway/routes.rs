@@ -66,6 +66,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             delete(handlers::credentials::delete_credential),
         )
         .route(
+            "/credentials/{key}/value",
+            get(handlers::credentials::get_credential_value),
+        )
+        .route(
             "/credentials/{key}/exists",
             get(handlers::credentials::credential_exists),
         )
@@ -143,6 +147,13 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(handlers::user::get_observation_by_key).delete(handlers::user::delete_observation),
         )
         .route("/user/profile", get(handlers::user::get_user_profile))
+        // Channel credential test (always available, no feature gate)
+        .route(
+            "/channels/{name}/test",
+            post(handlers::channels_test::test_channel_credentials),
+        )
+        // Channels (Phase 8)
+        .merge(channel_routes())
         // WebSocket
         .route("/ws/chat", get(handlers::ws::ws_chat))
         // Auth middleware
@@ -155,6 +166,39 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Tracing
         .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+/// Build channel routes, conditionally compiled.
+fn channel_routes() -> Router<Arc<AppState>> {
+    #[cfg(feature = "channels")]
+    {
+        Router::new()
+            .route("/channels", get(handlers::channels::list_channels))
+            .route(
+                "/channels/{name}/status",
+                get(handlers::channels::channel_status),
+            )
+            .route(
+                "/channels/{name}/send",
+                post(handlers::channels::send_message),
+            )
+            .route(
+                "/channels/{name}/connect",
+                post(handlers::channels::connect_channel),
+            )
+            .route(
+                "/channels/{name}/disconnect",
+                post(handlers::channels::disconnect_channel),
+            )
+            .route(
+                "/channels/{name}/health",
+                get(handlers::channels::health_check),
+            )
+    }
+    #[cfg(not(feature = "channels"))]
+    {
+        Router::new()
+    }
 }
 
 fn build_cors(origins: &[String]) -> CorsLayer {

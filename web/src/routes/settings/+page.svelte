@@ -52,6 +52,9 @@
 		<Button variant="outline" onclick={() => goto('/settings/persona')}>
 			Persona & Skills
 		</Button>
+		<Button variant="outline" onclick={() => goto('/settings/channels')}>
+			Channels
+		</Button>
 	</div>
 
 	{#if configStore.loading}

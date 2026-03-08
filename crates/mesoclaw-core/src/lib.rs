@@ -13,6 +13,8 @@ pub mod user;
 #[cfg(feature = "ai")]
 pub mod ai;
 pub mod boot;
+#[cfg(feature = "channels")]
+pub mod channels;
 #[cfg(feature = "gateway")]
 pub mod gateway;
 

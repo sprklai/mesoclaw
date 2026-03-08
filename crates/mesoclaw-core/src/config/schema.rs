@@ -39,6 +39,10 @@ pub struct AppConfig {
     pub tool_file_search_max_results: usize,
     pub tool_process_list_limit: usize,
 
+    // Web Search
+    pub web_search_timeout_secs: u64,
+    pub web_search_max_results: usize,
+
     // Phase 3: Gateway
     pub gateway_auth_token: Option<String>,
     pub ws_max_connections: usize,
@@ -58,6 +62,14 @@ pub struct AppConfig {
 
     // Phase 8: Credentials
     pub keyring_service_id: String,
+
+    // Phase 8: Channels
+    pub channels_enabled: Vec<String>,
+    pub telegram_polling_timeout_secs: u32,
+    pub telegram_dm_policy: String,
+    pub telegram_retry_min_ms: u64,
+    pub telegram_retry_max_ms: u64,
+    pub telegram_require_group_mention: bool,
 
     // Phase 4: User Learning
     pub learning_enabled: bool,
@@ -104,6 +116,10 @@ impl Default for AppConfig {
             tool_file_search_max_results: 100,
             tool_process_list_limit: 200,
 
+            // Web Search
+            web_search_timeout_secs: 30,
+            web_search_max_results: 20,
+
             // Gateway
             gateway_auth_token: None,
             ws_max_connections: 32,
@@ -123,6 +139,14 @@ impl Default for AppConfig {
 
             // Credentials
             keyring_service_id: "com.sprklai.mesoclaw".into(),
+
+            // Channels
+            channels_enabled: vec![],
+            telegram_polling_timeout_secs: 30,
+            telegram_dm_policy: "allowlist".into(),
+            telegram_retry_min_ms: 1000,
+            telegram_retry_max_ms: 60_000,
+            telegram_require_group_mention: true,
 
             // User Learning
             learning_enabled: true,

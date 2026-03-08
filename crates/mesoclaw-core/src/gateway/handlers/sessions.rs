@@ -62,9 +62,15 @@ pub async fn delete_session(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GenerateTitleRequest {
+    pub model: Option<String>,
+}
+
 pub async fn generate_title(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
+    Json(req): Json<GenerateTitleRequest>,
 ) -> Result<impl IntoResponse> {
     let messages = state.session_manager.get_messages(&id).await?;
 
@@ -91,7 +97,7 @@ pub async fn generate_title(
         }
     };
 
-    let agent = match resolve_agent(None, &state).await {
+    let agent = match resolve_agent(req.model.as_deref(), &state, None).await {
         Ok(a) => a,
         Err(e) => {
             warn!("generate_title: no agent available: {e}");

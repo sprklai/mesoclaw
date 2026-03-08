@@ -14,10 +14,39 @@ export interface WsErrorMessage {
   error: string;
 }
 
-export type WsMessage = WsTextMessage | WsDoneMessage | WsErrorMessage;
+export interface WsToolCallMessage {
+  type: "tool_call";
+  call_id: string;
+  tool_name: string;
+  args: unknown;
+}
+
+export interface WsToolResultMessage {
+  type: "tool_result";
+  call_id: string;
+  tool_name: string;
+  output: string;
+  success: boolean;
+  duration_ms: number;
+}
+
+export type WsMessage =
+  | WsTextMessage
+  | WsDoneMessage
+  | WsErrorMessage
+  | WsToolCallMessage
+  | WsToolResultMessage;
 
 export interface ChatStreamCallbacks {
   onToken: (content: string) => void;
+  onToolCall?: (callId: string, toolName: string, args: unknown) => void;
+  onToolResult?: (
+    callId: string,
+    toolName: string,
+    output: string,
+    success: boolean,
+    durationMs: number,
+  ) => void;
   onDone: () => void;
   onError: (error: string) => void;
 }
@@ -53,6 +82,18 @@ export function createChatStream(
       switch (msg.type) {
         case "text":
           callbacks.onToken(msg.content);
+          break;
+        case "tool_call":
+          callbacks.onToolCall?.(msg.call_id, msg.tool_name, msg.args);
+          break;
+        case "tool_result":
+          callbacks.onToolResult?.(
+            msg.call_id,
+            msg.tool_name,
+            msg.output,
+            msg.success,
+            msg.duration_ms,
+          );
           break;
         case "done":
           callbacks.onDone();

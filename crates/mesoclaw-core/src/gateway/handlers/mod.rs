@@ -1,3 +1,6 @@
+#[cfg(feature = "channels")]
+pub mod channels;
+pub mod channels_test;
 pub mod chat;
 pub mod config;
 pub mod credentials;
@@ -53,6 +56,9 @@ pub(crate) mod tests {
         ));
         provider_registry.seed_builtin_providers().await.unwrap();
 
+        #[cfg(feature = "channels")]
+        let channel_registry = Arc::new(crate::channels::registry::ChannelRegistry::new());
+
         let state = Arc::new(AppState {
             config: Arc::new(config),
             db: pool.clone(),
@@ -67,6 +73,8 @@ pub(crate) mod tests {
             soul_loader,
             skill_registry,
             user_learner,
+            #[cfg(feature = "channels")]
+            channel_registry,
         });
         (dir, state)
     }
