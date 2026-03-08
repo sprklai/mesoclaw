@@ -17,11 +17,13 @@ use crate::user::UserLearner;
 
 #[cfg(feature = "channels")]
 use crate::channels::registry::ChannelRegistry;
+#[cfg(feature = "scheduler")]
+use crate::scheduler::TokioScheduler;
 
 #[cfg(feature = "ai")]
 use crate::ai::agent::MesoAgent;
 #[cfg(feature = "ai")]
-use crate::ai::context::BootContext;
+use crate::ai::context::{BootContext, ContextBuilder};
 #[cfg(feature = "ai")]
 use crate::ai::provider_registry::ProviderRegistry;
 #[cfg(feature = "ai")]
@@ -46,6 +48,8 @@ pub struct AppState {
     pub boot_context: BootContext,
     #[cfg(feature = "ai")]
     pub last_used_model: Arc<RwLock<Option<String>>>,
+    #[cfg(feature = "ai")]
+    pub context_builder: Arc<ContextBuilder>,
     /// Runtime toggle: context injection (mutable via PUT /config)
     pub context_injection_enabled: Arc<AtomicBool>,
     /// Runtime toggle: self-evolution / learning (mutable via PUT /config)
@@ -55,6 +59,8 @@ pub struct AppState {
     pub user_learner: Arc<UserLearner>,
     #[cfg(feature = "channels")]
     pub channel_registry: Arc<ChannelRegistry>,
+    #[cfg(feature = "scheduler")]
+    pub scheduler: Option<Arc<TokioScheduler>>,
 }
 
 #[cfg(test)]

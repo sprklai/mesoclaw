@@ -130,6 +130,19 @@ pub async fn update_config(
         if let Some(v) = obj.get("agent_system_prompt") {
             config.agent_system_prompt = v.as_str().map(|s| s.to_string());
         }
+        if let Some(v) = obj.get("context_strategy").and_then(|v| v.as_str()) {
+            // Validate: only accept known strategy values
+            match v {
+                "minimal" | "balanced" | "full" => {
+                    config.context_strategy = v.to_string();
+                }
+                _ => {
+                    return Err(crate::MesoError::Validation(format!(
+                        "invalid context_strategy '{v}': expected minimal, balanced, or full"
+                    )));
+                }
+            }
+        }
     }
 
     crate::config::save_config(&state.config_path, &config)?;
@@ -179,6 +192,7 @@ mod tests {
             provider_registry: base_state.provider_registry.clone(),
             boot_context: base_state.boot_context.clone(),
             last_used_model: base_state.last_used_model.clone(),
+            context_builder: base_state.context_builder.clone(),
             context_injection_enabled: base_state.context_injection_enabled.clone(),
             self_evolution_enabled: base_state.self_evolution_enabled.clone(),
             soul_loader: base_state.soul_loader.clone(),
@@ -186,6 +200,8 @@ mod tests {
             user_learner: base_state.user_learner.clone(),
             #[cfg(feature = "channels")]
             channel_registry: base_state.channel_registry.clone(),
+            #[cfg(feature = "scheduler")]
+            scheduler: base_state.scheduler.clone(),
         });
         (dir, state)
     }

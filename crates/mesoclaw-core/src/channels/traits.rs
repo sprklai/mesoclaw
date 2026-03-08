@@ -74,16 +74,92 @@ pub trait ChannelSender: Send + Sync {
     async fn send_message(&self, message: ChannelMessage) -> Result<()>;
 }
 
-/// Combined channel trait: lifecycle + sender + listen.
+/// Combined channel trait: lifecycle + sender + listen + lifecycle hooks.
 #[async_trait]
 pub trait Channel: ChannelLifecycle + ChannelSender {
     async fn listen(&self, tx: mpsc::Sender<ChannelMessage>) -> Result<()>;
     async fn health_check(&self) -> bool;
+
+    /// Called when the agent starts processing a message. Show typing/status.
+    async fn on_agent_start(&self, _recipient: Option<&str>) {}
+
+    /// Called when the agent uses a tool. Update status message.
+    async fn on_tool_use(&self, _tool_name: &str, _recipient: Option<&str>) {}
+
+    /// Called when the agent completes processing. Cleanup status.
+    async fn on_agent_complete(&self, _recipient: Option<&str>) {}
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::sync::mpsc;
+
+    // Mock channel for lifecycle hook tests
+    struct MockLifecycleChannel;
+
+    #[async_trait]
+    impl ChannelSender for MockLifecycleChannel {
+        fn channel_type(&self) -> &str {
+            "mock"
+        }
+        async fn send_message(&self, _message: ChannelMessage) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    #[async_trait]
+    impl ChannelLifecycle for MockLifecycleChannel {
+        fn display_name(&self) -> &str {
+            "mock"
+        }
+        async fn connect(&self) -> Result<()> {
+            Ok(())
+        }
+        async fn disconnect(&self) -> Result<()> {
+            Ok(())
+        }
+        fn status(&self) -> ChannelStatus {
+            ChannelStatus::Connected
+        }
+        fn create_sender(&self) -> Box<dyn ChannelSender> {
+            Box::new(MockLifecycleChannel)
+        }
+    }
+
+    #[async_trait]
+    impl Channel for MockLifecycleChannel {
+        async fn listen(&self, _tx: mpsc::Sender<ChannelMessage>) -> Result<()> {
+            Ok(())
+        }
+        async fn health_check(&self) -> bool {
+            true
+        }
+    }
+
+    // CR.21 — Default on_agent_start is no-op (does not panic)
+    #[tokio::test]
+    async fn default_lifecycle_noop() {
+        let ch = MockLifecycleChannel;
+        ch.on_agent_start(Some("user1")).await;
+        // No panic = pass
+    }
+
+    // CR.22 — Default on_tool_use is no-op
+    #[tokio::test]
+    async fn default_tool_use_noop() {
+        let ch = MockLifecycleChannel;
+        ch.on_tool_use("web_search", Some("user1")).await;
+        // No panic = pass
+    }
+
+    // CR.23 — Default on_agent_complete is no-op
+    #[tokio::test]
+    async fn default_agent_complete_noop() {
+        let ch = MockLifecycleChannel;
+        ch.on_agent_complete(Some("user1")).await;
+        // No panic = pass
+    }
 
     #[test]
     fn status_default_disconnected() {

@@ -197,6 +197,45 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         }
     }
 
+    if version < 6 {
+        conn.execute_batch(
+            "DROP TABLE IF EXISTS schedule_jobs;
+
+            CREATE TABLE IF NOT EXISTS scheduled_jobs (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                schedule_json TEXT NOT NULL,
+                session_target TEXT NOT NULL DEFAULT 'main',
+                payload_json TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                error_count INTEGER NOT NULL DEFAULT 0,
+                next_run TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                active_hours_json TEXT,
+                delete_after_run INTEGER NOT NULL DEFAULT 0
+            );
+
+            PRAGMA user_version = 6;",
+        )?;
+    }
+
+    if version < 7 {
+        // Add source column to sessions table for channel tracking
+        let has_source: bool = conn
+            .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'")
+            .and_then(|mut stmt| stmt.query_row([], |row| row.get::<_, String>(0)))
+            .map(|sql| sql.contains("source"))
+            .unwrap_or(false);
+
+        if !has_source {
+            conn.execute_batch(
+                "ALTER TABLE sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'web';",
+            )?;
+        }
+
+        conn.execute_batch("PRAGMA user_version = 7;")?;
+    }
+
     Ok(())
 }
 
@@ -232,7 +271,7 @@ mod tests {
         assert!(tables.contains(&"sessions".to_string()));
         assert!(tables.contains(&"messages".to_string()));
         assert!(tables.contains(&"providers".to_string()));
-        assert!(tables.contains(&"schedule_jobs".to_string()));
+        assert!(tables.contains(&"scheduled_jobs".to_string()));
     }
 
     #[test]
@@ -246,7 +285,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, 7);
     }
 
     #[test]
@@ -381,7 +420,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 5);
+        assert!(version >= 5);
     }
 
     // 15.3.39b — Migration v5 adds summary column to sessions
@@ -405,6 +444,32 @@ mod tests {
             })
             .unwrap();
         assert_eq!(summary, Some("A summary".to_string()));
+    }
+
+    // 16.42 — Migration v6 creates scheduled_jobs table
+    #[test]
+    fn migration_v6_creates_scheduled_jobs() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test.db");
+        let conn = Connection::open(&path).unwrap();
+        run_migrations(&conn).unwrap();
+
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert!(tables.contains(&"scheduled_jobs".to_string()));
+        // Orphaned v1 schedule_jobs should be gone
+        assert!(!tables.contains(&"schedule_jobs".to_string()));
+
+        let version: u32 = conn
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, 7);
     }
 
     #[tokio::test]

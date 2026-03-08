@@ -10,6 +10,8 @@ pub mod memory;
 pub mod messages;
 pub mod models;
 pub mod providers;
+#[cfg(feature = "scheduler")]
+pub mod scheduler;
 pub mod sessions;
 pub mod skill_proposals;
 pub mod skills;
@@ -62,20 +64,33 @@ pub(crate) mod tests {
         #[cfg(feature = "channels")]
         let channel_registry = Arc::new(crate::channels::registry::ChannelRegistry::new());
 
+        let config = Arc::new(config);
+        let memory: Arc<dyn crate::memory::traits::Memory> = Arc::new(InMemoryStore::new());
+        let session_manager = Arc::new(crate::ai::session::SessionManager::new(pool.clone()));
+
+        let context_builder = Arc::new(crate::ai::context::ContextBuilder::new(
+            session_manager.clone(),
+            memory.clone(),
+            soul_loader.clone(),
+            user_learner.clone(),
+            config.clone(),
+        ));
+
         let state = Arc::new(AppState {
-            config: Arc::new(config),
+            config,
             config_path: dir.path().join("config.toml"),
             db: pool.clone(),
             event_bus: Arc::new(crate::event_bus::TokioBroadcastBus::new(16)),
-            memory: Arc::new(InMemoryStore::new()),
+            memory,
             credentials: Arc::new(InMemoryCredentialStore::new()),
             security: Arc::new(SecurityPolicy::default_policy()),
             tools: Arc::new(crate::tools::ToolRegistry::new()),
-            session_manager: Arc::new(crate::ai::session::SessionManager::new(pool)),
+            session_manager,
             agent: None,
             provider_registry,
             boot_context: crate::ai::context::BootContext::from_system(),
             last_used_model: Arc::new(RwLock::new(None)),
+            context_builder,
             context_injection_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             self_evolution_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             soul_loader,
@@ -83,6 +98,15 @@ pub(crate) mod tests {
             user_learner,
             #[cfg(feature = "channels")]
             channel_registry,
+            #[cfg(feature = "scheduler")]
+            scheduler: {
+                let sched = crate::scheduler::TokioScheduler::new(
+                    pool.clone(),
+                    Arc::new(crate::event_bus::TokioBroadcastBus::new(16)),
+                    &crate::config::AppConfig::default(),
+                );
+                Some(sched)
+            },
         });
         (dir, state)
     }

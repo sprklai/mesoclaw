@@ -8,16 +8,45 @@ export interface MemoryEntry {
   created_at: number;
 }
 
+export interface UserObservation {
+  id: string;
+  category: string;
+  key: string;
+  value: string;
+  confidence: number;
+  created_at: string;
+  updated_at: string;
+}
+
 function createMemoryStore() {
   let entries = $state<MemoryEntry[]>([]);
+  let observations = $state<UserObservation[]>([]);
   let loading = $state(false);
 
   return {
     get entries() {
       return entries;
     },
+    get observations() {
+      return observations;
+    },
     get loading() {
       return loading;
+    },
+
+    async loadAll() {
+      loading = true;
+      try {
+        const [memResult, obsResult] = await Promise.allSettled([
+          apiGet<MemoryEntry[]>("/memory?q=&limit=50&offset=0"),
+          apiGet<{ observations: UserObservation[] }>("/user/observations"),
+        ]);
+        entries = memResult.status === "fulfilled" ? memResult.value : [];
+        observations =
+          obsResult.status === "fulfilled" ? obsResult.value.observations : [];
+      } finally {
+        loading = false;
+      }
     },
 
     async search(query: string, limit = 20, offset = 0) {
@@ -66,6 +95,7 @@ function createMemoryStore() {
 
     clear() {
       entries = [];
+      observations = [];
     },
   };
 }

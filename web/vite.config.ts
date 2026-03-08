@@ -4,6 +4,10 @@ import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
   plugins: [
     tailwindcss(),
     paraglideVitePlugin({

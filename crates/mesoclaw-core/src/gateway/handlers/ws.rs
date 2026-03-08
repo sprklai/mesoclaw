@@ -5,7 +5,7 @@ use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::ai::adapter::{ToolCallEvent, ToolCallPhase};
 use crate::ai::context::ContextEngine;
@@ -79,7 +79,26 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
             }
         };
 
-        // Compose context preamble
+        // Build context: history + augmented preamble via ContextBuilder
+        let (history, preamble) = match state
+            .context_builder
+            .build(request.session_id.as_deref(), &request.prompt)
+            .await
+        {
+            Ok(ctx) => ctx,
+            Err(e) => {
+                send_outbound(
+                    &mut socket,
+                    &WsOutbound::Error {
+                        error: format!("context build failed: {e}"),
+                    },
+                )
+                .await;
+                continue;
+            }
+        };
+
+        // Also compose ContextEngine preamble for boot context / cached summaries
         let ctx_enabled = state
             .context_injection_enabled
             .load(std::sync::atomic::Ordering::Relaxed);
@@ -101,7 +120,7 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
             false,
         );
         let model_display = request.model.as_deref().unwrap_or("default");
-        let preamble = match context_engine
+        let engine_preamble = match context_engine
             .compose(
                 &level,
                 &state.boot_context,
@@ -124,6 +143,27 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
             }
         };
 
+        // Merge preambles: ContextBuilder (identity + memory + user) + ContextEngine (boot + summaries)
+        let merged_preamble = format!("{preamble}\n\n{engine_preamble}");
+        info!(
+            "WS chat: session={}, history={} msgs, preamble={}B, prompt='{}'",
+            request.session_id.as_deref().unwrap_or("none"),
+            history.len(),
+            merged_preamble.len(),
+            &request.prompt[..request.prompt.len().min(80)]
+        );
+        for (i, msg) in history.iter().enumerate() {
+            let preview = match msg {
+                rig::message::Message::User { content, .. } => {
+                    format!("user: {:?}", content)
+                }
+                rig::message::Message::Assistant { content, .. } => {
+                    format!("assistant: {:?}", content)
+                }
+            };
+            info!("  history[{i}] {}", &preview[..preview.len().min(120)]);
+        }
+
         // Create per-request broadcast channel for tool events
         let (tool_tx, mut tool_rx) = broadcast::channel::<ToolCallEvent>(32);
 
@@ -131,7 +171,7 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
             request.model.as_deref(),
             &state,
             Some(tool_tx),
-            Some(preamble.as_str()),
+            Some(&merged_preamble),
         )
         .await
         {
@@ -151,11 +191,11 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
         // Note: user message is stored by the frontend via POST /sessions/{id}/messages
         // before the WS stream starts. Do not duplicate here.
 
-        // Spawn agent work in background
+        // Spawn agent work in background with chat history
         let prompt = request.prompt.clone();
         let (result_tx, mut result_rx) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
-            let result = agent.prompt(&prompt).await;
+            let result = agent.chat(&prompt, history).await;
             let _ = result_tx.send(result);
         });
 
@@ -220,10 +260,24 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
 
                             // Store assistant response and tool calls
                             if let Some(ref sid) = request.session_id {
+                                info!(
+                                    "WS: storing assistant response for session={sid}, len={}",
+                                    response.len()
+                                );
                                 let msg = state
                                     .session_manager
                                     .append_message(sid, "assistant", &response)
                                     .await;
+
+                                match &msg {
+                                    Ok(m) => info!(
+                                        "WS: assistant message stored OK: id={}, session={}",
+                                        m.id, m.session_id
+                                    ),
+                                    Err(e) => warn!(
+                                        "WS: FAILED to store assistant message for session={sid}: {e}"
+                                    ),
+                                }
 
                                 if let Ok(msg) = msg && !tool_events.is_empty() {
                                     let _ = state
@@ -231,6 +285,12 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
                                         .store_tool_calls(&msg.id, sid, &tool_events)
                                         .await;
                                 }
+
+                                // Auto-extract facts from the conversation
+                                let _ = state
+                                    .context_builder
+                                    .extract_facts(&request.prompt, &response, Some(sid))
+                                    .await;
                             }
 
                             send_outbound(&mut socket, &WsOutbound::Done).await;

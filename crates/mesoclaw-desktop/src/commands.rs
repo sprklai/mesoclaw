@@ -48,6 +48,15 @@ pub fn resolve_data_dir() -> std::path::PathBuf {
 ///
 /// This is called from the Tauri `.setup()` hook when no external URL is configured.
 pub fn boot_gateway(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize tracing so gateway logs are visible in the terminal.
+    // Use try_init() because Tauri devtools may have already set a global subscriber.
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "mesoclaw_core=info,warn".parse().unwrap()),
+        )
+        .try_init();
+
     let mode = resolve_gateway_mode().map_err(|e| e.to_string())?;
 
     if mode.external_url.is_some() {

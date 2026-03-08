@@ -27,7 +27,13 @@ pub async fn chat(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatRequest>,
 ) -> Result<impl IntoResponse> {
-    // Compose context preamble
+    // Build context: history + augmented preamble via ContextBuilder
+    let (history, preamble) = state
+        .context_builder
+        .build(req.session_id.as_deref(), &req.prompt)
+        .await?;
+
+    // Also compose ContextEngine preamble for boot context / cached summaries
     let ctx_enabled = state
         .context_injection_enabled
         .load(std::sync::atomic::Ordering::Relaxed);
@@ -48,7 +54,7 @@ pub async fn chat(
         false,
     );
     let model_display = req.model.as_deref().unwrap_or("default");
-    let preamble = context_engine
+    let engine_preamble = context_engine
         .compose(
             &level,
             &state.boot_context,
@@ -57,7 +63,11 @@ pub async fn chat(
             summary.as_deref(),
         )
         .await?;
-    let agent = resolve_agent(req.model.as_deref(), &state, None, Some(preamble.as_str())).await?;
+
+    // Merge preambles: ContextBuilder (identity + memory + user) + ContextEngine (boot + summaries)
+    let merged_preamble = format!("{preamble}\n\n{engine_preamble}");
+
+    let agent = resolve_agent(req.model.as_deref(), &state, None, Some(&merged_preamble)).await?;
 
     // If session_id provided, store the user message
     if let Some(ref sid) = req.session_id {
@@ -67,7 +77,16 @@ pub async fn chat(
             .await;
     }
 
-    let response = agent.prompt(&req.prompt).await?;
+    // Use chat() with history for multi-turn continuity
+    let response = agent.chat(&req.prompt, history).await?;
+
+    // Auto-extract facts from the conversation
+    if let Some(ref sid) = req.session_id {
+        let _ = state
+            .context_builder
+            .extract_facts(&req.prompt, &response, Some(sid))
+            .await;
+    }
 
     // If session_id provided, store the assistant response
     if let Some(ref sid) = req.session_id {

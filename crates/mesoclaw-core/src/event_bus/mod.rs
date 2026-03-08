@@ -19,6 +19,11 @@ pub enum AppEvent {
     ChannelConnected { channel: String },
     ChannelDisconnected { channel: String, reason: String },
     ChannelMessageReceived { channel: String, sender: String },
+    HeartbeatTick { job_id: String },
+    CronFired { job_id: String, name: String },
+    HeartbeatAlert { message: String },
+    SchedulerStarted,
+    SchedulerStopped,
     Shutdown,
 }
 
@@ -93,6 +98,39 @@ mod tests {
 
         let event = rx.recv().await.unwrap();
         assert!(matches!(event, AppEvent::ChannelConnected { channel } if channel == "telegram"));
+    }
+
+    // 16.40 — HeartbeatTick event serialization
+    #[tokio::test]
+    async fn heartbeat_tick_event() {
+        let bus = TokioBroadcastBus::new(16);
+        let mut rx = bus.subscribe();
+
+        bus.publish(AppEvent::HeartbeatTick {
+            job_id: "j1".into(),
+        })
+        .unwrap();
+
+        let event = rx.recv().await.unwrap();
+        assert!(matches!(event, AppEvent::HeartbeatTick { job_id } if job_id == "j1"));
+    }
+
+    // 16.41 — CronFired event serialization
+    #[tokio::test]
+    async fn cron_fired_event() {
+        let bus = TokioBroadcastBus::new(16);
+        let mut rx = bus.subscribe();
+
+        bus.publish(AppEvent::CronFired {
+            job_id: "j2".into(),
+            name: "daily_check".into(),
+        })
+        .unwrap();
+
+        let event = rx.recv().await.unwrap();
+        assert!(
+            matches!(event, AppEvent::CronFired { job_id, name } if job_id == "j2" && name == "daily_check")
+        );
     }
 
     #[tokio::test]

@@ -19,6 +19,8 @@
 - [Desktop App Architecture](#desktop-app-architecture)
 - [Context-Aware Agent System](#context-aware-agent-system)
 - [Self-Evolving Framework](#self-evolving-framework)
+- [Scheduler Notification Flow](#scheduler-notification-flow-stage-861--planned)
+- [Channel Router Pipeline](#channel-router-pipeline-stage-87--planned)
 - [Concurrency Rules](#concurrency-rules)
 - [Lessons Learned from v1](#lessons-learned-from-v1)
 
@@ -507,7 +509,7 @@ graph TB
     end
 
     subgraph ComposerSG["PromptComposer"]
-        Compose["1. SOUL<br>2. IDENTITY meta<br>3. USER<br>4. Observations<br>5. Active skills<br>6. Config override"]
+        Compose["SOUL<br>IDENTITY meta<br>USER<br>Observations<br>Active skills<br>Config override"]
     end
 
     SOUL & IDENT & USER --> Loader
@@ -874,12 +876,29 @@ All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Rou
 | POST | `/channels/{name}/disconnect` | `channels` | Disconnect channel |
 | GET | `/channels/{name}/health` | `channels` | Health check |
 
-### Future Phases (not yet implemented)
+### Scheduler (6 routes, feature-gated)
 
-| Group | Routes | Phase |
+| Method | Path | Description |
 |---|---|---|
-| Scheduler | 4 routes (feature-gated) | Phase 8 |
-| WebSocket `/ws/events`, `/ws/agents` | 2 channels | Phase 8+ |
+| POST | `/scheduler/jobs` | Create scheduled job |
+| GET | `/scheduler/jobs` | List all jobs |
+| DELETE | `/scheduler/jobs/{id}` | Delete job |
+| PUT | `/scheduler/jobs/{id}/toggle` | Toggle job enabled/disabled |
+| GET | `/scheduler/jobs/{id}/history` | Get job execution history |
+| GET | `/scheduler/status` | Scheduler status |
+
+### WebSocket Channels (planned)
+
+| Path | Feature | Description |
+|---|---|---|
+| `/ws/chat` | always | Streaming chat responses |
+| `/ws/notifications` | `scheduler` | Push scheduler notifications to clients |
+
+### Channel Router (planned)
+
+| Method | Path | Feature | Description |
+|---|---|---|---|
+| POST | `/channels/{name}/message` | `channels` | Channel message webhook |
 
 ## Desktop App Architecture
 
@@ -953,6 +972,75 @@ The frontend detects the Tauri environment via `window.__TAURI__` and provides t
 - `openDataDir()` -- invoke `open_data_dir` IPC command
 
 All wrappers are no-ops when running in a browser (non-Tauri) context, so the same frontend works for both desktop and web.
+
+## Scheduler Notification Flow (Stage 8.6.1 — planned)
+
+```mermaid
+graph TB
+    subgraph SchedulerTick["Scheduler Tick Loop"]
+        Tick["1s interval ticker"] --> Due["Filter due jobs"]
+        Due --> Active["Check active hours"]
+        Active --> Exec["PayloadExecutor.execute#40;job#41;"]
+    end
+
+    subgraph PayloadExec["PayloadExecutor"]
+        Exec --> NotifyP["Notify<br>→ publish event"]
+        Exec --> AgentP["AgentTurn<br>→ resolve_agent + chat"]
+        Exec --> HeartP["Heartbeat<br>→ sysinfo gather"]
+        Exec --> ChanP["SendViaChannel<br>→ channel_registry.send"]
+    end
+
+    subgraph Delivery["Notification Delivery"]
+        NotifyP --> EventBus["Event Bus<br>SchedulerNotification"]
+        EventBus --> WS["WS /ws/notifications<br>push to clients"]
+        EventBus --> Toast["Frontend toast<br>svelte-sonner"]
+        EventBus --> Desktop["Desktop notification<br>tauri-plugin-notification"]
+    end
+
+    subgraph Wiring["AppState Wiring"]
+        OnceCell["OnceCell pattern<br>post-construction wire#40;#41;"]
+    end
+
+    style SchedulerTick fill:#2196F3,color:#fff
+    style PayloadExec fill:#4CAF50,color:#fff
+    style Delivery fill:#FF9800,color:#fff
+    style Wiring fill:#9E9E9E,color:#fff
+```
+
+## Channel Router Pipeline (Stage 8.7 — planned)
+
+```mermaid
+graph TB
+    subgraph Inbound["Inbound Message"]
+        Platform["Telegram / Slack / Discord"] --> Listen["Channel.listen#40;tx#41;"]
+        Webhook["POST /channels/name/message"] --> Router
+        Listen --> Router["ChannelRouter"]
+    end
+
+    subgraph Pipeline["Message Pipeline"]
+        Router --> Session["SessionMap<br>resolve or create"]
+        Session --> ToolFilter["ToolPolicy<br>filter allowed tools"]
+        ToolFilter --> Context["channel_system_context<br>preamble override"]
+        Context --> Agent["resolve_agent<br>with filtered tools"]
+        Agent --> Format["ChannelFormatter<br>platform-specific output"]
+        Format --> Send["ChannelSender<br>send response"]
+        Send --> Store["SessionManager<br>store messages"]
+    end
+
+    subgraph Hooks["Lifecycle Hooks - Stage 8.8"]
+        HookStart["on_agent_start<br>typing / status msg"]
+        HookTool["on_tool_use<br>update status"]
+        HookDone["on_agent_complete<br>cleanup status"]
+    end
+
+    Agent -.-> HookStart
+    Agent -.-> HookTool
+    Agent -.-> HookDone
+
+    style Inbound fill:#2196F3,color:#fff
+    style Pipeline fill:#4CAF50,color:#fff
+    style Hooks fill:#FF9800,color:#fff
+```
 
 ## Concurrency Rules
 

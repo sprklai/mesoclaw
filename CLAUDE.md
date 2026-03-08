@@ -96,6 +96,7 @@ scripts/build.sh            # Cross-platform build script
 - Imports: std -> external crates -> internal modules (blank line separated)
 - Logging: `tracing` macros only (info!, warn!, error!, debug!), never println!
 - Frontend: max 1 `$effect` per Svelte component, WS for real-time, no polling
+- **Native `<select>` in dark mode**: Always use `bg-background text-foreground` classes on `<select>` elements. The `color-scheme: dark` on `.dark` class in `app.css` ensures dropdown options render with dark backgrounds. Never use `bg-transparent` on selects — it breaks option visibility in dark mode.
 - Paths: absolute in code, relative when referencing to user
 - SQL: parameterized queries only, WAL mode, migrations in transactions
 - Security: never log credentials, use zeroize for sensitive data, keyring for storage
@@ -182,7 +183,7 @@ After each phase completion (Gate 3 approved), update all docs before proceeding
 - **Mermaid line breaks**: Use `<br>` not `<br/>` — Mermaid 11.x Langium parser rejects self-closing `<br/>` with "Syntax error in text"
 - **Mermaid parentheses**: Use `#40;` and `#41;` for `(` and `)` inside node labels — bare parentheses trigger "Unsupported markdown: list" in Mermaid 11.x. Does NOT apply to subgraph titles or sequence diagram participants — use plain text or dashes there instead.
 - **Mermaid subgraph/node ID collision**: Never use the same ID for a `subgraph` and a node inside it — Mermaid treats them as the same entity and throws "Setting X as parent of X would create a cycle". Use distinct IDs, e.g. `subgraph "Boot"` with node `BootEntry[...]` instead of `Boot[...]`.
-- **Mermaid numbered lists**: Never start node label text with `1.`, `2.`, etc. — Mermaid interprets these as Markdown ordered list items
+- **Mermaid numbered lists**: Never use `1.`, `2.`, etc. anywhere in node label text (including after `<br>`) — Mermaid interprets these as Markdown ordered list items and throws "Unsupported markdown: list". Use plain text without numbering, or use letters/dashes instead.
 - **Directory trees**: Use Unicode box-drawing characters (`├──`, `└──`, `│`) not ASCII `+--` and `|` — the `+` is a valid Markdown list marker and triggers "unsupported list" warnings in renderers
 - **Mermaid styling** (nice-to-have): For simple, non-complex diagrams, add `style` or `classDef` directives to improve readability with color. Use a consistent palette: `#4CAF50` (green/done), `#FF9800` (orange/in-progress), `#2196F3` (blue/info), `#9E9E9E` (gray/not-started), `#F44336` (red/error). Keep styling minimal — don't clutter complex diagrams. Prefer `classDef` for reusable styles over per-node `style` directives.
 - **Mermaid layout**: Use `direction TB` or `direction LR` explicitly for clarity. Group related nodes with `subgraph`. Add spacing with invisible edges (`~~>`) only if layout is unreadable otherwise.

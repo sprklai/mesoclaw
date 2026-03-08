@@ -80,8 +80,14 @@ pub enum MesoError {
     #[error("YAML parse error: {0}")]
     Yaml(#[from] serde_yaml::Error),
 
+    #[error("context error: {0}")]
+    Context(String),
+
     #[error("validation error: {0}")]
     Validation(String),
+
+    #[error("scheduler error: {0}")]
+    Scheduler(String),
 
     #[error("{0}")]
     Other(String),
@@ -102,6 +108,13 @@ mod tests {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file missing");
         let err: MesoError = io_err.into();
         assert!(err.to_string().contains("file missing"));
+    }
+
+    // 16.38 — MesoError::Scheduler variant
+    #[test]
+    fn scheduler_error_variant() {
+        let err = MesoError::Scheduler("job failed".into());
+        assert_eq!(err.to_string(), "scheduler error: job failed");
     }
 
     #[test]

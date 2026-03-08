@@ -18,6 +18,8 @@
 - [Provider Management Flow](#provider-management-flow)
 - [Context Injection Flow](#context-injection-flow)
 - [Skill Proposal Flow](#skill-proposal-flow)
+- [Scheduler Notification Flow](#scheduler-notification-flow)
+- [Channel Router Message Pipeline](#channel-router-message-pipeline)
 
 ---
 
@@ -513,4 +515,108 @@ sequenceDiagram
         GW->>DB: UPDATE status = 'rejected'
         GW-->>User: { status: "rejected" }
     end
+```
+
+## Scheduler Notification Flow
+
+The scheduler tick loop executes payloads via `PayloadExecutor` and delivers notifications through multiple channels.
+
+```mermaid
+sequenceDiagram
+    participant Sched as TokioScheduler
+    participant PE as PayloadExecutor
+    participant EB as EventBus
+    participant WS as WS /ws/notifications
+    participant Web as Frontend (toast)
+    participant Desk as Desktop (OS notification)
+    participant Agent as MesoAgent
+    participant Chan as ChannelRegistry
+
+    Note over Sched: 1s tick loop finds due job
+
+    alt Notify payload
+        Sched->>PE: execute(Notify { message })
+        PE->>EB: publish(SchedulerNotification)
+        EB-->>WS: push to connected clients
+        WS-->>Web: JSON message
+        Web-->>Web: svelte-sonner toast
+        opt Tauri desktop
+            Web-->>Desk: invoke("show_notification")
+        end
+    else AgentTurn payload
+        Sched->>PE: execute(AgentTurn { prompt })
+        PE->>Agent: resolve_agent + chat(prompt)
+        Agent-->>PE: response text
+        PE->>EB: publish(SchedulerJobCompleted)
+    else Heartbeat payload
+        Sched->>PE: execute(Heartbeat)
+        PE->>PE: sysinfo gather (CPU, memory, disk)
+        PE->>EB: publish(HeartbeatAlert { message })
+    else SendViaChannel payload
+        Sched->>PE: execute(SendViaChannel { channel, message })
+        PE->>Chan: get_sender(channel)
+        Chan-->>PE: ChannelSender
+        PE->>Chan: send_message(ChannelMessage)
+    end
+
+    Sched->>Sched: Record execution in history
+    Sched->>Sched: Compute next_run
+```
+
+## Channel Router Message Pipeline
+
+The ChannelRouter orchestrates the full message processing flow from inbound channel message to outbound response.
+
+```mermaid
+sequenceDiagram
+    participant Ext as External Platform
+    participant Ch as Channel (listen)
+    participant CR as ChannelRouter
+    participant SM as ChannelSessionMap
+    participant TP as ChannelToolPolicy
+    participant AI as resolve_agent
+    participant LLM as LLM Provider
+    participant Fmt as ChannelFormatter
+    participant Send as ChannelSender
+    participant DB as SessionManager
+
+    Ext->>Ch: Platform message arrives
+    Ch->>CR: mpsc::send(ChannelMessage)
+
+    CR->>SM: resolve_or_create(msg)
+    SM-->>CR: session_id
+
+    CR->>TP: allowed_tools(channel, tools)
+    TP-->>CR: filtered tool list
+
+    CR->>CR: channel_system_context(channel)
+    Note over CR: Platform-specific preamble
+
+    opt Lifecycle hooks (Stage 8.8)
+        CR->>Ch: on_agent_start(msg)
+        Note over Ch: Typing indicator / status msg
+    end
+
+    CR->>AI: resolve_agent(model, preamble_override)
+    AI->>LLM: prompt with context
+    LLM-->>AI: response
+
+    opt Tool use during agent loop
+        CR->>Ch: on_tool_use(msg, tool_name)
+    end
+
+    AI-->>CR: final response text
+
+    opt Lifecycle hooks (Stage 8.8)
+        CR->>Ch: on_agent_complete(msg)
+        Note over Ch: Clear status / typing
+    end
+
+    CR->>Fmt: format(response, channel)
+    Fmt-->>CR: platform-formatted text
+
+    CR->>Send: send_message(reply)
+    Send->>Ext: Deliver response
+
+    CR->>DB: store user + assistant messages
 ```

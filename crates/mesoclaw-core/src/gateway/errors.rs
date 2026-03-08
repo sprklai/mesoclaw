@@ -35,6 +35,7 @@ impl IntoResponse for MesoError {
             MesoError::Io(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_IO_ERROR"),
             MesoError::EventBus(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_EVENT_ERROR"),
             MesoError::Channel(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_CHANNEL_ERROR"),
+            MesoError::Context(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_CONTEXT"),
             MesoError::TomlSerialize(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "MESO_TOML_SERIALIZE_ERROR",
@@ -46,6 +47,7 @@ impl IntoResponse for MesoError {
             MesoError::User(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_P4_USER"),
             MesoError::Yaml(_) => (StatusCode::BAD_REQUEST, "MESO_YAML_PARSE_ERROR"),
             MesoError::Validation(_) => (StatusCode::BAD_REQUEST, "MESO_VALIDATION"),
+            MesoError::Scheduler(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_SCHEDULER_ERROR"),
             MesoError::Other(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_INTERNAL_ERROR"),
         };
 
@@ -191,6 +193,7 @@ mod tests {
             MesoError::Io(io_err),
             MesoError::EventBus("t".into()),
             MesoError::Channel("t".into()),
+            MesoError::Context("t".into()),
             {
                 use serde::ser::Error as _;
                 MesoError::TomlSerialize(toml::ser::Error::custom("t"))
@@ -206,6 +209,7 @@ mod tests {
                 MesoError::Yaml(yaml_err)
             },
             MesoError::Validation("t".into()),
+            MesoError::Scheduler("t".into()),
             MesoError::Other("t".into()),
         ];
 
@@ -215,8 +219,8 @@ mod tests {
             assert!(codes.insert(code.clone()), "duplicate error code: {code}");
         }
 
-        // 27 variants tested (Http skipped because reqwest::Error can't be easily constructed)
-        assert_eq!(codes.len(), 27);
+        // 29 variants tested (Http skipped because reqwest::Error can't be easily constructed)
+        assert_eq!(codes.len(), 29);
     }
 
     #[test]

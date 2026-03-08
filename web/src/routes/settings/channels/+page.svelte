@@ -258,7 +258,7 @@
 										<label class="text-sm font-medium" for="tg-dm-policy">DM Policy</label>
 										<select
 											id="tg-dm-policy"
-											class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+											class="flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm"
 											bind:value={tgDmPolicy}
 										>
 											<option value="allowlist">Allowlist Only</option>

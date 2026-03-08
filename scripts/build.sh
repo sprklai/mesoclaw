@@ -394,6 +394,15 @@ run_dev() {
     }
     trap cleanup EXIT INT TERM
 
+    # Kill any existing process on port 5173
+    local existing_pid
+    existing_pid=$(lsof -ti :5173 2>/dev/null || true)
+    if [ -n "$existing_pid" ]; then
+        warn "Port 5173 is in use (PID $existing_pid), killing it..."
+        kill "$existing_pid" 2>/dev/null || true
+        sleep 1
+    fi
+
     # Start Vite dev server in background
     info "Starting Vite dev server on http://localhost:5173..."
     (cd "${WORKSPACE_ROOT}/web" && bun run dev) &

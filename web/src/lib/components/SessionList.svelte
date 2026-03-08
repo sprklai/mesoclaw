@@ -66,7 +66,7 @@
 					{#if editingId === session.id}
 						<div class="flex w-full items-center gap-1 px-2 py-1">
 							<input
-								class="flex-1 rounded border bg-transparent px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+								class="flex-1 rounded border bg-background text-foreground px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
 								bind:value={editTitle}
 								onkeydown={handleEditKeydown}
 								onblur={saveEdit}

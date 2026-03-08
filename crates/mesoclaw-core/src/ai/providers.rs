@@ -7,15 +7,16 @@ use crate::{MesoError, Result};
 /// Resolve the API key for the configured provider.
 ///
 /// Resolution order:
-/// 1. Credential store lookup by `provider_name`
+/// 1. Credential store lookup by `api_key:{provider_name}`
 /// 2. Environment variable from `provider_api_key_env`
 /// 3. Error if neither found
 pub async fn resolve_api_key(
     config: &AppConfig,
     credentials: &dyn CredentialStore,
 ) -> Result<String> {
-    // 1. Try credential store
-    if let Some(key) = credentials.get(&config.provider_name).await?
+    // 1. Try credential store (using api_key:{provider} naming convention)
+    let key_name = format!("api_key:{}", config.provider_name);
+    if let Some(key) = credentials.get(&key_name).await?
         && !key.is_empty()
     {
         return Ok(key);
@@ -193,7 +194,10 @@ mod tests {
             ..Default::default()
         };
         let creds = InMemoryCredentialStore::new();
-        creds.set("test-prov", "sk-from-store").await.unwrap();
+        creds
+            .set("api_key:test-prov", "sk-from-store")
+            .await
+            .unwrap();
 
         // SAFETY: test-only, single-threaded tokio runtime
         unsafe { std::env::set_var("TEST_MESO_CRED_PRIO", "sk-from-env") };

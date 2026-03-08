@@ -76,6 +76,11 @@ enum Commands {
         #[command(subcommand)]
         action: ProviderAction,
     },
+    /// Manage scheduled jobs
+    Schedule {
+        #[command(subcommand)]
+        action: ScheduleAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -175,6 +180,55 @@ enum KeyAction {
 }
 
 #[derive(Subcommand)]
+enum ScheduleAction {
+    /// List all scheduled jobs
+    List,
+    /// Create a new scheduled job
+    Create {
+        /// Job name
+        name: String,
+        /// Schedule type: interval or cron
+        #[arg(long, default_value = "interval")]
+        schedule_type: String,
+        /// Interval in seconds (for interval schedule)
+        #[arg(long)]
+        interval_secs: Option<u64>,
+        /// Cron expression (for cron schedule)
+        #[arg(long)]
+        cron_expr: Option<String>,
+        /// Payload type: heartbeat, notify, or agent_turn
+        #[arg(long, default_value = "heartbeat")]
+        payload: String,
+        /// Message for notify payload
+        #[arg(long)]
+        message: Option<String>,
+        /// Prompt for agent_turn payload
+        #[arg(long)]
+        prompt: Option<String>,
+        /// Delete after first run (one-shot)
+        #[arg(long)]
+        one_shot: bool,
+    },
+    /// Toggle a job enabled/disabled
+    Toggle {
+        /// Job ID
+        id: String,
+    },
+    /// Delete a scheduled job
+    Delete {
+        /// Job ID
+        id: String,
+    },
+    /// Show execution history for a job
+    History {
+        /// Job ID
+        id: String,
+    },
+    /// Show scheduler status
+    Status,
+}
+
+#[derive(Subcommand)]
 enum ProviderAction {
     /// List all providers with key status
     List,
@@ -258,6 +312,38 @@ async fn main() {
             KeyAction::SetRaw { key, value } => commands::key::set_raw(&client, &key, &value).await,
             KeyAction::RemoveRaw { key } => commands::key::remove_raw(&client, &key).await,
             KeyAction::List => commands::key::list(&client).await,
+        },
+        Commands::Schedule { action } => match action {
+            ScheduleAction::List => commands::schedule::list(&client).await,
+            ScheduleAction::Create {
+                name,
+                schedule_type,
+                interval_secs,
+                cron_expr,
+                payload,
+                message,
+                prompt,
+                one_shot,
+            } => {
+                commands::schedule::create(
+                    &client,
+                    commands::schedule::CreateJobArgs {
+                        name: &name,
+                        schedule_type: &schedule_type,
+                        interval_secs,
+                        cron_expr: cron_expr.as_deref(),
+                        payload_type: &payload,
+                        message: message.as_deref(),
+                        prompt: prompt.as_deref(),
+                        one_shot,
+                    },
+                )
+                .await
+            }
+            ScheduleAction::Toggle { id } => commands::schedule::toggle(&client, &id).await,
+            ScheduleAction::Delete { id } => commands::schedule::delete(&client, &id).await,
+            ScheduleAction::History { id } => commands::schedule::history(&client, &id).await,
+            ScheduleAction::Status => commands::schedule::status(&client).await,
         },
         Commands::Provider { action } => match action {
             ProviderAction::List => commands::provider::list(&client).await,
@@ -521,6 +607,103 @@ mod tests {
                 assert_eq!(model_id, "gpt-4o");
             }
             _ => panic!("expected Provider Default"),
+        }
+    }
+
+    #[test]
+    fn parse_schedule_list() {
+        let cli = parse(&["mesoclaw", "schedule", "list"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Schedule {
+                action: ScheduleAction::List
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_schedule_status() {
+        let cli = parse(&["mesoclaw", "schedule", "status"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Schedule {
+                action: ScheduleAction::Status
+            }
+        ));
+    }
+
+    #[test]
+    fn parse_schedule_create_interval() {
+        let cli = parse(&[
+            "mesoclaw",
+            "schedule",
+            "create",
+            "my-job",
+            "--schedule-type",
+            "interval",
+            "--interval-secs",
+            "300",
+            "--payload",
+            "heartbeat",
+        ]);
+        match cli.command {
+            Commands::Schedule {
+                action:
+                    ScheduleAction::Create {
+                        name,
+                        schedule_type,
+                        interval_secs,
+                        payload,
+                        one_shot,
+                        ..
+                    },
+            } => {
+                assert_eq!(name, "my-job");
+                assert_eq!(schedule_type, "interval");
+                assert_eq!(interval_secs, Some(300));
+                assert_eq!(payload, "heartbeat");
+                assert!(!one_shot);
+            }
+            _ => panic!("expected Schedule Create"),
+        }
+    }
+
+    #[test]
+    fn parse_schedule_toggle() {
+        let cli = parse(&["mesoclaw", "schedule", "toggle", "job-123"]);
+        match cli.command {
+            Commands::Schedule {
+                action: ScheduleAction::Toggle { id },
+            } => {
+                assert_eq!(id, "job-123");
+            }
+            _ => panic!("expected Schedule Toggle"),
+        }
+    }
+
+    #[test]
+    fn parse_schedule_delete() {
+        let cli = parse(&["mesoclaw", "schedule", "delete", "job-456"]);
+        match cli.command {
+            Commands::Schedule {
+                action: ScheduleAction::Delete { id },
+            } => {
+                assert_eq!(id, "job-456");
+            }
+            _ => panic!("expected Schedule Delete"),
+        }
+    }
+
+    #[test]
+    fn parse_schedule_history() {
+        let cli = parse(&["mesoclaw", "schedule", "history", "job-789"]);
+        match cli.command {
+            Commands::Schedule {
+                action: ScheduleAction::History { id },
+            } => {
+                assert_eq!(id, "job-789");
+            }
+            _ => panic!("expected Schedule History"),
         }
     }
 }

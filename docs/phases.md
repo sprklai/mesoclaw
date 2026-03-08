@@ -341,6 +341,23 @@ gantt
 - Config: `channels_enabled`, Telegram-specific settings (polling timeout, DM policy, retry, group mention)
 - `WebSearchTool` refactored to use `websearch` crate with Tavily → Brave → DuckDuckGo provider cascade
 
+**Step 15.3: Context Management — `[IN PROGRESS]`**
+- Plan covers multi-turn context continuity, cross-session memory recall, and adaptive context strategies
+- 52 core context unit tests planned (ContextEngine lifecycle, BootContext, tier injection, cache invalidation, summary generation)
+- Sub-steps 15.3.1 (Tool Visibility) and 15.3.2 (Web Search refactor) are complete; core context tests remain unimplemented
+- Plan: [plans/phase8.3_context.md](../plans/phase8.3_context.md), Test plan: [tests/phase8.3_context.md](../tests/phase8.3_context.md)
+
+**Step 15.3.1: Tool Visibility — `[COMPLETE]`**
+- Dynamic tool visibility based on context and user preferences
+- 25 automated tests passing (adapter, WS protocol, DB persistence, frontend, build verification)
+- Test plan: [tests/phase8.3.1_tool_visibility.md](../tests/phase8.3.1_tool_visibility.md)
+
+**Step 15.3.2: Web Search Refactor — `[COMPLETE]`**
+- `WebSearchTool` refactored to use `websearch` crate with Tavily → Brave → DuckDuckGo cascade
+- 14 automated tests passing (unit, integration, boot, build verification)
+- Manual tests M.WS.2-M.WS.3 pending (multi-provider cascade, DuckDuckGo fallback)
+- Test plan: [tests/phase8.3.2_web_search.md](../tests/phase8.3.2_web_search.md)
+
 **Step 15.3b: Context-Aware Agent & Self-Evolving Framework — `[COMPLETE]`**
 - `ContextEngine` -- 3-tier adaptive context injection (Full / Minimal / Summary) with hash-based cache invalidation
 - `BootContext` -- system info computed once at startup (OS, arch, hostname, locale, region)
@@ -359,21 +376,83 @@ gantt
 - Runtime toggles: `context_injection_enabled` and `self_evolution_enabled` (AtomicBool, mutable via PUT /config)
 - Config: `context_reinject_gap_minutes`, `context_reinject_message_count`, `context_summary_model_id`, `context_summary_provider_id`, `skill_max_content_size`, `skill_proposal_expiry_days`
 
-**Step 16: Scheduler — `[NOT STARTED]`**
-- Cron/interval job system with SQLite persistence (`cron` crate 0.15)
-- `TokioScheduler` -- 1s tick, DashMap job registry, error backoff, stuck detection
-- Job payloads: Heartbeat, AgentTurn, Notify, SendViaChannel
-- Active hours gate, one-shot jobs, graceful shutdown
+**Step 15.5: Channel Router Components — `[COMPLETE]`**
+- `ChannelSessionMap` -- DashMap-backed session mapping for channel threads (creates sessions on first contact)
+- `ChannelToolPolicy` -- per-channel tool allowlists from config
+- `ChannelFormatter` trait with Telegram/Slack/Discord/Default formatters
+- `channel_system_context()` -- platform-specific preamble strings
+- `Session.source` field -- tracks origin ("web", "cli", "telegram", etc.)
+- DB migration v7: `sessions.source` column
+- 32 unit tests passing. Router orchestrator and lifecycle hooks deferred to stages 8.7 and 8.8.
+- Plan: [plans/phase8.5_channel_router.md](../plans/phase8.5_channel_router.md), Test plan: [tests/phase8.5_channel_router.md](../tests/phase8.5_channel_router.md)
+
+**Step 16: Scheduler Infrastructure — `[COMPLETE]`**
+- `TokioScheduler` -- DashMap+Arc job registry with 1s tick loop, cron/interval schedules, error backoff, active hours gate, one-shot jobs, SQLite persistence, graceful shutdown
+- Job payloads: Heartbeat, AgentTurn, Notify, SendViaChannel (execution stubs — wired in 8.6.1)
+- 6 gateway routes (feature-gated), Schedule UI page, CLI schedule commands
 - Feature-gated behind `scheduler` feature flag
+- 52 core tests + 6 CLI tests passing
+- Plan: [plans/phase8.6_scheduler.md](../plans/phase8.6_scheduler.md), Test plan: [tests/phase8.6_scheduler.md](../tests/phase8.6_scheduler.md)
+
+**Stage 8.6.1: Scheduler Notification & Payload Execution — `[NOT STARTED]`**
+- Wire real execution for all 4 scheduler payloads (Notify, AgentTurn, Heartbeat, SendViaChannel)
+- PayloadExecutor module with event bus integration
+- OnceCell pattern for TokioScheduler ↔ AppState circular dependency
+- WebSocket `/ws/notifications` push endpoint
+- Frontend toast notifications (`svelte-sonner`)
+- Desktop OS notifications (`tauri-plugin-notification`)
+- Plan: [plans/phase8.6.1_scheduler_notification.md](../plans/phase8.6.1_scheduler_notification.md), Test plan: [tests/phase8.6.1_scheduler_notification.md](../tests/phase8.6.1_scheduler_notification.md)
+
+**Stage 8.7: Channel Router Orchestrator — `[NOT STARTED]`**
+- End-to-end message pipeline: channel → session → tools → context → agent → format → send
+- ChannelRouter struct with start/stop/handle_message lifecycle
+- Boot integration and AppState wiring
+- Channel message webhook endpoint
+- Frontend channel badges in session sidebar
+- Plan: [plans/phase8.7_channel_router.md](../plans/phase8.7_channel_router.md), Test plan: [tests/phase8.7_channel_router.md](../tests/phase8.7_channel_router.md)
+
+**Stage 8.8: Channel Lifecycle Hooks — `[NOT STARTED]`**
+- Telegram: status messages + typing refresh loop
+- Slack: ephemeral messages
+- Discord: typing indicator
+- Hooks wired into ChannelRouter pipeline
+- 8 manual tests requiring live bot tokens
+- Plan: [plans/phase8.8_channel_lifecycle.md](../plans/phase8.8_channel_lifecycle.md), Test plan: [tests/phase8.8_channel_lifecycle.md](../tests/phase8.8_channel_lifecycle.md)
+
+**Stage 8.9: Test Debt & Hardening — `[NOT STARTED]`**
+- ProcessTool kill action (sysinfo-based, Full autonomy gate)
+- 52 core context unit tests (ContextEngine, BootContext, tiers, cache, summaries)
+- Agent tool loop integration tests 4.8-4.12 (mock LLM)
+- Manual tests requiring API keys (CLI, web search, tool error recovery)
+- Plan: [plans/phase8.9_test_debt.md](../plans/phase8.9_test_debt.md), Test plan: [tests/phase8.9_test_debt.md](../tests/phase8.9_test_debt.md)
+
+**Execution Strategy**:
+- Track A: 8.6.1 → 8.7 → 8.8 (sequential, each depends on prior)
+- Track B: 8.9 (independent, runs in parallel with Track A)
 
 **New dependencies (15.1)**: keyring 3, websearch (workspace)
 **New dependencies (15.2)**: teloxide 0.13+ (channels-telegram), serenity 0.12+ (channels-discord)
-- **Tests**: 134 new tests across steps 15.1 + 15.2 + 15.3b (488 total Rust), all passing. Zero clippy warnings.
-- **Plans**: [plans/phase8_credentials.md](../plans/phase8_credentials.md), [plans/phase8_channels.md](../plans/phase8_channels.md), [plans/phase8_context_agent.md](../plans/phase8_context_agent.md), [plans/phase8_scheduler.md](../plans/phase8_scheduler.md)
+**New dependencies (8.6.1)**: svelte-sonner (web), tauri-plugin-notification v2 (desktop)
+- **Tests**: 182 new tests across completed steps (616 total Rust + 26 JS), all passing. Zero clippy warnings.
+- **Remaining**: 128 tests across stages 8.6.1-8.9 (109 Rust + 4 JS + 15 manual)
+- **Plans**: [plans/phase8.1_credentials.md](../plans/phase8.1_credentials.md), [plans/phase8.2_channels.md](../plans/phase8.2_channels.md), [plans/phase8.3_context.md](../plans/phase8.3_context.md), [plans/phase8.4_context_agent.md](../plans/phase8.4_context_agent.md), [plans/phase8.5_channel_router.md](../plans/phase8.5_channel_router.md), [plans/phase8.6_scheduler.md](../plans/phase8.6_scheduler.md), [plans/phase8.6.1_scheduler_notification.md](../plans/phase8.6.1_scheduler_notification.md), [plans/phase8.7_channel_router.md](../plans/phase8.7_channel_router.md), [plans/phase8.8_channel_lifecycle.md](../plans/phase8.8_channel_lifecycle.md), [plans/phase8.9_test_debt.md](../plans/phase8.9_test_debt.md)
+- **Test plans**: [tests/phase8.1_credentials.md](../tests/phase8.1_credentials.md), [tests/phase8.2_channels.md](../tests/phase8.2_channels.md), [tests/phase8.3_context.md](../tests/phase8.3_context.md), [tests/phase8.3.1_tool_visibility.md](../tests/phase8.3.1_tool_visibility.md), [tests/phase8.3.2_web_search.md](../tests/phase8.3.2_web_search.md), [tests/phase8.4_context_agent.md](../tests/phase8.4_context_agent.md), [tests/phase8.5_channel_router.md](../tests/phase8.5_channel_router.md), [tests/phase8.6_scheduler.md](../tests/phase8.6_scheduler.md), [tests/phase8.6.1_scheduler_notification.md](../tests/phase8.6.1_scheduler_notification.md), [tests/phase8.7_channel_router.md](../tests/phase8.7_channel_router.md), [tests/phase8.8_channel_lifecycle.md](../tests/phase8.8_channel_lifecycle.md), [tests/phase8.9_test_debt.md](../tests/phase8.9_test_debt.md)
 
 ---
 
-### Phase 9: TUI & Cross-Compilation — `[NOT STARTED]`
+### Phase 9: Mobile App — `[NOT STARTED]`
+
+**Step 23: Mobile Binary**
+- Tauri 2 iOS + Android targets
+- In-process gateway (no separate daemon needed)
+- Responsive layout adapting to mobile screens
+
+- **Tests**: mobile build, responsive layout, in-process gateway
+- **Plan**: [plans/phase12_mobile.md](../plans/phase12_mobile.md)
+
+---
+
+### Phase 10: TUI & Cross-Compilation — `[NOT STARTED]`
 
 **Step 17: TUI Binary**
 - ratatui + crossterm
@@ -390,7 +469,7 @@ gantt
 
 ---
 
-### Phase 10: CI/CD & Quality — `[NOT STARTED]`
+### Phase 11: CI/CD & Quality — `[NOT STARTED]`
 
 **Step 19: GitHub Actions CI/CD**
 - PR checks: cargo test, clippy, fmt, frontend lint
@@ -408,7 +487,7 @@ gantt
 
 ---
 
-### Phase 11: Documentation & Community — `[NOT STARTED]`
+### Phase 12: Documentation & Community — `[NOT STARTED]`
 
 **Step 21: Documentation**
 - README with badges, screenshots, quick-start
@@ -429,14 +508,3 @@ gantt
 - **Tests**: link validation, markdown lint
 - **Plan**: [plans/phase11_docs_community.md](../plans/phase11_docs_community.md)
 
----
-
-### Phase 12: Mobile App — `[NOT STARTED]`
-
-**Step 23: Mobile Binary**
-- Tauri 2 iOS + Android targets
-- In-process gateway (no separate daemon needed)
-- Responsive layout adapting to mobile screens
-
-- **Tests**: mobile build, responsive layout, in-process gateway
-- **Plan**: [plans/phase12_mobile.md](../plans/phase12_mobile.md)

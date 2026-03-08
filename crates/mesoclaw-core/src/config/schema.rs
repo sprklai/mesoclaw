@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -64,6 +66,7 @@ pub struct AppConfig {
     pub keyring_service_id: String,
 
     // Phase 8: Channels
+    pub channel_tool_policy: HashMap<String, Vec<String>>,
     pub channels_enabled: Vec<String>,
     pub telegram_polling_timeout_secs: u32,
     pub telegram_dm_policy: String,
@@ -84,6 +87,20 @@ pub struct AppConfig {
     pub context_summary_provider_id: String,
     pub context_reinject_gap_minutes: u32,
     pub context_reinject_message_count: u32,
+
+    // Phase 8: Context Management (Step 15.3)
+    pub context_strategy: String,
+    pub context_max_history_messages: usize,
+    pub context_max_memory_results: usize,
+    pub context_auto_extract: bool,
+    pub context_extract_interval: usize,
+    pub context_summary_model: String,
+
+    // Phase 8: Scheduler
+    pub scheduler_tick_interval_secs: u64,
+    pub scheduler_stuck_threshold_secs: u64,
+    pub scheduler_error_backoff_secs: Vec<u64>,
+    pub scheduler_max_history_per_job: usize,
 
     // Phase 8: Self-Evolution
     pub self_evolution_enabled: bool,
@@ -154,6 +171,10 @@ impl Default for AppConfig {
             keyring_service_id: "com.sprklai.mesoclaw".into(),
 
             // Channels
+            channel_tool_policy: HashMap::from([(
+                "default".into(),
+                vec!["web_search".into(), "system_info".into()],
+            )]),
             channels_enabled: vec![],
             telegram_polling_timeout_secs: 30,
             telegram_dm_policy: "allowlist".into(),
@@ -175,6 +196,20 @@ impl Default for AppConfig {
             context_reinject_gap_minutes: 30,
             context_reinject_message_count: 20,
 
+            // Context Management (Step 15.3)
+            context_strategy: "balanced".into(),
+            context_max_history_messages: 20,
+            context_max_memory_results: 5,
+            context_auto_extract: true,
+            context_extract_interval: 3,
+            context_summary_model: String::new(),
+
+            // Scheduler
+            scheduler_tick_interval_secs: 1,
+            scheduler_stuck_threshold_secs: 120,
+            scheduler_error_backoff_secs: vec![30, 60, 300, 900, 3600],
+            scheduler_max_history_per_job: 100,
+
             // Self-Evolution
             self_evolution_enabled: true,
             learning_archive_threshold: 0.3,
@@ -187,6 +222,53 @@ impl Default for AppConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // CR.31 — channel_tool_policy defaults to default allowlist
+    #[test]
+    fn channel_tool_policy_default() {
+        let config = AppConfig::default();
+        let default_tools = config.channel_tool_policy.get("default").unwrap();
+        assert!(default_tools.contains(&"web_search".to_string()));
+        assert!(default_tools.contains(&"system_info".to_string()));
+        assert_eq!(default_tools.len(), 2);
+    }
+
+    // CR.32 — channel_tool_policy deserializes from TOML
+    #[test]
+    fn channel_tool_policy_from_toml() {
+        let toml_str = r#"
+            [channel_tool_policy]
+            default = ["web_search", "system_info"]
+            telegram = ["web_search"]
+            discord = []
+        "#;
+
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(
+            config.channel_tool_policy.get("telegram").unwrap(),
+            &vec!["web_search".to_string()]
+        );
+        assert!(
+            config
+                .channel_tool_policy
+                .get("discord")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    // 16.39 — Scheduler config defaults correct
+    #[test]
+    fn scheduler_config_defaults() {
+        let config = AppConfig::default();
+        assert_eq!(config.scheduler_tick_interval_secs, 1);
+        assert_eq!(config.scheduler_stuck_threshold_secs, 120);
+        assert_eq!(
+            config.scheduler_error_backoff_secs,
+            vec![30, 60, 300, 900, 3600]
+        );
+        assert_eq!(config.scheduler_max_history_per_job, 100);
+    }
 
     // 15.3.40 — config context defaults
     #[test]

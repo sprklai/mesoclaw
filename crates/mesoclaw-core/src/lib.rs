@@ -17,6 +17,8 @@ pub mod boot;
 pub mod channels;
 #[cfg(feature = "gateway")]
 pub mod gateway;
+#[cfg(feature = "scheduler")]
+pub mod scheduler;
 
 pub use error::MesoError;
 

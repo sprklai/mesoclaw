@@ -340,7 +340,7 @@ mod tests {
             ..Default::default()
         };
         let creds = InMemoryCredentialStore::new();
-        creds.set("openai", "sk-test-key").await.unwrap();
+        creds.set("api_key:openai", "sk-test-key").await.unwrap();
 
         let tools: Vec<Arc<dyn Tool>> = vec![];
         let agent = MesoAgent::new(&config, &creds, &tools).await;
@@ -357,7 +357,7 @@ mod tests {
             ..Default::default()
         };
         let creds = InMemoryCredentialStore::new();
-        creds.set("anthropic", "sk-ant-test").await.unwrap();
+        creds.set("api_key:anthropic", "sk-ant-test").await.unwrap();
 
         let tools: Vec<Arc<dyn Tool>> = vec![];
         let agent = MesoAgent::new(&config, &creds, &tools).await;
@@ -373,7 +373,7 @@ mod tests {
             ..Default::default()
         };
         let creds = InMemoryCredentialStore::new();
-        creds.set("bad", "sk-test").await.unwrap();
+        creds.set("api_key:bad", "sk-test").await.unwrap();
 
         let tools: Vec<Arc<dyn Tool>> = vec![];
         let result = MesoAgent::new(&config, &creds, &tools).await;
@@ -501,7 +501,7 @@ mod tests {
             ..Default::default()
         };
         let creds = InMemoryCredentialStore::new();
-        creds.set("openai", "sk-test").await.unwrap();
+        creds.set("api_key:openai", "sk-test").await.unwrap();
 
         let tools: Vec<Arc<dyn Tool>> = vec![];
         let agent = MesoAgent::new(&config, &creds, &tools).await;

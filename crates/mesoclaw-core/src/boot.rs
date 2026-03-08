@@ -20,9 +20,14 @@ use crate::user::UserLearner;
 #[cfg(feature = "channels")]
 use crate::channels::registry::ChannelRegistry;
 
+#[cfg(feature = "scheduler")]
+use crate::scheduler::{TokioScheduler, traits::Scheduler};
+
 #[cfg(feature = "ai")]
 use crate::ai::{
-    agent::MesoAgent, context::BootContext, provider_registry::ProviderRegistry,
+    agent::MesoAgent,
+    context::{BootContext, ContextBuilder},
+    provider_registry::ProviderRegistry,
     session::SessionManager,
 };
 
@@ -49,6 +54,8 @@ pub struct Services {
     pub boot_context: BootContext,
     #[cfg(feature = "ai")]
     pub last_used_model: Arc<RwLock<Option<String>>>,
+    #[cfg(feature = "ai")]
+    pub context_builder: Arc<ContextBuilder>,
     pub context_injection_enabled: Arc<AtomicBool>,
     pub self_evolution_enabled: Arc<AtomicBool>,
     pub soul_loader: Arc<SoulLoader>,
@@ -56,6 +63,8 @@ pub struct Services {
     pub user_learner: Arc<UserLearner>,
     #[cfg(feature = "channels")]
     pub channel_registry: Arc<ChannelRegistry>,
+    #[cfg(feature = "scheduler")]
+    pub scheduler: Option<Arc<TokioScheduler>>,
 }
 
 /// Initialize all services from config.
@@ -238,6 +247,18 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         }
     }
 
+    // 12b. ContextBuilder
+    #[cfg(feature = "ai")]
+    let context_builder = Arc::new(ContextBuilder::new(
+        session_manager.clone(),
+        memory.clone(),
+        soul_loader.clone(),
+        user_learner.clone(),
+        config.clone(),
+    ));
+    #[cfg(feature = "ai")]
+    info!("Context builder initialized");
+
     // 12. Provider Registry -- seed built-ins, load from DB
     #[cfg(feature = "ai")]
     let provider_registry = Arc::new(ProviderRegistry::new(pool.clone()));
@@ -269,6 +290,18 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
     #[cfg(feature = "channels")]
     info!("Channel registry initialized");
 
+    // 14. Scheduler
+    #[cfg(feature = "scheduler")]
+    let scheduler = {
+        let sched = TokioScheduler::new(pool.clone(), event_bus.clone(), &config);
+        if let Err(e) = sched.load_from_db().await {
+            tracing::warn!("Failed to load scheduler jobs from DB: {e}");
+        }
+        sched.start().await;
+        info!("Scheduler initialized and started");
+        Some(sched)
+    };
+
     info!("All services initialized");
 
     Ok(Services {
@@ -290,6 +323,8 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         boot_context,
         #[cfg(feature = "ai")]
         last_used_model: Arc::new(RwLock::new(None)),
+        #[cfg(feature = "ai")]
+        context_builder,
         context_injection_enabled,
         self_evolution_enabled,
         soul_loader,
@@ -297,6 +332,8 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         user_learner,
         #[cfg(feature = "channels")]
         channel_registry,
+        #[cfg(feature = "scheduler")]
+        scheduler,
     })
 }
 
@@ -323,6 +360,8 @@ impl From<Services> for AppState {
             boot_context: s.boot_context,
             #[cfg(feature = "ai")]
             last_used_model: s.last_used_model,
+            #[cfg(feature = "ai")]
+            context_builder: s.context_builder,
             context_injection_enabled: s.context_injection_enabled,
             self_evolution_enabled: s.self_evolution_enabled,
             soul_loader: s.soul_loader,
@@ -330,6 +369,8 @@ impl From<Services> for AppState {
             user_learner: s.user_learner,
             #[cfg(feature = "channels")]
             channel_registry: s.channel_registry,
+            #[cfg(feature = "scheduler")]
+            scheduler: s.scheduler,
         }
     }
 }
@@ -407,7 +448,9 @@ mod tests {
     #[tokio::test]
     async fn init_services_agent_none_without_key() {
         let dir = tempfile::TempDir::new().unwrap();
-        let config = test_config(&dir);
+        let mut config = test_config(&dir);
+        // Use a provider name that definitely won't have a key in the system keyring
+        config.provider_name = "nonexistent-test-provider".into();
         let services = init_services(config).await.unwrap();
         assert!(
             services.agent.is_none(),

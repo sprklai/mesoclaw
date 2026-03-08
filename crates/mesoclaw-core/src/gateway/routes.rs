@@ -171,6 +171,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         // Channels (Phase 8)
         .merge(channel_routes())
+        // Scheduler (Phase 8)
+        .merge(scheduler_routes())
         // WebSocket
         .route("/ws/chat", get(handlers::ws::ws_chat))
         // Auth middleware
@@ -213,6 +215,39 @@ fn channel_routes() -> Router<Arc<AppState>> {
             )
     }
     #[cfg(not(feature = "channels"))]
+    {
+        Router::new()
+    }
+}
+
+/// Build scheduler routes, conditionally compiled.
+fn scheduler_routes() -> Router<Arc<AppState>> {
+    #[cfg(feature = "scheduler")]
+    {
+        use axum::routing::put;
+        Router::new()
+            .route(
+                "/scheduler/jobs",
+                get(handlers::scheduler::list_jobs).post(handlers::scheduler::create_job),
+            )
+            .route(
+                "/scheduler/jobs/{id}/toggle",
+                put(handlers::scheduler::toggle_job),
+            )
+            .route(
+                "/scheduler/jobs/{id}",
+                delete(handlers::scheduler::delete_job),
+            )
+            .route(
+                "/scheduler/jobs/{id}/history",
+                get(handlers::scheduler::job_history),
+            )
+            .route(
+                "/scheduler/status",
+                get(handlers::scheduler::scheduler_status),
+            )
+    }
+    #[cfg(not(feature = "scheduler"))]
     {
         Router::new()
     }

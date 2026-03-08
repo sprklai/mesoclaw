@@ -2,6 +2,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as Card from '$lib/components/ui/card';
+	import * as Select from '$lib/components/ui/select';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Switch } from '$lib/components/ui/switch';
 	import { configStore } from '$lib/stores/config.svelte';
@@ -22,15 +23,21 @@
 	}
 
 	async function toggleConfig(key: string, value: boolean) {
-		console.log(`[Settings] toggleConfig called: ${key} = ${value}`);
 		try {
-			const result = await configStore.update({ [key]: value });
-			console.log(`[Settings] Config ${key} persisted:`, result);
-			// Re-fetch from server to confirm round-trip
+			await configStore.update({ [key]: value });
 			await configStore.load();
-			console.log(`[Settings] After reload: ${key} =`, configStore.config[key]);
 		} catch (e) {
 			console.error(`[Settings] Failed to update ${key}:`, e);
+			await configStore.load();
+		}
+	}
+
+	async function updateStrategy(value: string) {
+		try {
+			await configStore.update({ context_strategy: value });
+			await configStore.load();
+		} catch (e) {
+			console.error('[Settings] Failed to update context_strategy:', e);
 			await configStore.load();
 		}
 	}
@@ -83,6 +90,26 @@
 						checked={configStore.config.self_evolution_enabled === true}
 						onCheckedChange={(v) => toggleConfig('self_evolution_enabled', v)}
 					/>
+				</div>
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm font-medium">Context Strategy</p>
+						<p class="text-xs text-muted-foreground">Controls how much conversation history and memory is injected</p>
+					</div>
+					<Select.Root
+						type="single"
+						value={String(configStore.config.context_strategy ?? 'balanced')}
+						onValueChange={(v) => { if (v) updateStrategy(v); }}
+					>
+						<Select.Trigger class="w-[140px]">
+							{String(configStore.config.context_strategy ?? 'balanced')}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Item value="minimal">Minimal</Select.Item>
+							<Select.Item value="balanced">Balanced</Select.Item>
+							<Select.Item value="full">Full</Select.Item>
+						</Select.Content>
+					</Select.Root>
 				</div>
 			</Card.Content>
 		</Card.Root>

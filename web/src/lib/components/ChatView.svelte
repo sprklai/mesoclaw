@@ -15,6 +15,7 @@
 		ToolInput,
 		ToolOutput
 	} from '$lib/components/ai-elements/tool';
+	import { Actions, Action } from '$lib/components/ai-elements/action';
 	import {
 		PromptInput,
 		PromptInputTextarea,
@@ -27,6 +28,7 @@
 		PromptInputModelSelectValue,
 		type PromptInputMessage
 	} from '$lib/components/ai-elements/prompt-input';
+	import { Copy, RefreshCw } from '@lucide/svelte';
 	import { messagesStore } from '$lib/stores/messages.svelte';
 	import { sessionsStore } from '$lib/stores/sessions.svelte';
 	import { providersStore } from '$lib/stores/providers.svelte';
@@ -45,6 +47,33 @@
 		providersStore.configuredModels.find((m) => m.value === providersStore.selectedModel)
 			?.label ?? ''
 	);
+
+	async function copyMessage(content: string) {
+		try {
+			await navigator.clipboard.writeText(content);
+		} catch {
+			// Fallback for non-secure contexts
+			const textarea = document.createElement('textarea');
+			textarea.value = content;
+			textarea.style.position = 'fixed';
+			textarea.style.opacity = '0';
+			document.body.appendChild(textarea);
+			textarea.select();
+			document.execCommand('copy');
+			document.body.removeChild(textarea);
+		}
+	}
+
+	function retryMessage(msgIndex: number) {
+		const messages = messagesStore.messages;
+		// Find the preceding user message
+		for (let i = msgIndex - 1; i >= 0; i--) {
+			if (messages[i].role === 'user') {
+				handleSubmit({ text: messages[i].content });
+				return;
+			}
+		}
+	}
 
 	async function handleSubmit(message: PromptInputMessage) {
 		const prompt = (message.text ?? '').trim();
@@ -105,7 +134,7 @@
 				/>
 			{:else}
 				<div class="space-y-2">
-					{#each messagesStore.messages as msg (msg.id)}
+					{#each messagesStore.messages as msg, idx (msg.id)}
 						<Message from={msg.role === 'user' ? 'user' : 'assistant'}>
 							<MessageContent variant="flat">
 								{#if msg.role === 'user'}
@@ -128,6 +157,14 @@
 										{/each}
 									{/if}
 									<Response content={msg.content} />
+									<Actions class="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
+										<Action tooltip="Copy" onclick={() => copyMessage(msg.content)}>
+											<Copy class="size-3.5" />
+										</Action>
+										<Action tooltip="Retry" onclick={() => retryMessage(idx)}>
+											<RefreshCw class="size-3.5" />
+										</Action>
+									</Actions>
 								{/if}
 							</MessageContent>
 						</Message>

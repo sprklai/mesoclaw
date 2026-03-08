@@ -1,0 +1,339 @@
+use std::sync::Arc;
+
+use axum::Json;
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use serde::{Deserialize, Serialize};
+
+use crate::MesoError;
+use crate::gateway::state::AppState;
+use crate::scheduler::traits::{JobExecution, ScheduledJob, Scheduler};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SchedulerStatusResponse {
+    pub running: bool,
+    pub job_count: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateJobRequest {
+    #[serde(flatten)]
+    pub job: ScheduledJob,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateJobResponse {
+    pub id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ToggleResponse {
+    pub id: String,
+    pub enabled: bool,
+}
+
+/// GET /scheduler/jobs
+pub async fn list_jobs(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<ScheduledJob>>, MesoError> {
+    let scheduler = state
+        .scheduler
+        .as_ref()
+        .ok_or_else(|| MesoError::Scheduler("scheduler not initialized".into()))?;
+    let jobs = scheduler.list_jobs().await;
+    Ok(Json(jobs))
+}
+
+/// POST /scheduler/jobs
+pub async fn create_job(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateJobRequest>,
+) -> Result<(StatusCode, Json<CreateJobResponse>), MesoError> {
+    let scheduler = state
+        .scheduler
+        .as_ref()
+        .ok_or_else(|| MesoError::Scheduler("scheduler not initialized".into()))?;
+    let id = scheduler.add_job(req.job).await?;
+    Ok((StatusCode::CREATED, Json(CreateJobResponse { id })))
+}
+
+/// PUT /scheduler/jobs/:id/toggle
+pub async fn toggle_job(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<ToggleResponse>, MesoError> {
+    let scheduler = state
+        .scheduler
+        .as_ref()
+        .ok_or_else(|| MesoError::Scheduler("scheduler not initialized".into()))?;
+    let enabled = scheduler.toggle_job(&id).await?;
+    Ok(Json(ToggleResponse { id, enabled }))
+}
+
+/// DELETE /scheduler/jobs/:id
+pub async fn delete_job(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, MesoError> {
+    let scheduler = state
+        .scheduler
+        .as_ref()
+        .ok_or_else(|| MesoError::Scheduler("scheduler not initialized".into()))?;
+    scheduler.remove_job(&id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /scheduler/jobs/:id/history
+pub async fn job_history(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<Vec<JobExecution>>, MesoError> {
+    let scheduler = state
+        .scheduler
+        .as_ref()
+        .ok_or_else(|| MesoError::Scheduler("scheduler not initialized".into()))?;
+    let history = scheduler.job_history(&id).await;
+    Ok(Json(history))
+}
+
+/// GET /scheduler/status
+pub async fn scheduler_status(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<SchedulerStatusResponse>, MesoError> {
+    let scheduler = state
+        .scheduler
+        .as_ref()
+        .ok_or_else(|| MesoError::Scheduler("scheduler not initialized".into()))?;
+    Ok(Json(SchedulerStatusResponse {
+        running: scheduler.is_running(),
+        job_count: scheduler.job_count(),
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use tower::ServiceExt;
+
+    async fn test_state() -> (tempfile::TempDir, Arc<AppState>) {
+        crate::gateway::handlers::tests::test_state().await
+    }
+
+    fn build_router(state: Arc<AppState>) -> axum::Router {
+        crate::gateway::routes::build_router(state)
+    }
+
+    // 16.31 — GET /scheduler/jobs lists all jobs
+    #[tokio::test]
+    async fn list_jobs() {
+        let (_dir, state) = test_state().await;
+        let app = build_router(state.clone());
+
+        // Add a job via the scheduler
+        if let Some(ref sched) = state.scheduler {
+            sched
+                .add_job(crate::scheduler::ScheduledJob {
+                    id: String::new(),
+                    name: "test_job".into(),
+                    schedule: crate::scheduler::Schedule::Interval { secs: 60 },
+                    session_target: crate::scheduler::SessionTarget::Main,
+                    payload: crate::scheduler::JobPayload::Notify {
+                        message: "hi".into(),
+                    },
+                    enabled: true,
+                    error_count: 0,
+                    next_run: None,
+                    active_hours: None,
+                    delete_after_run: false,
+                })
+                .await
+                .unwrap();
+        }
+
+        let req = Request::builder()
+            .uri("/scheduler/jobs")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let jobs: Vec<crate::scheduler::ScheduledJob> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(jobs.len(), 1);
+    }
+
+    // 16.32 — POST /scheduler/jobs creates job
+    #[tokio::test]
+    async fn create_job() {
+        let (_dir, state) = test_state().await;
+        let app = build_router(state);
+
+        let body = serde_json::json!({
+            "id": "",
+            "name": "new_job",
+            "schedule": {"type": "interval", "secs": 30},
+            "payload": {"type": "notify", "message": "hello"}
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/scheduler/jobs")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::CREATED);
+    }
+
+    // 16.33 — POST /scheduler/jobs invalid cron returns 400
+    #[tokio::test]
+    async fn create_job_invalid_cron() {
+        let (_dir, state) = test_state().await;
+        let app = build_router(state);
+
+        let body = serde_json::json!({
+            "id": "",
+            "name": "bad_cron",
+            "schedule": {"type": "cron", "expr": "not valid"},
+            "payload": {"type": "heartbeat"}
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/scheduler/jobs")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        // Scheduler error maps to 500
+        assert!(
+            resp.status() == StatusCode::INTERNAL_SERVER_ERROR
+                || resp.status() == StatusCode::BAD_REQUEST
+        );
+    }
+
+    // 16.34 — PUT /scheduler/jobs/:id/toggle toggles
+    #[tokio::test]
+    async fn toggle_job() {
+        let (_dir, state) = test_state().await;
+
+        // Add job first
+        let id = if let Some(ref sched) = state.scheduler {
+            sched
+                .add_job(crate::scheduler::ScheduledJob {
+                    id: "toggle-test".into(),
+                    name: "toggle_job".into(),
+                    schedule: crate::scheduler::Schedule::Interval { secs: 60 },
+                    session_target: crate::scheduler::SessionTarget::Main,
+                    payload: crate::scheduler::JobPayload::Notify {
+                        message: "hi".into(),
+                    },
+                    enabled: true,
+                    error_count: 0,
+                    next_run: None,
+                    active_hours: None,
+                    delete_after_run: false,
+                })
+                .await
+                .unwrap()
+        } else {
+            panic!("scheduler not initialized");
+        };
+
+        let app = build_router(state);
+        let req = Request::builder()
+            .method("PUT")
+            .uri(format!("/scheduler/jobs/{id}/toggle"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let toggle: ToggleResponse = serde_json::from_slice(&body).unwrap();
+        assert!(!toggle.enabled);
+    }
+
+    // 16.35 — DELETE /scheduler/jobs/:id removes job
+    #[tokio::test]
+    async fn delete_job() {
+        let (_dir, state) = test_state().await;
+
+        let id = if let Some(ref sched) = state.scheduler {
+            sched
+                .add_job(crate::scheduler::ScheduledJob {
+                    id: "del-test".into(),
+                    name: "del_job".into(),
+                    schedule: crate::scheduler::Schedule::Interval { secs: 60 },
+                    session_target: crate::scheduler::SessionTarget::Main,
+                    payload: crate::scheduler::JobPayload::Notify {
+                        message: "hi".into(),
+                    },
+                    enabled: true,
+                    error_count: 0,
+                    next_run: None,
+                    active_hours: None,
+                    delete_after_run: false,
+                })
+                .await
+                .unwrap()
+        } else {
+            panic!("scheduler not initialized");
+        };
+
+        let app = build_router(state);
+        let req = Request::builder()
+            .method("DELETE")
+            .uri(format!("/scheduler/jobs/{id}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    }
+
+    // 16.36 — GET /scheduler/jobs/:id/history returns history
+    #[tokio::test]
+    async fn job_history() {
+        let (_dir, state) = test_state().await;
+        let app = build_router(state);
+
+        let req = Request::builder()
+            .uri("/scheduler/jobs/nonexistent/history")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let history: Vec<crate::scheduler::JobExecution> = serde_json::from_slice(&body).unwrap();
+        assert!(history.is_empty());
+    }
+
+    // 16.37 — GET /scheduler/status returns running status
+    #[tokio::test]
+    async fn scheduler_status() {
+        let (_dir, state) = test_state().await;
+        let app = build_router(state);
+
+        let req = Request::builder()
+            .uri("/scheduler/status")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let status: SchedulerStatusResponse = serde_json::from_slice(&body).unwrap();
+        assert!(status.running);
+    }
+}

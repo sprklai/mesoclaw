@@ -10,6 +10,12 @@ pub struct Session {
     pub title: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default = "default_source")]
+    pub source: String,
+}
+
+fn default_source() -> String {
+    "web".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,6 +25,8 @@ pub struct SessionSummary {
     pub created_at: String,
     pub updated_at: String,
     pub message_count: i64,
+    #[serde(default = "default_source")]
+    pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,18 +61,24 @@ impl SessionManager {
     }
 
     pub async fn create_session(&self, title: &str) -> Result<Session> {
+        self.create_session_with_source(title, "web").await
+    }
+
+    pub async fn create_session_with_source(&self, title: &str, source: &str) -> Result<Session> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
         let title = title.to_string();
+        let source = source.to_string();
 
         let session_id = id.clone();
         let session_title = title.clone();
         let session_now = now.clone();
+        let session_source = source.clone();
 
         db::with_db(&self.db, move |conn| {
             conn.execute(
-                "INSERT INTO sessions (id, title, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-                rusqlite::params![session_id, session_title, session_now, session_now],
+                "INSERT INTO sessions (id, title, created_at, updated_at, source) VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params![session_id, session_title, session_now, session_now, session_source],
             )?;
             Ok(())
         })
@@ -75,6 +89,7 @@ impl SessionManager {
             title,
             created_at: now.clone(),
             updated_at: now,
+            source,
         })
     }
 
@@ -83,7 +98,7 @@ impl SessionManager {
 
         db::with_db(&self.db, move |conn| {
             conn.query_row(
-                "SELECT id, title, created_at, updated_at FROM sessions WHERE id = ?1",
+                "SELECT id, title, created_at, updated_at, source FROM sessions WHERE id = ?1",
                 rusqlite::params![id],
                 |row| {
                     Ok(Session {
@@ -91,6 +106,7 @@ impl SessionManager {
                         title: row.get(1)?,
                         created_at: row.get(2)?,
                         updated_at: row.get(3)?,
+                        source: row.get(4)?,
                     })
                 },
             )
@@ -107,7 +123,7 @@ impl SessionManager {
     pub async fn list_sessions(&self) -> Result<Vec<SessionSummary>> {
         db::with_db(&self.db, |conn| {
             let mut stmt = conn.prepare(
-                "SELECT s.id, s.title, s.created_at, s.updated_at, COUNT(m.id) as message_count
+                "SELECT s.id, s.title, s.created_at, s.updated_at, COUNT(m.id) as message_count, s.source
                  FROM sessions s
                  LEFT JOIN messages m ON m.session_id = s.id
                  GROUP BY s.id
@@ -122,6 +138,7 @@ impl SessionManager {
                         created_at: row.get(2)?,
                         updated_at: row.get(3)?,
                         message_count: row.get(4)?,
+                        source: row.get(5)?,
                     })
                 })?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -153,7 +170,7 @@ impl SessionManager {
             }
 
             conn.query_row(
-                "SELECT id, title, created_at, updated_at FROM sessions WHERE id = ?1",
+                "SELECT id, title, created_at, updated_at, source FROM sessions WHERE id = ?1",
                 rusqlite::params![update_id],
                 |row| {
                     Ok(Session {
@@ -161,6 +178,7 @@ impl SessionManager {
                         title: row.get(1)?,
                         created_at: row.get(2)?,
                         updated_at: row.get(3)?,
+                        source: row.get(4)?,
                     })
                 },
             )
@@ -800,5 +818,36 @@ mod tests {
 
         let summary = mgr.get_summary(&session.id).await.unwrap();
         assert!(summary.is_none());
+    }
+
+    // CR.28 — create_session with source stores correct value
+    #[tokio::test]
+    async fn create_session_with_source() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr
+            .create_session_with_source("Telegram Chat", "telegram")
+            .await
+            .unwrap();
+        assert_eq!(session.source, "telegram");
+    }
+
+    // CR.29 — create_session defaults source to "web" when not specified
+    #[tokio::test]
+    async fn create_session_default_source() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr.create_session("Web Chat").await.unwrap();
+        assert_eq!(session.source, "web");
+    }
+
+    // CR.30 — get_session returns source field
+    #[tokio::test]
+    async fn get_session_includes_source() {
+        let (_dir, mgr) = setup().await;
+        let created = mgr
+            .create_session_with_source("Slack Chat", "slack")
+            .await
+            .unwrap();
+        let fetched = mgr.get_session(&created.id).await.unwrap();
+        assert_eq!(fetched.source, "slack");
     }
 }
