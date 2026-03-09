@@ -68,13 +68,8 @@ jobs:
           projectPath: crates/mesoclaw-desktop
           args: --bundles deb,rpm -- --profile ci-release
 
-      - name: Build desktop (appimage)
-        env:
-          NO_STRIP: true
-          APPIMAGE_EXTRACT_AND_RUN: 1
-        run: |
-          cargo install tauri-cli --version "^2" --locked || true
-          cd crates/mesoclaw-desktop && cargo tauri build --bundles appimage -- --profile ci-release
+      # NOTE: AppImage disabled — linuxdeploy fails on GitHub runners (no FUSE).
+      # Re-enable when GitHub runners support FUSE or Tauri fixes extraction mode.
 
       - name: Build standalone CLI and daemon
         run: cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --all-features
@@ -85,7 +80,6 @@ jobs:
           name: linux-desktop
           path: |
             target/ci-release/bundle/deb/*.deb
-            target/ci-release/bundle/appimage/*.AppImage
             target/ci-release/bundle/rpm/*.rpm
 
       - name: Upload standalone binaries
@@ -171,8 +165,8 @@ jobs:
       - name: Generate checksums
         run: |
           cd artifacts
-          find . -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.rpm" \
-            -o -name "*.msi" -o -name "*.exe" -o -name "*.dmg" \
+          find . -type f \( -name "*.deb" -o -name "*.rpm" \
+            -o -name "*.msi" -o -name "*.exe" \
             -o -name "mesoclaw-cli" -o -name "mesoclaw-daemon" \
             -o -name "mesoclaw-cli.exe" -o -name "mesoclaw-daemon.exe" \) \
             -exec sha256sum {} \; > ../SHA256SUMS.txt
@@ -196,7 +190,6 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/**/*.deb
-            artifacts/**/*.AppImage
             artifacts/**/*.rpm
             artifacts/**/*.msi
             artifacts/**/*.exe
