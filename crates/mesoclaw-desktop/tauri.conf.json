@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "MesoClaw",
-  "version": "0.1.0",
+  "version": "0.0.2",
   "identifier": "com.sprklai.mesoclaw",
   "build": {
     "devUrl": "http://localhost:5173",
@@ -35,6 +35,17 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "shortDescription": "AI-powered personal assistant",
+    "longDescription": "MesoClaw is an AI-powered personal assistant with multi-provider support, memory, tools, and extensible channels.",
+    "category": "Utility",
+    "linux": {
+      "deb": {
+        "desktopTemplate": "mesoclaw.desktop"
+      },
+      "rpm": {
+        "desktopTemplate": "mesoclaw.desktop"
+      }
+    }
   }
 }

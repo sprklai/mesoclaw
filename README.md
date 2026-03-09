@@ -123,53 +123,53 @@ graph TB
 ### System Architecture
 
 ```mermaid
-graph TB
-    subgraph UI["User Interfaces"]
-        Desktop["Desktop<br>#40;Tauri 2#41;"]
-        Mobile["Mobile #40;future#41;<br>#40;Tauri 2#41;"]
-        CLI["CLI<br>#40;clap#41;"]
-        TUI["TUI #40;future#41;<br>#40;ratatui#41;"]
-        Web["Web Frontend<br>#40;Svelte 5#41;"]
+graph TD
+    subgraph Clients["Clients"]
+        Desktop[Desktop] & Mobile["Mobile<br>#40;future#41;"] & CLI[CLI] & TUI["TUI<br>#40;future#41;"] & Daemon[Daemon]
+        Web["Frontend<br>Svelte 5"]
     end
 
-    subgraph CoreLib["mesoclaw-core"]
-        subgraph AppLayer["Application Layer"]
-            Gateway["Gateway<br>axum REST + WS<br>:18981"]
-            AI["AI Engine<br>rig-core<br>18 providers"]
-            Storage["Storage<br>rusqlite + sqlite-vec<br>FTS5 + vectors"]
+    subgraph Core["mesoclaw-core"]
+        BootEntry["boot.rs<br>init_services"]
+
+        subgraph App["Application Layer"]
+            Gateway["Gateway<br>axum :18981"]
+            AI["AI Engine<br>rig-core"]
+            Context["Context Engine<br>3-tier injection"]
+            DB["Database<br>rusqlite + sqlite-vec"]
         end
-        subgraph DomainLayer["Domain Layer"]
-            Identity["Identity / Soul<br>SoulLoader + PromptComposer"]
-            Skills["Skills<br>SkillRegistry + markdown"]
-            UserProfile["User Profile<br>UserLearner + SQLite"]
+
+        subgraph Domain["Domain Layer"]
+            Identity["Identity<br>SoulLoader"]
+            Skills["Skills<br>SkillRegistry"]
+            UserL["User Profile<br>UserLearner"]
+            Channels["Channels"]
         end
-        subgraph SupportLayer["Support Layer"]
-            Agent["Agent System<br>tool registry"]
-            Creds["Credentials<br>keyring + zeroize"]
-            Config["Config<br>TOML + env"]
-            Channels["Channels<br>openclaw-channels"]
+
+        subgraph Support["Support Layer"]
+            Tools["Agent Tools"]
+            Security["Security"]
+            Creds2["Credentials"]
+            Config["Config"]
+            EventBus["EventBus"]
         end
     end
 
-    Desktop -->|Rust API| Gateway
-    Mobile -->|Rust API| Gateway
-    CLI -->|Rust API| Gateway
-    TUI -->|Rust API| Gateway
+    Desktop -->|embedded gateway| Gateway
+    Mobile & CLI & TUI & Daemon --> Gateway
     Web -->|HTTP/WS| Gateway
-    Gateway --> AI
-    Gateway --> Storage
-    Gateway --> Identity
-    Gateway --> Skills
-    Gateway --> UserProfile
-    AI --> Agent
-    AI --> Creds
-    AI --> Storage
 
-    style UI fill:#2196F3,color:#fff
-    style CoreLib fill:none
-    style AppLayer fill:#4CAF50,color:#fff
-    style DomainLayer fill:#FF9800,color:#fff
-    style SupportLayer fill:#9E9E9E,color:#fff
+    BootEntry --> Gateway & DB & EventBus
+    Gateway --> AI & DB & Context
+    Gateway --> Identity & Skills & UserL & Channels
+    AI --> Tools & Security & DB
+    AI --> Identity & Skills
+    Context --> DB & Identity & UserL & Skills
+
+    style Clients fill:#2196F3,color:#fff
+    style App fill:#4CAF50,color:#fff
+    style Domain fill:#FF9800,color:#fff
+    style Support fill:#9E9E9E,color:#fff
 ```
 
 ### Crate Dependency Graph

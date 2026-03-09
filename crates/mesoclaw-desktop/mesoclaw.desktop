@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=MesoClaw
+GenericName=AI Assistant
+Comment=AI-powered personal assistant
+Exec=meso-claw
+Icon=meso-claw
+Terminal=false
+Type=Application
+Categories=Utility;Office;
+Keywords=ai;assistant;chat;llm;
+StartupWMClass=MesoClaw
