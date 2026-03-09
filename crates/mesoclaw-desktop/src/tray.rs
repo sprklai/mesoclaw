@@ -22,7 +22,11 @@ pub fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>
     let menu = Menu::with_items(app, &[&show_item, &hide_item, &separator, &quit_item])?;
 
     TrayIconBuilder::with_id("main-tray")
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(
+            app.default_window_icon()
+                .ok_or("no default window icon set")?
+                .clone(),
+        )
         .tooltip("MesoClaw")
         .menu(&menu)
         .show_menu_on_left_click(false)

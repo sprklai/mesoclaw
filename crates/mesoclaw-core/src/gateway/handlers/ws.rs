@@ -77,8 +77,9 @@ async fn handle_notifications(mut socket: WebSocket, state: Arc<AppState>) {
                             status: None,
                             error: None,
                         };
-                        let json = serde_json::to_string(&outbound).unwrap();
-                        if socket.send(Message::Text(json.into())).await.is_err() {
+                        if let Ok(json) = serde_json::to_string(&outbound)
+                            && socket.send(Message::Text(json.into())).await.is_err()
+                        {
                             break;
                         }
                     }
@@ -91,8 +92,9 @@ async fn handle_notifications(mut socket: WebSocket, state: Arc<AppState>) {
                             status: Some(status),
                             error,
                         };
-                        let json = serde_json::to_string(&outbound).unwrap();
-                        if socket.send(Message::Text(json.into())).await.is_err() {
+                        if let Ok(json) = serde_json::to_string(&outbound)
+                            && socket.send(Message::Text(json.into())).await.is_err()
+                        {
                             break;
                         }
                     }
@@ -126,8 +128,9 @@ pub async fn ws_chat(
 }
 
 async fn send_outbound(socket: &mut WebSocket, msg: &WsOutbound) {
-    let json = serde_json::to_string(msg).unwrap();
-    let _ = socket.send(Message::Text(json.into())).await;
+    if let Ok(json) = serde_json::to_string(msg) {
+        let _ = socket.send(Message::Text(json.into())).await;
+    }
 }
 
 async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {

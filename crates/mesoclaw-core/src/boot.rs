@@ -107,51 +107,33 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
 
     // 6. Tools
     let tool_registry = ToolRegistry::new();
-    tool_registry
-        .register(Arc::new(crate::tools::system_info::SystemInfoTool::new()))
-        .unwrap();
-    tool_registry
-        .register(Arc::new(crate::tools::web_search::WebSearchTool::new(
-            credentials.clone(),
-            config.web_search_timeout_secs,
-            config.web_search_max_results,
-        )))
-        .unwrap();
-    tool_registry
-        .register(Arc::new(crate::tools::file_ops::FileReadTool::new(
-            security.clone(),
-        )))
-        .unwrap();
-    tool_registry
-        .register(Arc::new(crate::tools::file_ops::FileWriteTool::new(
-            security.clone(),
-        )))
-        .unwrap();
-    tool_registry
-        .register(Arc::new(crate::tools::file_ops::FileListTool::new(
-            security.clone(),
-        )))
-        .unwrap();
-    tool_registry
-        .register(Arc::new(crate::tools::file_search::FileSearchTool::new(
-            config.tool_file_search_max_results,
-        )))
-        .unwrap();
-    tool_registry
-        .register(Arc::new(crate::tools::shell::ShellTool::new(
-            security.clone(),
-            config.tool_shell_timeout_secs,
-        )))
-        .unwrap();
-    tool_registry
-        .register(Arc::new(crate::tools::process::ProcessTool::new(
-            security.clone(),
-            config.tool_process_list_limit,
-        )))
-        .unwrap();
-    tool_registry
-        .register(Arc::new(crate::tools::patch::PatchTool::new()))
-        .unwrap();
+    tool_registry.register(Arc::new(crate::tools::system_info::SystemInfoTool::new()))?;
+    tool_registry.register(Arc::new(crate::tools::web_search::WebSearchTool::new(
+        credentials.clone(),
+        config.web_search_timeout_secs,
+        config.web_search_max_results,
+    )))?;
+    tool_registry.register(Arc::new(crate::tools::file_ops::FileReadTool::new(
+        security.clone(),
+    )))?;
+    tool_registry.register(Arc::new(crate::tools::file_ops::FileWriteTool::new(
+        security.clone(),
+    )))?;
+    tool_registry.register(Arc::new(crate::tools::file_ops::FileListTool::new(
+        security.clone(),
+    )))?;
+    tool_registry.register(Arc::new(crate::tools::file_search::FileSearchTool::new(
+        config.tool_file_search_max_results,
+    )))?;
+    tool_registry.register(Arc::new(crate::tools::shell::ShellTool::new(
+        security.clone(),
+        config.tool_shell_timeout_secs,
+    )))?;
+    tool_registry.register(Arc::new(crate::tools::process::ProcessTool::new(
+        security.clone(),
+        config.tool_process_list_limit,
+    )))?;
+    tool_registry.register(Arc::new(crate::tools::patch::PatchTool::new()))?;
 
     // 10. User learner (needed before tools that reference it)
     let user_learner = Arc::new(UserLearner::new(pool.clone(), &config));
@@ -161,20 +143,16 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
     let self_evolution_enabled = Arc::new(AtomicBool::new(config.self_evolution_enabled));
 
     // Register LearnTool and SkillProposalTool
-    tool_registry
-        .register(Arc::new(crate::tools::learn::LearnTool::new(
-            user_learner.clone(),
+    tool_registry.register(Arc::new(crate::tools::learn::LearnTool::new(
+        user_learner.clone(),
+        self_evolution_enabled.clone(),
+    )))?;
+    tool_registry.register(Arc::new(
+        crate::tools::skill_proposal::SkillProposalTool::new(
+            pool.clone(),
             self_evolution_enabled.clone(),
-        )))
-        .unwrap();
-    tool_registry
-        .register(Arc::new(
-            crate::tools::skill_proposal::SkillProposalTool::new(
-                pool.clone(),
-                self_evolution_enabled.clone(),
-            ),
-        ))
-        .unwrap();
+        ),
+    ))?;
 
     let tools = Arc::new(tool_registry);
     info!("Registered {} tools", tools.len());

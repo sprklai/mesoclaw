@@ -3,6 +3,7 @@ pub mod tray;
 
 use tauri::Manager;
 
+#[allow(clippy::expect_used)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
 

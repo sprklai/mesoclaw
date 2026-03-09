@@ -8,7 +8,7 @@ name = "mesoclaw-tui"
 path = "src/main.rs"
 
 [dependencies]
-mesoclaw-core = { workspace = true }
+mesoclaw-core = { workspace = true, features = ["gateway", "ai", "keyring"] }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

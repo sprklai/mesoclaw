@@ -458,21 +458,16 @@ impl ContextEngine {
 // ============================================================================
 
 /// Strategy controlling how much context history and memory is injected.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ContextStrategy {
     /// Last 2 turns (4 messages), top 3 memories
     Minimal,
     /// Last 10 turns (20 messages) + top 5 memories
+    #[default]
     Balanced,
     /// All messages up to max cap, top 10 memories
     Full,
-}
-
-impl Default for ContextStrategy {
-    fn default() -> Self {
-        Self::Balanced
-    }
 }
 
 impl FromStr for ContextStrategy {

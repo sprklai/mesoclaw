@@ -1,2 +1,3 @@
 [advisories]
-ignore = []
+# time 0.3.45 DoS via stack exhaustion in RFC 2822 parsing — pinned by tauri's cookie dependency
+ignore = ["RUSTSEC-2026-0009"]

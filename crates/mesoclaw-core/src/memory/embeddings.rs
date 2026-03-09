@@ -70,7 +70,9 @@ impl<P: EmbeddingProvider> LruEmbeddingCache<P> {
     pub fn new(provider: P, capacity: usize) -> Self {
         Self {
             provider,
-            cache: Mutex::new(LruCache::new(NonZeroUsize::new(capacity).unwrap())),
+            cache: Mutex::new(LruCache::new(
+                NonZeroUsize::new(capacity).unwrap_or(NonZeroUsize::MIN),
+            )),
         }
     }
 }

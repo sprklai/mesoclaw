@@ -230,7 +230,9 @@ impl SecurityPolicy {
 
         // Check rate limit
         {
-            let mut limiter = self.rate_limiter.lock().expect("rate limiter poisoned");
+            let Ok(mut limiter) = self.rate_limiter.lock() else {
+                return ValidationResult::Denied("rate limiter lock poisoned".to_string());
+            };
             if !limiter.check_and_record() {
                 return ValidationResult::Denied("rate limited".to_string());
             }
@@ -307,7 +309,9 @@ impl SecurityPolicy {
             timestamp: Utc::now().to_rfc3339(),
         };
 
-        let mut log = self.audit_log.lock().expect("audit log poisoned");
+        let Ok(mut log) = self.audit_log.lock() else {
+            return;
+        };
         if log.len() >= self.audit_capacity {
             log.pop_front();
         }
@@ -316,7 +320,9 @@ impl SecurityPolicy {
 
     /// Return a copy of the audit log entries.
     pub fn audit_log(&self) -> Vec<AuditEntry> {
-        let log = self.audit_log.lock().expect("audit log poisoned");
+        let Ok(log) = self.audit_log.lock() else {
+            return Vec::new();
+        };
         log.iter().cloned().collect()
     }
 }

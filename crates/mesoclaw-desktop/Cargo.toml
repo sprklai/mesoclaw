@@ -7,7 +7,7 @@ edition.workspace = true
 tauri-build = { version = "2.5", features = [] }
 
 [dependencies]
-mesoclaw-core = { workspace = true }
+mesoclaw-core = { workspace = true, features = ["gateway", "ai", "keyring"] }
 tauri = { version = "2.10", features = ["tray-icon"] }
 tauri-plugin-window-state = "2.4"
 tauri-plugin-single-instance = "2.4"

@@ -135,7 +135,9 @@ jobs:
           key: embedded-aarch64-musl
 
       - name: Check CLI + Daemon for aarch64-musl
-        run: cargo check -p mesoclaw-cli -p mesoclaw-daemon --target aarch64-unknown-linux-musl
+        run: |
+          cargo check -p mesoclaw-cli --target aarch64-unknown-linux-musl
+          cargo check -p mesoclaw-daemon --no-default-features --target aarch64-unknown-linux-musl
 
   cargo-audit:
     name: Cargo Audit
@@ -143,6 +145,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: rustsec/audit-check@v1
+      - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -8,7 +8,7 @@ name = "mesoclaw-daemon"
 path = "src/main.rs"
 
 [dependencies]
-mesoclaw-core = { workspace = true, features = ["gateway"] }
+mesoclaw-core = { workspace = true, default-features = false, features = ["gateway", "ai", "keyring"] }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -18,7 +18,8 @@ clap = { workspace = true }
 workspace = true
 
 [features]
-default = []
+default = ["keyring"]
+keyring = ["mesoclaw-core/keyring"]
 channels = ["mesoclaw-core/channels"]
 scheduler = ["mesoclaw-core/scheduler"]
 web-dashboard = ["mesoclaw-core/web-dashboard"]

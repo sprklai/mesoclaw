@@ -47,6 +47,7 @@ pub fn resolve_data_dir() -> std::path::PathBuf {
 /// Boot the embedded gateway server in a background task.
 ///
 /// This is called from the Tauri `.setup()` hook when no external URL is configured.
+#[allow(clippy::unwrap_used)]
 pub fn boot_gateway(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing so gateway logs are visible in the terminal.
     // Use try_init() because Tauri devtools may have already set a global subscriber.

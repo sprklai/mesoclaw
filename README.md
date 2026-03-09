@@ -1,8 +1,68 @@
 # MesoClaw
 
-[![CI](https://github.com/nsrtech/mesoclaw/actions/workflows/ci.yml/badge.svg)](https://github.com/nsrtech/mesoclaw/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org/)
+<p align="center">
+  <img src="crates/mesoclaw-desktop/icons/icon.png" alt="MesoClaw — native desktop AI agent" width="180" />
+</p>
+
+<p align="center">
+  <strong>A native desktop AI agent — 18 providers, 11 tools, 3 channels, ~50 MB binary.</strong><br>
+  Built with Rust + Tauri 2. Runs on Windows, macOS, and Linux. No cloud required.
+</p>
+
+<!-- Row 1: CI & Release -->
+<p align="center">
+  <a href="https://github.com/sprklai/mesoclaw/actions/workflows/release.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/sprklai/mesoclaw/release.yml?style=flat-square&label=release" alt="Release Build" />
+  </a>
+  <a href="https://github.com/sprklai/mesoclaw/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/sprklai/mesoclaw/ci.yml?style=flat-square&label=CI" alt="CI" />
+  </a>
+  <a href="https://github.com/sprklai/mesoclaw/releases/latest">
+    <img src="https://img.shields.io/github/v/release/sprklai/mesoclaw?style=flat-square" alt="Latest Release" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License" />
+  </a>
+</p>
+
+<!-- Row 2: Tech Stack -->
+<p align="center">
+  <img src="https://img.shields.io/badge/Rust-2024%20Edition-orange?style=flat-square&logo=rust" alt="Rust 2024 Edition" />
+  <img src="https://img.shields.io/badge/Tauri-2-24C8D8?style=flat-square&logo=tauri&logoColor=white" alt="Tauri 2" />
+  <img src="https://img.shields.io/badge/Svelte-5-FF3E00?style=flat-square&logo=svelte&logoColor=white" alt="Svelte 5" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/SQLite-rusqlite%20%2B%20sqlite--vec-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite + rusqlite + sqlite-vec" />
+</p>
+
+<!-- Row 3: App Modes & Platform -->
+<p align="center">
+  <img src="https://img.shields.io/badge/mode-Desktop%20GUI-8B5CF6?style=flat-square" alt="Desktop GUI" />
+  <img src="https://img.shields.io/badge/mode-CLI-4B5563?style=flat-square" alt="CLI" />
+  <img src="https://img.shields.io/badge/mode-Daemon-1F2937?style=flat-square" alt="Daemon" />
+  <img src="https://img.shields.io/badge/Windows-0078D4?style=flat-square&logo=windows&logoColor=white" alt="Windows" />
+  <img src="https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS" />
+  <img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux" />
+  <img src="https://img.shields.io/badge/ARM64-CLI-6C757D?style=flat-square&logo=arm&logoColor=white" alt="ARM64 CLI" />
+</p>
+
+<!-- Row 4: Quality & i18n -->
+<p align="center">
+  <img src="https://img.shields.io/badge/tests-827%20Rust%20%2B%2033%20TS-success?style=flat-square" alt="827 Rust + 33 TS Tests" />
+  <img src="https://img.shields.io/badge/i18n-EN-blue?style=flat-square" alt="English" />
+</p>
+
+<!-- Row 5: Community -->
+<p align="center">
+  <a href="https://github.com/sprklai/mesoclaw/stargazers">
+    <img src="https://img.shields.io/github/stars/sprklai/mesoclaw?style=flat-square" alt="GitHub Stars" />
+  </a>
+  <a href="https://github.com/sprklai/mesoclaw/issues">
+    <img src="https://img.shields.io/github/issues/sprklai/mesoclaw?style=flat-square" alt="GitHub Issues" />
+  </a>
+  <a href="https://github.com/sprklai/mesoclaw/pulls">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome" />
+  </a>
+</p>
 
 An AI-powered multi-interface application built with Rust, producing multiple binaries from a single codebase: Desktop, CLI, and Daemon (with TUI and Mobile planned for future release).
 
@@ -328,19 +388,75 @@ MESOCLAW_GATEWAY_URL=http://localhost:18981 cd crates/mesoclaw-desktop && cargo 
 cd web && bun run dev
 ```
 
-### Cross-Platform Builds
+### Building Executables
+
+#### Native builds (current platform)
 
 ```bash
-./scripts/build.sh --target native            # Current OS
-./scripts/build.sh --target native --release   # Release mode
-./scripts/build.sh --target linux-x86          # Linux x86_64
-./scripts/build.sh --target linux-arm          # Linux aarch64 (RPi)
-./scripts/build.sh --target macos-x86          # macOS Intel
-./scripts/build.sh --target macos-arm          # macOS Apple Silicon
-./scripts/build.sh --target windows            # Windows x86_64
-./scripts/build.sh --target all                # All platforms
-./scripts/build.sh --list-targets              # Show available targets
+./scripts/build.sh --target native                  # Debug build
+./scripts/build.sh --target native --release         # Release (optimized, smallest binary)
+./scripts/build.sh --target native --release --crates "mesoclaw-daemon mesoclaw-cli"  # Specific crates only
+./scripts/build.sh --target native --release --all-features  # With all features
 ```
+
+Output goes to `dist/native/release/`.
+
+#### Tauri desktop app (with GUI)
+
+```bash
+./scripts/build.sh --tauri --release                 # Release bundle (.deb/.AppImage, .dmg, .msi)
+./scripts/build.sh --tauri --release --bundle deb,appimage  # Specific bundle formats
+./scripts/build.sh --dev                             # Dev mode (Vite + Tauri hot reload)
+```
+
+#### Cross-compilation
+
+```bash
+./scripts/build.sh --list-targets                    # Show all available targets
+
+# Linux targets
+./scripts/build.sh --target linux-x86 --release --install-toolchain
+./scripts/build.sh --target linux-arm64 --release --install-toolchain
+./scripts/build.sh --target linux-armv7 --release --install-toolchain   # Raspberry Pi
+./scripts/build.sh --target linux-musl --release --install-toolchain    # Static binary
+
+# macOS (must run on macOS)
+./scripts/build.sh --target macos-x86 --release      # Intel
+./scripts/build.sh --target macos-arm --release       # Apple Silicon
+./scripts/build.sh --target macos-universal --release  # Universal (x86_64 + ARM via lipo)
+
+# Windows (from Linux)
+./scripts/build.sh --target windows --release --install-toolchain
+
+# All targets at once
+./scripts/build.sh --target all --release --install-toolchain
+```
+
+**Cross-compilation prerequisites (Linux):**
+
+```bash
+sudo apt install gcc-aarch64-linux-gnu      # ARM64
+sudo apt install gcc-arm-linux-gnueabihf    # ARMv7
+sudo apt install gcc-mingw-w64-x86-64       # Windows
+```
+
+#### Docker-based cross-compilation (no local cross-compilers needed)
+
+```bash
+./scripts/build.sh --target linux-arm64 --release --docker
+./scripts/build.sh --target windows --release --docker
+```
+
+#### Build profiles
+
+| Profile | Flag | Use Case |
+|---------|------|----------|
+| `debug` | *(default)* | Development |
+| `release` | `--release` | Production (full LTO, smallest binary) |
+| `ci-release` | `--profile ci-release` | CI builds (thin LTO, faster compile) |
+| `release-fast` | `--profile release-fast` | Profiling (thin LTO + debug info) |
+
+> **Note:** Tauri desktop builds cannot cross-compile -- each platform must build on its native OS. Use the [GitHub Actions CI workflow](.github/workflows/ci.yml) for automated multi-platform Tauri builds.
 
 See [scripts/build.sh](scripts/build.sh) for full options.
 
