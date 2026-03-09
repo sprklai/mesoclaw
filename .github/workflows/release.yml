@@ -68,7 +68,7 @@ jobs:
         run: cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --all-features
 
       - name: Upload desktop artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-desktop
           path: |
@@ -77,7 +77,7 @@ jobs:
             target/ci-release/bundle/rpm/*.rpm
 
       - name: Upload standalone binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-standalone
           path: |
@@ -116,7 +116,7 @@ jobs:
         run: cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --all-features
 
       - name: Upload desktop artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-desktop
           path: |
@@ -124,7 +124,7 @@ jobs:
             target/ci-release/bundle/nsis/*.exe
 
       - name: Upload standalone binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-standalone
           path: |
@@ -212,7 +212,7 @@ jobs:
             -output target/ci-release/universal/mesoclaw-daemon
 
       - name: Upload desktop artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-desktop
           path: |
@@ -220,7 +220,7 @@ jobs:
             target/x86_64-apple-darwin/ci-release/bundle/dmg/*.dmg
 
       - name: Upload standalone binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-standalone
           path: |
