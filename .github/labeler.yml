@@ -1,0 +1,25 @@
+core:
+  - changed-files:
+      - any-glob-to-any-file: "crates/mesoclaw-core/**"
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: "web/**"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "*.md"
+
+cli:
+  - changed-files:
+      - any-glob-to-any-file: "crates/mesoclaw-cli/**"
+
+desktop:
+  - changed-files:
+      - any-glob-to-any-file: "crates/mesoclaw-desktop/**"

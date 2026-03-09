@@ -3,7 +3,7 @@ mod commands;
 
 use std::process;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 
 use client::MesoClient;
 
@@ -80,6 +80,12 @@ enum Commands {
     Schedule {
         #[command(subcommand)]
         action: ScheduleAction,
+    },
+    /// Generate shell completions (hidden from --help)
+    #[command(hide = true)]
+    Completions {
+        /// Shell to generate completions for
+        shell: clap_complete::Shell,
     },
 }
 
@@ -345,6 +351,15 @@ async fn main() {
             ScheduleAction::History { id } => commands::schedule::history(&client, &id).await,
             ScheduleAction::Status => commands::schedule::status(&client).await,
         },
+        Commands::Completions { shell } => {
+            clap_complete::generate(
+                shell,
+                &mut Cli::command(),
+                "mesoclaw",
+                &mut std::io::stdout(),
+            );
+            Ok(())
+        }
         Commands::Provider { action } => match action {
             ProviderAction::List => commands::provider::list(&client).await,
             ProviderAction::Test { provider_id } => {
@@ -608,6 +623,12 @@ mod tests {
             }
             _ => panic!("expected Provider Default"),
         }
+    }
+
+    #[test]
+    fn parse_completions_bash() {
+        let cli = parse(&["mesoclaw", "completions", "bash"]);
+        assert!(matches!(cli.command, Commands::Completions { .. }));
     }
 
     #[test]

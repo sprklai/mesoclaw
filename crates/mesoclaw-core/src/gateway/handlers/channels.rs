@@ -107,10 +107,7 @@ pub async fn webhook_message(
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Validate channel exists
     if state.channel_registry.status(&name).is_none() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            format!("channel not found: {name}"),
-        ));
+        return Err((StatusCode::NOT_FOUND, format!("channel not found: {name}")));
     }
 
     // Build channel message
@@ -235,35 +232,61 @@ mod tests {
     // 8.7.13 — Webhook message for a registered channel returns 202
     #[tokio::test]
     async fn channel_message_webhook_202() {
+        use crate::channels::traits::{
+            Channel, ChannelLifecycle, ChannelSender, ChannelStatus as CS,
+        };
         use async_trait::async_trait;
-        use crate::channels::traits::{Channel, ChannelLifecycle, ChannelSender, ChannelStatus as CS};
 
         // Minimal mock channel for registry
         struct MockCh;
 
         #[async_trait]
         impl ChannelSender for MockCh {
-            fn channel_type(&self) -> &str { "test" }
-            async fn send_message(&self, _msg: ChannelMessage) -> crate::Result<()> { Ok(()) }
+            fn channel_type(&self) -> &str {
+                "test"
+            }
+            async fn send_message(&self, _msg: ChannelMessage) -> crate::Result<()> {
+                Ok(())
+            }
         }
 
         #[async_trait]
         impl ChannelLifecycle for MockCh {
-            fn display_name(&self) -> &str { "test" }
-            async fn connect(&self) -> crate::Result<()> { Ok(()) }
-            async fn disconnect(&self) -> crate::Result<()> { Ok(()) }
-            fn status(&self) -> CS { CS::Connected }
-            fn create_sender(&self) -> Box<dyn ChannelSender> { Box::new(MockCh) }
+            fn display_name(&self) -> &str {
+                "test"
+            }
+            async fn connect(&self) -> crate::Result<()> {
+                Ok(())
+            }
+            async fn disconnect(&self) -> crate::Result<()> {
+                Ok(())
+            }
+            fn status(&self) -> CS {
+                CS::Connected
+            }
+            fn create_sender(&self) -> Box<dyn ChannelSender> {
+                Box::new(MockCh)
+            }
         }
 
         #[async_trait]
         impl Channel for MockCh {
-            async fn listen(&self, _tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> crate::Result<()> { Ok(()) }
-            async fn health_check(&self) -> bool { true }
+            async fn listen(
+                &self,
+                _tx: tokio::sync::mpsc::Sender<ChannelMessage>,
+            ) -> crate::Result<()> {
+                Ok(())
+            }
+            async fn health_check(&self) -> bool {
+                true
+            }
         }
 
         let (_dir, state) = test_state().await;
-        state.channel_registry.register(std::sync::Arc::new(MockCh)).unwrap();
+        state
+            .channel_registry
+            .register(std::sync::Arc::new(MockCh))
+            .unwrap();
 
         let app = Router::new()
             .route(

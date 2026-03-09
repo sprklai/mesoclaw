@@ -129,11 +129,7 @@ pub fn get_app_version(app: tauri::AppHandle) -> String {
 }
 
 #[tauri::command]
-pub fn show_notification(
-    app: tauri::AppHandle,
-    title: String,
-    body: String,
-) -> Result<(), String> {
+pub fn show_notification(app: tauri::AppHandle, title: String, body: String) -> Result<(), String> {
     use tauri_plugin_notification::NotificationExt;
     app.notification()
         .builder()

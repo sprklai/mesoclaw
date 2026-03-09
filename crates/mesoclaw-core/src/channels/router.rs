@@ -113,7 +113,10 @@ impl ChannelRouter {
         // 1. Resolve or create session
         let session_map = ChannelSessionMap::new(state.session_manager.clone());
         let channel_key = ChannelSessionMap::channel_key(&message);
-        let session_id = match session_map.resolve_session(&channel_key, &channel_name).await {
+        let session_id = match session_map
+            .resolve_session(&channel_key, &channel_name)
+            .await
+        {
             Ok(id) => id,
             Err(e) => {
                 warn!("ChannelRouter: failed to resolve session for {channel_key}: {e}");
@@ -144,14 +147,7 @@ impl ChannelRouter {
         }
 
         // 6. Resolve agent with channel preamble
-        let agent = match crate::ai::resolve_agent(
-            None,
-            state,
-            None,
-            Some(system_context),
-        )
-        .await
-        {
+        let agent = match crate::ai::resolve_agent(None, state, None, Some(system_context)).await {
             Ok(a) => a,
             Err(e) => {
                 warn!("ChannelRouter: failed to resolve agent for {channel_name}: {e}");
@@ -389,9 +385,7 @@ mod tests {
         use std::sync::Arc;
 
         let config = Arc::new(AppConfig {
-            channel_tool_policy: HashMap::from([
-                ("telegram".into(), vec!["system_info".into()]),
-            ]),
+            channel_tool_policy: HashMap::from([("telegram".into(), vec!["system_info".into()])]),
             ..Default::default()
         });
         let policy = ChannelToolPolicy::new(config);
@@ -417,8 +411,14 @@ mod tests {
     #[test]
     fn pipeline_preamble_override() {
         let telegram_ctx = channel_system_context("telegram");
-        assert!(telegram_ctx.contains("Telegram"), "Should contain channel name");
-        assert!(telegram_ctx.contains("concise"), "Should mention conciseness");
+        assert!(
+            telegram_ctx.contains("Telegram"),
+            "Should contain channel name"
+        );
+        assert!(
+            telegram_ctx.contains("concise"),
+            "Should mention conciseness"
+        );
 
         let slack_ctx = channel_system_context("slack");
         assert!(slack_ctx.contains("Slack"));
@@ -490,8 +490,7 @@ mod tests {
         router.wire(state.clone());
         router.start().await;
 
-        let msg = ChannelMessage::new("telegram", "persist test")
-            .with_sender("user123");
+        let msg = ChannelMessage::new("telegram", "persist test").with_sender("user123");
         router.sender().send(msg).await.unwrap();
 
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
@@ -499,7 +498,10 @@ mod tests {
 
         // Verify session was created
         let sessions = state.session_manager.list_sessions().await.unwrap();
-        assert!(!sessions.is_empty(), "At least one session should be created");
+        assert!(
+            !sessions.is_empty(),
+            "At least one session should be created"
+        );
     }
 
     // CR.42 — Router tool policy filtering (requires live credentials, skipped by default)

@@ -3,8 +3,10 @@
 # Usage: ./scripts/build.sh [OPTIONS]
 #
 # Options:
-#   --target <TARGET>     Build target (native|linux-x86|linux-arm|macos-x86|macos-arm|windows|all)
+#   --target <TARGET>     Build target (native|linux-x86|linux-arm64|linux-armv7|linux-musl|
+#                                       macos-x86|macos-arm|macos-universal|windows|all)
 #   --release             Build in release mode (default: debug)
+#   --profile <PROFILE>   Cargo profile (release|ci-release|release-fast) (overrides --release)
 #   --crates <CRATES>     Space-separated list of crates to build (default: all binary crates)
 #   --features <FEATURES> Comma-separated features to enable
 #   --all-features        Enable all features
@@ -13,6 +15,7 @@
 #   --tauri               Build Tauri desktop app (native platform only)
 #   --bundle <FORMATS>    Comma-separated bundle formats (e.g., deb,appimage,dmg,msi,nsis)
 #   --dev                 Start dev mode (Vite + Tauri dev server)
+#   --docker              Use Docker-based cross-compilation via Dockerfile.cross-compile
 #   --help                Show this help message
 
 set -euo pipefail
@@ -28,20 +31,24 @@ ALL_CRATES="mesoclaw-cli mesoclaw-tui mesoclaw-daemon mesoclaw-desktop"
 # Using a function instead of associative arrays for macOS Bash 3.2 compatibility
 get_rust_target() {
     case "$1" in
-        linux-x86)  echo "x86_64-unknown-linux-gnu";;
-        linux-arm)  echo "aarch64-unknown-linux-gnu";;
-        macos-x86)  echo "x86_64-apple-darwin";;
-        macos-arm)  echo "aarch64-apple-darwin";;
-        windows)    echo "x86_64-pc-windows-gnu";;
-        *)          return 1;;
+        linux-x86)      echo "x86_64-unknown-linux-gnu";;
+        linux-arm|linux-arm64) echo "aarch64-unknown-linux-gnu";;
+        linux-armv7)    echo "armv7-unknown-linux-gnueabihf";;
+        linux-musl)     echo "aarch64-unknown-linux-musl";;
+        macos-x86)      echo "x86_64-apple-darwin";;
+        macos-arm)      echo "aarch64-apple-darwin";;
+        macos-universal) echo "universal-apple-darwin";;
+        windows)        echo "x86_64-pc-windows-gnu";;
+        *)              return 1;;
     esac
 }
 
-ALL_TARGETS="linux-x86 linux-arm macos-x86 macos-arm windows"
+ALL_TARGETS="linux-x86 linux-arm64 linux-armv7 linux-musl macos-x86 macos-arm windows"
 
 # ── Defaults ───────────────────────────────────────────────────────────
 TARGET="native"
 PROFILE="debug"
+CARGO_PROFILE=""
 CRATES=""
 FEATURES=""
 ALL_FEATURES=false
@@ -49,36 +56,48 @@ INSTALL_TOOLCHAIN=false
 DEV_MODE=false
 TAURI_MODE=false
 BUNDLE_FORMATS=""
+DOCKER_MODE=false
 
 # ── Colors ─────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 info()  { echo -e "${BLUE}[INFO]${NC}  $*"; }
 ok()    { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 err()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+step()  { echo -e "${CYAN}[STEP]${NC}  $*"; }
 
 # ── Functions ──────────────────────────────────────────────────────────
 
 show_help() {
-    head -14 "$0" | tail -13 | sed 's/^# //' | sed 's/^#//'
+    head -18 "$0" | tail -17 | sed 's/^# //' | sed 's/^#//'
 }
 
 list_targets() {
     echo "Available build targets:"
     echo ""
-    echo "  native       Build for the current OS/architecture"
+    echo "  native          Build for the current OS/architecture"
     for key in $ALL_TARGETS; do
-        printf "  %-12s %s\n" "$key" "$(get_rust_target "$key")"
+        local rust_target
+        rust_target="$(get_rust_target "$key" 2>/dev/null || echo "N/A")"
+        printf "  %-16s %s\n" "$key" "$rust_target"
     done
-    echo "  all          Build for all targets (requires cross-compilation setup)"
+    echo "  macos-universal Build both darwin targets and merge with lipo"
+    echo "  all             Build for all targets (requires cross-compilation setup)"
     echo ""
     detect_os
     echo "Current platform: ${DETECTED_OS} (${DETECTED_ARCH})"
+    echo ""
+    echo "Available profiles:"
+    echo "  debug           Default debug profile"
+    echo "  release         Full LTO, opt-level=z, codegen-units=1"
+    echo "  ci-release      Thin LTO, opt-level=s, codegen-units=16 (faster CI builds)"
+    echo "  release-fast    Thin LTO with debug info (profiling)"
 }
 
 detect_os() {
@@ -116,10 +135,17 @@ check_cross_compiler() {
     local target="$1"
 
     case "$target" in
-        "aarch64-unknown-linux-gnu")
+        "aarch64-unknown-linux-gnu"|"aarch64-unknown-linux-musl")
             if ! command -v aarch64-linux-gnu-gcc &> /dev/null; then
                 warn "Cross-compiler 'aarch64-linux-gnu-gcc' not found."
                 echo "  Install with: sudo apt install gcc-aarch64-linux-gnu"
+                return 1
+            fi
+            ;;
+        "armv7-unknown-linux-gnueabihf")
+            if ! command -v arm-linux-gnueabihf-gcc &> /dev/null; then
+                warn "Cross-compiler 'arm-linux-gnueabihf-gcc' not found."
+                echo "  Install with: sudo apt install gcc-arm-linux-gnueabihf"
                 return 1
             fi
             ;;
@@ -134,11 +160,43 @@ check_cross_compiler() {
     return 0
 }
 
+# Resolve the effective Cargo profile flag for the build command
+get_cargo_profile_args() {
+    local profile="$1"
+    case "$profile" in
+        debug)
+            # No extra flags needed for debug
+            ;;
+        release)
+            echo "--release"
+            ;;
+        ci-release|release-fast)
+            echo "--profile" "$profile"
+            ;;
+        *)
+            err "Unknown profile: $profile"
+            exit 1
+            ;;
+    esac
+}
+
+# Get the target directory name for a profile
+get_profile_dir() {
+    local profile="$1"
+    case "$profile" in
+        debug)         echo "debug";;
+        release)       echo "release";;
+        ci-release)    echo "ci-release";;
+        release-fast)  echo "release-fast";;
+        *)             echo "$profile";;
+    esac
+}
+
 build_target() {
     local rust_target="$1"
     local friendly_name="$2"
 
-    info "Building for $friendly_name ($rust_target)..."
+    info "Building for $friendly_name ($rust_target) [profile: $PROFILE]..."
 
     # Check toolchain
     if [ "$rust_target" != "$(get_native_target)" ]; then
@@ -150,7 +208,9 @@ build_target() {
     fi
 
     # Determine output directory
-    local output_dir="${BUILD_DIR}/${friendly_name}/${PROFILE}"
+    local profile_dir
+    profile_dir="$(get_profile_dir "$PROFILE")"
+    local output_dir="${BUILD_DIR}/${friendly_name}/${profile_dir}"
     mkdir -p "$output_dir"
 
     # Build each crate
@@ -172,9 +232,12 @@ build_target() {
 
         local cargo_args=("-p" "$crate")
 
-        # Profile
-        if [ "$PROFILE" = "release" ]; then
-            cargo_args+=("--release")
+        # Profile flags
+        local profile_args
+        profile_args="$(get_cargo_profile_args "$PROFILE")"
+        if [ -n "$profile_args" ]; then
+            # shellcheck disable=SC2086
+            cargo_args+=($profile_args)
         fi
 
         # Target (skip for native)
@@ -196,14 +259,14 @@ build_target() {
 
             local src_path
             if [ "$rust_target" = "$(get_native_target)" ]; then
-                src_path="${WORKSPACE_ROOT}/target/${PROFILE}/${bin_name}"
+                src_path="${WORKSPACE_ROOT}/target/${profile_dir}/${bin_name}"
             else
-                src_path="${WORKSPACE_ROOT}/target/${rust_target}/${PROFILE}/${bin_name}"
+                src_path="${WORKSPACE_ROOT}/target/${rust_target}/${profile_dir}/${bin_name}"
             fi
 
             if [ -f "$src_path" ]; then
                 cp "$src_path" "$output_dir/"
-                ok "  $crate -> dist/${friendly_name}/${PROFILE}/${bin_name}"
+                ok "  $crate -> dist/${friendly_name}/${profile_dir}/${bin_name}"
             fi
         else
             err "  Failed to build $crate for $friendly_name"
@@ -212,6 +275,99 @@ build_target() {
     done
 
     ok "Build complete for $friendly_name"
+}
+
+build_macos_universal() {
+    detect_os
+    if [ "$DETECTED_OS" != "macos" ]; then
+        err "macOS universal builds can only run on macOS (detected: $DETECTED_OS)"
+        exit 1
+    fi
+
+    if ! command -v lipo &> /dev/null; then
+        err "'lipo' command not found. It should be available on macOS."
+        exit 1
+    fi
+
+    step "Building macOS universal binary (x86_64 + aarch64)..."
+
+    # Build both architectures
+    info "Building x86_64-apple-darwin..."
+    build_target "x86_64-apple-darwin" "macos-x86"
+
+    info "Building aarch64-apple-darwin..."
+    build_target "aarch64-apple-darwin" "macos-arm"
+
+    # Merge with lipo
+    local profile_dir
+    profile_dir="$(get_profile_dir "$PROFILE")"
+    local universal_dir="${BUILD_DIR}/macos-universal/${profile_dir}"
+    mkdir -p "$universal_dir"
+
+    local crates_to_build
+    if [ -n "$CRATES" ]; then
+        crates_to_build="$CRATES"
+    else
+        crates_to_build="$ALL_CRATES"
+    fi
+
+    for crate in $crates_to_build; do
+        # Skip desktop for cross-compilation
+        if [ "$crate" = "mesoclaw-desktop" ]; then
+            warn "Skipping $crate for universal build (requires Tauri platform setup)"
+            continue
+        fi
+
+        local bin_name
+        bin_name=$(get_bin_name "$crate" "x86_64-apple-darwin")
+
+        local x86_bin="${BUILD_DIR}/macos-x86/${profile_dir}/${bin_name}"
+        local arm_bin="${BUILD_DIR}/macos-arm/${profile_dir}/${bin_name}"
+        local universal_bin="${universal_dir}/${bin_name}"
+
+        if [ -f "$x86_bin" ] && [ -f "$arm_bin" ]; then
+            info "  Merging $bin_name with lipo..."
+            lipo -create -output "$universal_bin" "$x86_bin" "$arm_bin"
+            ok "  $bin_name -> dist/macos-universal/${profile_dir}/${bin_name}"
+        else
+            warn "  Skipping $bin_name -- missing one or both architectures"
+        fi
+    done
+
+    ok "macOS universal build complete"
+}
+
+build_via_docker() {
+    local target="$1"
+    local friendly_name="$2"
+
+    info "Building via Docker for $friendly_name..."
+
+    # Delegate to docker-build.sh
+    local docker_script="${WORKSPACE_ROOT}/scripts/docker-build.sh"
+    if [ ! -x "$docker_script" ]; then
+        err "Docker build script not found or not executable: $docker_script"
+        echo "  Make it executable with: chmod +x $docker_script"
+        exit 1
+    fi
+
+    local docker_args=("--target" "$friendly_name")
+
+    if [ "$PROFILE" != "debug" ]; then
+        docker_args+=("--profile" "$PROFILE")
+    fi
+
+    if [ -n "$CRATES" ]; then
+        docker_args+=("--crates" "$CRATES")
+    fi
+
+    if [ "$ALL_FEATURES" = true ]; then
+        docker_args+=("--all-features")
+    elif [ -n "$FEATURES" ]; then
+        docker_args+=("--features" "$FEATURES")
+    fi
+
+    "$docker_script" "${docker_args[@]}"
 }
 
 get_bin_name() {
@@ -247,6 +403,11 @@ while [[ $# -gt 0 ]]; do
             PROFILE="release"
             shift
             ;;
+        --profile)
+            CARGO_PROFILE="$2"
+            PROFILE="$2"
+            shift 2
+            ;;
         --crates)
             CRATES="$2"
             shift 2
@@ -269,6 +430,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --dev)
             DEV_MODE=true
+            shift
+            ;;
+        --docker)
+            DOCKER_MODE=true
             shift
             ;;
         --install-toolchain)
@@ -451,19 +616,39 @@ echo "  MesoClaw Build"
 echo "  Target:  $TARGET"
 echo "  Profile: $PROFILE"
 echo "  Crates:  ${CRATES:-all}"
+if [ "$DOCKER_MODE" = true ]; then
+echo "  Docker:  yes"
+fi
 echo "========================================"
 echo ""
 
 case "$TARGET" in
     "native")
         native_target="$(get_native_target)"
-        build_target "$native_target" "native"
+        if [ "$DOCKER_MODE" = true ]; then
+            build_via_docker "$native_target" "native"
+        else
+            build_target "$native_target" "native"
+        fi
+        ;;
+    "macos-universal")
+        if [ "$DOCKER_MODE" = true ]; then
+            err "macOS universal builds are not supported via Docker."
+            exit 1
+        fi
+        build_macos_universal
         ;;
     "all")
         failed=0
         for friendly in $ALL_TARGETS; do
-            if ! build_target "$(get_rust_target "$friendly")" "$friendly"; then
-                failed=$((failed + 1))
+            if [ "$DOCKER_MODE" = true ]; then
+                if ! build_via_docker "$(get_rust_target "$friendly")" "$friendly"; then
+                    failed=$((failed + 1))
+                fi
+            else
+                if ! build_target "$(get_rust_target "$friendly")" "$friendly"; then
+                    failed=$((failed + 1))
+                fi
             fi
             echo ""
         done
@@ -474,7 +659,11 @@ case "$TARGET" in
     *)
         rust_target="$(get_rust_target "$TARGET")"
         if [ -n "$rust_target" ]; then
-            build_target "$rust_target" "$TARGET"
+            if [ "$DOCKER_MODE" = true ]; then
+                build_via_docker "$rust_target" "$TARGET"
+            else
+                build_target "$rust_target" "$TARGET"
+            fi
         else
             err "Unknown target: $TARGET"
             echo "Use --list-targets to see available targets."

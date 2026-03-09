@@ -1,5 +1,9 @@
 # MesoClaw
 
+[![CI](https://github.com/nsrtech/mesoclaw/actions/workflows/ci.yml/badge.svg)](https://github.com/nsrtech/mesoclaw/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.85+-orange.svg)](https://www.rust-lang.org/)
+
 An AI-powered multi-interface application built with Rust, producing multiple binaries from a single codebase: Desktop, CLI, and Daemon (with TUI and Mobile planned for future release).
 
 ---
@@ -443,26 +447,17 @@ Global options: `--host`, `--port`, `--token` (or `MESOCLAW_TOKEN` env var)
 
 ## Documentation
 
-Detailed documentation lives in the `docs/` and `plans/` directories:
+Detailed documentation lives in the `docs/` directory:
 
+- [CLI Reference](docs/cli-reference.md) -- All commands, options, shell completions, recipes
+- [API Reference](docs/api-reference.md) -- All 74 REST/WS routes with request/response schemas
+- [Configuration](docs/configuration.md) -- All config.toml fields with types and defaults
+- [Deployment Guide](docs/deployment.md) -- Native, Docker, systemd, Raspberry Pi, reverse proxy
+- [Development Guide](docs/development.md) -- Prerequisites, building, testing, how-to guides
 - [Architecture](docs/architecture.md) -- System diagrams, crate dependencies, project structure
 - [Implementation Phases](docs/phases.md) -- Phase gate protocol, checklist, phase details
 - [Process Flows](docs/processes.md) -- Chat request, startup, error handling, WebSocket flows
-- [Phase 1 Plan](plans/phase1_core_foundation.md) -- Detailed implementation plan for core foundation
-- [Phase 2 Plan](plans/phase2_ai_integration.md) -- Memory, security, credentials, and tools
-- [Phase 3 Plan](plans/phase3_gateway_server.md) -- Gateway server, AI agent, boot sequence
-- [Phase 4 Plan](plans/phase4_agent_intelligence.md) -- Identity, skills, user learning
-- [Phase 5 Plan](plans/phase5_combined.md) -- ToolRegistry, memory enhancements, CLI binary
-- [Phase 6 Plan](plans/phase6_frontend.md) -- Svelte 5 SPA frontend
-- [Phase 7 Plan](plans/phase7_desktop.md) -- Tauri 2 desktop app
-- [Phase 8 Plans](plans/phase8_credentials.md) -- Credentials, channels, scheduler
-- [Stage 9 Plan](plans/stage9_cross_compilation.md) -- Cross-compilation & build hardening
-- [Stage 10 Plan](plans/stage10_cicd_pipeline.md) -- CI/CD pipeline
-- [Stage 11 Plan](plans/stage11_quality_gates.md) -- Quality gates & automation
-- [Stage 12 Plan](plans/stage12_cli_reference.md) -- CLI reference documentation
-- [Stage 13 Plan](plans/stage13_api_config_reference.md) -- API & configuration reference
-- [Stage 14 Plan](plans/stage14_architecture_deployment.md) -- Architecture & deployment docs
-- [Stage 15 Plan](plans/stage15_community.md) -- Community & open source readiness
+- [Changelog](CHANGELOG.md) -- Release history
 
 ### Implementation Status
 
@@ -478,13 +473,13 @@ Detailed documentation lives in the `docs/` and `plans/` directories:
 | Phase 8: Credentials & Channels | 15.1-15.2 | Complete | 434/434 Rust + 26 JS passing |
 | Phase 8: Context-Aware Agent | 15.3b | Complete | 488/488 Rust + 26 JS passing |
 | Phase 8: Scheduler + Router + Lifecycle + Hardening | 16, 8.6.1-8.9 | Complete | 827 Rust + 33 JS passing |
-| Stage 9: Cross-Compilation & Build Hardening | -- | Not started | -- |
-| Stage 10: CI/CD Pipeline | -- | Not started | -- |
-| Stage 11: Quality Gates & Automation | -- | Not started | -- |
-| Stage 12: CLI Reference Documentation | -- | Not started | -- |
-| Stage 13: API & Configuration Reference | -- | Not started | -- |
-| Stage 14: Architecture & Deployment Docs | -- | Not started | -- |
-| Stage 15: Community & Open Source Readiness | -- | Not started | -- |
+| Stage 9: Cross-Compilation & Build Hardening | -- | Complete | Build profiles, Docker, smoke tests |
+| Stage 10: CI/CD Pipeline | -- | Complete | CI, release, dependabot, labeler |
+| Stage 11: Quality Gates & Automation | -- | Complete | Workspace lints, audit, quality-check.sh |
+| Stage 12: CLI Reference Documentation | -- | Complete | 25 CLI tests + shell completions |
+| Stage 13: API & Configuration Reference | -- | Complete | 74 routes + 55+ config fields documented |
+| Stage 14: Architecture & Deployment Docs | -- | Complete | Dockerfile, docker-compose, guides |
+| Stage 15: Community & Open Source Readiness | -- | Complete | LICENSE, CoC, SECURITY, templates |
 | FR-1: TUI Binary | -- | Future release | -- |
 | FR-2: Mobile App | -- | Future release | -- |
 
@@ -492,12 +487,13 @@ Detailed documentation lives in the `docs/` and `plans/` directories:
 
 ## Contributing
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines. Quick summary:
+
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Follow the phase gate protocol in [docs/phases.md](docs/phases.md)
-4. Write tests first, then implement
-5. Ensure `cargo test --workspace` and `cargo clippy --workspace` pass
-6. Submit a pull request
+3. Write tests first, then implement
+4. Ensure `cargo test --workspace` and `cargo clippy --workspace -- -D warnings` pass
+5. Submit a pull request
 
 ---
 

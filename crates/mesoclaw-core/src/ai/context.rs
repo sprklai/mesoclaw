@@ -2057,7 +2057,14 @@ mod tests {
     fn boot_context_arch_valid() {
         let boot = BootContext::from_system();
         let valid_archs = [
-            "x86_64", "x86", "aarch64", "arm", "riscv64", "s390x", "powerpc64", "mips64",
+            "x86_64",
+            "x86",
+            "aarch64",
+            "arm",
+            "riscv64",
+            "s390x",
+            "powerpc64",
+            "mips64",
         ];
         assert!(
             valid_archs.iter().any(|a| boot.arch.contains(a)) || !boot.arch.is_empty(),
@@ -2111,14 +2118,8 @@ mod tests {
     #[tokio::test]
     async fn summary_update_overwrites() {
         let (_dir, engine) = setup().await;
-        engine
-            .store_summary("key", "v1", "h1", "m1")
-            .await
-            .unwrap();
-        engine
-            .store_summary("key", "v2", "h2", "m2")
-            .await
-            .unwrap();
+        engine.store_summary("key", "v1", "h1", "m1").await.unwrap();
+        engine.store_summary("key", "v2", "h2", "m2").await.unwrap();
         let result = engine.get_cached_summary("key").await.unwrap().unwrap();
         assert_eq!(result.summary, "v2");
         assert_eq!(result.source_hash, "h2");
@@ -2128,10 +2129,7 @@ mod tests {
     #[tokio::test]
     async fn summary_missing_returns_none() {
         let (_dir, engine) = setup().await;
-        let result = engine
-            .get_cached_summary("nonexistent")
-            .await
-            .unwrap();
+        let result = engine.get_cached_summary("nonexistent").await.unwrap();
         assert!(result.is_none());
     }
 
@@ -2180,13 +2178,27 @@ mod tests {
             .unwrap();
 
         // Should have identity, capabilities, overall (user may be empty)
-        assert!(engine.get_cached_summary("identity").await.unwrap().is_some());
-        assert!(engine
-            .get_cached_summary("capabilities")
-            .await
-            .unwrap()
-            .is_some());
-        assert!(engine.get_cached_summary("overall").await.unwrap().is_some());
+        assert!(
+            engine
+                .get_cached_summary("identity")
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            engine
+                .get_cached_summary("capabilities")
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            engine
+                .get_cached_summary("overall")
+                .await
+                .unwrap()
+                .is_some()
+        );
     }
 
     // 8.9.28 — identity summary content is non-empty
@@ -2211,7 +2223,11 @@ mod tests {
             .await
             .unwrap();
 
-        let identity = engine.get_cached_summary("identity").await.unwrap().unwrap();
+        let identity = engine
+            .get_cached_summary("identity")
+            .await
+            .unwrap()
+            .unwrap();
         assert!(!identity.summary.is_empty());
     }
 
@@ -2248,11 +2264,13 @@ mod tests {
             h.await.unwrap();
         }
         for i in 0..5 {
-            assert!(engine
-                .get_cached_summary(&format!("key_{i}"))
-                .await
-                .unwrap()
-                .is_some());
+            assert!(
+                engine
+                    .get_cached_summary(&format!("key_{i}"))
+                    .await
+                    .unwrap()
+                    .is_some()
+            );
         }
     }
 
@@ -2260,10 +2278,12 @@ mod tests {
     #[tokio::test]
     async fn needs_regeneration_missing_key() {
         let (_dir, engine) = setup().await;
-        assert!(engine
-            .needs_regeneration("nonexistent", "any_hash")
-            .await
-            .unwrap());
+        assert!(
+            engine
+                .needs_regeneration("nonexistent", "any_hash")
+                .await
+                .unwrap()
+        );
     }
 
     // =========================================================================
@@ -2543,7 +2563,11 @@ mod tests {
             .await
             .unwrap();
 
-        let s = engine.get_cached_summary("identity").await.unwrap().unwrap();
+        let s = engine
+            .get_cached_summary("identity")
+            .await
+            .unwrap()
+            .unwrap();
         assert!(!s.summary.is_empty());
         assert_eq!(s.model_id, "builtin");
     }
@@ -2624,11 +2648,7 @@ mod tests {
             .await
             .unwrap();
 
-        let overall = engine
-            .get_cached_summary("overall")
-            .await
-            .unwrap()
-            .unwrap();
+        let overall = engine.get_cached_summary("overall").await.unwrap().unwrap();
         assert!(!overall.summary.is_empty());
     }
 
@@ -2641,7 +2661,10 @@ mod tests {
             .await
             .unwrap();
         let s = engine.get_cached_summary("test").await.unwrap().unwrap();
-        assert!(s.summary.len() < 10_000, "Summary should be reasonably short");
+        assert!(
+            s.summary.len() < 10_000,
+            "Summary should be reasonably short"
+        );
     }
 
     // 8.9.55 — compute_hash returns 16-char hex string
@@ -2825,14 +2848,28 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(engine.get_cached_summary("identity").await.unwrap().is_some());
+        assert!(
+            engine
+                .get_cached_summary("identity")
+                .await
+                .unwrap()
+                .is_some()
+        );
         assert!(engine.get_cached_summary("user").await.unwrap().is_some());
-        assert!(engine
-            .get_cached_summary("capabilities")
-            .await
-            .unwrap()
-            .is_some());
-        assert!(engine.get_cached_summary("overall").await.unwrap().is_some());
+        assert!(
+            engine
+                .get_cached_summary("capabilities")
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            engine
+                .get_cached_summary("overall")
+                .await
+                .unwrap()
+                .is_some()
+        );
     }
 
     // 8.9.29 — Generated summary content is non-empty
@@ -2856,7 +2893,11 @@ mod tests {
             .await
             .unwrap();
 
-        let identity = engine.get_cached_summary("identity").await.unwrap().unwrap();
+        let identity = engine
+            .get_cached_summary("identity")
+            .await
+            .unwrap()
+            .unwrap();
         assert!(!identity.summary.is_empty());
     }
 
@@ -2864,7 +2905,10 @@ mod tests {
     #[tokio::test]
     async fn summary_empty_input() {
         let (_dir, engine) = setup().await;
-        engine.store_summary("empty_key", "", "", "m").await.unwrap();
+        engine
+            .store_summary("empty_key", "", "", "m")
+            .await
+            .unwrap();
         let result = engine
             .get_cached_summary("empty_key")
             .await
@@ -2889,14 +2933,9 @@ mod tests {
         for i in 0..10 {
             let eng = Arc::clone(&engine);
             handles.push(tokio::spawn(async move {
-                eng.store_summary(
-                    &format!("concurrent_{i}"),
-                    &format!("value_{i}"),
-                    "h",
-                    "m",
-                )
-                .await
-                .unwrap();
+                eng.store_summary(&format!("concurrent_{i}"), &format!("value_{i}"), "h", "m")
+                    .await
+                    .unwrap();
             }));
         }
         // Spawn readers interleaved
@@ -3011,7 +3050,10 @@ mod tests {
         let boot = BootContext::from_system();
         let minimal = engine.compose_minimal(&boot, "gpt-4o");
         let year = chrono::Local::now().format("%Y").to_string();
-        assert!(minimal.contains(&year), "Minimal should contain current year");
+        assert!(
+            minimal.contains(&year),
+            "Minimal should contain current year"
+        );
     }
 
     // 8.9.39 — Minimal tier has OS info
@@ -3164,8 +3206,15 @@ mod tests {
             .await
             .unwrap();
 
-        let s = engine.get_cached_summary("identity").await.unwrap().unwrap();
-        assert!(!s.summary.is_empty(), "Identity summary should be non-empty");
+        let s = engine
+            .get_cached_summary("identity")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            !s.summary.is_empty(),
+            "Identity summary should be non-empty"
+        );
     }
 
     // 8.9.51 — User summary with observations lists them
@@ -3288,17 +3337,19 @@ mod tests {
             .await
             .unwrap();
 
-        let overall = engine
-            .get_cached_summary("overall")
+        let overall = engine.get_cached_summary("overall").await.unwrap().unwrap();
+        assert!(!overall.summary.is_empty());
+        // Overall should reference identity content from the default soul
+        let identity = engine
+            .get_cached_summary("identity")
             .await
             .unwrap()
             .unwrap();
-        assert!(!overall.summary.is_empty());
-        // Overall should reference identity content from the default soul
-        let identity = engine.get_cached_summary("identity").await.unwrap().unwrap();
         // The overall summary is built from identity + caps, so it should contain identity info
         assert!(
-            overall.summary.contains(&identity.summary[..identity.summary.len().min(20)]),
+            overall
+                .summary
+                .contains(&identity.summary[..identity.summary.len().min(20)]),
             "Overall should include identity content"
         );
     }

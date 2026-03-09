@@ -5,23 +5,62 @@ use tokio::sync::broadcast;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AppEvent {
-    SessionCreated { session_id: String },
-    SessionDeleted { session_id: String },
-    MessageReceived { session_id: String, role: String },
-    StreamChunk { session_id: String, content: String },
-    StreamDone { session_id: String },
-    ToolExecutionStarted { tool_name: String },
-    ToolExecutionCompleted { tool_name: String, success: bool },
-    ProviderChanged { provider: String, model: String },
-    MemoryStored { key: String },
+    SessionCreated {
+        session_id: String,
+    },
+    SessionDeleted {
+        session_id: String,
+    },
+    MessageReceived {
+        session_id: String,
+        role: String,
+    },
+    StreamChunk {
+        session_id: String,
+        content: String,
+    },
+    StreamDone {
+        session_id: String,
+    },
+    ToolExecutionStarted {
+        tool_name: String,
+    },
+    ToolExecutionCompleted {
+        tool_name: String,
+        success: bool,
+    },
+    ProviderChanged {
+        provider: String,
+        model: String,
+    },
+    MemoryStored {
+        key: String,
+    },
     ConfigUpdated,
-    GatewayStarted { port: u16 },
-    ChannelConnected { channel: String },
-    ChannelDisconnected { channel: String, reason: String },
-    ChannelMessageReceived { channel: String, sender: String },
-    HeartbeatTick { job_id: String },
-    CronFired { job_id: String, name: String },
-    HeartbeatAlert { message: String },
+    GatewayStarted {
+        port: u16,
+    },
+    ChannelConnected {
+        channel: String,
+    },
+    ChannelDisconnected {
+        channel: String,
+        reason: String,
+    },
+    ChannelMessageReceived {
+        channel: String,
+        sender: String,
+    },
+    HeartbeatTick {
+        job_id: String,
+    },
+    CronFired {
+        job_id: String,
+        name: String,
+    },
+    HeartbeatAlert {
+        message: String,
+    },
     SchedulerStarted,
     SchedulerStopped,
     SchedulerNotification {

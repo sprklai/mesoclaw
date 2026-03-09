@@ -22,6 +22,9 @@ serde_json = { workspace = true }
 url = "2"
 opener = "0.8"
 
+[lints]
+workspace = true
+
 [features]
 default = ["devtools"]
 devtools = ["dep:tauri-plugin-devtools"]

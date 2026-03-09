@@ -1,7 +1,7 @@
 # MesoClaw TODO Tracker
 
 > Auto-maintained list of all TODO, MOCK, FIX, and STUB items in the codebase.
-> Last updated: 2026-03-08 (Phase 8 complete -- all stages 8.6.1, 8.7, 8.8, 8.9 done)
+> Last updated: 2026-03-08 (Stages 9-15 complete -- all implementation stages done)
 
 ## Summary
 
@@ -70,5 +70,14 @@
 - Stage 8.8 completed: Channel lifecycle hooks — Telegram (status + typing), Slack (ephemeral), Discord (typing indicator) wired into router
 - Stage 8.9 completed: ProcessTool kill, core context tests, agent tool loop integration tests, hardening — 827 total Rust + 33 JS, 0 clippy warnings
 - **Phase 8 fully complete** — all stages done (15.1, 15.2, 15.3, 15.3b, 15.5, 16, 8.6.1, 8.7, 8.8, 8.9)
+- **Stage 9 complete** — Build profiles (release/ci-release/release-fast), Dockerfile.cross-compile, build.sh/docker-build.sh/smoke-test.sh, MSRV 1.85
+- **Stage 10 complete** — CI workflow (6 jobs), release workflow (tag-triggered), dependabot, labeler, stale bot, release.sh
+- **Stage 11 complete** — Workspace lints (unsafe_code/unwrap_used/expect_used = warn), cargo-audit config, quality-check.sh
+- **Stage 12 complete** — CLI reference docs (8 commands, shell completions via clap_complete, 7 recipes), completions subcommand
+- **Stage 13 complete** — API reference (74 routes, 29 error codes, WS protocol), configuration reference (55+ fields)
+- **Stage 14 complete** — Deployment guide, development guide, Dockerfile, docker-compose.yml
+- **Stage 15 complete** — LICENSE (MIT), CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, CHANGELOG.md, issue/PR templates, README badges
+- **All implementation stages complete** — 654 Rust tests passing, 26 JS tests passing, 0 clippy errors
 - Per "No magic numbers" rule: all tunable values in AppConfig (44+ fields in schema.rs including Phase 8 context, evolution, and channel_tool_policy settings)
 - tests/phase4_agent_tools.md: tests 4.1-4.4 (tool registry) covered by Phase 5, tests 4.5-4.7 (individual tools) covered by Phase 2, tests 4.8-4.12 + M4.1-M4.3 deferred
+- Only remaining work: TUI (FR-1) and Mobile (FR-2) — explicitly deferred to future release

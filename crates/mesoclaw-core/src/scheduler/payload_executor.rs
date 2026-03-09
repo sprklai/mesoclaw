@@ -48,11 +48,7 @@ pub async fn execute(
 }
 
 /// Execute a Notify payload: publish event and log.
-fn execute_notify(
-    job: &ScheduledJob,
-    message: &str,
-    event_bus: &Arc<dyn EventBus>,
-) -> JobStatus {
+fn execute_notify(job: &ScheduledJob, message: &str, event_bus: &Arc<dyn EventBus>) -> JobStatus {
     info!("Scheduler notify [{}]: {message}", job.name);
     let _ = event_bus.publish(AppEvent::SchedulerNotification {
         job_id: job.id.clone(),
@@ -98,10 +94,7 @@ async fn execute_agent_turn(
             JobStatus::Success
         }
         Err(e) => {
-            warn!(
-                "Scheduler job '{}': AgentTurn chat failed: {e}",
-                job.name
-            );
+            warn!("Scheduler job '{}': AgentTurn chat failed: {e}", job.name);
             JobStatus::Failed
         }
     }
@@ -169,10 +162,7 @@ async fn execute_send_via_channel(
                 JobStatus::Success
             }
             Err(e) => {
-                warn!(
-                    "Scheduler job '{}': SendViaChannel failed: {e}",
-                    job.name
-                );
+                warn!("Scheduler job '{}': SendViaChannel failed: {e}", job.name);
                 JobStatus::Failed
             }
         }
@@ -267,7 +257,9 @@ mod tests {
         execute(&job, &bus, None).await;
 
         let event = rx.recv().await.unwrap();
-        assert!(matches!(event, AppEvent::HeartbeatAlert { message } if message.contains("Heartbeat")));
+        assert!(
+            matches!(event, AppEvent::HeartbeatAlert { message } if message.contains("Heartbeat"))
+        );
     }
 
     // 8.6.1.11 — AgentTurn without AppState returns Skipped
@@ -341,7 +333,9 @@ mod tests {
         );
         // Second event should be SchedulerJobCompleted
         let event2 = rx.recv().await.unwrap();
-        assert!(matches!(event2, AppEvent::SchedulerJobCompleted { status, .. } if status == "success"));
+        assert!(
+            matches!(event2, AppEvent::SchedulerJobCompleted { status, .. } if status == "success")
+        );
     }
 
     // 8.6.1.19 — Heartbeat payload publishes HeartbeatAlert end-to-end
@@ -356,10 +350,14 @@ mod tests {
 
         // First event should be HeartbeatAlert
         let event = rx.recv().await.unwrap();
-        assert!(matches!(event, AppEvent::HeartbeatAlert { message } if message.contains("Heartbeat")));
+        assert!(
+            matches!(event, AppEvent::HeartbeatAlert { message } if message.contains("Heartbeat"))
+        );
         // Second event should be SchedulerJobCompleted
         let event2 = rx.recv().await.unwrap();
-        assert!(matches!(event2, AppEvent::SchedulerJobCompleted { status, .. } if status == "success"));
+        assert!(
+            matches!(event2, AppEvent::SchedulerJobCompleted { status, .. } if status == "success")
+        );
     }
 
     // 8.6.1.20 — AgentTurn without API key returns Failed gracefully (no panic)

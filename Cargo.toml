@@ -13,6 +13,7 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 authors = ["NSRTech"]
+rust-version = "1.85"
 
 [workspace.dependencies]
 # Core library
@@ -81,8 +82,27 @@ serde_yaml = "0.9"
 teloxide = { version = "0.17.0", features = ["macros"] }
 serenity = { version = "0.12.5", default-features = false, features = ["client", "gateway", "model", "rustls_backend"] }
 
+[workspace.lints.rust]
+unsafe_code = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+
 [profile.release]
-lto = "thin"
-strip = "debuginfo"
+lto = true
+opt-level = "z"
 codegen-units = 1
-opt-level = 3
+strip = "debuginfo"
+panic = "unwind"
+
+[profile.ci-release]
+inherits = "release"
+lto = "thin"
+codegen-units = 16
+opt-level = "s"
+
+[profile.release-fast]
+inherits = "release"
+lto = "thin"
+debug = true

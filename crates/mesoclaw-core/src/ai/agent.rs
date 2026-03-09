@@ -625,7 +625,10 @@ mod tests {
             fn parameters_schema(&self) -> serde_json::Value {
                 serde_json::json!({})
             }
-            async fn execute(&self, _args: serde_json::Value) -> crate::Result<crate::tools::ToolResult> {
+            async fn execute(
+                &self,
+                _args: serde_json::Value,
+            ) -> crate::Result<crate::tools::ToolResult> {
                 Err(crate::MesoError::Tool("intentional failure".into()))
             }
         }

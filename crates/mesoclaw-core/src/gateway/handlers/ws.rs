@@ -460,11 +460,7 @@ mod tests {
         .unwrap();
 
         // Read the forwarded message
-        let resp = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            ws.next(),
-        )
-        .await;
+        let resp = tokio::time::timeout(std::time::Duration::from_secs(2), ws.next()).await;
 
         assert!(resp.is_ok(), "Should receive notification within timeout");
         let msg = resp.unwrap().unwrap().unwrap();

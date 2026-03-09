@@ -17,3 +17,7 @@ tokio-tungstenite = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+clap_complete = "4"
+
+[lints]
+workspace = true

@@ -1,0 +1,20 @@
+services:
+  mesoclaw:
+    build: .
+    ports:
+      - "18981:18981"
+    volumes:
+      - ./config:/config:ro
+      - mesoclaw-data:/data
+    environment:
+      - MESOCLAW_TOKEN=${MESOCLAW_TOKEN:-}
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18981/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  mesoclaw-data:
