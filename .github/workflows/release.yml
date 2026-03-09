@@ -56,6 +56,10 @@ jobs:
         working-directory: web
         run: bun install
 
+      - name: Build frontend
+        working-directory: web
+        run: bun run build
+
       - name: Build desktop (deb, appimage, rpm)
         uses: tauri-apps/tauri-action@v0
         env:
@@ -103,6 +107,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: web
         run: bun install
+
+      - name: Build frontend
+        working-directory: web
+        run: bun run build
 
       - name: Build desktop (msi, nsis)
         uses: tauri-apps/tauri-action@v0
@@ -152,6 +160,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: web
         run: bun install
+
+      - name: Build frontend
+        working-directory: web
+        run: bun run build
 
       - name: Import Apple certificate
         if: env.APPLE_CERTIFICATE != ''
