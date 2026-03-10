@@ -7,78 +7,83 @@ use super::traits::{Channel, ChannelSender, ChannelStatus};
 use crate::Result;
 use crate::error::MesoError;
 
-/// Concurrent channel registry (DashMap-backed, follows ToolRegistry pattern).
+/// Combined entry holding both the full channel and its send-only handle.
+struct ChannelEntry {
+    channel: Arc<dyn Channel>,
+    sender: Arc<dyn ChannelSender>,
+}
+
+/// Concurrent channel registry (single DashMap-backed, atomic register/unregister).
 pub struct ChannelRegistry {
-    channels: DashMap<String, Arc<dyn Channel>>,
-    senders: DashMap<String, Arc<dyn ChannelSender>>,
+    entries: DashMap<String, ChannelEntry>,
 }
 
 impl ChannelRegistry {
     pub fn new() -> Self {
         Self {
-            channels: DashMap::new(),
-            senders: DashMap::new(),
+            entries: DashMap::new(),
         }
     }
 
     /// Register a channel. Creates a sender handle automatically.
+    /// Uses `entry()` API for atomic insert (no TOCTOU).
     pub fn register(&self, channel: Arc<dyn Channel>) -> Result<()> {
         let name = channel.display_name().to_string();
-        if self.channels.contains_key(&name) {
-            return Err(MesoError::Channel(format!(
-                "channel already registered: {name}"
-            )));
+        use dashmap::mapref::entry::Entry;
+        match self.entries.entry(name.clone()) {
+            Entry::Occupied(_) => {
+                return Err(MesoError::Channel(format!(
+                    "channel already registered: {name}"
+                )));
+            }
+            Entry::Vacant(v) => {
+                let sender: Arc<dyn ChannelSender> = Arc::from(channel.create_sender());
+                v.insert(ChannelEntry { channel, sender });
+            }
         }
-        let sender = channel.create_sender();
-        let sender: Arc<dyn ChannelSender> = Arc::from(sender);
-        self.senders.insert(name.clone(), sender);
-        self.channels.insert(name, channel);
         Ok(())
     }
 
     /// Register a channel, replacing any existing registration with the same name.
     pub fn register_or_replace(&self, channel: Arc<dyn Channel>) -> Result<()> {
         let name = channel.display_name().to_string();
-        self.unregister(&name);
-        let sender = channel.create_sender();
-        let sender: Arc<dyn ChannelSender> = Arc::from(sender);
-        self.senders.insert(name.clone(), sender);
-        self.channels.insert(name, channel);
+        let sender: Arc<dyn ChannelSender> = Arc::from(channel.create_sender());
+        self.entries
+            .insert(name, ChannelEntry { channel, sender });
         Ok(())
     }
 
-    /// Unregister a channel by name.
+    /// Unregister a channel by name. Atomically removes both channel and sender.
     pub fn unregister(&self, name: &str) -> bool {
-        self.senders.remove(name);
-        self.channels.remove(name).is_some()
+        self.entries.remove(name).is_some()
     }
 
     /// Get the full channel object by name.
     pub fn get_channel(&self, name: &str) -> Option<Arc<dyn Channel>> {
-        self.channels.get(name).map(|r| Arc::clone(r.value()))
+        self.entries.get(name).map(|r| Arc::clone(&r.value().channel))
     }
 
     /// Get a lightweight send-only handle for a channel.
     pub fn get_sender(&self, name: &str) -> Option<Arc<dyn ChannelSender>> {
-        self.senders.get(name).map(|r| Arc::clone(r.value()))
+        self.entries.get(name).map(|r| Arc::clone(&r.value().sender))
     }
 
     /// List all registered channel names.
     pub fn list(&self) -> Vec<String> {
-        self.channels.iter().map(|e| e.key().clone()).collect()
+        self.entries.iter().map(|e| e.key().clone()).collect()
     }
 
     /// Get the status of a channel.
     pub fn status(&self, name: &str) -> Option<ChannelStatus> {
-        self.channels.get(name).map(|c| c.status())
+        self.entries.get(name).map(|e| e.value().channel.status())
     }
 
     /// Connect all registered channels.
     pub async fn connect_all(&self) -> Result<()> {
         let channels: Vec<Arc<dyn Channel>> = self
-            .channels
+            .entries
             .iter()
-            .map(|e| Arc::clone(e.value()))
+            .map(|e| Arc::clone(&e.value().channel))
             .collect();
         for ch in channels {
             ch.connect().await?;
@@ -89,9 +94,9 @@ impl ChannelRegistry {
     /// Disconnect all registered channels.
     pub async fn disconnect_all(&self) -> Result<()> {
         let channels: Vec<Arc<dyn Channel>> = self
-            .channels
+            .entries
             .iter()
-            .map(|e| Arc::clone(e.value()))
+            .map(|e| Arc::clone(&e.value().channel))
             .collect();
         for ch in channels {
             ch.disconnect().await?;
@@ -102,9 +107,9 @@ impl ChannelRegistry {
     /// Health check all channels.
     pub async fn health_all(&self) -> std::collections::HashMap<String, bool> {
         let channels: Vec<(String, Arc<dyn Channel>)> = self
-            .channels
+            .entries
             .iter()
-            .map(|e| (e.key().clone(), Arc::clone(e.value())))
+            .map(|e| (e.key().clone(), Arc::clone(&e.value().channel)))
             .collect();
         let mut results = std::collections::HashMap::new();
         for (name, ch) in channels {
@@ -126,11 +131,11 @@ impl ChannelRegistry {
 
     /// Number of registered channels.
     pub fn len(&self) -> usize {
-        self.channels.len()
+        self.entries.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.channels.is_empty()
+        self.entries.is_empty()
     }
 }
 
@@ -297,5 +302,19 @@ mod tests {
     fn get_sender_unknown() {
         let registry = ChannelRegistry::new();
         assert!(registry.get_sender("unknown").is_none());
+    }
+
+    // WS2.8 — Atomic register and unregister removes both channel and sender
+    #[test]
+    fn channel_registry_atomic_register_and_unregister() {
+        let registry = ChannelRegistry::new();
+        registry
+            .register(Arc::new(MockChannel::new("test")))
+            .unwrap();
+        assert!(registry.get_channel("test").is_some());
+        assert!(registry.get_sender("test").is_some());
+        registry.unregister("test");
+        assert!(registry.get_channel("test").is_none());
+        assert!(registry.get_sender("test").is_none());
     }
 }

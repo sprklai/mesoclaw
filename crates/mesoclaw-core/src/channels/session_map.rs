@@ -72,6 +72,7 @@ impl ChannelSessionMap {
 
     /// Resolve an existing session or create a new one for the given channel key.
     /// Lookup order: (1) DashMap cache → (2) DB by channel_key → (3) create new.
+    /// On UNIQUE constraint violation (TOCTOU race), retries by re-querying the DB.
     #[cfg(feature = "ai")]
     pub async fn resolve_session(&self, channel_key: &str, channel_name: &str) -> Result<String> {
         // 1. Check in-memory cache
@@ -93,14 +94,34 @@ impl ChannelSessionMap {
         // 3. Create new session with channel_key and descriptive title
         let identifier = channel_key.split(':').nth(1).unwrap_or("unknown");
         let title = format!("{} #{}", capitalize_first(channel_name), identifier);
-        let session = self
+        match self
             .session_manager
             .create_session_with_channel_key(&title, channel_name, channel_key)
-            .await?;
-
-        let session_id = session.id.clone();
-        self.map.insert(channel_key.to_string(), session_id.clone());
-        Ok(session_id)
+            .await
+        {
+            Ok(session) => {
+                let session_id = session.id.clone();
+                self.map.insert(channel_key.to_string(), session_id.clone());
+                Ok(session_id)
+            }
+            Err(_) => {
+                // TOCTOU retry: another task created the session concurrently.
+                // Re-query the DB for the session that was just created.
+                if let Some(session) = self
+                    .session_manager
+                    .find_session_by_channel_key(channel_key)
+                    .await?
+                {
+                    let session_id = session.id.clone();
+                    self.map.insert(channel_key.to_string(), session_id.clone());
+                    Ok(session_id)
+                } else {
+                    Err(crate::MesoError::Channel(format!(
+                        "failed to resolve session for channel_key: {channel_key}"
+                    )))
+                }
+            }
+        }
     }
 
     /// List all active channel-to-session mappings.

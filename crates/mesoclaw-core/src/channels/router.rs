@@ -1,18 +1,26 @@
 use std::sync::Arc;
 
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::sync::{mpsc, watch};
 use tracing::{info, warn};
 
 #[cfg(feature = "gateway")]
 use crate::gateway::state::AppState;
 
+#[cfg(feature = "ai")]
+use tokio::sync::broadcast;
+#[cfg(feature = "ai")]
 use crate::ai::adapter::{ToolCallEvent, ToolCallPhase};
+#[cfg(feature = "ai")]
 use crate::ai::context::ContextEngine;
+#[cfg(feature = "ai")]
 use crate::event_bus::AppEvent;
 
+#[cfg(feature = "ai")]
 use super::format::formatter_for;
 use super::message::ChannelMessage;
+#[cfg(feature = "ai")]
 use super::policy::ChannelToolPolicy;
+#[cfg(all(feature = "channels", feature = "gateway", feature = "ai"))]
 use super::session_map::ChannelSessionMap;
 
 /// Channel Router orchestrator: receives messages from all channels,
@@ -24,6 +32,8 @@ pub struct ChannelRouter {
     stop_tx: watch::Sender<bool>,
     stop_rx: watch::Receiver<bool>,
     state: Arc<tokio::sync::OnceCell<Arc<AppState>>>,
+    #[cfg(feature = "ai")]
+    session_map: Arc<tokio::sync::OnceCell<Arc<ChannelSessionMap>>>,
 }
 
 #[cfg(all(feature = "channels", feature = "gateway"))]
@@ -38,11 +48,18 @@ impl ChannelRouter {
             stop_tx,
             stop_rx,
             state: Arc::new(tokio::sync::OnceCell::new()),
+            #[cfg(feature = "ai")]
+            session_map: Arc::new(tokio::sync::OnceCell::new()),
         }
     }
 
     /// Wire the router with AppState.
     pub fn wire(&self, state: Arc<AppState>) {
+        #[cfg(feature = "ai")]
+        {
+            let sm = Arc::new(ChannelSessionMap::new(state.session_manager.clone()));
+            let _ = self.session_map.set(sm);
+        }
         let _ = self.state.set(state);
     }
 
@@ -66,6 +83,8 @@ impl ChannelRouter {
 
         let mut stop_rx = self.stop_rx.clone();
         let state_cell = self.state.clone();
+        #[cfg(feature = "ai")]
+        let session_map_cell = self.session_map.clone();
 
         tokio::spawn(async move {
             info!("ChannelRouter started");
@@ -75,7 +94,17 @@ impl ChannelRouter {
                         match msg {
                             Some(message) => {
                                 if let Some(state) = state_cell.get() {
-                                    Self::handle_message(message, state).await;
+                                    #[cfg(feature = "ai")]
+                                    {
+                                        let sm = session_map_cell.get().cloned();
+                                        Self::handle_message(message, state, sm.as_ref()).await;
+                                    }
+                                    #[cfg(not(feature = "ai"))]
+                                    {
+                                        let _ = message;
+                                        let _ = state;
+                                        warn!("ChannelRouter: ai feature not enabled, dropping message");
+                                    }
                                 } else {
                                     warn!("ChannelRouter: no AppState wired, dropping message");
                                 }
@@ -105,22 +134,37 @@ impl ChannelRouter {
 
     /// Handle a single incoming channel message through the full pipeline.
     /// Public static version for use by webhook endpoints.
+    #[cfg(feature = "ai")]
     pub async fn handle_message_static(message: ChannelMessage, state: &Arc<AppState>) {
-        Self::handle_message(message, state).await;
+        // Create a transient session map for webhook-originated messages
+        let sm = Arc::new(ChannelSessionMap::new(state.session_manager.clone()));
+        Self::handle_message(message, state, Some(&sm)).await;
     }
 
     /// Handle a single incoming channel message through the full pipeline.
-    async fn handle_message(message: ChannelMessage, state: &Arc<AppState>) {
+    #[cfg(feature = "ai")]
+    async fn handle_message(
+        message: ChannelMessage,
+        state: &Arc<AppState>,
+        session_map: Option<&Arc<ChannelSessionMap>>,
+    ) {
         let channel_name = message.channel.clone();
         let reply_metadata = message.metadata.clone();
 
         // Extract chat_id for lifecycle hooks (channels need chat_id, not username)
         let recipient = reply_metadata.get("chat_id").cloned();
 
-        // 1. Resolve or create session
-        let session_map = ChannelSessionMap::new(state.session_manager.clone());
+        // 1. Resolve or create session (uses shared map if available, else transient)
+        let transient_map;
+        let sm = match session_map {
+            Some(sm) => sm.as_ref(),
+            None => {
+                transient_map = Arc::new(ChannelSessionMap::new(state.session_manager.clone()));
+                &transient_map
+            }
+        };
         let channel_key = ChannelSessionMap::channel_key(&message);
-        let session_id = match session_map
+        let session_id = match sm
             .resolve_session(&channel_key, &channel_name)
             .await
         {
@@ -152,9 +196,9 @@ impl ChannelRouter {
             role: "user".into(),
         });
 
-        // 3. Get allowed tools for this channel
+        // 3. Get allowed tools for this channel (enforced via resolve_agent_with_tools)
         let tool_policy = ChannelToolPolicy::new(state.config.clone());
-        let _allowed_tools = tool_policy.allowed_tools(&channel_name, &state.tools);
+        let allowed_tools = tool_policy.allowed_tools(&channel_name, &state.tools);
 
         // 4. Build full context (identity + memory + user + environment + reasoning)
         let (history_from_ctx, preamble) = state
@@ -205,11 +249,21 @@ impl ChannelRouter {
         // 7. Create tool event channel for broadcasting tool calls to lifecycle hooks
         let (tool_event_tx, mut tool_event_rx) = broadcast::channel::<ToolCallEvent>(32);
 
-        // 8. Resolve agent WITH tool events
-        let agent =
-            match crate::ai::resolve_agent(None, state, Some(tool_event_tx), Some(&system_context))
-                .await
-            {
+        // 8. Resolve agent WITH tool events and channel-filtered tools
+        let tool_override = if allowed_tools.is_empty() {
+            None // empty policy = no tools
+        } else {
+            Some(allowed_tools)
+        };
+        let agent = match crate::ai::resolve_agent_with_tools(
+            None,
+            state,
+            Some(tool_event_tx),
+            Some(&system_context),
+            tool_override,
+        )
+        .await
+        {
                 Ok(a) => a,
                 Err(e) => {
                     warn!("ChannelRouter: failed to resolve agent for {channel_name}: {e}");

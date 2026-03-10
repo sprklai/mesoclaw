@@ -447,7 +447,8 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         Ok(Some(_))
     ) {
         let sl: Arc<dyn crate::channels::traits::Channel> = Arc::new(
-            crate::channels::slack::SlackChannel::new(credentials.clone()),
+            crate::channels::slack::SlackChannel::new(credentials.clone())
+                .with_allowed_channels(config.slack_allowed_channel_ids.clone()),
         );
         if let Err(e) = channel_registry.register_or_replace(sl.clone()) {
             tracing::warn!("Failed to register slack: {e}");

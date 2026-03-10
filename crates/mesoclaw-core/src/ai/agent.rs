@@ -249,6 +249,18 @@ pub async fn resolve_agent(
     tool_event_tx: Option<broadcast::Sender<ToolCallEvent>>,
     preamble_override: Option<&str>,
 ) -> Result<Arc<MesoAgent>> {
+    resolve_agent_with_tools(requested_model, state, tool_event_tx, preamble_override, None).await
+}
+
+/// Like `resolve_agent`, but accepts an optional tool override for channel tool policy filtering.
+/// When `tool_override` is `Some`, those tools are used instead of the full registry.
+pub async fn resolve_agent_with_tools(
+    requested_model: Option<&str>,
+    state: &AppState,
+    tool_event_tx: Option<broadcast::Sender<ToolCallEvent>>,
+    preamble_override: Option<&str>,
+    tool_override: Option<Vec<Arc<dyn crate::tools::traits::Tool>>>,
+) -> Result<Arc<MesoAgent>> {
     // Try requested model first, then last_used, then default model
     let model_spec = if let Some(spec) = requested_model {
         // Explicit model — also update last_used_model
@@ -277,7 +289,7 @@ pub async fn resolve_agent(
         })?;
 
         let provider = state.provider_registry.get_provider(provider_id).await?;
-        let tools = state.tools.to_vec();
+        let tools = tool_override.unwrap_or_else(|| state.tools.to_vec());
 
         let agent = if let Some(tx) = tool_event_tx {
             MesoAgent::from_provider_with_events(

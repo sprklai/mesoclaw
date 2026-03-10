@@ -25,7 +25,9 @@ const STATUS_CONNECTED: u8 = 2;
 /// Slack channel using raw Socket Mode WebSocket (no slack-morphism).
 pub struct SlackChannel {
     display_name: String,
-    bot_id: Option<String>,
+    /// Bot user ID for echo-loop prevention. Set at build time via `with_bot_id()`,
+    /// or auto-resolved from `auth.test` during `connect()`.
+    bot_id: Arc<tokio::sync::OnceCell<String>>,
     allowed_channel_ids: Vec<String>,
     status: AtomicU8,
     credentials: Arc<dyn CredentialStore>,
@@ -42,7 +44,7 @@ impl SlackChannel {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         Self {
             display_name: "slack".to_string(),
-            bot_id: None,
+            bot_id: Arc::new(tokio::sync::OnceCell::new()),
             allowed_channel_ids: vec![],
             status: AtomicU8::new(STATUS_DISCONNECTED),
             credentials,
@@ -61,7 +63,8 @@ impl SlackChannel {
     }
 
     pub fn with_bot_id(mut self, bot_id: &str) -> Self {
-        self.bot_id = Some(bot_id.to_string());
+        self.bot_id = Arc::new(tokio::sync::OnceCell::new());
+        let _ = self.bot_id.set(bot_id.to_string());
         self
     }
 
@@ -229,8 +232,11 @@ impl ChannelLifecycle for SlackChannel {
             return Err(MesoError::Channel(format!("slack: auth.test error: {err}")));
         }
 
-        let _bot_user_id = body["user_id"].as_str().unwrap_or("").to_string();
-        info!("Slack bot connected as user_id={_bot_user_id}");
+        let bot_user_id = body["user_id"].as_str().unwrap_or("").to_string();
+        if !bot_user_id.is_empty() {
+            let _ = self.bot_id.set(bot_user_id.clone());
+        }
+        info!("Slack bot connected as user_id={bot_user_id}");
 
         let _ = self.bot_token.set(bot_token);
         let _ = self.app_token.set(app_token);
@@ -268,6 +274,7 @@ impl Channel for SlackChannel {
             .clone();
 
         let bot_id = self.bot_id.clone();
+        let bot_id_ref = bot_id.get().cloned();
         let mut shutdown_rx = self.shutdown_rx.clone();
         let http_client = self.http_client.clone();
         let max_attempts = self.max_reconnect_attempts;
@@ -359,13 +366,13 @@ impl Channel for SlackChannel {
                                         let thread_ts = event.get("thread_ts").and_then(|t| t.as_str());
                                         let ts = event.get("ts").and_then(|t| t.as_str()).unwrap_or("");
 
-                                        // Skip bot's own messages
-                                        if let Some(ref bid) = bot_id
+                                        // Skip bot's own messages (echo-loop prevention)
+                                        if let Some(ref bid) = bot_id_ref
                                             && user == bid.as_str()
                                         {
                                             continue;
                                         }
-                                        // Also skip if bot_user_id field present
+                                        // Also skip if bot_id field present (covers bot messages)
                                         if event.get("bot_id").is_some() {
                                             continue;
                                         }
@@ -378,7 +385,7 @@ impl Channel for SlackChannel {
 
                                         // For non-DM channels, require bot mention
                                         if !api::is_dm_channel(channel_id)
-                                            && let Some(ref bid) = bot_id
+                                            && let Some(ref bid) = bot_id_ref
                                             && !api::contains_bot_mention(text_content, bid)
                                         {
                                             continue;
@@ -636,5 +643,19 @@ mod tests {
         let ch = SlackChannel::new(test_credentials());
         assert!(ch.is_channel_allowed("C123"));
         assert!(ch.is_channel_allowed("anything"));
+    }
+
+    // WS2.2a — with_bot_id sets the OnceCell for echo-loop prevention
+    #[test]
+    fn with_bot_id_sets_once_cell() {
+        let ch = SlackChannel::new(test_credentials()).with_bot_id("U12345");
+        assert_eq!(ch.bot_id.get(), Some(&"U12345".to_string()));
+    }
+
+    // WS2.2b — bot_id is None by default (resolved during connect)
+    #[test]
+    fn bot_id_default_is_none() {
+        let ch = SlackChannel::new(test_credentials());
+        assert!(ch.bot_id.get().is_none());
     }
 }

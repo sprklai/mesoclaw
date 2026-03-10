@@ -4,6 +4,20 @@ use crate::config::AppConfig;
 use crate::tools::ToolRegistry;
 use crate::tools::traits::Tool;
 
+/// Filter a list of tool names by a comma-separated policy string.
+/// If `policy` is empty, returns all tools (no filtering).
+pub fn filter_tools_by_policy<'a>(all_tools: &[&'a str], policy: &str) -> Vec<&'a str> {
+    if policy.is_empty() {
+        return all_tools.to_vec();
+    }
+    let allowed: Vec<&str> = policy.split(',').map(|s| s.trim()).collect();
+    all_tools
+        .iter()
+        .filter(|t| allowed.contains(t))
+        .copied()
+        .collect()
+}
+
 /// Per-channel tool allowlist policy.
 pub struct ChannelToolPolicy {
     config: Arc<AppConfig>,
@@ -141,5 +155,23 @@ mod tests {
 
         let tools = policy.allowed_tools("telegram", &registry);
         assert!(tools.is_empty());
+    }
+
+    // WS2.3a — filter_tools_by_policy filters to only allowed tools
+    #[test]
+    fn channel_tool_policy_filters_tools() {
+        let all_tools = vec!["shell", "file_read", "web_search", "system_info"];
+        let policy = "web_search,system_info";
+        let allowed = filter_tools_by_policy(&all_tools, policy);
+        assert_eq!(allowed, vec!["web_search", "system_info"]);
+    }
+
+    // WS2.3b — filter_tools_by_policy with empty string allows all
+    #[test]
+    fn channel_tool_policy_empty_allows_all() {
+        let all_tools = vec!["shell", "file_read", "web_search"];
+        let policy = "";
+        let allowed = filter_tools_by_policy(&all_tools, policy);
+        assert_eq!(allowed, all_tools);
     }
 }

@@ -140,6 +140,9 @@ impl TelegramChannel {
     }
 }
 
+/// Telegram max message size in bytes.
+const TELEGRAM_MAX_MESSAGE_BYTES: usize = 4096;
+
 #[async_trait]
 impl ChannelSender for TelegramChannel {
     fn channel_type(&self) -> &str {
@@ -161,10 +164,14 @@ impl ChannelSender for TelegramChannel {
             .parse()
             .map_err(|_| MesoError::Channel(format!("telegram: invalid chat_id: {chat_id_str}")))?;
 
-        bot.send_message(ChatId(chat_id), &message.content)
-            .parse_mode(ParseMode::Html)
-            .await
-            .map_err(|e| MesoError::Channel(format!("telegram send failed: {e}")))?;
+        // Split oversized messages to respect Telegram's 4096 byte limit
+        let parts = super::format::split_message(&message.content, TELEGRAM_MAX_MESSAGE_BYTES);
+        for part in parts {
+            bot.send_message(ChatId(chat_id), &part)
+                .parse_mode(ParseMode::Html)
+                .await
+                .map_err(|e| MesoError::Channel(format!("telegram send failed: {e}")))?;
+        }
 
         Ok(())
     }
@@ -255,10 +262,14 @@ impl Channel for TelegramChannel {
         let mut offset: i32 = 0;
         let timeout = self.config.polling_timeout_secs;
 
+        let max_attempts = self.app_config.channel_reconnect_max_attempts;
+
         info!(
-            "Telegram listen loop started (polling_timeout={}s)",
-            timeout
+            "Telegram listen loop started (polling_timeout={}s, max_attempts={})",
+            timeout, max_attempts
         );
+
+        let mut attempt_count: u32 = 0;
 
         loop {
             tokio::select! {
@@ -274,6 +285,9 @@ impl Channel for TelegramChannel {
                 result = bot.get_updates().offset(offset).timeout(timeout) => {
                     match result {
                         Ok(updates) => {
+                            // Reset attempt count on successful poll
+                            attempt_count = 0;
+
                             for update in updates {
                                 offset = update.id.as_offset();
 
@@ -327,9 +341,17 @@ impl Channel for TelegramChannel {
                             }
                         }
                         Err(e) => {
-                            warn!("Telegram polling error: {e}");
-                            // Retry with backoff
-                            tokio::time::sleep(self.config.retry.delay_for(0)).await;
+                            attempt_count += 1;
+                            warn!("Telegram polling error (attempt {attempt_count}/{max_attempts}): {e}");
+
+                            if attempt_count >= max_attempts {
+                                error!("Telegram: max reconnect attempts ({max_attempts}) reached, giving up");
+                                self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+                                break;
+                            }
+
+                            // Retry with exponential backoff based on attempt count
+                            tokio::time::sleep(self.config.retry.delay_for(attempt_count)).await;
                         }
                     }
                 }
@@ -469,10 +491,14 @@ impl ChannelSender for TelegramSender {
             .parse()
             .map_err(|_| MesoError::Channel(format!("telegram: invalid chat_id: {chat_id_str}")))?;
 
-        bot.send_message(ChatId(chat_id), &message.content)
-            .parse_mode(ParseMode::Html)
-            .await
-            .map_err(|e| MesoError::Channel(format!("telegram send failed: {e}")))?;
+        // Split oversized messages to respect Telegram's 4096 byte limit
+        let parts = super::format::split_message(&message.content, TELEGRAM_MAX_MESSAGE_BYTES);
+        for part in parts {
+            bot.send_message(ChatId(chat_id), &part)
+                .parse_mode(ParseMode::Html)
+                .await
+                .map_err(|e| MesoError::Channel(format!("telegram send failed: {e}")))?;
+        }
 
         Ok(())
     }
@@ -680,5 +706,14 @@ mod tests {
         // Unknown command returns Unknown variant
         let result = parse_bot_command("/foobar");
         assert!(matches!(result, Some(BotCommand::Unknown(cmd)) if cmd == "foobar"));
+    }
+
+    // WS2.5 — Telegram retry backoff increases with attempt count
+    #[test]
+    fn telegram_retry_backoff_increases() {
+        let retry = RetryPolicy::default();
+        let d0 = retry.delay_for(0);
+        let d3 = retry.delay_for(3);
+        assert!(d3 > d0, "Backoff should increase with attempt count");
     }
 }
