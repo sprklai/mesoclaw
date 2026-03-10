@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.10] - 2026-03-10
+
+### Fixed
+- Fix release asset name collisions: standalone binaries now use platform-specific names (mesoclaw-linux, mesoclaw-macos) to prevent duplicate upload failures
+
 ## [0.0.9] - 2026-03-10
 
 ### Fixed
