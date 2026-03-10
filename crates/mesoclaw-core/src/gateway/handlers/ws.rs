@@ -48,6 +48,14 @@ pub(crate) enum WsOutbound {
         status: Option<String>,
         error: Option<String>,
     },
+    #[serde(rename = "channel_message")]
+    ChannelMessage {
+        channel: String,
+        sender: String,
+        session_id: String,
+        content_preview: String,
+        role: String,
+    },
     #[serde(rename = "done")]
     Done,
     #[serde(rename = "error")]
@@ -91,6 +99,20 @@ async fn handle_notifications(mut socket: WebSocket, state: Arc<AppState>) {
                             message: None,
                             status: Some(status),
                             error,
+                        };
+                        if let Ok(json) = serde_json::to_string(&outbound)
+                            && socket.send(Message::Text(json.into())).await.is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(crate::event_bus::AppEvent::ChannelMessageReceived { channel, sender, session_id, content_preview, role }) => {
+                        let outbound = WsOutbound::ChannelMessage {
+                            channel,
+                            sender,
+                            session_id,
+                            content_preview,
+                            role,
                         };
                         if let Ok(json) = serde_json::to_string(&outbound)
                             && socket.send(Message::Text(json.into())).await.is_err()
@@ -477,6 +499,25 @@ mod tests {
         assert_eq!(parsed["event_type"], "scheduler_notification");
         assert_eq!(parsed["job_id"], "j1");
         assert_eq!(parsed["message"], "hello from scheduler");
+    }
+
+    // IN.10 — WsOutbound::ChannelMessage serializes correctly
+    #[test]
+    fn ws_outbound_channel_message_serializes() {
+        let msg = WsOutbound::ChannelMessage {
+            channel: "telegram".into(),
+            sender: "user123".into(),
+            session_id: "sess-abc".into(),
+            content_preview: "Hello there".into(),
+            role: "user".into(),
+        };
+        let json = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["type"], "channel_message");
+        assert_eq!(json["channel"], "telegram");
+        assert_eq!(json["sender"], "user123");
+        assert_eq!(json["session_id"], "sess-abc");
+        assert_eq!(json["content_preview"], "Hello there");
+        assert_eq!(json["role"], "user");
     }
 
     // TV.11 — WsOutbound::Text serializes to {"type":"text","content":"..."}

@@ -193,6 +193,14 @@ fn channel_routes() -> Router<Arc<AppState>> {
     #[cfg(feature = "channels")]
     {
         Router::new()
+            .route(
+                "/channels/sessions",
+                get(handlers::channels::list_channel_sessions),
+            )
+            .route(
+                "/channels/sessions/{id}/messages",
+                get(handlers::channels::list_channel_messages),
+            )
             .route("/channels", get(handlers::channels::list_channels))
             .route(
                 "/channels/{name}/status",

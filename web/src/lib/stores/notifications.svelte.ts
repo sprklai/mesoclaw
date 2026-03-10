@@ -1,4 +1,5 @@
 import { toast } from "svelte-sonner";
+import { inboxStore } from "./inbox.svelte";
 
 export interface SchedulerNotification {
   eventType: string;
@@ -36,7 +37,22 @@ class NotificationStore {
     this.ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "notification") {
+        if (data.type === "channel_message") {
+          inboxStore.handleRealtimeMessage({
+            channel: data.channel,
+            sender: data.sender,
+            session_id: data.session_id,
+            content_preview: data.content_preview,
+            role: data.role,
+          });
+
+          // Show toast for incoming user messages only
+          if (data.role === "user") {
+            toast.info(
+              `${data.channel}: ${data.sender} — ${data.content_preview.slice(0, 60)}`,
+            );
+          }
+        } else if (data.type === "notification") {
           const notification: SchedulerNotification = {
             eventType: data.event_type,
             jobId: data.job_id,

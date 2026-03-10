@@ -50,6 +50,9 @@ pub enum AppEvent {
     ChannelMessageReceived {
         channel: String,
         sender: String,
+        session_id: String,
+        content_preview: String,
+        role: String,
     },
     HeartbeatTick {
         job_id: String,
@@ -254,6 +257,47 @@ mod tests {
         assert!(
             matches!(back, AppEvent::SchedulerJobCompleted { job_id, job_name, status, error }
                 if job_id == "j2" && job_name == "heartbeat" && status == "success" && error == Some("timeout".into()))
+        );
+    }
+
+    // IN.11 — enriched ChannelMessageReceived event round-trip
+    #[tokio::test]
+    async fn channel_message_received_enriched() {
+        let bus = TokioBroadcastBus::new(16);
+        let mut rx = bus.subscribe();
+
+        bus.publish(AppEvent::ChannelMessageReceived {
+            channel: "telegram".into(),
+            sender: "user123".into(),
+            session_id: "sess-abc".into(),
+            content_preview: "Hello there".into(),
+            role: "user".into(),
+        })
+        .unwrap();
+
+        let event = rx.recv().await.unwrap();
+        assert!(
+            matches!(event, AppEvent::ChannelMessageReceived { channel, sender, session_id, content_preview, role }
+                if channel == "telegram" && sender == "user123" && session_id == "sess-abc"
+                && content_preview == "Hello there" && role == "user")
+        );
+    }
+
+    // IN.12 — enriched ChannelMessageReceived JSON serde round-trip
+    #[test]
+    fn channel_message_received_serde() {
+        let event = AppEvent::ChannelMessageReceived {
+            channel: "slack".into(),
+            sender: "bot".into(),
+            session_id: "s1".into(),
+            content_preview: "Hi".into(),
+            role: "assistant".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(
+            matches!(back, AppEvent::ChannelMessageReceived { channel, role, .. }
+                if channel == "slack" && role == "assistant")
         );
     }
 

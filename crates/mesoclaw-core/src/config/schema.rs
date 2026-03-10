@@ -116,6 +116,11 @@ pub struct AppConfig {
     pub agent_max_continuations: u32,
     pub agent_reasoning_guidance: Option<String>,
 
+    // Phase 8: Inbox
+    pub inbox_page_size: usize,
+    pub inbox_sessions_page_size: usize,
+    pub inbox_desktop_notifications: bool,
+
     // Phase 8: Self-Evolution
     pub self_evolution_enabled: bool,
     pub learning_archive_threshold: f64,
@@ -238,6 +243,11 @@ impl Default for AppConfig {
             agent_max_continuations: 3,
             agent_reasoning_guidance: None,
 
+            // Inbox
+            inbox_page_size: 50,
+            inbox_sessions_page_size: 30,
+            inbox_desktop_notifications: true,
+
             // Self-Evolution
             self_evolution_enabled: true,
             learning_archive_threshold: 0.3,
@@ -322,6 +332,29 @@ mod tests {
             config.scheduler_heartbeat_file.as_deref(),
             Some("/tmp/heartbeat.md")
         );
+    }
+
+    // IN.13 — inbox config defaults
+    #[test]
+    fn inbox_config_defaults() {
+        let config = AppConfig::default();
+        assert_eq!(config.inbox_page_size, 50);
+        assert_eq!(config.inbox_sessions_page_size, 30);
+        assert!(config.inbox_desktop_notifications);
+    }
+
+    // IN.14 — inbox config from TOML
+    #[test]
+    fn inbox_config_from_toml() {
+        let toml_str = r#"
+            inbox_page_size = 100
+            inbox_sessions_page_size = 20
+            inbox_desktop_notifications = false
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.inbox_page_size, 100);
+        assert_eq!(config.inbox_sessions_page_size, 20);
+        assert!(!config.inbox_desktop_notifications);
     }
 
     // 8.11.19 — default agent_max_continuations is 3

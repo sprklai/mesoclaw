@@ -81,6 +81,11 @@ enum Commands {
         #[command(subcommand)]
         action: ScheduleAction,
     },
+    /// View channel conversations and messages
+    Channel {
+        #[command(subcommand)]
+        action: ChannelAction,
+    },
     /// Generate shell completions (hidden from --help)
     #[command(hide = true)]
     Completions {
@@ -235,6 +240,27 @@ enum ScheduleAction {
 }
 
 #[derive(Subcommand)]
+enum ChannelAction {
+    /// List channel conversations
+    List {
+        /// Filter by channel source (telegram, slack, discord)
+        #[arg(long)]
+        source: Option<String>,
+    },
+    /// View messages in a channel conversation
+    Messages {
+        /// Session ID
+        session_id: String,
+        /// Maximum messages to show
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+        /// Cursor: show messages before this message ID
+        #[arg(long)]
+        before: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
 enum ProviderAction {
     /// List all providers with key status
     List,
@@ -350,6 +376,16 @@ async fn main() {
             ScheduleAction::Delete { id } => commands::schedule::delete(&client, &id).await,
             ScheduleAction::History { id } => commands::schedule::history(&client, &id).await,
             ScheduleAction::Status => commands::schedule::status(&client).await,
+        },
+        Commands::Channel { action } => match action {
+            ChannelAction::List { source } => {
+                commands::channel::list(&client, source.as_deref()).await
+            }
+            ChannelAction::Messages {
+                session_id,
+                limit,
+                before,
+            } => commands::channel::messages(&client, &session_id, limit, before.as_deref()).await,
         },
         Commands::Completions { shell } => {
             clap_complete::generate(
@@ -725,6 +761,76 @@ mod tests {
                 assert_eq!(id, "job-789");
             }
             _ => panic!("expected Schedule History"),
+        }
+    }
+
+    // IN.18 — parse channel list
+    #[test]
+    fn parse_channel_list() {
+        let cli = parse(&["mesoclaw", "channel", "list"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Channel {
+                action: ChannelAction::List { source: None }
+            }
+        ));
+    }
+
+    // IN.19 — parse channel list with source filter
+    #[test]
+    fn parse_channel_list_with_source() {
+        let cli = parse(&["mesoclaw", "channel", "list", "--source", "telegram"]);
+        match cli.command {
+            Commands::Channel {
+                action: ChannelAction::List { source },
+            } => {
+                assert_eq!(source.as_deref(), Some("telegram"));
+            }
+            _ => panic!("expected Channel List"),
+        }
+    }
+
+    // IN.20 — parse channel messages
+    #[test]
+    fn parse_channel_messages() {
+        let cli = parse(&["mesoclaw", "channel", "messages", "sess-123"]);
+        match cli.command {
+            Commands::Channel {
+                action:
+                    ChannelAction::Messages {
+                        session_id,
+                        limit,
+                        before,
+                    },
+            } => {
+                assert_eq!(session_id, "sess-123");
+                assert_eq!(limit, 50);
+                assert!(before.is_none());
+            }
+            _ => panic!("expected Channel Messages"),
+        }
+    }
+
+    // IN.21 — parse channel messages with options
+    #[test]
+    fn parse_channel_messages_with_options() {
+        let cli = parse(&[
+            "mesoclaw", "channel", "messages", "sess-abc", "--limit", "20", "--before", "msg-xyz",
+        ]);
+        match cli.command {
+            Commands::Channel {
+                action:
+                    ChannelAction::Messages {
+                        session_id,
+                        limit,
+                        before,
+                    },
+            } => {
+                assert_eq!(session_id, "sess-abc");
+                assert_eq!(limit, 20);
+                assert_eq!(before.as_deref(), Some("msg-xyz"));
+            }
+            _ => panic!("expected Channel Messages"),
         }
     }
 }

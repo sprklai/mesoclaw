@@ -253,6 +253,26 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         conn.execute_batch("PRAGMA user_version = 8;")?;
     }
 
+    if version < 9 {
+        // Add channel_key column to sessions for deduplication
+        let has_channel_key: bool = conn
+            .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'")
+            .and_then(|mut stmt| stmt.query_row([], |row| row.get::<_, String>(0)))
+            .map(|sql| sql.contains("channel_key"))
+            .unwrap_or(false);
+
+        if !has_channel_key {
+            conn.execute_batch("ALTER TABLE sessions ADD COLUMN channel_key TEXT;")?;
+        }
+
+        conn.execute_batch(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_channel_key
+                ON sessions(channel_key) WHERE channel_key IS NOT NULL;
+
+            PRAGMA user_version = 9;",
+        )?;
+    }
+
     Ok(())
 }
 
@@ -302,7 +322,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 8);
+        assert_eq!(version, 9);
     }
 
     #[test]
@@ -486,7 +506,45 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 8);
+        assert_eq!(version, 9);
+    }
+
+    // IN.9 — Migration v9 adds channel_key column and unique index
+    #[test]
+    fn migration_v9_adds_channel_key_column() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test.db");
+        let conn = Connection::open(&path).unwrap();
+        run_migrations(&conn).unwrap();
+
+        // Verify channel_key column works
+        conn.execute(
+            "INSERT INTO sessions (id, title, channel_key) VALUES ('s1', 'Test', 'telegram:123')",
+            [],
+        )
+        .unwrap();
+
+        let ck: Option<String> = conn
+            .query_row(
+                "SELECT channel_key FROM sessions WHERE id = 's1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(ck, Some("telegram:123".to_string()));
+
+        // Verify unique index
+        let result = conn.execute(
+            "INSERT INTO sessions (id, title, channel_key) VALUES ('s2', 'Test2', 'telegram:123')",
+            [],
+        );
+        assert!(result.is_err());
+
+        // NULL channel_key should be allowed (web sessions)
+        conn.execute("INSERT INTO sessions (id, title) VALUES ('s3', 'Web')", [])
+            .unwrap();
+        conn.execute("INSERT INTO sessions (id, title) VALUES ('s4', 'Web2')", [])
+            .unwrap();
     }
 
     #[tokio::test]

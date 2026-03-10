@@ -8,9 +8,11 @@
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { Toaster } from 'svelte-sonner';
 	import Home from '@lucide/svelte/icons/home';
+	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import Database from '@lucide/svelte/icons/database';
 	import Settings from '@lucide/svelte/icons/settings';
 	import Calendar from '@lucide/svelte/icons/calendar';
+	import { inboxStore } from '$lib/stores/inbox.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { sessionsStore } from '$lib/stores/sessions.svelte';
@@ -30,6 +32,7 @@
 
 	const navItems = [
 		{ href: '/', icon: Home, label: 'Home' },
+		{ href: '/channels', icon: MessageSquare, label: 'Channels' },
 		{ href: '/memory', icon: Database, label: 'Memory' },
 		{ href: '/schedule', icon: Calendar, label: 'Schedule' }
 	];
@@ -53,11 +56,16 @@
 							{#each navItems as item (item.href)}
 								<Sidebar.MenuItem>
 									<Sidebar.MenuButton
-										isActive={page.url.pathname === item.href}
+										isActive={page.url.pathname === item.href || (item.href !== '/' && page.url.pathname.startsWith(item.href))}
 										onclick={() => goto(item.href)}
 									>
 										<item.icon class="h-4 w-4" />
 										<span>{item.label}</span>
+										{#if item.href === '/channels' && inboxStore.totalUnread > 0}
+											<span class="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground">
+												{inboxStore.totalUnread}
+											</span>
+										{/if}
 									</Sidebar.MenuButton>
 								</Sidebar.MenuItem>
 							{/each}

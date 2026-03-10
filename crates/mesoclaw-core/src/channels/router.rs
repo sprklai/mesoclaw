@@ -7,6 +7,8 @@ use tracing::{info, warn};
 use crate::gateway::state::AppState;
 
 use crate::ai::adapter::{ToolCallEvent, ToolCallPhase};
+use crate::ai::context::ContextEngine;
+use crate::event_bus::AppEvent;
 
 use super::format::formatter_for;
 use super::message::ChannelMessage;
@@ -139,24 +141,73 @@ impl ChannelRouter {
             return;
         }
 
+        // Publish user message event
+        let sender_name = message.sender.clone().unwrap_or_else(|| "unknown".into());
+        let preview = message.content.chars().take(100).collect::<String>();
+        let _ = state.event_bus.publish(AppEvent::ChannelMessageReceived {
+            channel: channel_name.clone(),
+            sender: sender_name.clone(),
+            session_id: session_id.clone(),
+            content_preview: preview,
+            role: "user".into(),
+        });
+
         // 3. Get allowed tools for this channel
         let tool_policy = ChannelToolPolicy::new(state.config.clone());
         let _allowed_tools = tool_policy.allowed_tools(&channel_name, &state.tools);
 
-        // 4. Get channel-specific system context
-        let system_context = channel_system_context(&channel_name);
+        // 4. Build full context (identity + memory + user + environment + reasoning)
+        let (history_from_ctx, preamble) = state
+            .context_builder
+            .build(Some(&session_id), &message.content)
+            .await
+            .unwrap_or_else(|e| {
+                warn!("ChannelRouter: context build failed for {channel_name}: {e}");
+                (vec![], String::new())
+            });
 
-        // 5. Call lifecycle hook: on_agent_start
+        let ctx_enabled = state
+            .context_injection_enabled
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let context_engine =
+            ContextEngine::new(state.db.clone(), state.config.clone(), ctx_enabled);
+        let (msg_count, last_at, summary) = state
+            .session_manager
+            .get_context_info(&session_id)
+            .await
+            .unwrap_or((0, None, None));
+        let level = context_engine.determine_context_level(
+            msg_count,
+            last_at.as_ref(),
+            summary.is_some(),
+            false,
+        );
+        let engine_preamble = context_engine
+            .compose(
+                &level,
+                &state.boot_context,
+                "default",
+                Some(&session_id),
+                summary.as_deref(),
+            )
+            .await
+            .unwrap_or_default();
+
+        // 5. Merge: full context + channel-specific formatting hint
+        let channel_hint = channel_system_context(&channel_name);
+        let system_context = format!("{preamble}\n\n{engine_preamble}\n\n{channel_hint}");
+
+        // 6. Call lifecycle hook: on_agent_start
         if let Some(channel) = state.channel_registry.get_channel(&channel_name) {
             channel.on_agent_start(recipient.as_deref()).await;
         }
 
-        // 6. Create tool event channel for broadcasting tool calls to lifecycle hooks
+        // 7. Create tool event channel for broadcasting tool calls to lifecycle hooks
         let (tool_event_tx, mut tool_event_rx) = broadcast::channel::<ToolCallEvent>(32);
 
-        // 7. Resolve agent WITH tool events
+        // 8. Resolve agent WITH tool events
         let agent =
-            match crate::ai::resolve_agent(None, state, Some(tool_event_tx), Some(system_context))
+            match crate::ai::resolve_agent(None, state, Some(tool_event_tx), Some(&system_context))
                 .await
             {
                 Ok(a) => a,
@@ -169,7 +220,7 @@ impl ChannelRouter {
                 }
             };
 
-        // 8. Spawn tool event listener that forwards events to channel lifecycle hooks
+        // 9. Spawn tool event listener that forwards events to channel lifecycle hooks
         let tool_channel_name = channel_name.clone();
         let tool_recipient = recipient.clone();
         let tool_registry = state.channel_registry.clone();
@@ -184,21 +235,25 @@ impl ChannelRouter {
             }
         });
 
-        // 9. Build chat history using existing conversion
-        let history = match state.session_manager.get_messages(&session_id).await {
-            Ok(msgs) => {
-                let to_convert = if msgs.len() > 1 {
-                    &msgs[..msgs.len() - 1]
-                } else {
-                    &[]
-                };
-                let start = to_convert.len().saturating_sub(20);
-                crate::ai::context::convert_session_messages(&to_convert[start..])
+        // 10. Use history from context builder (windowed by strategy), fallback to manual
+        let history = if !history_from_ctx.is_empty() {
+            history_from_ctx
+        } else {
+            match state.session_manager.get_messages(&session_id).await {
+                Ok(msgs) => {
+                    let to_convert = if msgs.len() > 1 {
+                        &msgs[..msgs.len() - 1]
+                    } else {
+                        &[]
+                    };
+                    let start = to_convert.len().saturating_sub(20);
+                    crate::ai::context::convert_session_messages(&to_convert[start..])
+                }
+                Err(_) => vec![],
             }
-            Err(_) => vec![],
         };
 
-        // 10. Run agent chat with reasoning engine
+        // 11. Run agent chat with reasoning engine
         let response = match state
             .reasoning_engine
             .chat(&agent, &message.content, history)
@@ -216,25 +271,35 @@ impl ChannelRouter {
             }
         };
 
-        // 11. Abort tool listener (agent done)
+        // 12. Abort tool listener (agent done)
         tool_listener.abort();
 
-        // 12. Call lifecycle hook: on_agent_complete
+        // 13. Call lifecycle hook: on_agent_complete
         if let Some(channel) = state.channel_registry.get_channel(&channel_name) {
             channel.on_agent_complete(recipient.as_deref()).await;
         }
 
-        // 13. Store assistant response
+        // 14. Store assistant response
         let _ = state
             .session_manager
             .append_message(&session_id, "assistant", &response)
             .await;
 
-        // 14. Format response for the channel
+        // Publish assistant response event
+        let response_preview = response.chars().take(100).collect::<String>();
+        let _ = state.event_bus.publish(AppEvent::ChannelMessageReceived {
+            channel: channel_name.clone(),
+            sender: state.config.identity_name.clone(),
+            session_id: session_id.clone(),
+            content_preview: response_preview,
+            role: "assistant".into(),
+        });
+
+        // 15. Format response for the channel
         let formatter = formatter_for(&channel_name);
         let parts = formatter.format(&response);
 
-        // 15. Send formatted response parts
+        // 16. Send formatted response parts
         for part in parts {
             let reply =
                 ChannelMessage::new(&channel_name, &part).with_metadata(reply_metadata.clone());

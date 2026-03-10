@@ -12,6 +12,8 @@ pub struct Session {
     pub updated_at: String,
     #[serde(default = "default_source")]
     pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel_key: Option<String>,
 }
 
 fn default_source() -> String {
@@ -27,6 +29,8 @@ pub struct SessionSummary {
     pub message_count: i64,
     #[serde(default = "default_source")]
     pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,7 +94,200 @@ impl SessionManager {
             created_at: now.clone(),
             updated_at: now,
             source,
+            channel_key: None,
         })
+    }
+
+    pub async fn create_session_with_channel_key(
+        &self,
+        title: &str,
+        source: &str,
+        channel_key: &str,
+    ) -> Result<Session> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+        let title = title.to_string();
+        let source = source.to_string();
+        let channel_key = channel_key.to_string();
+
+        let session_id = id.clone();
+        let session_title = title.clone();
+        let session_now = now.clone();
+        let session_source = source.clone();
+        let session_ck = channel_key.clone();
+
+        db::with_db(&self.db, move |conn| {
+            conn.execute(
+                "INSERT INTO sessions (id, title, created_at, updated_at, source, channel_key) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![session_id, session_title, session_now, session_now, session_source, session_ck],
+            )?;
+            Ok(())
+        })
+        .await?;
+
+        Ok(Session {
+            id,
+            title,
+            created_at: now.clone(),
+            updated_at: now,
+            source,
+            channel_key: Some(channel_key),
+        })
+    }
+
+    pub async fn find_session_by_channel_key(&self, channel_key: &str) -> Result<Option<Session>> {
+        let channel_key = channel_key.to_string();
+
+        db::with_db(&self.db, move |conn| {
+            let result = conn.query_row(
+                "SELECT id, title, created_at, updated_at, source, channel_key FROM sessions WHERE channel_key = ?1",
+                rusqlite::params![channel_key],
+                |row| {
+                    Ok(Session {
+                        id: row.get(0)?,
+                        title: row.get(1)?,
+                        created_at: row.get(2)?,
+                        updated_at: row.get(3)?,
+                        source: row.get(4)?,
+                        channel_key: row.get(5)?,
+                    })
+                },
+            );
+            match result {
+                Ok(session) => Ok(Some(session)),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                Err(e) => Err(MesoError::Sqlite(e)),
+            }
+        })
+        .await
+    }
+
+    pub async fn list_channel_sessions(
+        &self,
+        source: Option<&str>,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<SessionSummary>> {
+        let source = source.map(|s| s.to_string());
+
+        db::with_db(&self.db, move |conn| {
+            let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match source {
+                Some(ref src) => (
+                    "SELECT s.id, s.title, s.created_at, s.updated_at, COUNT(m.id), s.source, s.channel_key
+                     FROM sessions s
+                     LEFT JOIN messages m ON m.session_id = s.id
+                     WHERE s.source != 'web' AND s.source = ?1
+                     GROUP BY s.id
+                     ORDER BY s.updated_at DESC
+                     LIMIT ?2 OFFSET ?3".to_string(),
+                    vec![
+                        Box::new(src.clone()) as Box<dyn rusqlite::types::ToSql>,
+                        Box::new(limit as i64),
+                        Box::new(offset as i64),
+                    ],
+                ),
+                None => (
+                    "SELECT s.id, s.title, s.created_at, s.updated_at, COUNT(m.id), s.source, s.channel_key
+                     FROM sessions s
+                     LEFT JOIN messages m ON m.session_id = s.id
+                     WHERE s.source != 'web'
+                     GROUP BY s.id
+                     ORDER BY s.updated_at DESC
+                     LIMIT ?1 OFFSET ?2".to_string(),
+                    vec![
+                        Box::new(limit as i64) as Box<dyn rusqlite::types::ToSql>,
+                        Box::new(offset as i64),
+                    ],
+                ),
+            };
+
+            let mut stmt = conn.prepare(&sql)?;
+            let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+            let rows = stmt
+                .query_map(param_refs.as_slice(), |row| {
+                    Ok(SessionSummary {
+                        id: row.get(0)?,
+                        title: row.get(1)?,
+                        created_at: row.get(2)?,
+                        updated_at: row.get(3)?,
+                        message_count: row.get(4)?,
+                        source: row.get(5)?,
+                        channel_key: row.get(6)?,
+                    })
+                })?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+
+            Ok(rows)
+        })
+        .await
+    }
+
+    pub async fn get_messages_paginated(
+        &self,
+        session_id: &str,
+        limit: usize,
+        before_id: Option<&str>,
+    ) -> Result<Vec<Message>> {
+        let session_id = session_id.to_string();
+        let before_id = before_id.map(|s| s.to_string());
+
+        db::with_db(&self.db, move |conn| {
+            match before_id {
+                Some(ref bid) => {
+                    let mut stmt = conn.prepare(
+                        "SELECT id, session_id, role, content, created_at
+                         FROM messages
+                         WHERE session_id = ?1
+                           AND created_at < (SELECT created_at FROM messages WHERE id = ?2)
+                         ORDER BY created_at DESC
+                         LIMIT ?3",
+                    )?;
+
+                    let rows = stmt
+                        .query_map(rusqlite::params![session_id, bid, limit as i64], |row| {
+                            Ok(Message {
+                                id: row.get(0)?,
+                                session_id: row.get(1)?,
+                                role: row.get(2)?,
+                                content: row.get(3)?,
+                                created_at: row.get(4)?,
+                            })
+                        })?
+                        .collect::<std::result::Result<Vec<_>, _>>()?;
+
+                    // Reverse to return in chronological order
+                    let mut rows = rows;
+                    rows.reverse();
+                    Ok(rows)
+                }
+                None => {
+                    let mut stmt = conn.prepare(
+                        "SELECT id, session_id, role, content, created_at
+                         FROM messages
+                         WHERE session_id = ?1
+                         ORDER BY created_at DESC
+                         LIMIT ?2",
+                    )?;
+
+                    let rows = stmt
+                        .query_map(rusqlite::params![session_id, limit as i64], |row| {
+                            Ok(Message {
+                                id: row.get(0)?,
+                                session_id: row.get(1)?,
+                                role: row.get(2)?,
+                                content: row.get(3)?,
+                                created_at: row.get(4)?,
+                            })
+                        })?
+                        .collect::<std::result::Result<Vec<_>, _>>()?;
+
+                    let mut rows = rows;
+                    rows.reverse();
+                    Ok(rows)
+                }
+            }
+        })
+        .await
     }
 
     pub async fn get_session(&self, id: &str) -> Result<Session> {
@@ -98,7 +295,7 @@ impl SessionManager {
 
         db::with_db(&self.db, move |conn| {
             conn.query_row(
-                "SELECT id, title, created_at, updated_at, source FROM sessions WHERE id = ?1",
+                "SELECT id, title, created_at, updated_at, source, channel_key FROM sessions WHERE id = ?1",
                 rusqlite::params![id],
                 |row| {
                     Ok(Session {
@@ -107,6 +304,7 @@ impl SessionManager {
                         created_at: row.get(2)?,
                         updated_at: row.get(3)?,
                         source: row.get(4)?,
+                        channel_key: row.get(5)?,
                     })
                 },
             )
@@ -123,7 +321,7 @@ impl SessionManager {
     pub async fn list_sessions(&self) -> Result<Vec<SessionSummary>> {
         db::with_db(&self.db, |conn| {
             let mut stmt = conn.prepare(
-                "SELECT s.id, s.title, s.created_at, s.updated_at, COUNT(m.id) as message_count, s.source
+                "SELECT s.id, s.title, s.created_at, s.updated_at, COUNT(m.id) as message_count, s.source, s.channel_key
                  FROM sessions s
                  LEFT JOIN messages m ON m.session_id = s.id
                  GROUP BY s.id
@@ -139,6 +337,7 @@ impl SessionManager {
                         updated_at: row.get(3)?,
                         message_count: row.get(4)?,
                         source: row.get(5)?,
+                        channel_key: row.get(6)?,
                     })
                 })?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -170,7 +369,7 @@ impl SessionManager {
             }
 
             conn.query_row(
-                "SELECT id, title, created_at, updated_at, source FROM sessions WHERE id = ?1",
+                "SELECT id, title, created_at, updated_at, source, channel_key FROM sessions WHERE id = ?1",
                 rusqlite::params![update_id],
                 |row| {
                     Ok(Session {
@@ -179,6 +378,7 @@ impl SessionManager {
                         created_at: row.get(2)?,
                         updated_at: row.get(3)?,
                         source: row.get(4)?,
+                        channel_key: row.get(5)?,
                     })
                 },
             )
@@ -849,5 +1049,138 @@ mod tests {
             .unwrap();
         let fetched = mgr.get_session(&created.id).await.unwrap();
         assert_eq!(fetched.source, "slack");
+    }
+
+    // IN.1 — create_session_with_channel_key stores channel_key
+    #[tokio::test]
+    async fn create_session_with_channel_key() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr
+            .create_session_with_channel_key("Telegram #12345", "telegram", "telegram:12345")
+            .await
+            .unwrap();
+        assert_eq!(session.channel_key.as_deref(), Some("telegram:12345"));
+        assert_eq!(session.source, "telegram");
+        assert_eq!(session.title, "Telegram #12345");
+    }
+
+    // IN.2 — find_session_by_channel_key returns existing session
+    #[tokio::test]
+    async fn find_session_by_channel_key_found() {
+        let (_dir, mgr) = setup().await;
+        let created = mgr
+            .create_session_with_channel_key("Telegram #111", "telegram", "telegram:111")
+            .await
+            .unwrap();
+        let found = mgr
+            .find_session_by_channel_key("telegram:111")
+            .await
+            .unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, created.id);
+    }
+
+    // IN.3 — find_session_by_channel_key returns None for unknown key
+    #[tokio::test]
+    async fn find_session_by_channel_key_not_found() {
+        let (_dir, mgr) = setup().await;
+        let found = mgr
+            .find_session_by_channel_key("telegram:999")
+            .await
+            .unwrap();
+        assert!(found.is_none());
+    }
+
+    // IN.4 — list_channel_sessions excludes web sessions
+    #[tokio::test]
+    async fn list_channel_sessions_excludes_web() {
+        let (_dir, mgr) = setup().await;
+        mgr.create_session("Web Chat").await.unwrap();
+        mgr.create_session_with_channel_key("TG Chat", "telegram", "telegram:1")
+            .await
+            .unwrap();
+        mgr.create_session_with_channel_key("Slack Chat", "slack", "slack:C1")
+            .await
+            .unwrap();
+
+        let all = mgr.list_channel_sessions(None, 50, 0).await.unwrap();
+        assert_eq!(all.len(), 2);
+        assert!(all.iter().all(|s| s.source != "web"));
+    }
+
+    // IN.5 — list_channel_sessions filters by source
+    #[tokio::test]
+    async fn list_channel_sessions_filter_source() {
+        let (_dir, mgr) = setup().await;
+        mgr.create_session_with_channel_key("TG 1", "telegram", "telegram:1")
+            .await
+            .unwrap();
+        mgr.create_session_with_channel_key("Slack 1", "slack", "slack:C1")
+            .await
+            .unwrap();
+
+        let tg = mgr
+            .list_channel_sessions(Some("telegram"), 50, 0)
+            .await
+            .unwrap();
+        assert_eq!(tg.len(), 1);
+        assert_eq!(tg[0].source, "telegram");
+    }
+
+    // IN.6 — get_messages_paginated returns latest N messages
+    #[tokio::test]
+    async fn get_messages_paginated_latest() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr.create_session("Chat").await.unwrap();
+        for i in 0..5 {
+            mgr.append_message(&session.id, "user", &format!("msg {i}"))
+                .await
+                .unwrap();
+        }
+
+        let msgs = mgr
+            .get_messages_paginated(&session.id, 3, None)
+            .await
+            .unwrap();
+        assert_eq!(msgs.len(), 3);
+        assert_eq!(msgs[0].content, "msg 2");
+        assert_eq!(msgs[2].content, "msg 4");
+    }
+
+    // IN.7 — get_messages_paginated cursor-based pagination
+    #[tokio::test]
+    async fn get_messages_paginated_cursor() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr.create_session("Chat").await.unwrap();
+        let mut msg_ids = vec![];
+        for i in 0..5 {
+            let m = mgr
+                .append_message(&session.id, "user", &format!("msg {i}"))
+                .await
+                .unwrap();
+            msg_ids.push(m.id);
+        }
+
+        // Get 2 messages before msg 3 (index 3)
+        let msgs = mgr
+            .get_messages_paginated(&session.id, 2, Some(&msg_ids[3]))
+            .await
+            .unwrap();
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0].content, "msg 1");
+        assert_eq!(msgs[1].content, "msg 2");
+    }
+
+    // IN.8 — channel_key unique constraint prevents duplicates
+    #[tokio::test]
+    async fn channel_key_unique_constraint() {
+        let (_dir, mgr) = setup().await;
+        mgr.create_session_with_channel_key("TG 1", "telegram", "telegram:1")
+            .await
+            .unwrap();
+        let result = mgr
+            .create_session_with_channel_key("TG 1 dup", "telegram", "telegram:1")
+            .await;
+        assert!(result.is_err());
     }
 }

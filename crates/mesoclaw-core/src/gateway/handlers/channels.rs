@@ -215,6 +215,51 @@ pub async fn disconnect_channel(
     Ok(StatusCode::OK)
 }
 
+/// Query params for listing channel sessions.
+#[derive(Deserialize)]
+pub struct ChannelSessionsQuery {
+    pub source: Option<String>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+/// Query params for paginated messages.
+#[derive(Deserialize)]
+pub struct ChannelMessagesQuery {
+    pub limit: Option<usize>,
+    pub before: Option<String>,
+}
+
+/// GET /channels/sessions — list channel conversations
+pub async fn list_channel_sessions(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Query(query): axum::extract::Query<ChannelSessionsQuery>,
+) -> Json<Vec<crate::ai::session::SessionSummary>> {
+    let limit = query.limit.unwrap_or(state.config.inbox_sessions_page_size);
+    let offset = query.offset.unwrap_or(0);
+    let sessions = state
+        .session_manager
+        .list_channel_sessions(query.source.as_deref(), limit, offset)
+        .await
+        .unwrap_or_default();
+    Json(sessions)
+}
+
+/// GET /channels/sessions/:id/messages — paginated messages for a channel conversation
+pub async fn list_channel_messages(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<ChannelMessagesQuery>,
+) -> Result<Json<Vec<crate::ai::session::Message>>, StatusCode> {
+    let limit = query.limit.unwrap_or(state.config.inbox_page_size);
+    let messages = state
+        .session_manager
+        .get_messages_paginated(&id, limit, query.before.as_deref())
+        .await
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+    Ok(Json(messages))
+}
+
 /// Incoming webhook message body.
 #[derive(Deserialize)]
 pub struct WebhookMessageRequest {
@@ -430,6 +475,103 @@ mod tests {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
+    }
+
+    // IN.15 — list_channel_sessions returns empty when no channel sessions
+    #[tokio::test]
+    async fn list_channel_sessions_empty() {
+        let (_dir, state) = test_state().await;
+        let app = Router::new()
+            .route("/channels/sessions", get(list_channel_sessions))
+            .with_state(state);
+
+        let req = Request::get("/channels/sessions")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let sessions: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert!(sessions.is_empty());
+    }
+
+    // IN.16 — list_channel_sessions returns channel sessions only
+    #[tokio::test]
+    async fn list_channel_sessions_returns_channel_only() {
+        let (_dir, state) = test_state().await;
+
+        // Create a web session and a channel session
+        state
+            .session_manager
+            .create_session("Web Chat")
+            .await
+            .unwrap();
+        state
+            .session_manager
+            .create_session_with_channel_key("TG #123", "telegram", "telegram:123")
+            .await
+            .unwrap();
+
+        let app = Router::new()
+            .route("/channels/sessions", get(list_channel_sessions))
+            .with_state(state);
+
+        let req = Request::get("/channels/sessions")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let sessions: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0]["source"], "telegram");
+    }
+
+    // IN.17 — list_channel_messages with pagination
+    #[tokio::test]
+    async fn list_channel_messages_paginated() {
+        let (_dir, state) = test_state().await;
+        let session = state
+            .session_manager
+            .create_session_with_channel_key("TG #1", "telegram", "telegram:1")
+            .await
+            .unwrap();
+
+        for i in 0..5 {
+            state
+                .session_manager
+                .append_message(&session.id, "user", &format!("msg {i}"))
+                .await
+                .unwrap();
+        }
+
+        let app = Router::new()
+            .route(
+                "/channels/sessions/{id}/messages",
+                get(list_channel_messages),
+            )
+            .with_state(state);
+
+        let req = Request::get(&format!(
+            "/channels/sessions/{}/messages?limit=3",
+            session.id
+        ))
+        .body(Body::empty())
+        .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let messages: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(messages.len(), 3);
     }
 
     // 8.7.14 — Webhook message with missing content returns 422 (invalid JSON)

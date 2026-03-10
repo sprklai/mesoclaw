@@ -71,18 +71,31 @@ impl ChannelSessionMap {
     }
 
     /// Resolve an existing session or create a new one for the given channel key.
+    /// Lookup order: (1) DashMap cache → (2) DB by channel_key → (3) create new.
     #[cfg(feature = "ai")]
     pub async fn resolve_session(&self, channel_key: &str, channel_name: &str) -> Result<String> {
-        // Check existing mapping
+        // 1. Check in-memory cache
         if let Some(session_id) = self.map.get(channel_key) {
             return Ok(session_id.clone());
         }
 
-        // Create new session with source tag
-        let title = format!("{} conversation", capitalize_first(channel_name));
+        // 2. Check DB for existing session with this channel_key
+        if let Some(session) = self
+            .session_manager
+            .find_session_by_channel_key(channel_key)
+            .await?
+        {
+            let session_id = session.id.clone();
+            self.map.insert(channel_key.to_string(), session_id.clone());
+            return Ok(session_id);
+        }
+
+        // 3. Create new session with channel_key and descriptive title
+        let identifier = channel_key.split(':').nth(1).unwrap_or("unknown");
+        let title = format!("{} #{}", capitalize_first(channel_name), identifier);
         let session = self
             .session_manager
-            .create_session_with_source(&title, channel_name)
+            .create_session_with_channel_key(&title, channel_name, channel_key)
             .await?;
 
         let session_id = session.id.clone();
@@ -164,8 +177,9 @@ mod tests {
 
         // Verify session was created in DB
         let session = mgr.get_session(&session_id).await.unwrap();
-        assert_eq!(session.title, "Telegram conversation");
+        assert_eq!(session.title, "Telegram #12345");
         assert_eq!(session.source, "telegram");
+        assert_eq!(session.channel_key.as_deref(), Some("telegram:12345"));
     }
 
     // CR.5 — resolve_session returns same session_id for same channel_key
