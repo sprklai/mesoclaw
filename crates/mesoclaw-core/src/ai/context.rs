@@ -28,6 +28,13 @@ pub struct BootContext {
     pub hostname: String,
     pub locale: String,
     pub region: String,
+    pub home_dir: Option<String>,
+    pub username: String,
+    pub shell: Option<String>,
+    pub desktop_path: Option<String>,
+    pub downloads_path: Option<String>,
+    pub data_dir: Option<String>,
+    pub working_dir: Option<String>,
 }
 
 impl BootContext {
@@ -41,12 +48,52 @@ impl BootContext {
             .unwrap_or_else(|_| "en_US.UTF-8".into());
         let region = infer_region_from_timezone();
 
+        let home_dir = std::env::var("HOME")
+            .or_else(|_| std::env::var("USERPROFILE"))
+            .ok()
+            .or_else(|| {
+                directories::UserDirs::new().map(|u| u.home_dir().to_string_lossy().into_owned())
+            });
+
+        let username = std::env::var("USER")
+            .or_else(|_| std::env::var("USERNAME"))
+            .unwrap_or_else(|_| "unknown".into());
+
+        let shell = std::env::var("SHELL").ok();
+
+        let user_dirs = directories::UserDirs::new();
+        let desktop_path = user_dirs
+            .as_ref()
+            .and_then(|u| u.desktop_dir())
+            .map(|p| p.to_string_lossy().into_owned());
+        let downloads_path = user_dirs
+            .as_ref()
+            .and_then(|u| u.download_dir())
+            .map(|p| p.to_string_lossy().into_owned());
+
+        let data_dir = Some(
+            crate::config::default_data_dir()
+                .to_string_lossy()
+                .into_owned(),
+        );
+
+        let working_dir = std::env::current_dir()
+            .ok()
+            .map(|p| p.to_string_lossy().into_owned());
+
         Self {
             os,
             arch,
             hostname,
             locale,
             region,
+            home_dir,
+            username,
+            shell,
+            desktop_path,
+            downloads_path,
+            data_dir,
+            working_dir,
         }
     }
 }
@@ -205,7 +252,56 @@ impl ContextEngine {
             boot_context.locale,
             boot_context.region,
         ));
+
+        // User environment details
+        let mut user_line = format!("User: {}", boot_context.username);
+        if let Some(ref home) = boot_context.home_dir {
+            user_line.push_str(&format!(" | Home: {home}"));
+        }
+        if let Some(ref shell) = boot_context.shell {
+            user_line.push_str(&format!(" | Shell: {shell}"));
+        }
+        parts.push(user_line);
+
+        // Paths line (only if we have any)
+        let mut path_parts = Vec::new();
+        if let Some(ref desktop) = boot_context.desktop_path {
+            path_parts.push(format!("Desktop: {desktop}"));
+        }
+        if let Some(ref downloads) = boot_context.downloads_path {
+            path_parts.push(format!("Downloads: {downloads}"));
+        }
+        if !path_parts.is_empty() {
+            parts.push(path_parts.join(" | "));
+        }
+
+        let mut dir_parts = Vec::new();
+        if let Some(ref working) = boot_context.working_dir {
+            dir_parts.push(format!("Working Dir: {working}"));
+        }
+        if let Some(ref data) = boot_context.data_dir {
+            dir_parts.push(format!("Data Dir: {data}"));
+        }
+        if !dir_parts.is_empty() {
+            parts.push(dir_parts.join(" | "));
+        }
+
         parts.push(self.dynamic_runtime(model_display, session_id));
+
+        // Reasoning guidance
+        parts.push("## Reasoning & Discovery".into());
+        if let Some(ref custom_guidance) = self.config.agent_reasoning_guidance {
+            parts.push(custom_guidance.clone());
+        } else {
+            parts.push(
+                "- When you encounter an error or cannot find something, REASON about alternatives before giving up.\n\
+                 - Use ShellTool to discover paths dynamically: `ls`, `echo $HOME`, `find`.\n\
+                 - If a file path fails, try common alternatives (~/Desktop, ~/desktop, $XDG_DESKTOP_DIR).\n\
+                 - Always try at least 2 approaches before telling the user you cannot do something.\n\
+                 - When a tool returns an error, analyze the error message and adapt your next tool call.\n\
+                 - Do NOT describe what you would do — actually call the tools and do it.".into()
+            );
+        }
 
         // Identity summary (Tier 3)
         if let Some(identity) = self.get_cached_summary("identity").await? {
@@ -3379,5 +3475,60 @@ mod tests {
                 );
             }
         }
+    }
+
+    // 8.11.14 — boot context has home_dir
+    #[test]
+    fn boot_context_has_home_dir() {
+        let ctx = BootContext::from_system();
+        assert!(ctx.home_dir.is_some(), "home_dir should be Some");
+        assert!(
+            !ctx.home_dir.as_ref().unwrap().is_empty(),
+            "home_dir should be non-empty"
+        );
+    }
+
+    // 8.11.15 — boot context has username
+    #[test]
+    fn boot_context_has_username() {
+        let ctx = BootContext::from_system();
+        assert!(!ctx.username.is_empty(), "username should be non-empty");
+    }
+
+    // 8.11.16 — boot context has working_dir
+    #[test]
+    fn boot_context_has_working_dir() {
+        let ctx = BootContext::from_system();
+        assert!(ctx.working_dir.is_some(), "working_dir should be Some");
+    }
+
+    // 8.11.17 — compose_full includes Home:
+    #[tokio::test]
+    async fn compose_full_includes_home_dir() {
+        let (_dir, engine) = setup().await;
+        let boot = BootContext::from_system();
+        let result = engine
+            .compose(&ContextLevel::Full, &boot, "test-model", None, None)
+            .await
+            .unwrap();
+        assert!(
+            result.contains("Home:"),
+            "compose_full output should contain 'Home:'"
+        );
+    }
+
+    // 8.11.18 — compose_full includes reasoning guidance
+    #[tokio::test]
+    async fn compose_full_includes_reasoning_guidance() {
+        let (_dir, engine) = setup().await;
+        let boot = BootContext::from_system();
+        let result = engine
+            .compose(&ContextLevel::Full, &boot, "test-model", None, None)
+            .await
+            .unwrap();
+        assert!(
+            result.contains("Reasoning & Discovery"),
+            "compose_full output should contain reasoning guidance"
+        );
     }
 }

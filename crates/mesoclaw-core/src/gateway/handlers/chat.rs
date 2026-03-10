@@ -77,8 +77,12 @@ pub async fn chat(
             .await;
     }
 
-    // Use chat() with history for multi-turn continuity
-    let response = agent.chat(&req.prompt, history).await?;
+    // Use reasoning engine for multi-turn continuity with autonomous reasoning
+    let chat_result = state
+        .reasoning_engine
+        .chat(&agent, &req.prompt, history)
+        .await?;
+    let response = chat_result.response;
 
     // Auto-extract facts from the conversation
     if let Some(ref sid) = req.session_id {

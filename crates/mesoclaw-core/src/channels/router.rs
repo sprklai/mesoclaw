@@ -198,8 +198,13 @@ impl ChannelRouter {
             Err(_) => vec![],
         };
 
-        // 10. Run agent chat
-        let response = match agent.chat(&message.content, history).await {
+        // 10. Run agent chat with reasoning engine
+        let response = match state
+            .reasoning_engine
+            .chat(&agent, &message.content, history)
+            .await
+            .map(|r| r.response)
+        {
             Ok(r) => r,
             Err(e) => {
                 warn!("ChannelRouter: agent chat failed for {channel_name}: {e}");

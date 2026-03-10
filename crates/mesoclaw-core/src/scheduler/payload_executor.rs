@@ -84,7 +84,12 @@ async fn execute_agent_turn(
         }
     };
 
-    match agent.chat(prompt, vec![]).await {
+    match state
+        .reasoning_engine
+        .chat(&agent, prompt, vec![])
+        .await
+        .map(|r| r.response)
+    {
         Ok(response) => {
             info!(
                 "Scheduler job '{}': AgentTurn completed, response len={}",

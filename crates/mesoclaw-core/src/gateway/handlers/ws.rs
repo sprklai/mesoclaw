@@ -267,11 +267,15 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
         // Note: user message is stored by the frontend via POST /sessions/{id}/messages
         // before the WS stream starts. Do not duplicate here.
 
-        // Spawn agent work in background with chat history
+        // Spawn agent work in background with reasoning engine
         let prompt = request.prompt.clone();
+        let reasoning_engine = state.reasoning_engine.clone();
         let (result_tx, mut result_rx) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
-            let result = agent.chat(&prompt, history).await;
+            let result = reasoning_engine
+                .chat(&agent, &prompt, history)
+                .await
+                .map(|r| r.response);
             let _ = result_tx.send(result);
         });
 

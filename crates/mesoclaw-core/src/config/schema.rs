@@ -112,6 +112,10 @@ pub struct AppConfig {
     pub scheduler_agent_turn_timeout_secs: u64,
     pub scheduler_heartbeat_file: Option<String>,
 
+    // Phase 8.11: Autonomous Reasoning
+    pub agent_max_continuations: u32,
+    pub agent_reasoning_guidance: Option<String>,
+
     // Phase 8: Self-Evolution
     pub self_evolution_enabled: bool,
     pub learning_archive_threshold: f64,
@@ -230,6 +234,10 @@ impl Default for AppConfig {
             scheduler_agent_turn_timeout_secs: 120,
             scheduler_heartbeat_file: None,
 
+            // Autonomous Reasoning
+            agent_max_continuations: 3,
+            agent_reasoning_guidance: None,
+
             // Self-Evolution
             self_evolution_enabled: true,
             learning_archive_threshold: 0.3,
@@ -314,6 +322,14 @@ mod tests {
             config.scheduler_heartbeat_file.as_deref(),
             Some("/tmp/heartbeat.md")
         );
+    }
+
+    // 8.11.19 — default agent_max_continuations is 3
+    #[test]
+    fn default_agent_max_continuations() {
+        let config = AppConfig::default();
+        assert_eq!(config.agent_max_continuations, 3);
+        assert!(config.agent_reasoning_guidance.is_none());
     }
 
     // 15.3.40 — config context defaults

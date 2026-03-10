@@ -91,6 +91,7 @@ pub(crate) mod tests {
             boot_context: crate::ai::context::BootContext::from_system(),
             last_used_model: Arc::new(RwLock::new(None)),
             context_builder,
+            reasoning_engine: Arc::new(crate::ai::reasoning::ReasoningEngine::new(3)),
             context_injection_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             self_evolution_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             soul_loader,

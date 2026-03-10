@@ -27,6 +27,8 @@ use crate::ai::context::{BootContext, ContextBuilder};
 #[cfg(feature = "ai")]
 use crate::ai::provider_registry::ProviderRegistry;
 #[cfg(feature = "ai")]
+use crate::ai::reasoning::ReasoningEngine;
+#[cfg(feature = "ai")]
 use crate::ai::session::SessionManager;
 
 pub struct AppState {
@@ -50,6 +52,8 @@ pub struct AppState {
     pub last_used_model: Arc<RwLock<Option<String>>>,
     #[cfg(feature = "ai")]
     pub context_builder: Arc<ContextBuilder>,
+    #[cfg(feature = "ai")]
+    pub reasoning_engine: Arc<ReasoningEngine>,
     /// Runtime toggle: context injection (mutable via PUT /config)
     pub context_injection_enabled: Arc<AtomicBool>,
     /// Runtime toggle: self-evolution / learning (mutable via PUT /config)

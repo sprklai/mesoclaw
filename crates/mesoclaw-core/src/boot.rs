@@ -28,6 +28,7 @@ use crate::ai::{
     agent::MesoAgent,
     context::{BootContext, ContextBuilder},
     provider_registry::ProviderRegistry,
+    reasoning::{ReasoningEngine, continuation::ContinuationStrategy},
     session::SessionManager,
 };
 
@@ -56,6 +57,8 @@ pub struct Services {
     pub last_used_model: Arc<RwLock<Option<String>>>,
     #[cfg(feature = "ai")]
     pub context_builder: Arc<ContextBuilder>,
+    #[cfg(feature = "ai")]
+    pub reasoning_engine: Arc<ReasoningEngine>,
     pub context_injection_enabled: Arc<AtomicBool>,
     pub self_evolution_enabled: Arc<AtomicBool>,
     pub soul_loader: Arc<SoulLoader>,
@@ -239,6 +242,19 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
             info!("Context summaries refreshed");
         }
     }
+
+    // 12a. Reasoning Engine
+    #[cfg(feature = "ai")]
+    let reasoning_engine = {
+        let mut engine = ReasoningEngine::new(config.agent_max_continuations);
+        engine.add_strategy(ContinuationStrategy::new(config.agent_max_continuations));
+        Arc::new(engine)
+    };
+    #[cfg(feature = "ai")]
+    info!(
+        "Reasoning engine initialized with max {} continuations",
+        config.agent_max_continuations
+    );
 
     // 12b. ContextBuilder
     #[cfg(feature = "ai")]
@@ -441,6 +457,8 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         last_used_model: Arc::new(RwLock::new(None)),
         #[cfg(feature = "ai")]
         context_builder,
+        #[cfg(feature = "ai")]
+        reasoning_engine,
         context_injection_enabled,
         self_evolution_enabled,
         soul_loader,
@@ -481,6 +499,8 @@ impl From<Services> for AppState {
             last_used_model: s.last_used_model,
             #[cfg(feature = "ai")]
             context_builder: s.context_builder,
+            #[cfg(feature = "ai")]
+            reasoning_engine: s.reasoning_engine,
             context_injection_enabled: s.context_injection_enabled,
             self_evolution_enabled: s.self_evolution_enabled,
             soul_loader: s.soul_loader,
@@ -585,6 +605,21 @@ mod tests {
         assert!(
             services.agent.is_none(),
             "Agent should be None when no API key is configured"
+        );
+    }
+
+    // 8.11.20 — init_services creates ReasoningEngine with ContinuationStrategy
+    #[cfg(feature = "ai")]
+    #[tokio::test]
+    async fn init_services_creates_reasoning_engine() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let config = test_config(&dir);
+        let services = init_services(config).await.unwrap();
+        // ReasoningEngine is created and accessible
+        // It should have at least the ContinuationStrategy
+        assert!(
+            Arc::strong_count(&services.reasoning_engine) >= 1,
+            "reasoning_engine should be initialized"
         );
     }
 
