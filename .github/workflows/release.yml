@@ -70,7 +70,7 @@ jobs:
           args: --bundles deb,rpm,appimage -- --profile ci-release
 
       - name: Build standalone CLI and daemon
-        run: cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --all-features
+        run: cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard
 
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v7
@@ -122,7 +122,7 @@ jobs:
           args: --bundles msi,nsis -- --profile ci-release
 
       - name: Build standalone CLI and daemon
-        run: cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --all-features
+        run: cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard
 
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v7
@@ -176,8 +176,8 @@ jobs:
 
       - name: Build standalone CLI and daemon (universal)
         run: |
-          cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --all-features --target aarch64-apple-darwin
-          cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --all-features --target x86_64-apple-darwin
+          cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard --target aarch64-apple-darwin
+          cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard --target x86_64-apple-darwin
           mkdir -p target/ci-release/universal
           lipo -create \
             target/aarch64-apple-darwin/ci-release/mesoclaw-cli \
@@ -235,7 +235,7 @@ jobs:
         run: cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Build CLI and daemon
-        run: cross build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --all-features --target ${{ matrix.target }}
+        run: cross build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard --target ${{ matrix.target }}
 
       - name: Upload binaries
         uses: actions/upload-artifact@v7
