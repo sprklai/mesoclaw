@@ -261,7 +261,7 @@ The frontend is a SvelteKit SPA (Single Page Application) using Svelte 5 runes, 
 ```bash
 cd web
 bun install        # Install dependencies (first time)
-bun run dev        # Start Vite dev server on http://localhost:5173
+bun run dev        # Start Vite dev server on http://localhost:18971
 ```
 
 The frontend expects the MesoClaw daemon running on `http://localhost:18981`. Start the daemon in another terminal:
@@ -301,7 +301,7 @@ The desktop app uses Tauri 2 wrapping the SvelteKit frontend.
 ./scripts/build.sh --dev
 ```
 
-This launches the Vite dev server on port 5173 and opens a Tauri window pointing to it. Hot module replacement (HMR) works for frontend changes. Rust changes trigger a recompile.
+This launches the Vite dev server on port 18971 and opens a Tauri window pointing to it. Hot module replacement (HMR) works for frontend changes. Rust changes trigger a recompile.
 
 ### Build Desktop App
 

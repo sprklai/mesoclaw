@@ -60,14 +60,14 @@ All fields use `serde(default)`, so any field can be omitted to use its default 
 | `gateway_host` | String | `"127.0.0.1"` | IP address the gateway listens on |
 | `gateway_port` | u16 | `18981` | Port the gateway listens on |
 | `gateway_auth_token` | Option\<String\> | `null` | Bearer token for API authentication. If unset, auth is disabled |
-| `gateway_cors_origins` | Vec\<String\> | `[]` | Allowed CORS origins. Empty or `["*"]` enables permissive CORS |
+| `gateway_cors_origins` | Vec\<String\> | `["http://localhost:18971"]` | Allowed CORS origins. `["*"]` enables permissive CORS |
 | `ws_max_connections` | usize | `32` | Maximum concurrent WebSocket connections |
 
 ```toml
 gateway_host = "127.0.0.1"
 gateway_port = 18981
 gateway_auth_token = "my-secret-token"
-gateway_cors_origins = ["http://localhost:5173", "http://localhost:1420"]
+gateway_cors_origins = ["http://localhost:18971"]
 ws_max_connections = 32
 ```
 
@@ -376,7 +376,7 @@ Fields can always be set in the config file regardless of feature flags -- they 
 gateway_host = "127.0.0.1"
 gateway_port = 18981
 gateway_auth_token = "my-secret-token"
-gateway_cors_origins = ["http://localhost:5173"]
+gateway_cors_origins = ["http://localhost:18971"]
 ws_max_connections = 32
 
 # Logging

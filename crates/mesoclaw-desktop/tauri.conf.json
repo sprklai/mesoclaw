@@ -4,7 +4,7 @@
   "version": "0.0.3",
   "identifier": "com.sprklai.mesoclaw",
   "build": {
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://localhost:18971",
     "frontendDist": "../../web/build",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""

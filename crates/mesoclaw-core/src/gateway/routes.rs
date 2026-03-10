@@ -333,7 +333,7 @@ mod tests {
 
         let req = Request::builder()
             .uri("/health")
-            .header("origin", "http://localhost:5173")
+            .header("origin", "http://localhost:18971")
             .body(Body::empty())
             .unwrap();
 
@@ -351,7 +351,7 @@ mod tests {
         let req = Request::builder()
             .method("OPTIONS")
             .uri("/sessions")
-            .header("origin", "http://localhost:5173")
+            .header("origin", "http://localhost:18971")
             .header("access-control-request-method", "POST")
             .body(Body::empty())
             .unwrap();

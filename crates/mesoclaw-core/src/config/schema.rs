@@ -183,7 +183,7 @@ impl Default for AppConfig {
             // Gateway
             gateway_auth_token: None,
             ws_max_connections: 32,
-            gateway_cors_origins: vec![],
+            gateway_cors_origins: vec!["http://localhost:18971".into()],
 
             // Agent
             agent_max_turns: 20,

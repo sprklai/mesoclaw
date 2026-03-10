@@ -45,7 +45,7 @@ pub(crate) mod tests {
             .unwrap();
 
         let config = AppConfig {
-            gateway_cors_origins: vec!["*".into()],
+            gateway_cors_origins: vec!["http://localhost:18971".into()],
             ..Default::default()
         };
 
