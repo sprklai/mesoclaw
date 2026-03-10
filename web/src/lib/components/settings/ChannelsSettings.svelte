@@ -83,17 +83,32 @@
 	}
 
 	let disconnecting = $state<Record<string, boolean>>({});
+	let connecting = $state<Record<string, boolean>>({});
 
 	async function testConnection(channelId: string) {
 		testing[channelId] = true;
 		testResult[channelId] = null;
 		try {
-			testResult[channelId] = await channelsStore.testConnection(channelId);
-			if (testResult[channelId]?.healthy) {
-				await channelsStore.connectChannel(channelId);
+			const result = await channelsStore.testConnection(channelId);
+			testResult[channelId] = result;
+			if (result.healthy) {
+				connecting[channelId] = true;
+				testing[channelId] = false;
+				const connected = await channelsStore.connectChannel(channelId);
+				connecting[channelId] = false;
+				// Verify actual status from registry
+				const ch = channelsStore.channels.find((c) => c.id === channelId);
+				if (!connected || !ch?.connected) {
+					testResult[channelId] = {
+						healthy: false,
+						error: 'Test passed but connection failed. Check backend logs.',
+						latency_ms: result.latency_ms,
+					};
+				}
 			}
 		} finally {
 			testing[channelId] = false;
+			connecting[channelId] = false;
 		}
 	}
 
@@ -214,15 +229,19 @@
 										{disconnecting[channel.id] ? 'Disconnecting...' : 'Disconnect'}
 									</Button>
 								{/if}
-								{#if testResult[channel.id]}
-									{#if testResult[channel.id]?.healthy}
+								{#if connecting[channel.id]}
+									<span class="text-sm text-muted-foreground">
+										Test passed, connecting...
+									</span>
+								{:else if testResult[channel.id]}
+									{#if testResult[channel.id]?.healthy && channel.connected}
 										<span class="text-sm text-green-600">
-											Connected successfully
+											Connected
 											{#if testResult[channel.id]?.latency_ms}
 												({testResult[channel.id]?.latency_ms}ms)
 											{/if}
 										</span>
-									{:else}
+									{:else if !testResult[channel.id]?.healthy}
 										<span class="text-sm text-destructive">
 											{testResult[channel.id]?.error ?? 'Connection failed'}
 										</span>

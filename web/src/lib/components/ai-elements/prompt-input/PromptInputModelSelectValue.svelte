@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { cn } from "$lib/utils";
-	// import * as Select from "$lib/components/ui/select/index.js";
 
 	interface Props {
 		class?: string;
@@ -20,4 +19,3 @@
 		{value}
 	{/if}
 </div>
-<!-- <Select.Value class={cn(className)} {placeholder} {...props} /> -->

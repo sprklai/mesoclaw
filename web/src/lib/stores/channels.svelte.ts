@@ -84,33 +84,6 @@ const BUILTIN_CHANNELS: ChannelDef[] = [
       },
     ],
   },
-  {
-    id: "matrix",
-    name: "Matrix",
-    description: "Matrix Protocol (Bridge Hub)",
-    credentials: [
-      {
-        key: "homeserver_url",
-        label: "Homeserver URL",
-        placeholder: "https://matrix.org",
-      },
-      {
-        key: "username",
-        label: "Username (MXID)",
-        placeholder: "@bot:matrix.org",
-      },
-      {
-        key: "access_token",
-        label: "Access Token",
-        placeholder: "Access token from Element settings",
-      },
-      {
-        key: "allowed_room_ids",
-        label: "Allowed Room IDs",
-        placeholder: "Comma-separated room IDs (empty = all)",
-      },
-    ],
-  },
 ];
 
 function credKey(channelId: string, field: string): string {

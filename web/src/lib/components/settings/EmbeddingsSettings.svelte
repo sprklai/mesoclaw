@@ -66,7 +66,7 @@
 {:else}
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>Provider Selection</Card.Title>
+			<Card.Title>Provider Selection <span class="text-xs font-normal text-muted-foreground">(Experimental)</span></Card.Title>
 			<Card.Description>Choose how semantic embeddings are generated for memory search</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-3">
@@ -90,6 +90,12 @@
 					OpenAI API
 				</Button>
 			</div>
+
+			{#if embeddingsStore.status.provider === 'none'}
+				<p class="text-sm text-muted-foreground">
+					Semantic search is disabled. Select a provider to enable.
+				</p>
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
@@ -128,43 +134,45 @@
 		</Card.Root>
 	{/if}
 
-	<Card.Root>
-		<Card.Header>
-			<Card.Title>Status</Card.Title>
-		</Card.Header>
-		<Card.Content class="space-y-3">
-			<div class="grid grid-cols-2 gap-2 text-sm">
-				<span class="text-muted-foreground">Provider:</span>
-				<span>{embeddingsStore.status.provider}</span>
-				<span class="text-muted-foreground">Model:</span>
-				<span>{embeddingsStore.status.model || '-'}</span>
-				<span class="text-muted-foreground">Dimensions:</span>
-				<span>{embeddingsStore.status.dimensions}</span>
-			</div>
-
-			<div class="flex gap-2 pt-2">
-				<Button variant="outline" size="sm" onclick={runTest} disabled={testing}>
-					{testing ? 'Testing...' : 'Test Connection'}
-				</Button>
-				<Button
-					variant="outline"
-					size="sm"
-					onclick={triggerReindex}
-					disabled={reindexing || embeddingsStore.status.provider === 'none'}
-				>
-					{reindexing ? 'Re-indexing...' : 'Re-index All Memories'}
-				</Button>
-			</div>
-
-			{#if testResult}
-				<div class="text-sm mt-2 p-2 rounded bg-muted">
-					{#if testResult.success}
-						<p class="text-green-600 dark:text-green-400">Test passed ({testResult.dimensions} dims, {testResult.latency_ms}ms)</p>
-					{:else}
-						<p class="text-red-600 dark:text-red-400">Test failed: {testResult.error}</p>
-					{/if}
+	{#if embeddingsStore.status.provider !== 'none'}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Status</Card.Title>
+			</Card.Header>
+			<Card.Content class="space-y-3">
+				<div class="grid grid-cols-2 gap-2 text-sm">
+					<span class="text-muted-foreground">Provider:</span>
+					<span>{embeddingsStore.status.provider}</span>
+					<span class="text-muted-foreground">Model:</span>
+					<span>{embeddingsStore.status.model || '-'}</span>
+					<span class="text-muted-foreground">Dimensions:</span>
+					<span>{embeddingsStore.status.dimensions}</span>
 				</div>
-			{/if}
-		</Card.Content>
-	</Card.Root>
+
+				<div class="flex gap-2 pt-2">
+					<Button variant="outline" size="sm" onclick={runTest} disabled={testing}>
+						{testing ? 'Testing...' : 'Test Connection'}
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={triggerReindex}
+						disabled={reindexing}
+					>
+						{reindexing ? 'Re-indexing...' : 'Re-index All Memories'}
+					</Button>
+				</div>
+
+				{#if testResult}
+					<div class="text-sm mt-2 p-2 rounded bg-muted">
+						{#if testResult.success}
+							<p class="text-green-600 dark:text-green-400">Test passed ({testResult.dimensions} dims, {testResult.latency_ms}ms)</p>
+						{:else}
+							<p class="text-red-600 dark:text-red-400">Test failed: {testResult.error}</p>
+						{/if}
+					</div>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 {/if}

@@ -11,20 +11,12 @@
 		id: string;
 		name: string;
 		type: string;
-		isCustom?: boolean;
 	}
 
 	const BUILTIN_SERVICES: ServiceDef[] = [
 		{ id: 'tavily', name: 'Tavily', type: 'Web Search API' },
 		{ id: 'brave', name: 'Brave Search', type: 'Web Search API' },
-		{ id: 'perplexity', name: 'Perplexity', type: 'AI-Powered Search API' },
-		{ id: 'serpapi', name: 'SerpAPI', type: 'Search Engine Results API' },
-		{ id: 'github', name: 'GitHub', type: 'Developer Platform Token' },
-		{ id: 'jina', name: 'Jina AI', type: 'Reader & Embeddings API' },
-		{ id: 'firecrawl', name: 'Firecrawl', type: 'Web Scraping API' },
 	];
-
-	const CUSTOM_STORAGE_KEY = 'mesoclaw_custom_services';
 
 	let loading = $state(true);
 	let configuredKeys = $state<Set<string>>(new Set());
@@ -32,30 +24,9 @@
 	let apiKeyInputs = $state<Record<string, string>>({});
 	let showKey = $state<Record<string, boolean>>({});
 	let saving = $state<Record<string, boolean>>({});
-	let showAddService = $state(false);
-	let newService = $state({ id: '', name: '', type: '' });
-	let customServices = $state<ServiceDef[]>([]);
 
 	function credentialKey(id: string): string {
 		return `api_key:${id}`;
-	}
-
-	function loadCustomServices(): ServiceDef[] {
-		try {
-			const raw = localStorage.getItem(CUSTOM_STORAGE_KEY);
-			if (!raw) return [];
-			return JSON.parse(raw);
-		} catch {
-			return [];
-		}
-	}
-
-	function saveCustomServices(services: ServiceDef[]) {
-		localStorage.setItem(CUSTOM_STORAGE_KEY, JSON.stringify(services));
-	}
-
-	function allServices(): ServiceDef[] {
-		return [...BUILTIN_SERVICES, ...customServices];
 	}
 
 	async function refreshKeys() {
@@ -68,7 +39,6 @@
 	}
 
 	onMount(async () => {
-		customServices = loadCustomServices();
 		await refreshKeys();
 		loading = false;
 	});
@@ -103,67 +73,12 @@
 			saving[service.id] = false;
 		}
 	}
-
-	function addService() {
-		if (!newService.id.trim() || !newService.name.trim() || !newService.type.trim()) return;
-		const existing = allServices().find((s) => s.id === newService.id.trim());
-		if (existing) return;
-		const entry: ServiceDef = {
-			id: newService.id.trim(),
-			name: newService.name.trim(),
-			type: newService.type.trim(),
-			isCustom: true,
-		};
-		customServices = [...customServices, entry];
-		saveCustomServices(customServices);
-		newService = { id: '', name: '', type: '' };
-		showAddService = false;
-	}
-
-	function removeService(id: string) {
-		customServices = customServices.filter((s) => s.id !== id);
-		saveCustomServices(customServices);
-		if (expandedId === id) expandedId = null;
-	}
 </script>
 
 <div class="flex items-center justify-between mb-4">
 	<h2 class="text-lg font-semibold">Services</h2>
-	<Button size="sm" variant="outline" onclick={() => (showAddService = !showAddService)}>
-		{showAddService ? 'Cancel' : '+ Add Service'}
-	</Button>
+	<span class="text-xs text-muted-foreground">Custom services coming soon</span>
 </div>
-
-{#if showAddService}
-	<Card.Root>
-		<Card.Header>
-			<Card.Title>Add Custom Service</Card.Title>
-		</Card.Header>
-		<Card.Content class="space-y-3">
-			<div class="grid grid-cols-2 gap-3">
-				<div class="space-y-1">
-					<label class="text-sm font-medium" for="new-svc-id">Service ID</label>
-					<Input id="new-svc-id" placeholder="my-service" bind:value={newService.id} />
-				</div>
-				<div class="space-y-1">
-					<label class="text-sm font-medium" for="new-svc-name">Display Name</label>
-					<Input id="new-svc-name" placeholder="My Service" bind:value={newService.name} />
-				</div>
-			</div>
-			<div class="space-y-1">
-				<label class="text-sm font-medium" for="new-svc-type">Type / Description</label>
-				<Input id="new-svc-type" placeholder="Web Search API" bind:value={newService.type} />
-			</div>
-			<Button
-				size="sm"
-				disabled={!newService.id.trim() || !newService.name.trim() || !newService.type.trim()}
-				onclick={addService}
-			>
-				Add Service
-			</Button>
-		</Card.Content>
-	</Card.Root>
-{/if}
 
 {#if loading}
 	<div class="space-y-2">
@@ -173,7 +88,7 @@
 	</div>
 {:else}
 	<div class="space-y-2">
-		{#each allServices() as service (service.id)}
+		{#each BUILTIN_SERVICES as service (service.id)}
 			{@const configured = isConfigured(service.id)}
 			<Card.Root>
 				<button
@@ -198,18 +113,6 @@
 
 				{#if expandedId === service.id}
 					<Card.Content class="pt-0 space-y-4">
-						{#if service.isCustom}
-							<div class="flex justify-end">
-								<Button
-									variant="destructive"
-									size="sm"
-									onclick={() => removeService(service.id)}
-								>
-									Remove Service
-								</Button>
-							</div>
-						{/if}
-
 						<div class="space-y-2">
 							<label class="text-sm font-medium" for="key-{service.id}">API Key</label>
 							<div class="flex gap-2">
