@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-03-10
+
+- Enable macOS and embedded builds in release workflow
+
 ## [0.0.4] - 2026-03-10
 
 - v0.0.4
