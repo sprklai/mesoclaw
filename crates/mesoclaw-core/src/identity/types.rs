@@ -13,7 +13,7 @@ impl Default for IdentityMeta {
     fn default() -> Self {
         Self {
             name: "MesoClaw".into(),
-            version: "0.0.3".into(),
+            version: "0.0.4".into(),
             description: "AI-powered assistant for developers".into(),
         }
     }
@@ -62,7 +62,7 @@ mod tests {
     fn identity_meta_default() {
         let meta = IdentityMeta::default();
         assert_eq!(meta.name, "MesoClaw");
-        assert_eq!(meta.version, "0.0.3");
+        assert_eq!(meta.version, "0.0.4");
         assert!(!meta.description.is_empty());
     }
 
