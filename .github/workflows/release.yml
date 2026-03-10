@@ -262,10 +262,14 @@ jobs:
         include:
           - target: aarch64-unknown-linux-gnu
             label: arm64
+            extra-features: ""
           - target: armv7-unknown-linux-gnueabihf
             label: armv7
-          - target: x86_64-unknown-linux-musl
-            label: musl
+            extra-features: ""
+          # TODO: musl needs vendored OpenSSL — re-enable after fixing cross-compilation
+          # - target: x86_64-unknown-linux-musl
+          #   label: musl
+          #   extra-features: ",vendored-openssl"
     steps:
       - uses: actions/checkout@v6
 
@@ -281,7 +285,7 @@ jobs:
         run: cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Build CLI and daemon
-        run: cross build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --no-default-features --features channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard --target ${{ matrix.target }}
+        run: cross build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --no-default-features --features channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard${{ matrix.extra-features }} --target ${{ matrix.target }}
 
       - name: Rename binaries with target label
         run: |
