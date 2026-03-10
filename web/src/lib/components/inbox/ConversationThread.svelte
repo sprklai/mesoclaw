@@ -3,7 +3,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { onMount } from 'svelte';
 
-	let threadContainer: HTMLDivElement;
+	let threadContainer: HTMLDivElement | undefined = $state();
 	let selectedConv = $derived(
 		inboxStore.conversations.find((c) => c.id === inboxStore.selectedId)
 	);
@@ -19,9 +19,10 @@
 	});
 
 	function scrollToBottom() {
-		if (threadContainer) {
+		const el = threadContainer;
+		if (el) {
 			requestAnimationFrame(() => {
-				threadContainer.scrollTop = threadContainer.scrollHeight;
+				el.scrollTop = el.scrollHeight;
 			});
 		}
 	}

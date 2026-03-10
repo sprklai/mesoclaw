@@ -19,6 +19,7 @@ function createSessionsStore() {
   let sessions = $state<SessionSummary[]>([]);
   let active = $state<Session | null>(null);
   let loading = $state(false);
+  let error = $state<string | null>(null);
 
   return {
     get sessions() {
@@ -30,9 +31,13 @@ function createSessionsStore() {
     get loading() {
       return loading;
     },
+    get error() {
+      return error;
+    },
 
     async load() {
       loading = true;
+      error = null;
       try {
         sessions = await apiGet<SessionSummary[]>("/sessions");
       } catch {
@@ -41,6 +46,8 @@ function createSessionsStore() {
         try {
           sessions = await apiGet<SessionSummary[]>("/sessions");
         } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          error = `Failed to load sessions. Is the daemon running? (${msg})`;
           console.error("sessionsStore.load failed after retry:", e);
         }
       } finally {

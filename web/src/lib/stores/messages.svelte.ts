@@ -62,10 +62,15 @@ function createMessagesStore() {
 
     async load(sessionId: string) {
       loading = true;
+      error = "";
       try {
         messages = await apiGet<Message[]>(
           `/sessions/${encodeURIComponent(sessionId)}/messages`,
         );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        error = `Failed to load messages. Is the daemon running? (${msg})`;
+        console.error("messagesStore.load failed:", e);
       } finally {
         loading = false;
       }

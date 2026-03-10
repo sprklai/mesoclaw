@@ -92,14 +92,21 @@ impl SkillRegistry {
     }
 
     /// Create a new user skill. Writes the .md file to disk.
+    /// Returns an error if a skill with the given id already exists.
     pub async fn create(&self, id: String, content: String) -> Result<Skill> {
+        let mut skills = self.skills.write().await;
+        if skills.contains_key(&id) {
+            return Err(MesoError::Skill(format!(
+                "skill '{id}' already exists, use update instead"
+            )));
+        }
+
         let skill = load_skill_from_content(&id, &content, SkillSource::User);
 
         // Write to disk
         let path = self.dir.join(format!("{id}.md"));
         std::fs::write(&path, &content)?;
 
-        let mut skills = self.skills.write().await;
         skills.insert(id, skill.clone());
         Ok(skill)
     }
@@ -320,6 +327,36 @@ mod tests {
         let registry = SkillRegistry::new(dir.path(), 100_000).unwrap();
         let result = registry.delete("system-prompt").await;
         assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), MesoError::Skill(_)));
+    }
+
+    #[tokio::test]
+    async fn skill_create_rejects_existing() {
+        let dir = TempDir::new().unwrap();
+        let registry = SkillRegistry::new(dir.path(), 100_000).unwrap();
+
+        let content = "---\nname: test\ndescription: Test\ncategory: test\n---\nBody.";
+        registry
+            .create("test".into(), content.into())
+            .await
+            .unwrap();
+
+        let result = registry
+            .create("test".into(), "---\nname: test\ndescription: Other\ncategory: test\n---\nOther.".into())
+            .await;
+        assert!(result.is_err(), "Creating duplicate skill should fail");
+        assert!(matches!(result.unwrap_err(), MesoError::Skill(_)));
+    }
+
+    #[tokio::test]
+    async fn skill_create_rejects_bundled() {
+        let dir = TempDir::new().unwrap();
+        let registry = SkillRegistry::new(dir.path(), 100_000).unwrap();
+
+        let result = registry
+            .create("system-prompt".into(), "# override".into())
+            .await;
+        assert!(result.is_err(), "Creating skill with bundled id should fail");
         assert!(matches!(result.unwrap_err(), MesoError::Skill(_)));
     }
 

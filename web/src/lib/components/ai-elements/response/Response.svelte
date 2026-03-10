@@ -3,10 +3,7 @@
 	import Code from "svelte-streamdown/code"; // Shiki syntax highlighting
 	import { cn } from "$lib/utils";
 	import { themeStore } from "$lib/stores/theme.svelte";
-
-	// Import Shiki themes
-	import githubLightDefault from "@shikijs/themes/github-light-default";
-	import githubDarkDefault from "@shikijs/themes/github-dark-default";
+	import { shikiThemes } from "$lib/components/ai-elements/code/shiki";
 
 	type Props = StreamdownProps & {
 		class?: string;
@@ -23,9 +20,6 @@
 	shikiTheme={currentTheme}
 	baseTheme="shadcn"
 	components={{ code: Code }}
-	shikiThemes={{
-		"github-light-default": githubLightDefault,
-		"github-dark-default": githubDarkDefault,
-	}}
+	shikiThemes={shikiThemes}
 	{...restProps}
 />

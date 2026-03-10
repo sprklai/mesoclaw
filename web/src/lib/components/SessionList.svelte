@@ -14,6 +14,13 @@
 	let editTitle = $state('');
 	let confirmOpen = $state(false);
 	let deleteTarget = $state<string | null>(null);
+	let editInputRef = $state<HTMLInputElement | null>(null);
+
+	$effect(() => {
+		if (editInputRef) {
+			editInputRef.focus();
+		}
+	});
 
 	async function handleNew() {
 		const session = await sessionsStore.create('New Chat');
@@ -78,9 +85,9 @@
 							<input
 								class="flex-1 rounded border bg-background text-foreground px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
 								bind:value={editTitle}
+								bind:this={editInputRef}
 								onkeydown={handleEditKeydown}
 								onblur={saveEdit}
-								autofocus
 							/>
 						</div>
 					{:else}

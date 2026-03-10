@@ -1,6 +1,8 @@
 // Follows the best practices established in https://shiki.matsu.io/guide/best-performance
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import { createHighlighterCore } from "shiki/core";
+import githubLightDefault from "@shikijs/themes/github-light-default";
+import githubDarkDefault from "@shikijs/themes/github-dark-default";
 
 const bundledLanguages = {
   bash: () => import("@shikijs/langs/bash"),
@@ -18,6 +20,12 @@ const bundledLanguages = {
 
 /** The languages configured for the highlighter */
 export type SupportedLanguage = keyof typeof bundledLanguages;
+
+/** Shared Shiki theme objects for use by both the Code element and Streamdown. */
+export const shikiThemes = {
+  "github-light-default": githubLightDefault,
+  "github-dark-default": githubDarkDefault,
+} as const;
 
 /** A preloaded highlighter instance. */
 export const highlighter = createHighlighterCore({

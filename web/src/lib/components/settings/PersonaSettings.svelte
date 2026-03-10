@@ -7,6 +7,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Separator } from '$lib/components/ui/separator';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -35,6 +36,8 @@
 	let addSkillOpen = $state(false);
 	let newSkillId = $state('');
 	let newSkillContent = $state('');
+	let skillDeleteOpen = $state(false);
+	let skillDeleteTarget = $state<string | null>(null);
 
 	onMount(async () => {
 		await loadAll();
@@ -85,7 +88,14 @@
 		await loadAll();
 	}
 
-	async function handleDeleteSkill(id: string) {
+	function handleDeleteSkill(id: string) {
+		skillDeleteTarget = id;
+		skillDeleteOpen = true;
+	}
+
+	async function confirmDeleteSkill() {
+		if (!skillDeleteTarget) return;
+		const id = skillDeleteTarget;
 		await apiDelete(`/skills/${encodeURIComponent(id)}`);
 		skills = skills.filter((s) => s.id !== id);
 	}
@@ -187,3 +197,10 @@
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
+
+<ConfirmDialog
+	bind:open={skillDeleteOpen}
+	title="Delete skill?"
+	description="This will permanently delete this skill."
+	onConfirm={confirmDeleteSkill}
+/>

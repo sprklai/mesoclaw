@@ -3,6 +3,7 @@ import { apiGet, apiPut } from "$lib/api/client";
 function createConfigStore() {
   let config = $state<Record<string, unknown>>({});
   let loading = $state(false);
+  let error = $state<string | null>(null);
 
   return {
     get config() {
@@ -11,11 +12,19 @@ function createConfigStore() {
     get loading() {
       return loading;
     },
+    get error() {
+      return error;
+    },
 
     async load() {
       loading = true;
+      error = null;
       try {
         config = await apiGet<Record<string, unknown>>("/config");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        error = `Failed to load config. Is the daemon running? (${msg})`;
+        console.error("configStore.load failed:", e);
       } finally {
         loading = false;
       }

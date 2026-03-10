@@ -113,7 +113,8 @@ impl Memory for SqliteMemoryStore {
 
     async fn recall(&self, query: &str, limit: usize, offset: usize) -> Result<Vec<MemoryEntry>> {
         let pool = self.pool.clone();
-        let query_str = query.to_string();
+        // Wrap query in double quotes to escape FTS5 special characters (AND, OR, *, ", etc.)
+        let query_str = format!("\"{}\"", query.replace('"', "\"\""));
         let fts_weight = self.fts_weight;
         let vector_weight = self.vector_weight;
 
@@ -496,6 +497,21 @@ mod tests {
         for entry in &results {
             assert!(entry.score != 0.0 || entry.key == "python");
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn fts5_special_chars_dont_crash() {
+        let (_dir, store) = setup().await;
+        store
+            .store("test", "some content with special chars", MemoryCategory::Core)
+            .await
+            .unwrap();
+        let r1 = store.recall("hello AND world", 10, 0).await;
+        assert!(r1.is_ok());
+        let r2 = store.recall("\"unbalanced quote", 10, 0).await;
+        assert!(r2.is_ok());
+        let r3 = store.recall("test*", 10, 0).await;
+        assert!(r3.is_ok());
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from "svelte";
 	import { cn } from "$lib/utils";
 	import { watch } from "runed";
 	import { Collapsible } from "$lib/components/ui/collapsible/index.js";
@@ -28,16 +29,22 @@
 	let AUTO_CLOSE_DELAY = 1000;
 	let MS_IN_S = 1000;
 
+	// Capture initial prop values (one-time setup, intentionally non-reactive)
+	const { initialOpen, initialDuration } = untrack(() => ({
+		initialOpen: open ?? defaultOpen,
+		initialDuration: duration ?? 0,
+	}));
+
 	// Create the reasoning context
 	let reasoningContext = new ReasoningContext({
-		isStreaming,
-		isOpen: open ?? defaultOpen,
-		duration: duration ?? 0,
+		isStreaming: false,
+		isOpen: initialOpen,
+		duration: initialDuration,
 	});
 
 	// Set up controllable state for open
-	let isOpen = $state(open ?? defaultOpen);
-	let currentDuration = $state(duration ?? 0);
+	let isOpen = $state(initialOpen);
+	let currentDuration = $state(initialDuration);
 	let hasAutoClosed = $state(false);
 	let startTime = $state<number | null>(null);
 
