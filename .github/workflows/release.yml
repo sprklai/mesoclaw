@@ -72,6 +72,11 @@ jobs:
       - name: Build standalone CLI and daemon
         run: cargo build --profile ci-release -p mesoclaw-cli -p mesoclaw-daemon --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard
 
+      - name: Rename standalone binaries with platform label
+        run: |
+          cp target/ci-release/mesoclaw target/ci-release/mesoclaw-linux
+          cp target/ci-release/mesoclaw-daemon target/ci-release/mesoclaw-daemon-linux
+
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -86,8 +91,8 @@ jobs:
         with:
           name: linux-standalone
           path: |
-            target/ci-release/mesoclaw
-            target/ci-release/mesoclaw-daemon
+            target/ci-release/mesoclaw-linux
+            target/ci-release/mesoclaw-daemon-linux
 
   build-windows:
     name: Build Windows
@@ -233,13 +238,18 @@ jobs:
             target/aarch64-apple-darwin/ci-release/bundle/dmg/*.dmg
             target/x86_64-apple-darwin/ci-release/bundle/dmg/*.dmg
 
+      - name: Rename standalone binaries with platform label
+        run: |
+          cp target/ci-release/universal/mesoclaw target/ci-release/universal/mesoclaw-macos
+          cp target/ci-release/universal/mesoclaw-daemon target/ci-release/universal/mesoclaw-daemon-macos
+
       - name: Upload standalone binaries
         uses: actions/upload-artifact@v7
         with:
           name: macos-standalone
           path: |
-            target/ci-release/universal/mesoclaw
-            target/ci-release/universal/mesoclaw-daemon
+            target/ci-release/universal/mesoclaw-macos
+            target/ci-release/universal/mesoclaw-daemon-macos
 
       - name: Cleanup keychain
         if: always()
@@ -325,7 +335,8 @@ jobs:
           cd artifacts
           find . -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \
             -o -name "*.dmg" -o -name "*.msi" -o -name "*.exe" \
-            -o -name "mesoclaw" -o -name "mesoclaw-daemon" \
+            -o -name "mesoclaw-linux" -o -name "mesoclaw-daemon-linux" \
+            -o -name "mesoclaw-macos" -o -name "mesoclaw-daemon-macos" \
             -o -name "mesoclaw-arm64" -o -name "mesoclaw-daemon-arm64" \
             -o -name "mesoclaw-armv7" -o -name "mesoclaw-daemon-armv7" \
             -o -name "mesoclaw.exe" -o -name "mesoclaw-daemon.exe" \) \
@@ -356,8 +367,10 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.msi
             artifacts/**/*.exe
-            artifacts/**/mesoclaw
-            artifacts/**/mesoclaw-daemon
+            artifacts/**/mesoclaw-linux
+            artifacts/**/mesoclaw-daemon-linux
+            artifacts/**/mesoclaw-macos
+            artifacts/**/mesoclaw-daemon-macos
             artifacts/**/mesoclaw-arm64
             artifacts/**/mesoclaw-daemon-arm64
             artifacts/**/mesoclaw-armv7
