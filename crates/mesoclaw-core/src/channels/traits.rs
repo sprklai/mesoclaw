@@ -9,19 +9,14 @@ use crate::Result;
 use super::message::ChannelMessage;
 
 /// Status of a channel's connection.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub enum ChannelStatus {
+    #[default]
     Disconnected,
     Connecting,
     Connected,
     Reconnecting,
     Error(String),
-}
-
-impl Default for ChannelStatus {
-    fn default() -> Self {
-        Self::Disconnected
-    }
 }
 
 impl fmt::Display for ChannelStatus {

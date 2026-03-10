@@ -5,17 +5,12 @@ use serde::{Deserialize, Serialize};
 use crate::config::AppConfig;
 
 /// Controls who can DM the bot.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub enum DmPolicy {
+    #[default]
     Allowlist,
     Open,
     Disabled,
-}
-
-impl Default for DmPolicy {
-    fn default() -> Self {
-        Self::Allowlist
-    }
 }
 
 impl DmPolicy {
