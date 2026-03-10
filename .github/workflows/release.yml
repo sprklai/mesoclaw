@@ -328,7 +328,6 @@ jobs:
             -o -name "mesoclaw" -o -name "mesoclaw-daemon" \
             -o -name "mesoclaw-arm64" -o -name "mesoclaw-daemon-arm64" \
             -o -name "mesoclaw-armv7" -o -name "mesoclaw-daemon-armv7" \
-            -o -name "mesoclaw-musl" -o -name "mesoclaw-daemon-musl" \
             -o -name "mesoclaw.exe" -o -name "mesoclaw-daemon.exe" \) \
             -exec sha256sum {} \; > ../SHA256SUMS.txt
           cat ../SHA256SUMS.txt
@@ -337,8 +336,9 @@ jobs:
         id: version
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$INPUT_VERSION" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$INPUT_VERSION" ]; then
             echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
           else
             echo "version=${GITHUB_REF#refs/tags/app-v}" >> "$GITHUB_OUTPUT"
@@ -362,8 +362,6 @@ jobs:
             artifacts/**/mesoclaw-daemon-arm64
             artifacts/**/mesoclaw-armv7
             artifacts/**/mesoclaw-daemon-armv7
-            artifacts/**/mesoclaw-musl
-            artifacts/**/mesoclaw-daemon-musl
             SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
