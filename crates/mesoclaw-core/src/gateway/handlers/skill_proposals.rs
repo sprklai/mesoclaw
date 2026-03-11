@@ -10,6 +10,7 @@ use crate::gateway::state::AppState;
 use crate::{MesoError, Result};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct SkillProposal {
     pub id: String,
     pub action: String,
@@ -22,6 +23,10 @@ pub struct SkillProposal {
 }
 
 /// GET /skills/proposals — list pending proposals
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/skills/proposals", tag = "Skill Proposals",
+    responses((status = 200, description = "List of pending skill proposals", body = Vec<SkillProposal>))
+))]
 pub async fn list_proposals(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse> {
     let proposals = db::with_db(&state.db, |conn| {
         let mut stmt = conn.prepare(
@@ -54,6 +59,15 @@ pub async fn list_proposals(State(state): State<Arc<AppState>>) -> Result<impl I
 }
 
 /// POST /skills/proposals/:id/approve — approve and execute a proposal
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/skills/proposals/{id}/approve", tag = "Skill Proposals",
+    params(("id" = String, Path, description = "Proposal ID")),
+    responses(
+        (status = 200, description = "Proposal approved and executed"),
+        (status = 404, description = "Proposal not found"),
+        (status = 400, description = "Proposal not in pending state")
+    )
+))]
 pub async fn approve_proposal(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -135,6 +149,14 @@ pub async fn approve_proposal(
 }
 
 /// POST /skills/proposals/:id/reject — reject a proposal
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/skills/proposals/{id}/reject", tag = "Skill Proposals",
+    params(("id" = String, Path, description = "Proposal ID")),
+    responses(
+        (status = 200, description = "Proposal rejected"),
+        (status = 404, description = "Pending proposal not found")
+    )
+))]
 pub async fn reject_proposal(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -162,6 +184,14 @@ pub async fn reject_proposal(
 }
 
 /// DELETE /skills/proposals/:id — delete a proposal
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/skills/proposals/{id}", tag = "Skill Proposals",
+    params(("id" = String, Path, description = "Proposal ID")),
+    responses(
+        (status = 200, description = "Proposal deleted"),
+        (status = 404, description = "Proposal not found")
+    )
+))]
 pub async fn delete_proposal(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,

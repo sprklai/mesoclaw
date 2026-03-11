@@ -39,6 +39,28 @@
 
 The MesoClaw gateway is an axum HTTP+WebSocket server. All routes accept and return JSON unless otherwise noted. CORS is configured via the `gateway_cors_origins` config field; an empty list or `["*"]` enables permissive CORS.
 
+### Interactive API Documentation
+
+When built with the `api-docs` feature (enabled by default in daemon and desktop), MesoClaw serves interactive API documentation:
+
+- **Scalar UI:** `http://127.0.0.1:18981/api-docs` -- interactive API explorer with try-it-out functionality
+- **OpenAPI JSON:** `http://127.0.0.1:18981/api-docs/openapi.json` -- raw OpenAPI 3.1 spec
+
+Both endpoints bypass authentication and are always accessible.
+
+```bash
+# Open interactive API docs in browser
+open http://127.0.0.1:18981/api-docs
+
+# Download the OpenAPI spec
+curl http://127.0.0.1:18981/api-docs/openapi.json -o openapi.json
+```
+
+To disable API docs (reduces binary size), build without the feature:
+```bash
+cargo build -p mesoclaw-daemon --no-default-features --features gateway,ai,keyring
+```
+
 ## Authentication
 
 Authentication uses bearer tokens via the `Authorization` header:

@@ -114,6 +114,21 @@ impl ProviderRegistry {
                     )?;
                 }
             }
+
+            // Seed default model if none exists yet (fresh install)
+            let has_default: bool = conn.query_row(
+                "SELECT COUNT(*) FROM ai_models WHERE id = '_default_model'",
+                [],
+                |row| row.get::<_, i32>(0).map(|v| v > 0),
+            )?;
+            if !has_default {
+                conn.execute(
+                    "INSERT INTO ai_models (id, provider_id, model_id, display_name, is_custom)
+                     VALUES ('_default_model', 'anthropic', 'claude-sonnet-4-6', 'Default', 0)",
+                    [],
+                )?;
+            }
+
             Ok(())
         })
         .await

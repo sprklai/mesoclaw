@@ -20,8 +20,11 @@ pub async fn auth_middleware(
         None => return Ok(next.run(request).await),
     };
 
-    // Skip auth for GET /health
-    if request.method() == axum::http::Method::GET && request.uri().path() == "/health" {
+    // Skip auth for GET /health, /api-docs/*, and GET /setup/status
+    if request.method() == axum::http::Method::GET && request.uri().path() == "/health"
+        || request.uri().path().starts_with("/api-docs")
+        || request.method() == axum::http::Method::GET && request.uri().path() == "/setup/status"
+    {
         return Ok(next.run(request).await);
     }
 

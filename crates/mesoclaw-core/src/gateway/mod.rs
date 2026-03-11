@@ -1,6 +1,8 @@
 pub mod errors;
 pub mod handlers;
 pub mod middleware;
+#[cfg(feature = "api-docs")]
+pub mod openapi;
 pub mod routes;
 pub mod state;
 

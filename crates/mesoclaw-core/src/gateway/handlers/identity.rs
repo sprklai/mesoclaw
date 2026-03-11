@@ -9,11 +9,13 @@ use crate::gateway::state::AppState;
 use crate::identity::PersonaFile;
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct IdentityListResponse {
     pub files: Vec<IdentityFileInfo>,
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct IdentityFileInfo {
     pub name: String,
     pub description: String,
@@ -31,6 +33,7 @@ impl From<&PersonaFile> for IdentityFileInfo {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct IdentityFileResponse {
     pub name: String,
     pub content: String,
@@ -38,11 +41,16 @@ pub struct IdentityFileResponse {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct UpdateIdentityRequest {
     pub content: String,
 }
 
 /// GET /identity — list all identity files
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/identity", tag = "Identity",
+    responses((status = 200, description = "List of identity files", body = IdentityListResponse))
+))]
 pub async fn list_identity(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<IdentityListResponse>, MesoError> {
@@ -57,6 +65,14 @@ pub async fn list_identity(
 }
 
 /// GET /identity/{name} — get file content
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/identity/{name}", tag = "Identity",
+    params(("name" = String, Path, description = "Identity file name")),
+    responses(
+        (status = 200, description = "Identity file content", body = IdentityFileResponse),
+        (status = 404, description = "Identity file not found")
+    )
+))]
 pub async fn get_identity_file(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -70,6 +86,15 @@ pub async fn get_identity_file(
 }
 
 /// PUT /identity/{name} — update file content
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/identity/{name}", tag = "Identity",
+    params(("name" = String, Path, description = "Identity file name")),
+    request_body = UpdateIdentityRequest,
+    responses(
+        (status = 200, description = "Identity file updated"),
+        (status = 404, description = "Identity file not found")
+    )
+))]
 pub async fn update_identity_file(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -80,6 +105,10 @@ pub async fn update_identity_file(
 }
 
 /// POST /identity/reload — force reload all files
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/identity/reload", tag = "Identity",
+    responses((status = 200, description = "Identity files reloaded"))
+))]
 pub async fn reload_identity(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, MesoError> {

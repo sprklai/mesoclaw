@@ -9,24 +9,31 @@ use crate::channels::message::ChannelMessage;
 use crate::gateway::state::AppState;
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ChannelInfo {
     pub name: String,
     pub status: String,
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ChannelHealthResponse {
     pub name: String,
     pub healthy: bool,
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct SendMessageRequest {
     pub content: String,
     pub recipient: Option<String>,
 }
 
 /// GET /channels -- list registered channels with status
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/channels", tag = "Channels",
+    responses((status = 200, description = "List of registered channels", body = Vec<ChannelInfo>))
+))]
 pub async fn list_channels(State(state): State<Arc<AppState>>) -> Json<Vec<ChannelInfo>> {
     let registry = state.channel_registry.as_ref();
     let names = registry.list();
@@ -44,6 +51,14 @@ pub async fn list_channels(State(state): State<Arc<AppState>>) -> Json<Vec<Chann
 }
 
 /// GET /channels/:name/status -- single channel status
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/channels/{name}/status", tag = "Channels",
+    params(("name" = String, Path, description = "Channel name")),
+    responses(
+        (status = 200, description = "Channel status", body = ChannelInfo),
+        (status = 404, description = "Channel not found")
+    )
+))]
 pub async fn channel_status(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -59,6 +74,15 @@ pub async fn channel_status(
 }
 
 /// POST /channels/:name/send -- send message via channel
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/channels/{name}/send", tag = "Channels",
+    params(("name" = String, Path, description = "Channel name")),
+    request_body = SendMessageRequest,
+    responses(
+        (status = 200, description = "Message sent"),
+        (status = 500, description = "Send failed")
+    )
+))]
 pub async fn send_message(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -74,6 +98,14 @@ pub async fn send_message(
 }
 
 /// POST /channels/:name/connect -- connect channel
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/channels/{name}/connect", tag = "Channels",
+    params(("name" = String, Path, description = "Channel name")),
+    responses(
+        (status = 200, description = "Channel connected", body = ChannelInfo),
+        (status = 400, description = "Unknown channel or missing credentials")
+    )
+))]
 pub async fn connect_channel(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -200,6 +232,14 @@ pub async fn connect_channel(
 }
 
 /// POST /channels/:name/disconnect -- disconnect channel
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/channels/{name}/disconnect", tag = "Channels",
+    params(("name" = String, Path, description = "Channel name")),
+    responses(
+        (status = 200, description = "Channel disconnected"),
+        (status = 404, description = "Channel not found")
+    )
+))]
 pub async fn disconnect_channel(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -233,6 +273,15 @@ pub struct ChannelMessagesQuery {
 }
 
 /// GET /channels/sessions — list channel conversations
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/channels/sessions", tag = "Channels",
+    params(
+        ("source" = Option<String>, Query, description = "Filter by channel source"),
+        ("limit" = Option<usize>, Query, description = "Page size"),
+        ("offset" = Option<usize>, Query, description = "Offset")
+    ),
+    responses((status = 200, description = "Channel sessions"))
+))]
 pub async fn list_channel_sessions(
     State(state): State<Arc<AppState>>,
     axum::extract::Query(query): axum::extract::Query<ChannelSessionsQuery>,
@@ -250,6 +299,18 @@ pub async fn list_channel_sessions(
 }
 
 /// GET /channels/sessions/:id/messages — paginated messages for a channel conversation
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/channels/sessions/{id}/messages", tag = "Channels",
+    params(
+        ("id" = String, Path, description = "Session ID"),
+        ("limit" = Option<usize>, Query, description = "Page size"),
+        ("before" = Option<String>, Query, description = "Cursor for pagination")
+    ),
+    responses(
+        (status = 200, description = "Paginated messages"),
+        (status = 404, description = "Session not found")
+    )
+))]
 pub async fn list_channel_messages(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -266,6 +327,7 @@ pub async fn list_channel_messages(
 
 /// Incoming webhook message body.
 #[derive(Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct WebhookMessageRequest {
     pub content: String,
     pub sender: Option<String>,
@@ -274,6 +336,14 @@ pub struct WebhookMessageRequest {
 }
 
 /// POST /channels/:name/message -- webhook: inject message into router pipeline
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/channels/{name}/message", tag = "Channels",
+    params(("name" = String, Path, description = "Channel name")),
+    responses(
+        (status = 202, description = "Message accepted"),
+        (status = 404, description = "Channel not found")
+    )
+))]
 pub async fn webhook_message(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -306,6 +376,14 @@ pub async fn webhook_message(
 }
 
 /// GET /channels/:name/health -- health check
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/channels/{name}/health", tag = "Channels",
+    params(("name" = String, Path, description = "Channel name")),
+    responses(
+        (status = 200, description = "Channel health", body = ChannelHealthResponse),
+        (status = 404, description = "Channel not found")
+    )
+))]
 pub async fn health_check(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,

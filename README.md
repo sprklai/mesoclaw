@@ -49,7 +49,7 @@
 
 <!-- Row 4: Quality & i18n -->
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-962%20Rust%20%2B%2037%20JS-success?style=flat-square" alt="962 Rust + 37 TS Tests" />
+  <img src="https://img.shields.io/badge/tests-1000%20Rust%20%2B%2039%20JS-success?style=flat-square" alt="1000 Rust + 39 JS Tests" />
   <img src="https://img.shields.io/badge/i18n-EN-blue?style=flat-square" alt="English" />
 </p>
 
@@ -88,7 +88,7 @@
 | **Language** | Rust | TypeScript | Rust |
 | **Desktop GUI** | Tauri 2 + Svelte 5 | -- | -- |
 | **CLI** | clap | -- | -- |
-| **Headless Daemon** | axum (88 routes) | Node.js | 3.4MB daemon |
+| **Headless Daemon** | axum (90 routes) | Node.js | 3.4MB daemon |
 | **AI Providers** | 18 via rig-core | Multi-model | 22+ |
 | **Built-in Tools** | 15 | 100+ AgentSkills | Tool orchestration |
 | **Plugin System** | JSON-RPC (any language) | AgentSkills | Trait-based adapters |
@@ -101,7 +101,7 @@
 | **Binary Size** | <20MB (native w/ GUI) | Node.js runtime | 3.4MB |
 | **Privacy** | 100% local, zero telemetry | Local, model-agnostic | 100% local |
 | **License** | MIT | Open source | Open source |
-| **Tests** | 962 Rust + 37 TS | -- | -- |
+| **Tests** | 1000 Rust + 39 JS | -- | -- |
 
 ---
 
@@ -335,7 +335,7 @@ mesoclaw/
 │   ├── architecture.md     # Detailed architecture diagrams
 │   ├── phases.md           # Implementation phase details
 │   ├── processes.md        # Process flow diagrams
-│   ├── api-reference.md    # All 88 REST/WS routes
+│   ├── api-reference.md    # All 90 REST/WS routes
 │   ├── configuration.md    # All 60+ config fields
 │   ├── cli-reference.md    # CLI command reference
 │   ├── deployment.md       # Deployment guide
@@ -509,6 +509,7 @@ cargo build -p mesoclaw-daemon --features channels-telegram  # + Telegram (telox
 cargo build -p mesoclaw-daemon --features channels-slack     # + Slack
 cargo build -p mesoclaw-daemon --features channels-discord   # + Discord (serenity)
 cargo build -p mesoclaw-daemon --features scheduler     # + cron jobs
+cargo build -p mesoclaw-daemon --features api-docs      # + Scalar UI + OpenAPI spec at /api-docs
 cargo build -p mesoclaw-daemon --features web-dashboard # + embedded web UI
 cargo build -p mesoclaw-daemon --all-features           # Everything
 ```
@@ -594,7 +595,7 @@ mesoclaw plugin info <name>                  # Show plugin details
 
 Global options: `--host`, `--port`, `--token` (or `MESOCLAW_TOKEN` env var)
 
-## Gateway Routes (73 base + 15 feature-gated = 88 total)
+## Gateway Routes (73 base + 17 feature-gated = 90 total)
 
 | Group | Routes | Description |
 |-------|--------|-------------|
@@ -615,6 +616,7 @@ Global options: `--host`, `--port`, `--token` (or `MESOCLAW_TOKEN` env var)
 | Channels | `POST /channels/{name}/test` (always), `GET /channels`, `GET /channels/{name}/status`, `POST /channels/{name}/send`, `POST /channels/{name}/connect/disconnect`, `GET /channels/{name}/health`, `POST /channels/{name}/message`, `GET /channels/sessions`, `GET /channels/sessions/{id}/messages` (feature-gated) | Messaging channels |
 | Scheduler | `GET/POST /scheduler/jobs`, `PUT /scheduler/jobs/{id}/toggle`, `DELETE /scheduler/jobs/{id}`, `GET /scheduler/jobs/{id}/history`, `GET /scheduler/status` (feature-gated) | Cron job management |
 | WebSocket | `GET /ws/chat`, `GET /ws/notifications` | Streaming chat + notification push |
+| API Docs | `GET /api-docs`, `GET /api-docs/openapi.json` | Interactive Scalar UI + OpenAPI 3.1 spec (feature-gated: `api-docs`) |
 
 ---
 
@@ -623,7 +625,7 @@ Global options: `--host`, `--port`, `--token` (or `MESOCLAW_TOKEN` env var)
 Detailed documentation lives in the `docs/` directory:
 
 - [CLI Reference](docs/cli-reference.md) -- All commands, options, shell completions, recipes
-- [API Reference](docs/api-reference.md) -- All 88 REST/WS routes with request/response schemas
+- [API Reference](docs/api-reference.md) -- All 90 REST/WS routes with request/response schemas
 - [Configuration](docs/configuration.md) -- All 60+ config.toml fields with types and defaults
 - [Deployment Guide](docs/deployment.md) -- Native, Docker, systemd, Raspberry Pi, reverse proxy
 - [Development Guide](docs/development.md) -- Prerequisites, building, testing, how-to guides

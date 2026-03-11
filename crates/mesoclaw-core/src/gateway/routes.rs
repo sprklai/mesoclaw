@@ -219,6 +219,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // WebSocket
         .route("/ws/chat", get(handlers::ws::ws_chat))
         .route("/ws/notifications", get(handlers::ws::ws_notifications))
+        // API Documentation (feature-gated)
+        .merge(api_docs_routes())
         // Auth middleware
         .layer(middleware::from_fn_with_state(
             state.config.load().gateway_auth_token.clone(),
@@ -304,6 +306,18 @@ fn scheduler_routes() -> Router<Arc<AppState>> {
             )
     }
     #[cfg(not(feature = "scheduler"))]
+    {
+        Router::new()
+    }
+}
+
+/// Build API docs routes, conditionally compiled.
+fn api_docs_routes() -> Router<Arc<AppState>> {
+    #[cfg(feature = "api-docs")]
+    {
+        super::openapi::openapi_routes()
+    }
+    #[cfg(not(feature = "api-docs"))]
     {
         Router::new()
     }

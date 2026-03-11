@@ -11,6 +11,7 @@ use crate::gateway::state::AppState;
 use crate::memory::traits::MemoryCategory;
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct StoreMemoryRequest {
     pub key: String,
     pub content: String,
@@ -18,12 +19,14 @@ pub struct StoreMemoryRequest {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct UpdateMemoryRequest {
     pub content: String,
     pub category: Option<String>,
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema, utoipa::IntoParams))]
 pub struct RecallQuery {
     pub q: Option<String>,
     pub limit: Option<usize>,
@@ -38,6 +41,11 @@ fn parse_category(cat: Option<&str>) -> MemoryCategory {
 }
 
 /// POST /memory — store a new memory entry.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/memory", tag = "Memory",
+    request_body = StoreMemoryRequest,
+    responses((status = 201, description = "Memory stored"))
+))]
 pub async fn create_memory(
     State(state): State<Arc<AppState>>,
     Json(body): Json<StoreMemoryRequest>,
@@ -51,6 +59,11 @@ pub async fn create_memory(
 }
 
 /// GET /memory?q=search_term&limit=N — recall memories matching a query.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/memory", tag = "Memory",
+    params(RecallQuery),
+    responses((status = 200, description = "Matching memories", body = Vec<Object>))
+))]
 pub async fn recall_memories(
     State(state): State<Arc<AppState>>,
     Query(params): Query<RecallQuery>,
@@ -65,6 +78,14 @@ pub async fn recall_memories(
 }
 
 /// GET /memory/{key} — recall a specific memory by exact key.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/memory/{key}", tag = "Memory",
+    params(("key" = String, Path, description = "Memory key")),
+    responses(
+        (status = 200, description = "Memory entry", body = Object),
+        (status = 404, description = "Key not found", body = Object),
+    )
+))]
 pub async fn read_memory_by_key(
     State(state): State<Arc<AppState>>,
     Path(key): Path<String>,
@@ -78,6 +99,12 @@ pub async fn read_memory_by_key(
 }
 
 /// PUT /memory/{key} — update (upsert) a memory entry.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/memory/{key}", tag = "Memory",
+    params(("key" = String, Path, description = "Memory key")),
+    request_body = UpdateMemoryRequest,
+    responses((status = 200, description = "Memory updated"))
+))]
 pub async fn update_memory(
     State(state): State<Arc<AppState>>,
     Path(key): Path<String>,
@@ -89,6 +116,14 @@ pub async fn update_memory(
 }
 
 /// DELETE /memory/{key} — forget a memory entry.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/memory/{key}", tag = "Memory",
+    params(("key" = String, Path, description = "Memory key")),
+    responses(
+        (status = 204, description = "Memory deleted"),
+        (status = 404, description = "Key not found", body = Object),
+    )
+))]
 pub async fn delete_memory(
     State(state): State<Arc<AppState>>,
     Path(key): Path<String>,

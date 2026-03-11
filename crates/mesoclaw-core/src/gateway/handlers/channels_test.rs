@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::gateway::state::AppState;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ChannelTestResult {
     pub channel: String,
     pub healthy: bool,
@@ -18,6 +19,11 @@ pub struct ChannelTestResult {
 
 /// POST /channels/{name}/test -- test channel credentials by calling the provider API.
 /// Works without the channels feature being enabled.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/channels/{name}/test", tag = "Channels",
+    params(("name" = String, Path, description = "Channel name")),
+    responses((status = 200, description = "Channel test result", body = ChannelTestResult))
+))]
 pub async fn test_channel_credentials(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,

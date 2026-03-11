@@ -5,6 +5,7 @@ use crate::{MesoError, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct Session {
     pub id: String,
     pub title: String,
@@ -21,6 +22,7 @@ fn default_source() -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct SessionSummary {
     pub id: String,
     pub title: String,
@@ -34,6 +36,7 @@ pub struct SessionSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct Message {
     pub id: String,
     pub session_id: String,
@@ -43,6 +46,7 @@ pub struct Message {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ToolCallRecord {
     pub id: String,
     pub message_id: String,

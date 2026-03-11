@@ -210,8 +210,21 @@ impl ChannelRouter {
         let ctx_enabled = state
             .context_injection_enabled
             .load(std::sync::atomic::Ordering::Relaxed);
-        let context_engine =
-            ContextEngine::new(state.db.clone(), state.config.load_full(), ctx_enabled);
+        let self_evo = state
+            .self_evolution_enabled
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let mut context_engine =
+            ContextEngine::new(state.db.clone(), state.config.load_full(), ctx_enabled)
+                .with_skill_registry(state.skill_registry.clone())
+                .with_self_evolution(self_evo);
+        #[cfg(feature = "channels")]
+        {
+            context_engine = context_engine.with_channel_registry(state.channel_registry.clone());
+        }
+        #[cfg(feature = "scheduler")]
+        if let Some(ref sched) = state.scheduler {
+            context_engine = context_engine.with_scheduler(sched.clone());
+        }
         let (msg_count, last_at, summary) = state
             .session_manager
             .get_context_info(&session_id)
@@ -230,6 +243,7 @@ impl ChannelRouter {
                 "default",
                 Some(&session_id),
                 summary.as_deref(),
+                Some(&message.content),
             )
             .await
             .unwrap_or_default();

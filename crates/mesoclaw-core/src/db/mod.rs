@@ -273,6 +273,25 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    if version < 10 {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS agent_rules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                content TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT 'general',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                active INTEGER NOT NULL DEFAULT 1
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_agent_rules_category
+                ON agent_rules(category);
+            CREATE INDEX IF NOT EXISTS idx_agent_rules_active
+                ON agent_rules(active);
+
+            PRAGMA user_version = 10;",
+        )?;
+    }
+
     Ok(())
 }
 
@@ -322,7 +341,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 9);
+        assert_eq!(version, 10);
     }
 
     #[test]
@@ -506,7 +525,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 9);
+        assert_eq!(version, 10);
     }
 
     // IN.9 — Migration v9 adds channel_key column and unique index

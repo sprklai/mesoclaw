@@ -10,29 +10,37 @@ use crate::gateway::state::AppState;
 use crate::scheduler::traits::{JobExecution, ScheduledJob, Scheduler};
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct SchedulerStatusResponse {
     pub running: bool,
     pub job_count: usize,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct CreateJobRequest {
     #[serde(flatten)]
     pub job: ScheduledJob,
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct CreateJobResponse {
     pub id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ToggleResponse {
     pub id: String,
     pub enabled: bool,
 }
 
 /// GET /scheduler/jobs
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/scheduler/jobs", tag = "Scheduler",
+    responses((status = 200, description = "List of scheduled jobs", body = Vec<ScheduledJob>))
+))]
 pub async fn list_jobs(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<ScheduledJob>>, MesoError> {
@@ -45,6 +53,14 @@ pub async fn list_jobs(
 }
 
 /// POST /scheduler/jobs
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/scheduler/jobs", tag = "Scheduler",
+    request_body = CreateJobRequest,
+    responses(
+        (status = 201, description = "Job created", body = CreateJobResponse),
+        (status = 400, description = "Invalid job definition")
+    )
+))]
 pub async fn create_job(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateJobRequest>,
@@ -58,6 +74,11 @@ pub async fn create_job(
 }
 
 /// PUT /scheduler/jobs/:id/toggle
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/scheduler/jobs/{id}/toggle", tag = "Scheduler",
+    params(("id" = String, Path, description = "Job ID")),
+    responses((status = 200, description = "Job toggled", body = ToggleResponse))
+))]
 pub async fn toggle_job(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -71,6 +92,11 @@ pub async fn toggle_job(
 }
 
 /// DELETE /scheduler/jobs/:id
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/scheduler/jobs/{id}", tag = "Scheduler",
+    params(("id" = String, Path, description = "Job ID")),
+    responses((status = 204, description = "Job deleted"))
+))]
 pub async fn delete_job(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -84,6 +110,11 @@ pub async fn delete_job(
 }
 
 /// GET /scheduler/jobs/:id/history
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/scheduler/jobs/{id}/history", tag = "Scheduler",
+    params(("id" = String, Path, description = "Job ID")),
+    responses((status = 200, description = "Job execution history", body = Vec<JobExecution>))
+))]
 pub async fn job_history(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -97,6 +128,10 @@ pub async fn job_history(
 }
 
 /// GET /scheduler/status
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/scheduler/status", tag = "Scheduler",
+    responses((status = 200, description = "Scheduler running status", body = SchedulerStatusResponse))
+))]
 pub async fn scheduler_status(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<SchedulerStatusResponse>, MesoError> {

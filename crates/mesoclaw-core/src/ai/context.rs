@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
@@ -19,6 +20,75 @@ use crate::memory::traits::Memory;
 use crate::skills::SkillRegistry;
 use crate::tools::ToolRegistry;
 use crate::user::UserLearner;
+
+#[cfg(feature = "channels")]
+use crate::channels::registry::ChannelRegistry;
+#[cfg(feature = "scheduler")]
+use crate::scheduler::TokioScheduler;
+
+// ============================================================================
+// Context Domain Detection (Step 1)
+// ============================================================================
+
+/// Context domains that can be detected from user messages.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ContextDomain {
+    Channels,
+    Scheduler,
+    Skills,
+    Tools,
+}
+
+/// Detect which context domains are relevant to the user's message.
+/// Lightweight keyword matching — no LLM call.
+pub fn detect_relevant_domains(user_message: &str) -> HashSet<ContextDomain> {
+    let msg = user_message.to_lowercase();
+    let mut domains = HashSet::new();
+
+    // Channel-related
+    let channel_patterns = [
+        "telegram", "slack", "discord", "channel", "send me", "notify",
+        "message me", "dm ", "chat_id", "contact",
+    ];
+    if channel_patterns.iter().any(|p| msg.contains(p)) {
+        domains.insert(ContextDomain::Channels);
+    }
+
+    // Scheduler-related
+    let sched_patterns = [
+        "schedule", "remind", "cron", "timer", "alarm", "recurring",
+        "every day", "every hour", "at ", "job",
+    ];
+    if sched_patterns.iter().any(|p| msg.contains(p)) {
+        domains.insert(ContextDomain::Scheduler);
+    }
+
+    // Skills-related
+    let skill_patterns = ["skill", "template", "prompt", "persona"];
+    if skill_patterns.iter().any(|p| msg.contains(p)) {
+        domains.insert(ContextDomain::Skills);
+    }
+
+    domains
+}
+
+/// Map detected context domains to agent rule categories.
+fn domains_to_rule_categories(domains: &HashSet<ContextDomain>) -> Vec<String> {
+    let mut cats = vec!["general".to_string()]; // always include general
+    for d in domains {
+        match d {
+            ContextDomain::Channels => cats.push("channel".to_string()),
+            ContextDomain::Scheduler => cats.push("scheduling".to_string()),
+            ContextDomain::Skills | ContextDomain::Tools => cats.push("tool_usage".to_string()),
+        }
+    }
+    cats.dedup();
+    cats
+}
+
+// ============================================================================
+// Boot Context
+// ============================================================================
 
 /// Boot-time system context, computed once on startup.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,12 +212,28 @@ pub struct ContextSummary {
     pub model_id: String,
 }
 
+/// A known contact discovered from the sessions table.
+struct ChannelContact {
+    recipient_id: String,
+    label: String,
+}
+
 /// Manages context injection for the AI agent.
 pub struct ContextEngine {
     db: DbPool,
     config: std::sync::Arc<AppConfig>,
     /// Runtime-mutable enabled flag (from AppState AtomicBool).
     enabled: bool,
+    /// Channel registry for building state index and expanded context.
+    #[cfg(feature = "channels")]
+    channel_registry: Option<Arc<ChannelRegistry>>,
+    /// Scheduler for building state index and expanded context.
+    #[cfg(feature = "scheduler")]
+    scheduler: Option<Arc<TokioScheduler>>,
+    /// Skill registry for expanded skills context.
+    skill_registry: Option<Arc<SkillRegistry>>,
+    /// Whether self-evolution (agent learned rules) is enabled.
+    self_evolution_enabled: bool,
 }
 
 impl ContextEngine {
@@ -156,7 +242,39 @@ impl ContextEngine {
             db,
             config,
             enabled,
+            #[cfg(feature = "channels")]
+            channel_registry: None,
+            #[cfg(feature = "scheduler")]
+            scheduler: None,
+            skill_registry: None,
+            self_evolution_enabled: false,
         }
+    }
+
+    /// Set the channel registry for state context building.
+    #[cfg(feature = "channels")]
+    pub fn with_channel_registry(mut self, registry: Arc<ChannelRegistry>) -> Self {
+        self.channel_registry = Some(registry);
+        self
+    }
+
+    /// Set the scheduler for state context building.
+    #[cfg(feature = "scheduler")]
+    pub fn with_scheduler(mut self, scheduler: Arc<TokioScheduler>) -> Self {
+        self.scheduler = Some(scheduler);
+        self
+    }
+
+    /// Set the skill registry for expanded skills context.
+    pub fn with_skill_registry(mut self, registry: Arc<SkillRegistry>) -> Self {
+        self.skill_registry = Some(registry);
+        self
+    }
+
+    /// Set whether self-evolution (agent learned rules) is enabled.
+    pub fn with_self_evolution(mut self, enabled: bool) -> Self {
+        self.self_evolution_enabled = enabled;
+        self
     }
 
     /// Determine the appropriate context level based on session state.
@@ -206,6 +324,9 @@ impl ContextEngine {
     }
 
     /// Compose the full context preamble based on context level.
+    ///
+    /// `user_message`: the current user prompt, used for context-domain detection
+    /// to inject relevant system state and agent rules.
     pub async fn compose(
         &self,
         level: &ContextLevel,
@@ -213,6 +334,7 @@ impl ContextEngine {
         model_display: &str,
         session_id: Option<&str>,
         conversation_summary: Option<&str>,
+        user_message: Option<&str>,
     ) -> Result<String> {
         if !self.enabled {
             debug!("Context injection disabled, using fallback preamble");
@@ -229,7 +351,7 @@ impl ContextEngine {
         );
         match level {
             ContextLevel::Full => {
-                self.compose_full(boot_context, model_display, session_id)
+                self.compose_full(boot_context, model_display, session_id, user_message)
                     .await
             }
             ContextLevel::Minimal => Ok(self.compose_minimal(boot_context, model_display)),
@@ -239,6 +361,7 @@ impl ContextEngine {
                     model_display,
                     session_id,
                     conversation_summary,
+                    user_message,
                 )
                 .await
             }
@@ -251,6 +374,7 @@ impl ContextEngine {
         boot_context: &BootContext,
         model_display: &str,
         session_id: Option<&str>,
+        user_message: Option<&str>,
     ) -> Result<String> {
         let mut parts = Vec::new();
 
@@ -367,6 +491,36 @@ impl ContextEngine {
             parts.push(caps.summary);
         }
 
+        // --- Tier 1: System state index (always) ---
+        let state_index = self.build_state_index().await;
+        if !state_index.is_empty() {
+            parts.push(state_index);
+        }
+
+        // --- Tier 2: Expanded context (on-demand, based on user message) ---
+        let domains = if let Some(msg) = user_message {
+            detect_relevant_domains(msg)
+        } else {
+            HashSet::new()
+        };
+
+        if !domains.is_empty() {
+            let expanded = self.build_expanded_context(&domains).await?;
+            if !expanded.is_empty() {
+                parts.push(expanded);
+            }
+        }
+
+        // --- Layer 3: Agent learned rules (category-filtered) ---
+        if self.self_evolution_enabled {
+            let relevant_categories = domains_to_rule_categories(&domains);
+            let rules = self.load_agent_rules(&relevant_categories).await?;
+            if !rules.is_empty() {
+                let rules_str = rules.iter().map(|r| format!("- {r}")).collect::<Vec<_>>().join("\n");
+                parts.push(format!("## Your Learned Rules\n{rules_str}"));
+            }
+        }
+
         // Config override
         if let Some(ref override_prompt) = self.config.agent_system_prompt {
             parts.push(override_prompt.clone());
@@ -374,6 +528,220 @@ impl ContextEngine {
 
         Ok(parts.join("\n\n"))
     }
+
+    // ========================================================================
+    // Tiered System State (Layer 2)
+    // ========================================================================
+
+    /// Build compact one-line system state index (~50-100 tokens).
+    /// This is Tier 1: always injected when enabled.
+    async fn build_state_index(&self) -> String {
+        let mut parts: Vec<String> = Vec::new();
+
+        #[cfg(feature = "channels")]
+        if let Some(ref registry) = self.channel_registry {
+            use crate::channels::traits::ChannelStatus;
+            let channels = registry.list();
+            let connected: Vec<_> = channels
+                .iter()
+                .filter(|c| matches!(registry.status(c), Some(ChannelStatus::Connected)))
+                .collect();
+            if !connected.is_empty() {
+                let contact_count = self.count_channel_contacts().await.unwrap_or(0);
+                parts.push(format!(
+                    "Channels: {} connected ({} known contacts)",
+                    connected
+                        .iter()
+                        .map(|c| c.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    contact_count
+                ));
+            }
+        }
+
+        #[cfg(feature = "scheduler")]
+        if let Some(ref scheduler) = self.scheduler {
+            use crate::scheduler::traits::Scheduler;
+            let jobs = scheduler.list_jobs().await;
+            let active = jobs.iter().filter(|j| j.enabled).count();
+            if active > 0 {
+                parts.push(format!("Scheduled jobs: {active} active"));
+            }
+        }
+
+        if parts.is_empty() {
+            return String::new();
+        }
+        format!("## System State\n{}", parts.join(" | "))
+    }
+
+    /// Build expanded context for relevant domains.
+    /// This is Tier 2: only injected when the user message triggers specific domains.
+    async fn build_expanded_context(
+        &self,
+        domains: &HashSet<ContextDomain>,
+    ) -> Result<String> {
+        let mut sections = Vec::new();
+
+        if domains.contains(&ContextDomain::Channels) {
+            #[cfg(feature = "channels")]
+            if let Some(ref registry) = self.channel_registry {
+                let channels = registry.list();
+                let mut lines = Vec::new();
+                for name in &channels {
+                    let status = registry
+                        .status(name)
+                        .map(|s| format!("{s}"))
+                        .unwrap_or_else(|| "unknown".into());
+                    let contacts = self.query_channel_contacts(name).await?;
+                    let contact_str = if contacts.is_empty() {
+                        "no known contacts".into()
+                    } else {
+                        contacts
+                            .iter()
+                            .map(|c| format!("{} (id:{})", c.label, c.recipient_id))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    };
+                    lines.push(format!("- {name}: {status} | contacts: {contact_str}"));
+                }
+                if !lines.is_empty() {
+                    sections.push(format!("### Channels\n{}", lines.join("\n")));
+                }
+            }
+        }
+
+        if domains.contains(&ContextDomain::Scheduler) {
+            #[cfg(feature = "scheduler")]
+            if let Some(ref scheduler) = self.scheduler {
+                use crate::scheduler::traits::Scheduler;
+                let jobs = scheduler.list_jobs().await;
+                let active: Vec<_> = jobs.iter().filter(|j| j.enabled).collect();
+                if !active.is_empty() {
+                    let lines: Vec<String> = active
+                        .iter()
+                        .map(|j| {
+                            let sched = match &j.schedule {
+                                crate::scheduler::traits::Schedule::Cron { expr } => {
+                                    format!("cron: {expr}")
+                                }
+                                crate::scheduler::traits::Schedule::Interval { secs } => {
+                                    format!("every {secs}s")
+                                }
+                            };
+                            let next = j
+                                .next_run
+                                .map(|t| t.format("%H:%M UTC").to_string())
+                                .unwrap_or_else(|| "—".into());
+                            format!("- {} ({}) next: {}", j.name, sched, next)
+                        })
+                        .collect();
+                    sections.push(format!("### Scheduled Jobs\n{}", lines.join("\n")));
+                }
+            }
+        }
+
+        if domains.contains(&ContextDomain::Skills)
+            && let Some(ref skill_registry) = self.skill_registry
+        {
+            let skills = skill_registry.list().await;
+            let active: Vec<_> = skills.iter().filter(|s| s.enabled).collect();
+            if !active.is_empty() {
+                let lines: Vec<String> = active
+                    .iter()
+                    .map(|s| format!("- {}: {}", s.name, s.description))
+                    .collect();
+                sections.push(format!("### Available Skills\n{}", lines.join("\n")));
+            }
+        }
+
+        Ok(sections.join("\n\n"))
+    }
+
+    /// Query known contacts for a channel from the sessions table.
+    /// Uses channel_key column (format: "channel_name:recipient_id").
+    async fn query_channel_contacts(
+        &self,
+        channel_name: &str,
+    ) -> Result<Vec<ChannelContact>> {
+        let prefix = format!("{}:", channel_name);
+        let channel_name_owned = channel_name.to_string();
+        let pool = self.db.clone();
+        db::with_db(&pool, move |conn| {
+            let mut stmt = conn.prepare(
+                "SELECT DISTINCT channel_key, title FROM sessions \
+                 WHERE channel_key LIKE ?1 AND channel_key IS NOT NULL \
+                 ORDER BY updated_at DESC LIMIT 20",
+            )?;
+            let rows = stmt.query_map([format!("{prefix}%")], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                ))
+            })?;
+            let mut result = Vec::new();
+            for row in rows {
+                let (key, title) = row.map_err(crate::MesoError::from)?;
+                let recipient_id =
+                    key.strip_prefix(&prefix).unwrap_or(&key).to_string();
+                let label = title
+                    .unwrap_or_else(|| format!("{}:{}", channel_name_owned, recipient_id));
+                result.push(ChannelContact {
+                    recipient_id,
+                    label,
+                });
+            }
+            Ok(result)
+        })
+        .await
+    }
+
+    /// Count total known contacts across all channels.
+    async fn count_channel_contacts(&self) -> Result<usize> {
+        let pool = self.db.clone();
+        db::with_db(&pool, move |conn| {
+            let count: i64 = conn.query_row(
+                "SELECT COUNT(DISTINCT channel_key) FROM sessions WHERE channel_key IS NOT NULL",
+                [],
+                |row| row.get(0),
+            )?;
+            Ok(count as usize)
+        })
+        .await
+    }
+
+    // ========================================================================
+    // Agent Learned Rules (Layer 3)
+    // ========================================================================
+
+    /// Load active agent rules matching given categories.
+    async fn load_agent_rules(&self, categories: &[String]) -> Result<Vec<String>> {
+        if categories.is_empty() {
+            return Ok(Vec::new());
+        }
+        let pool = self.db.clone();
+        let cats = categories.to_vec();
+        db::with_db(&pool, move |conn| {
+            let placeholders: String =
+                cats.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            let sql = format!(
+                "SELECT content FROM agent_rules WHERE active = 1 AND category IN ({}) \
+                 ORDER BY created_at",
+                placeholders
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let params: Vec<&dyn rusqlite::types::ToSql> =
+                cats.iter().map(|c| c as &dyn rusqlite::types::ToSql).collect();
+            let rows = stmt.query_map(params.as_slice(), |row| row.get::<_, String>(0))?;
+            Ok(rows.filter_map(|r| r.ok()).collect())
+        })
+        .await
+    }
+
+    // ========================================================================
+    // Minimal / Summary Compose
+    // ========================================================================
 
     /// Compose minimal one-liner context.
     pub fn compose_minimal(&self, boot_context: &BootContext, model_display: &str) -> String {
@@ -394,9 +762,10 @@ impl ContextEngine {
         model_display: &str,
         session_id: Option<&str>,
         conversation_summary: Option<&str>,
+        user_message: Option<&str>,
     ) -> Result<String> {
         let mut full = self
-            .compose_full(boot_context, model_display, session_id)
+            .compose_full(boot_context, model_display, session_id, user_message)
             .await?;
 
         if let Some(summary) = conversation_summary {
@@ -1060,7 +1429,7 @@ mod tests {
         let boot = BootContext::from_system();
 
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert_eq!(result, "You are MesoClaw, a helpful AI assistant.");
@@ -1073,7 +1442,7 @@ mod tests {
         let boot = BootContext::from_system();
 
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", Some("sess-1"), None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", Some("sess-1"), None, None)
             .await
             .unwrap();
         assert!(result.contains("Date:"));
@@ -1092,7 +1461,7 @@ mod tests {
         let boot = BootContext::from_system();
 
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("Your Identity"));
@@ -1110,7 +1479,7 @@ mod tests {
         let boot = BootContext::from_system();
 
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("User Context"));
@@ -1124,7 +1493,7 @@ mod tests {
         let boot = BootContext::from_system();
 
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(!result.contains("User Context"));
@@ -1146,7 +1515,7 @@ mod tests {
         let boot = BootContext::from_system();
 
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("Your Capabilities"));
@@ -1169,7 +1538,7 @@ mod tests {
         let boot = BootContext::from_system();
 
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("MesoClaw AI assistant for developers"));
@@ -1191,7 +1560,7 @@ mod tests {
         let boot = BootContext::from_system();
 
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("Always be concise."));
@@ -1379,6 +1748,7 @@ mod tests {
                 "gpt-4o",
                 Some("sess-1"),
                 Some("User asked about Rust async patterns."),
+                None,
             )
             .await
             .unwrap();
@@ -2155,7 +2525,7 @@ mod tests {
         let engine = ContextEngine::new(pool, config, false);
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "model", None, None)
+            .compose(&ContextLevel::Full, &boot, "model", None, None, None)
             .await
             .unwrap();
         assert_eq!(result, "Custom fallback.");
@@ -2167,7 +2537,7 @@ mod tests {
         let (_dir, engine) = setup().await;
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("## Environment"));
@@ -2200,6 +2570,7 @@ mod tests {
                 "gpt-4o",
                 None,
                 Some("We discussed Rust error handling."),
+                None,
             )
             .await
             .unwrap();
@@ -2219,14 +2590,14 @@ mod tests {
 
         let enabled = ContextEngine::new(pool.clone(), config.clone(), true);
         let enabled_result = enabled
-            .compose(&ContextLevel::Full, &boot, "model", None, None)
+            .compose(&ContextLevel::Full, &boot, "model", None, None, None)
             .await
             .unwrap();
         assert!(enabled_result.contains("## Environment"));
 
         let disabled = ContextEngine::new(pool, config, false);
         let disabled_result = disabled
-            .compose(&ContextLevel::Full, &boot, "model", None, None)
+            .compose(&ContextLevel::Full, &boot, "model", None, None, None)
             .await
             .unwrap();
         assert!(!disabled_result.contains("## Environment"));
@@ -2245,7 +2616,7 @@ mod tests {
         let engine = ContextEngine::new(pool, config, true);
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("Be very terse."));
@@ -2518,7 +2889,7 @@ mod tests {
         let (_dir, engine) = setup().await;
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains(&boot.os));
@@ -2531,7 +2902,7 @@ mod tests {
         let (_dir, engine) = setup().await;
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", Some("s1"), None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", Some("s1"), None, None)
             .await
             .unwrap();
         assert!(result.contains("Date:"));
@@ -2548,7 +2919,7 @@ mod tests {
             .unwrap();
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("## Your Identity"));
@@ -2565,7 +2936,7 @@ mod tests {
             .unwrap();
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("## User Context"));
@@ -2581,7 +2952,7 @@ mod tests {
             .unwrap();
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("## Your Capabilities"));
@@ -2613,6 +2984,7 @@ mod tests {
                 "gpt-4o",
                 None,
                 Some("We discussed Tauri plugins."),
+                None,
             )
             .await
             .unwrap();
@@ -2631,7 +3003,7 @@ mod tests {
         let engine = ContextEngine::new(pool, config, false);
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Minimal, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Minimal, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert_eq!(result, "You are MesoClaw, a helpful AI assistant.");
@@ -2643,7 +3015,7 @@ mod tests {
         let (_dir, engine) = setup().await;
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("Reasoning Protocol"));
@@ -2671,7 +3043,7 @@ mod tests {
             .unwrap();
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("Overall summary"));
@@ -2699,7 +3071,7 @@ mod tests {
         let (_dir, engine) = setup().await;
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Summary, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Summary, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(!result.contains("## Prior Conversation"));
@@ -2985,7 +3357,7 @@ mod tests {
         // Enabled: should contain environment section
         let enabled = ContextEngine::new(pool.clone(), config.clone(), true);
         let result_on = enabled
-            .compose(&ContextLevel::Full, &boot, "model", None, None)
+            .compose(&ContextLevel::Full, &boot, "model", None, None, None)
             .await
             .unwrap();
         assert!(result_on.contains("## Environment"));
@@ -2993,7 +3365,7 @@ mod tests {
         // Disabled: should return fallback
         let disabled = ContextEngine::new(pool, config, false);
         let result_off = disabled
-            .compose(&ContextLevel::Full, &boot, "model", None, None)
+            .compose(&ContextLevel::Full, &boot, "model", None, None, None)
             .await
             .unwrap();
         assert_eq!(result_off, "You are MesoClaw, a helpful AI assistant.");
@@ -3178,7 +3550,7 @@ mod tests {
         let (_dir, engine) = setup().await;
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains(&boot.hostname) || result.contains(&boot.os));
@@ -3190,7 +3562,7 @@ mod tests {
         let (_dir, engine) = setup().await;
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", Some("s1"), None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", Some("s1"), None, None)
             .await
             .unwrap();
         assert!(result.contains("Date:"));
@@ -3206,7 +3578,7 @@ mod tests {
             .unwrap();
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("## Your Identity"));
@@ -3223,7 +3595,7 @@ mod tests {
             .unwrap();
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("## User Context"));
@@ -3240,7 +3612,7 @@ mod tests {
             .unwrap();
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert!(result.contains("## Your Capabilities"));
@@ -3317,6 +3689,7 @@ mod tests {
                 "gpt-4o",
                 None,
                 Some("User discussed async patterns in Rust."),
+                None,
             )
             .await
             .unwrap();
@@ -3337,7 +3710,7 @@ mod tests {
         let (_dir, engine) = setup().await;
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Summary, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Summary, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         // Should succeed without conversation summary and not include that section
@@ -3355,7 +3728,7 @@ mod tests {
         let engine = ContextEngine::new(pool, config, false);
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
+            .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None, None)
             .await
             .unwrap();
         assert_eq!(result, "You are MesoClaw, a helpful AI assistant.");
@@ -3639,7 +4012,7 @@ mod tests {
         let (_dir, engine) = setup().await;
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "test-model", None, None)
+            .compose(&ContextLevel::Full, &boot, "test-model", None, None, None)
             .await
             .unwrap();
         assert!(
@@ -3654,7 +4027,7 @@ mod tests {
         let (_dir, engine) = setup().await;
         let boot = BootContext::from_system();
         let result = engine
-            .compose(&ContextLevel::Full, &boot, "test-model", None, None)
+            .compose(&ContextLevel::Full, &boot, "test-model", None, None, None)
             .await
             .unwrap();
         assert!(

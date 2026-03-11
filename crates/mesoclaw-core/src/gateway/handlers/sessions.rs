@@ -12,15 +12,25 @@ use crate::ai::resolve_agent;
 use crate::gateway::state::AppState;
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct CreateSessionRequest {
     pub title: String,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct UpdateSessionRequest {
     pub title: String,
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/sessions", tag = "Sessions",
+    request_body = CreateSessionRequest,
+    responses(
+        (status = 201, description = "Session created", body = Object),
+        (status = 401, description = "Unauthorized", body = Object),
+    )
+))]
 pub async fn create_session(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateSessionRequest>,
@@ -29,11 +39,23 @@ pub async fn create_session(
     Ok((StatusCode::CREATED, Json(session)))
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/sessions", tag = "Sessions",
+    responses((status = 200, description = "List of sessions", body = Vec<Object>))
+))]
 pub async fn list_sessions(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse> {
     let sessions = state.session_manager.list_sessions().await?;
     Ok(Json(sessions))
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/sessions/{id}", tag = "Sessions",
+    params(("id" = String, Path, description = "Session ID")),
+    responses(
+        (status = 200, description = "Session details", body = Object),
+        (status = 404, description = "Session not found", body = Object),
+    )
+))]
 pub async fn get_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -42,6 +64,15 @@ pub async fn get_session(
     Ok(Json(session))
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/sessions/{id}", tag = "Sessions",
+    params(("id" = String, Path, description = "Session ID")),
+    request_body = UpdateSessionRequest,
+    responses(
+        (status = 200, description = "Session updated", body = Object),
+        (status = 404, description = "Session not found", body = Object),
+    )
+))]
 pub async fn update_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -54,6 +85,14 @@ pub async fn update_session(
     Ok(Json(session))
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/sessions/{id}", tag = "Sessions",
+    params(("id" = String, Path, description = "Session ID")),
+    responses(
+        (status = 204, description = "Session deleted"),
+        (status = 404, description = "Session not found", body = Object),
+    )
+))]
 pub async fn delete_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -63,10 +102,17 @@ pub async fn delete_session(
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct GenerateTitleRequest {
     pub model: Option<String>,
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/sessions/{id}/generate-title", tag = "Sessions",
+    params(("id" = String, Path, description = "Session ID")),
+    request_body = GenerateTitleRequest,
+    responses((status = 200, description = "Title generated", body = Object))
+))]
 pub async fn generate_title(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,

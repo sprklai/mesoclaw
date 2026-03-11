@@ -14,11 +14,13 @@ pub struct ObservationsQuery {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ObservationsListResponse {
     pub observations: Vec<UserObservation>,
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct AddObservationRequest {
     pub category: String,
     pub key: String,
@@ -32,11 +34,17 @@ fn default_confidence() -> f32 {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct UserProfileResponse {
     pub context: String,
 }
 
 /// GET /user/observations — list (optional ?category= filter)
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/user/observations", tag = "User",
+    params(("category" = Option<String>, Query, description = "Filter by category")),
+    responses((status = 200, description = "List of user observations", body = ObservationsListResponse))
+))]
 pub async fn list_observations(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ObservationsQuery>,
@@ -49,6 +57,11 @@ pub async fn list_observations(
 }
 
 /// POST /user/observations — add observation
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/user/observations", tag = "User",
+    request_body = AddObservationRequest,
+    responses((status = 200, description = "Observation recorded"))
+))]
 pub async fn add_observation(
     State(state): State<Arc<AppState>>,
     Json(body): Json<AddObservationRequest>,
@@ -61,6 +74,14 @@ pub async fn add_observation(
 }
 
 /// GET /user/observations/{key} — get by key
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/user/observations/{key}", tag = "User",
+    params(("key" = String, Path, description = "Observation key")),
+    responses(
+        (status = 200, description = "User observation"),
+        (status = 404, description = "Observation not found")
+    )
+))]
 pub async fn get_observation_by_key(
     State(state): State<Arc<AppState>>,
     Path(key): Path<String>,
@@ -75,6 +96,11 @@ pub async fn get_observation_by_key(
 }
 
 /// DELETE /user/observations/{key} — delete by key
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/user/observations/{key}", tag = "User",
+    params(("key" = String, Path, description = "Observation key")),
+    responses((status = 200, description = "Observation deleted"))
+))]
 pub async fn delete_observation(
     State(state): State<Arc<AppState>>,
     Path(key): Path<String>,
@@ -84,6 +110,11 @@ pub async fn delete_observation(
 }
 
 /// DELETE /user/observations — clear all or by category
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/user/observations", tag = "User",
+    params(("category" = Option<String>, Query, description = "Clear only this category")),
+    responses((status = 200, description = "Observations cleared"))
+))]
 pub async fn clear_observations(
     State(state): State<Arc<AppState>>,
     Query(query): Query<ObservationsQuery>,
@@ -104,6 +135,10 @@ pub async fn clear_observations(
 }
 
 /// GET /user/profile — get computed user context string
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/user/profile", tag = "User",
+    responses((status = 200, description = "Computed user profile context", body = UserProfileResponse))
+))]
 pub async fn get_user_profile(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<UserProfileResponse>, MesoError> {

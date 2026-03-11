@@ -83,6 +83,10 @@ serde_yaml = "0.9"
 # Phase 8.11: Local Embeddings (optional)
 fastembed = "4"
 
+# API Documentation (optional)
+utoipa = { version = "5", features = ["axum_extras", "chrono"] }
+utoipa-scalar = { version = "0.3", features = ["axum"] }
+
 # Phase 8: Channels (optional)
 teloxide = { version = "0.17.0", features = ["macros"] }
 serenity = { version = "0.12.5", default-features = false, features = ["client", "gateway", "model", "rustls_backend"] }

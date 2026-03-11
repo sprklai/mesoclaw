@@ -61,6 +61,10 @@ fastembed = { workspace = true, optional = true }
 # Phase 8: Scheduler (optional)
 cron = { version = "0.15", optional = true }
 
+# API Documentation (optional)
+utoipa = { workspace = true, optional = true }
+utoipa-scalar = { workspace = true, optional = true }
+
 # Vendored OpenSSL for musl/cross-compilation
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 
@@ -76,6 +80,7 @@ channels-discord = ["channels", "dep:serenity"]
 local-embeddings = ["dep:fastembed"]
 scheduler = ["dep:cron"]
 keyring = ["dep:keyring"]
+api-docs = ["gateway", "dep:utoipa", "dep:utoipa-scalar"]
 vendored-openssl = ["dep:openssl"]
 
 [lints]

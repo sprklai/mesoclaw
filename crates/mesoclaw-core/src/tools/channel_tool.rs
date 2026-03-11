@@ -9,6 +9,15 @@ use crate::{MesoError, Result};
 
 use super::traits::{Tool, ToolResult};
 
+/// Map channel name to the appropriate metadata key for recipient targeting.
+fn recipient_metadata_key(channel: &str) -> &'static str {
+    match channel {
+        "telegram" => "chat_id",
+        "slack" | "discord" => "channel_id",
+        _ => "recipient_id",
+    }
+}
+
 /// Agent tool for sending messages to channels and querying channel status.
 pub struct ChannelSendTool {
     registry: Arc<ChannelRegistry>,
@@ -27,7 +36,7 @@ impl Tool for ChannelSendTool {
     }
 
     fn description(&self) -> &str {
-        "Send messages to connected channels, list available channels, or check channel status. IMPORTANT: When asked to send a message to a channel, ALWAYS call with action='list' first to discover available channels and their status, then use the discovered channel name to send. Never ask the user for the channel name — discover it yourself. Use 'send' to dispatch a message, 'list' to see all channels, 'status' to check a specific channel."
+        "Send messages to connected channels, list available channels, or check channel status. Your context includes available channels and known contacts. When sending, provide the recipient ID from your context. Actions: send, list, status."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
@@ -46,6 +55,10 @@ impl Tool for ChannelSendTool {
                 "message": {
                     "type": "string",
                     "description": "Message content to send (required for send)"
+                },
+                "recipient": {
+                    "type": "string",
+                    "description": "Recipient ID (e.g. chat_id for telegram, channel_id for slack/discord)"
                 }
             },
             "required": ["action"]
@@ -66,7 +79,15 @@ impl Tool for ChannelSendTool {
                     .as_str()
                     .ok_or_else(|| MesoError::Validation("missing 'message' for send".into()))?;
 
-                let msg = ChannelMessage::new(channel, message).with_sender("agent");
+                let mut msg = ChannelMessage::new(channel, message).with_sender("agent");
+
+                // If recipient provided, inject into metadata with channel-specific key
+                if let Some(recipient) = args["recipient"].as_str() {
+                    let meta_key = recipient_metadata_key(channel);
+                    let mut metadata = std::collections::HashMap::new();
+                    metadata.insert(meta_key.to_string(), recipient.to_string());
+                    msg = msg.with_metadata(metadata);
+                }
 
                 match self.registry.send(channel, msg).await {
                     Ok(()) => Ok(ToolResult::ok(format!("Message sent to '{channel}'"))),

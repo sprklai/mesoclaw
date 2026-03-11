@@ -14,22 +14,30 @@ pub struct SkillsQuery {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct SkillsListResponse {
     pub skills: Vec<SkillInfo>,
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct CreateSkillRequest {
     pub id: String,
     pub content: String,
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct UpdateSkillRequest {
     pub content: String,
 }
 
 /// GET /skills — list skills (optional ?category= filter)
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/skills", tag = "Skills",
+    params(("category" = Option<String>, Query, description = "Filter by category")),
+    responses((status = 200, description = "List of skills", body = SkillsListResponse))
+))]
 pub async fn list_skills(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SkillsQuery>,
@@ -43,6 +51,14 @@ pub async fn list_skills(
 }
 
 /// GET /skills/{id} — get full skill definition
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/skills/{id}", tag = "Skills",
+    params(("id" = String, Path, description = "Skill ID")),
+    responses(
+        (status = 200, description = "Skill definition"),
+        (status = 404, description = "Skill not found")
+    )
+))]
 pub async fn get_skill(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -52,6 +68,11 @@ pub async fn get_skill(
 }
 
 /// POST /skills — create user skill
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/skills", tag = "Skills",
+    request_body = CreateSkillRequest,
+    responses((status = 200, description = "Skill created"))
+))]
 pub async fn create_skill(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateSkillRequest>,
@@ -61,6 +82,14 @@ pub async fn create_skill(
 }
 
 /// PUT /skills/{id} — update skill content
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/skills/{id}", tag = "Skills",
+    params(("id" = String, Path, description = "Skill ID")),
+    responses(
+        (status = 200, description = "Skill updated"),
+        (status = 404, description = "Skill not found")
+    )
+))]
 pub async fn update_skill(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -71,6 +100,14 @@ pub async fn update_skill(
 }
 
 /// DELETE /skills/{id} — delete user skill
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/skills/{id}", tag = "Skills",
+    params(("id" = String, Path, description = "Skill ID")),
+    responses(
+        (status = 200, description = "Skill deleted"),
+        (status = 404, description = "Skill not found")
+    )
+))]
 pub async fn delete_skill(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -80,6 +117,10 @@ pub async fn delete_skill(
 }
 
 /// POST /skills/reload — force reload
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/skills/reload", tag = "Skills",
+    responses((status = 200, description = "Skills reloaded"))
+))]
 pub async fn reload_skills(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, MesoError> {

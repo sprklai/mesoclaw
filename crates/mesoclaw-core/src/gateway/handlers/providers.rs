@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::gateway::state::AppState;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct CreateProviderRequest {
     pub id: String,
     pub name: String,
@@ -22,6 +23,7 @@ fn default_true() -> bool {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct CreateModelEntry {
     pub model_id: String,
     pub display_name: String,
@@ -30,11 +32,13 @@ pub struct CreateModelEntry {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct UpdateProviderRequest {
     pub base_url: String,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct AddModelRequest {
     pub model_id: String,
     pub display_name: String,
@@ -43,12 +47,17 @@ pub struct AddModelRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct SetDefaultModelRequest {
     pub provider_id: String,
     pub model_id: String,
 }
 
 /// GET /providers -- list all providers with models.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/providers", tag = "Providers",
+    responses((status = 200, description = "List of providers with models", body = Vec<Object>))
+))]
 pub async fn list_providers(
     State(state): State<Arc<AppState>>,
 ) -> crate::Result<impl IntoResponse> {
@@ -57,6 +66,10 @@ pub async fn list_providers(
 }
 
 /// GET /providers/with-key-status -- list providers with has_api_key boolean.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/providers/with-key-status", tag = "Providers",
+    responses((status = 200, description = "Providers with API key status", body = Vec<Object>))
+))]
 pub async fn list_with_key_status(
     State(state): State<Arc<AppState>>,
 ) -> crate::Result<impl IntoResponse> {
@@ -68,6 +81,10 @@ pub async fn list_with_key_status(
 }
 
 /// GET /providers/default -- get global default model.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/providers/default", tag = "Providers",
+    responses((status = 200, description = "Default model", body = Object))
+))]
 pub async fn get_default_model(
     State(state): State<Arc<AppState>>,
 ) -> crate::Result<impl IntoResponse> {
@@ -82,6 +99,11 @@ pub async fn get_default_model(
 }
 
 /// PUT /providers/default -- set global default model.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/providers/default", tag = "Providers",
+    request_body = SetDefaultModelRequest,
+    responses((status = 200, description = "Default model set", body = Object))
+))]
 pub async fn set_default_model(
     State(state): State<Arc<AppState>>,
     Json(req): Json<SetDefaultModelRequest>,
@@ -94,6 +116,11 @@ pub async fn set_default_model(
 }
 
 /// GET /providers/{id} -- get a specific provider by ID.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/providers/{id}", tag = "Providers",
+    params(("id" = String, Path, description = "Provider ID")),
+    responses((status = 200, description = "Provider details", body = Object))
+))]
 pub async fn get_provider(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -103,6 +130,11 @@ pub async fn get_provider(
 }
 
 /// POST /providers -- create a user-defined provider.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/providers", tag = "Providers",
+    request_body = CreateProviderRequest,
+    responses((status = 200, description = "Provider created", body = Object))
+))]
 pub async fn create_user_provider(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateProviderRequest>,
@@ -128,6 +160,12 @@ pub async fn create_user_provider(
 }
 
 /// PUT /providers/{id} -- update provider base_url.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/providers/{id}", tag = "Providers",
+    params(("id" = String, Path, description = "Provider ID")),
+    request_body = UpdateProviderRequest,
+    responses((status = 200, description = "Provider updated", body = Object))
+))]
 pub async fn update_provider(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -141,6 +179,11 @@ pub async fn update_provider(
 }
 
 /// DELETE /providers/{id} -- delete a user-defined provider.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/providers/{id}", tag = "Providers",
+    params(("id" = String, Path, description = "Provider ID")),
+    responses((status = 200, description = "Provider deleted", body = Object))
+))]
 pub async fn delete_user_provider(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -150,6 +193,12 @@ pub async fn delete_user_provider(
 }
 
 /// POST /providers/{id}/models -- add a custom model.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/providers/{id}/models", tag = "Providers",
+    params(("id" = String, Path, description = "Provider ID")),
+    request_body = AddModelRequest,
+    responses((status = 200, description = "Model added", body = Object))
+))]
 pub async fn add_model(
     State(state): State<Arc<AppState>>,
     Path(provider_id): Path<String>,
@@ -168,6 +217,11 @@ pub async fn add_model(
 }
 
 /// POST /providers/{id}/test -- test connection to a provider.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/providers/{id}/test", tag = "Providers",
+    params(("id" = String, Path, description = "Provider ID")),
+    responses((status = 200, description = "Connection test result", body = Object))
+))]
 pub async fn test_connection(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -222,6 +276,14 @@ pub async fn test_connection(
 }
 
 /// DELETE /providers/{id}/models/{model_id} -- delete a custom model.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/providers/{id}/models/{model_id}", tag = "Providers",
+    params(
+        ("id" = String, Path, description = "Provider ID"),
+        ("model_id" = String, Path, description = "Model ID"),
+    ),
+    responses((status = 200, description = "Model deleted", body = Object))
+))]
 pub async fn delete_model(
     State(state): State<Arc<AppState>>,
     Path((provider_id, model_id)): Path<(String, String)>,

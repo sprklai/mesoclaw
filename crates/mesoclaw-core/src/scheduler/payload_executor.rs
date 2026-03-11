@@ -79,14 +79,28 @@ async fn execute_agent_turn(
         let enabled = state
             .context_injection_enabled
             .load(std::sync::atomic::Ordering::Relaxed);
-        let context_engine =
-            crate::ai::context::ContextEngine::new(state.db.clone(), config.clone(), enabled);
+        let self_evo = state
+            .self_evolution_enabled
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let mut context_engine =
+            crate::ai::context::ContextEngine::new(state.db.clone(), config.clone(), enabled)
+                .with_skill_registry(state.skill_registry.clone())
+                .with_self_evolution(self_evo);
+        #[cfg(feature = "channels")]
+        {
+            context_engine = context_engine.with_channel_registry(state.channel_registry.clone());
+        }
+        #[cfg(feature = "scheduler")]
+        if let Some(ref sched) = state.scheduler {
+            context_engine = context_engine.with_scheduler(sched.clone());
+        }
 
         match context_engine
             .compose(
                 &crate::ai::context::ContextLevel::Full,
                 &state.boot_context,
                 "scheduler",
+                None,
                 None,
                 None,
             )

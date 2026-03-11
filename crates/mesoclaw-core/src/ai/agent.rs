@@ -369,6 +369,7 @@ mod tests {
     #[tokio::test]
     async fn agent_new_with_openai_config() {
         let config = AppConfig {
+            provider_name: "openai".into(),
             provider_type: "openai".into(),
             provider_model_id: "gpt-4o".into(),
             ..Default::default()
@@ -620,6 +621,7 @@ mod tests {
         // Since rig-core Agent internals aren't inspectable, we verify that
         // building an agent with max_turns=1 succeeds and the config is accepted.
         let config = AppConfig {
+            provider_name: "openai".into(),
             provider_type: "openai".into(),
             agent_max_turns: 1,
             agent_max_tokens: 50,
@@ -633,6 +635,7 @@ mod tests {
 
         // A second agent with max_turns=0 should also build (rig handles it)
         let config2 = AppConfig {
+            provider_name: "openai".into(),
             provider_type: "openai".into(),
             agent_max_turns: 0,
             ..Default::default()
@@ -731,6 +734,7 @@ mod tests {
     #[tokio::test]
     async fn agent_respects_config_max_turns() {
         let config = AppConfig {
+            provider_name: "openai".into(),
             provider_type: "openai".into(),
             agent_max_turns: 1,
             agent_max_tokens: 100,

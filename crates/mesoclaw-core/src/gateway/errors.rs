@@ -7,6 +7,7 @@ use tracing::error;
 use crate::MesoError;
 
 #[derive(Debug, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ErrorResponse {
     pub error_code: String,
     pub message: String,

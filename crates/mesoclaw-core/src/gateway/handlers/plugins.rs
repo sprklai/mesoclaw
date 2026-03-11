@@ -10,6 +10,7 @@ use crate::gateway::state::AppState;
 use crate::plugins::registry::InstalledPlugin;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct PluginListItem {
     name: String,
     version: String,
@@ -33,6 +34,10 @@ impl From<&InstalledPlugin> for PluginListItem {
 }
 
 /// GET /plugins — List all installed plugins.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/plugins", tag = "Plugins",
+    responses((status = 200, description = "List of installed plugins", body = Vec<PluginListItem>))
+))]
 pub async fn list_plugins(State(state): State<Arc<AppState>>) -> Json<Vec<PluginListItem>> {
     let plugins = state.plugin_registry.list();
     let items: Vec<PluginListItem> = plugins.iter().map(PluginListItem::from).collect();
@@ -40,6 +45,14 @@ pub async fn list_plugins(State(state): State<Arc<AppState>>) -> Json<Vec<Plugin
 }
 
 /// GET /plugins/{name} — Get plugin details.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/plugins/{name}", tag = "Plugins",
+    params(("name" = String, Path, description = "Plugin name")),
+    responses(
+        (status = 200, description = "Plugin details"),
+        (status = 404, description = "Plugin not found")
+    )
+))]
 pub async fn get_plugin(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -52,6 +65,7 @@ pub async fn get_plugin(
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct InstallRequest {
     pub source: String,
     #[serde(default)]
@@ -59,6 +73,14 @@ pub struct InstallRequest {
 }
 
 /// POST /plugins/install — Install a plugin from source.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/plugins/install", tag = "Plugins",
+    request_body = InstallRequest,
+    responses(
+        (status = 201, description = "Plugin installed"),
+        (status = 400, description = "Invalid plugin source")
+    )
+))]
 pub async fn install_plugin(
     State(state): State<Arc<AppState>>,
     Json(req): Json<InstallRequest>,
@@ -75,6 +97,14 @@ pub async fn install_plugin(
 }
 
 /// DELETE /plugins/{name} — Uninstall a plugin.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/plugins/{name}", tag = "Plugins",
+    params(("name" = String, Path, description = "Plugin name")),
+    responses(
+        (status = 204, description = "Plugin removed"),
+        (status = 404, description = "Plugin not found")
+    )
+))]
 pub async fn remove_plugin(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -84,6 +114,14 @@ pub async fn remove_plugin(
 }
 
 /// PUT /plugins/{name}/toggle — Enable or disable a plugin.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/plugins/{name}/toggle", tag = "Plugins",
+    params(("name" = String, Path, description = "Plugin name")),
+    responses(
+        (status = 200, description = "Plugin toggled"),
+        (status = 404, description = "Plugin not found")
+    )
+))]
 pub async fn toggle_plugin(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -107,6 +145,14 @@ pub async fn toggle_plugin(
 }
 
 /// POST /plugins/{name}/update — Update plugin to latest.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/plugins/{name}/update", tag = "Plugins",
+    params(("name" = String, Path, description = "Plugin name")),
+    responses(
+        (status = 200, description = "Plugin updated"),
+        (status = 404, description = "Plugin not found")
+    )
+))]
 pub async fn update_plugin(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -116,6 +162,14 @@ pub async fn update_plugin(
 }
 
 /// GET /plugins/{name}/config — Get plugin config.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/plugins/{name}/config", tag = "Plugins",
+    params(("name" = String, Path, description = "Plugin name")),
+    responses(
+        (status = 200, description = "Plugin configuration"),
+        (status = 404, description = "Plugin not found")
+    )
+))]
 pub async fn get_plugin_config(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -138,6 +192,15 @@ pub async fn get_plugin_config(
 }
 
 /// PUT /plugins/{name}/config — Update plugin config.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/plugins/{name}/config", tag = "Plugins",
+    params(("name" = String, Path, description = "Plugin name")),
+    request_body = serde_json::Value,
+    responses(
+        (status = 200, description = "Plugin configuration updated"),
+        (status = 404, description = "Plugin not found")
+    )
+))]
 pub async fn update_plugin_config(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,

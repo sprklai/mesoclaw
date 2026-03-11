@@ -7,6 +7,7 @@ use axum::http::StatusCode;
 use crate::gateway::state::AppState;
 
 #[derive(serde::Serialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct EmbeddingStatus {
     pub provider: String,
     pub model: String,
@@ -15,6 +16,10 @@ pub struct EmbeddingStatus {
 }
 
 /// GET /embeddings/status — returns current embedding provider info
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/embeddings/status", tag = "Embeddings",
+    responses((status = 200, description = "Embedding provider status", body = EmbeddingStatus))
+))]
 pub async fn embeddings_status(State(state): State<Arc<AppState>>) -> Json<EmbeddingStatus> {
     let cfg = state.config.load();
     let model_available = state
@@ -29,11 +34,13 @@ pub async fn embeddings_status(State(state): State<Arc<AppState>>) -> Json<Embed
 }
 
 #[derive(serde::Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct EmbedRequest {
     pub text: String,
 }
 
 #[derive(serde::Serialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct EmbedTestResult {
     pub success: bool,
     pub dimensions: Option<usize>,
@@ -42,6 +49,10 @@ pub struct EmbedTestResult {
 }
 
 /// POST /embeddings/test — test current embedding provider with sample text
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/embeddings/test", tag = "Embeddings",
+    responses((status = 200, description = "Embedding test result", body = EmbedTestResult))
+))]
 pub async fn embeddings_test(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<EmbedTestResult>, (StatusCode, Json<serde_json::Value>)> {
@@ -75,6 +86,13 @@ pub async fn embeddings_test(
 }
 
 /// POST /embeddings/download — trigger model download (local provider only)
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/embeddings/download", tag = "Embeddings",
+    responses(
+        (status = 200, description = "Download triggered", body = Object),
+        (status = 400, description = "Wrong provider", body = Object),
+    )
+))]
 pub async fn embeddings_download(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
@@ -96,6 +114,13 @@ pub async fn embeddings_download(
 }
 
 /// POST /embeddings/reindex — re-embed all existing memories
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/embeddings/reindex", tag = "Embeddings",
+    responses(
+        (status = 200, description = "Reindex triggered", body = Object),
+        (status = 400, description = "No provider configured", body = Object),
+    )
+))]
 pub async fn embeddings_reindex(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
@@ -120,6 +145,14 @@ pub async fn embeddings_reindex(
 use crate::memory::embeddings::EmbeddingProvider;
 
 /// POST /embeddings/embed — embed a text string (for testing/debugging)
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/embeddings/embed", tag = "Embeddings",
+    request_body = EmbedRequest,
+    responses(
+        (status = 200, description = "Embedding result", body = Object),
+        (status = 400, description = "No provider configured", body = Object),
+    )
+))]
 pub async fn embeddings_embed(
     State(state): State<Arc<AppState>>,
     Json(body): Json<EmbedRequest>,

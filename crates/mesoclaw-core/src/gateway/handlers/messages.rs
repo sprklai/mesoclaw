@@ -11,12 +11,14 @@ use crate::ai::session::ToolCallRecord;
 use crate::gateway::state::AppState;
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct SendMessageRequest {
     pub role: String,
     pub content: String,
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct MessageWithToolCalls {
     pub id: String,
     pub session_id: String,
@@ -27,6 +29,14 @@ pub struct MessageWithToolCalls {
     pub tool_calls: Option<Vec<ToolCallRecord>>,
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/sessions/{id}/messages", tag = "Messages",
+    params(("id" = String, Path, description = "Session ID")),
+    responses(
+        (status = 200, description = "List of messages with tool calls", body = Vec<MessageWithToolCalls>),
+        (status = 404, description = "Session not found", body = Object),
+    )
+))]
 pub async fn get_messages(
     State(state): State<Arc<AppState>>,
     Path(session_id): Path<String>,
@@ -57,6 +67,15 @@ pub async fn get_messages(
     Ok(Json(result))
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/sessions/{id}/messages", tag = "Messages",
+    params(("id" = String, Path, description = "Session ID")),
+    request_body = SendMessageRequest,
+    responses(
+        (status = 201, description = "Message created", body = Object),
+        (status = 404, description = "Session not found", body = Object),
+    )
+))]
 pub async fn send_message(
     State(state): State<Arc<AppState>>,
     Path(session_id): Path<String>,

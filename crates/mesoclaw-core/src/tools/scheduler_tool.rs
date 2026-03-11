@@ -27,7 +27,7 @@ impl Tool for SchedulerTool {
     }
 
     fn description(&self) -> &str {
-        "Manage scheduled jobs. Actions: 'create' (add a job), 'list' (view all), 'delete' (remove), 'toggle' (enable/disable), 'history' (execution log). IMPORTANT: Before creating a job, ALWAYS call with action='list' first to check existing jobs and avoid duplicates. For one-time reminders (e.g. 'remind me tonight', 'at 5pm today'), ALWAYS set one_shot=true so the job auto-deletes after firing. Use cron for recurring and interval for periodic jobs."
+        "Create, list, delete, toggle, or view history of scheduled jobs. Your context shows active jobs — check before creating duplicates. Use cron for complex schedules, interval for periodic. Set one_shot=true for one-time events (e.g. 'remind me at 5pm')."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {

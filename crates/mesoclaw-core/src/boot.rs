@@ -298,6 +298,12 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         memory.clone(),
     )))?;
 
+    // Register AgentSelfTool (self-evolving prompt notes)
+    tool_registry.register(Arc::new(crate::tools::agent_self_tool::AgentSelfTool::new(
+        pool.clone(),
+        self_evolution_enabled.clone(),
+    )))?;
+
     // Create shared ArcSwap config for runtime hot-swapping
     let config_swap = Arc::new(arc_swap::ArcSwap::from(config.clone()));
 
@@ -749,7 +755,7 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let config = test_config(&dir);
         let services = init_services(config).await.unwrap();
-        let mut expected = 13; // base tools + memory + config
+        let mut expected = 14; // base tools + memory + config + agent_notes
         #[cfg(feature = "channels")]
         {
             expected += 1; // channel_send

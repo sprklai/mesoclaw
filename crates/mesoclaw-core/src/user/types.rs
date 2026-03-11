@@ -35,6 +35,7 @@ impl From<&str> for ObservationCategory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct UserObservation {
     pub id: String,
     pub category: String,

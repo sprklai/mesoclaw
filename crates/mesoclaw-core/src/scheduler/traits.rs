@@ -6,6 +6,7 @@ pub type JobId = String;
 
 /// When a job runs.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Schedule {
     /// Run every `secs` seconds.
@@ -18,6 +19,7 @@ pub enum Schedule {
 /// Both values are 24-hour format (0–23). Job is skipped when
 /// local hour is outside `[start_hour, end_hour)`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ActiveHours {
     pub start_hour: u8,
     pub end_hour: u8,
@@ -25,6 +27,7 @@ pub struct ActiveHours {
 
 /// Which session context a job runs in.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SessionTarget {
     #[default]
@@ -34,6 +37,7 @@ pub enum SessionTarget {
 
 /// What a job does when it fires.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case", tag = "type")]
 #[non_exhaustive]
 pub enum JobPayload {
@@ -49,6 +53,7 @@ pub enum JobPayload {
 
 /// A registered job in the scheduler.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ScheduledJob {
     pub id: JobId,
     pub name: String,
@@ -74,6 +79,7 @@ fn default_true() -> bool {
 
 /// Outcome of a single job execution.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum JobStatus {
     Success,
@@ -84,6 +90,7 @@ pub enum JobStatus {
 
 /// Record of one job run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct JobExecution {
     pub id: String,
     pub job_id: JobId,

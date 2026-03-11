@@ -4,6 +4,10 @@ use serde_json::json;
 use sysinfo::System;
 
 /// GET /system/info -- returns host system information.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/system/info", tag = "System",
+    responses((status = 200, description = "System information", body = Object))
+))]
 pub async fn system_info() -> impl IntoResponse {
     let mut sys = System::new();
     sys.refresh_memory();

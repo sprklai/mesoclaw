@@ -10,16 +10,31 @@ use crate::gateway::state::AppState;
 use crate::security::policy::ValidationResult;
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ExecuteToolRequest {
     pub args: serde_json::Value,
 }
 
 /// GET /tools — list all registered tools.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/tools", tag = "Tools",
+    responses((status = 200, description = "List of registered tools"))
+))]
 pub async fn list_tools(State(state): State<Arc<AppState>>) -> crate::Result<impl IntoResponse> {
     Ok(Json(state.tools.list()))
 }
 
 /// POST /tools/{name}/execute — execute a tool by name.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/tools/{name}/execute", tag = "Tools",
+    params(("name" = String, Path, description = "Tool name")),
+    request_body = ExecuteToolRequest,
+    responses(
+        (status = 200, description = "Tool execution result"),
+        (status = 404, description = "Tool not found"),
+        (status = 403, description = "Tool execution denied by security policy")
+    )
+))]
 pub async fn execute_tool(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,

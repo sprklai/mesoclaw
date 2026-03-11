@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 #[non_exhaustive]
 pub enum SkillSource {
     Bundled,
@@ -17,6 +18,7 @@ impl std::fmt::Display for SkillSource {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct Skill {
     pub id: String,
     pub name: String,
@@ -29,6 +31,7 @@ pub struct Skill {
 
 /// Summary struct for list endpoints (excludes full content).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct SkillInfo {
     pub id: String,
     pub name: String,

@@ -8,6 +8,10 @@ use serde_json::json;
 use crate::gateway::state::AppState;
 
 /// GET /models -- returns list of available models from config.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/models", tag = "Models",
+    responses((status = 200, description = "List of available models"))
+))]
 pub async fn list_models(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let config = state.config.load();
     Json(json!([
@@ -57,7 +61,7 @@ mod tests {
 
         let arr = json.as_array().expect("response should be an array");
         assert_eq!(arr.len(), 1);
-        assert_eq!(arr[0]["id"], "gpt-4o");
-        assert_eq!(arr[0]["provider"], "openai");
+        assert_eq!(arr[0]["id"], "claude-sonnet-4-6");
+        assert_eq!(arr[0]["provider"], "anthropic");
     }
 }

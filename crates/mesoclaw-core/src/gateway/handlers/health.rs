@@ -3,6 +3,11 @@ use axum::response::IntoResponse;
 use serde_json::json;
 
 /// GET /health -- returns 200 {"status": "ok"}
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/health", tag = "System",
+    security(()),
+    responses((status = 200, description = "Health check", body = Object))
+))]
 pub async fn health() -> impl IntoResponse {
     Json(json!({"status": "ok"}))
 }

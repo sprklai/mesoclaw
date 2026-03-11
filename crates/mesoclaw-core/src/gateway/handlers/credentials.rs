@@ -8,17 +8,24 @@ use serde::{Deserialize, Serialize};
 use crate::gateway::state::AppState;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct SetCredentialRequest {
     pub key: String,
     pub value: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct CredentialExistsResponse {
     pub exists: bool,
 }
 
 /// POST /credentials -- set a credential.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/credentials", tag = "Credentials",
+    request_body = SetCredentialRequest,
+    responses((status = 200, description = "Credential stored", body = Object))
+))]
 pub async fn set_credential(
     State(state): State<Arc<AppState>>,
     Json(req): Json<SetCredentialRequest>,
@@ -28,6 +35,10 @@ pub async fn set_credential(
 }
 
 /// GET /credentials -- list stored credential keys (names only, never values).
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/credentials", tag = "Credentials",
+    responses((status = 200, description = "List of credential keys", body = Vec<String>))
+))]
 pub async fn list_credentials(
     State(state): State<Arc<AppState>>,
 ) -> crate::Result<impl IntoResponse> {
@@ -36,6 +47,11 @@ pub async fn list_credentials(
 }
 
 /// DELETE /credentials/{key} -- remove a credential.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    delete, path = "/credentials/{key}", tag = "Credentials",
+    params(("key" = String, Path, description = "Credential key")),
+    responses((status = 200, description = "Credential deleted", body = Object))
+))]
 pub async fn delete_credential(
     State(state): State<Arc<AppState>>,
     Path(key): Path<String>,
@@ -48,6 +64,11 @@ pub async fn delete_credential(
 ///
 /// Returns `{ "exists": true/false }` instead of the raw secret.
 /// Raw credential values must never be returned over the gateway.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/credentials/{key}/value", tag = "Credentials",
+    params(("key" = String, Path, description = "Credential key")),
+    responses((status = 200, description = "Credential existence check", body = CredentialExistsResponse))
+))]
 pub async fn get_credential_value(
     State(state): State<Arc<AppState>>,
     Path(key): Path<String>,
@@ -59,6 +80,11 @@ pub async fn get_credential_value(
 }
 
 /// GET /credentials/{key}/exists -- check if a credential exists (bool, no value).
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/credentials/{key}/exists", tag = "Credentials",
+    params(("key" = String, Path, description = "Credential key")),
+    responses((status = 200, description = "Credential existence check", body = CredentialExistsResponse))
+))]
 pub async fn credential_exists(
     State(state): State<Arc<AppState>>,
     Path(key): Path<String>,

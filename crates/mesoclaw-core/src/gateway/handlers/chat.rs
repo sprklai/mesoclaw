@@ -11,6 +11,7 @@ use crate::ai::resolve_agent;
 use crate::gateway::state::AppState;
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ChatRequest {
     pub prompt: String,
     pub session_id: Option<String>,
@@ -18,11 +19,20 @@ pub struct ChatRequest {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct ChatResponse {
     pub response: String,
     pub session_id: Option<String>,
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    post, path = "/chat", tag = "Chat",
+    request_body = ChatRequest,
+    responses(
+        (status = 200, description = "Chat response", body = ChatResponse),
+        (status = 502, description = "Agent error", body = Object),
+    )
+))]
 pub async fn chat(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatRequest>,
@@ -37,8 +47,21 @@ pub async fn chat(
     let ctx_enabled = state
         .context_injection_enabled
         .load(std::sync::atomic::Ordering::Relaxed);
-    let context_engine =
-        ContextEngine::new(state.db.clone(), state.config.load_full(), ctx_enabled);
+    let self_evo = state
+        .self_evolution_enabled
+        .load(std::sync::atomic::Ordering::Relaxed);
+    let mut context_engine =
+        ContextEngine::new(state.db.clone(), state.config.load_full(), ctx_enabled)
+            .with_skill_registry(state.skill_registry.clone())
+            .with_self_evolution(self_evo);
+    #[cfg(feature = "channels")]
+    {
+        context_engine = context_engine.with_channel_registry(state.channel_registry.clone());
+    }
+    #[cfg(feature = "scheduler")]
+    if let Some(ref sched) = state.scheduler {
+        context_engine = context_engine.with_scheduler(sched.clone());
+    }
     let (message_count, last_message_at, summary) = if let Some(ref sid) = req.session_id {
         state
             .session_manager
@@ -62,6 +85,7 @@ pub async fn chat(
             model_display,
             req.session_id.as_deref(),
             summary.as_deref(),
+            Some(&req.prompt),
         )
         .await?;
 
@@ -147,9 +171,9 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
-    // 3.4.1 — chat post with no agent returns 502
+    // 3.4.1 — chat post with no API key returns 500 (credential error)
     #[tokio::test]
-    async fn chat_no_agent_returns_502() {
+    async fn chat_no_agent_returns_credential_error() {
         let (_dir, state) = test_state().await;
 
         let req = Request::builder()
@@ -162,6 +186,8 @@ mod tests {
             .unwrap();
 
         let resp = app(state).oneshot(req).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_GATEWAY);
+        // Default model is seeded (anthropic:claude-sonnet-4-6) but no API key exists,
+        // so resolve_agent fails with a Credential error (500).
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

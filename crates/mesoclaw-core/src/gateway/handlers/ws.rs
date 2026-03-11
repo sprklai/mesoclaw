@@ -62,6 +62,12 @@ pub(crate) enum WsOutbound {
     Error { error: String },
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/ws/notifications", tag = "WebSocket",
+    responses(
+        (status = 101, description = "WebSocket upgrade for real-time notifications (scheduler events, channel messages)")
+    )
+))]
 pub async fn ws_notifications(
     State(state): State<Arc<AppState>>,
     ws: WebSocketUpgrade,
@@ -142,6 +148,12 @@ async fn handle_notifications(mut socket: WebSocket, state: Arc<AppState>) {
     }
 }
 
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/ws/chat", tag = "WebSocket",
+    responses(
+        (status = 101, description = "WebSocket upgrade for interactive chat with tool call streaming")
+    )
+))]
 pub async fn ws_chat(
     State(state): State<Arc<AppState>>,
     ws: WebSocketUpgrade,
@@ -200,8 +212,21 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
         let ctx_enabled = state
             .context_injection_enabled
             .load(std::sync::atomic::Ordering::Relaxed);
-        let context_engine =
-            ContextEngine::new(state.db.clone(), state.config.load_full(), ctx_enabled);
+        let self_evo = state
+            .self_evolution_enabled
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let mut context_engine =
+            ContextEngine::new(state.db.clone(), state.config.load_full(), ctx_enabled)
+                .with_skill_registry(state.skill_registry.clone())
+                .with_self_evolution(self_evo);
+        #[cfg(feature = "channels")]
+        {
+            context_engine = context_engine.with_channel_registry(state.channel_registry.clone());
+        }
+        #[cfg(feature = "scheduler")]
+        if let Some(ref sched) = state.scheduler {
+            context_engine = context_engine.with_scheduler(sched.clone());
+        }
         let (message_count, last_message_at, summary) = if let Some(ref sid) = request.session_id {
             state
                 .session_manager
@@ -225,6 +250,7 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
                 model_display,
                 request.session_id.as_deref(),
                 summary.as_deref(),
+                Some(&request.prompt),
             )
             .await
         {
@@ -615,7 +641,7 @@ mod tests {
         assert!(parsed["error"].as_str().unwrap().contains("invalid JSON"));
     }
 
-    // 4.2.3 — WS no agent returns error
+    // 4.2.3 — WS no API key returns credential error
     #[tokio::test]
     async fn ws_no_agent_returns_error() {
         let (_dir, state) = test_state().await;
@@ -633,11 +659,13 @@ mod tests {
         let text = resp.into_text().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(parsed["type"], "error");
+        // Default model is seeded (anthropic:claude-sonnet-4-6) but no API key exists,
+        // so resolve_agent fails with a credential error.
         assert!(
             parsed["error"]
                 .as_str()
                 .unwrap()
-                .contains("no agent configured")
+                .contains("no API key found")
         );
     }
 }

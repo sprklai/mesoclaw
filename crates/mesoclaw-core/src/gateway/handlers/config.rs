@@ -7,6 +7,10 @@ use axum::response::IntoResponse;
 use crate::gateway::state::AppState;
 
 /// GET /config — return the current AppConfig with secrets redacted and paths resolved.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/config", tag = "Config",
+    responses((status = 200, description = "Current configuration", body = Object))
+))]
 pub async fn get_config(State(state): State<Arc<AppState>>) -> crate::Result<impl IntoResponse> {
     let cfg = state.config.load();
     let mut config_value = serde_json::to_value(cfg.as_ref())?;
@@ -87,6 +91,14 @@ pub async fn get_config(State(state): State<Arc<AppState>>) -> crate::Result<imp
 }
 
 /// PUT /config — accept partial JSON config update, persist to TOML, update runtime state.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/config", tag = "Config",
+    request_body = Object,
+    responses(
+        (status = 200, description = "Config updated", body = Object),
+        (status = 400, description = "Validation error", body = Object),
+    )
+))]
 pub async fn update_config(
     State(state): State<Arc<AppState>>,
     Json(body): Json<serde_json::Value>,
@@ -232,6 +244,10 @@ pub async fn update_config(
 }
 
 /// GET /config/file — return the config file path and raw TOML content.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/config/file", tag = "Config",
+    responses((status = 200, description = "Config file path and TOML content", body = Object))
+))]
 pub async fn get_config_file(
     State(state): State<Arc<AppState>>,
 ) -> crate::Result<impl IntoResponse> {
@@ -243,6 +259,11 @@ pub async fn get_config_file(
 }
 
 /// GET /setup/status — return setup completeness for onboarding.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/setup/status", tag = "Config",
+    security(()),
+    responses((status = 200, description = "Setup completeness status", body = Object))
+))]
 pub async fn setup_status(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {

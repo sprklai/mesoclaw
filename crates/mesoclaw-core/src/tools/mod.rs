@@ -1,3 +1,4 @@
+pub mod agent_self_tool;
 pub mod config_tool;
 pub mod file_ops;
 pub mod file_search;

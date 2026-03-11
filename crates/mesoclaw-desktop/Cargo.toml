@@ -26,7 +26,8 @@ opener = "0.8"
 workspace = true
 
 [features]
-default = ["channels", "scheduler"]
+default = ["channels", "scheduler", "api-docs"]
+api-docs = ["mesoclaw-core/api-docs"]
 devtools = ["dep:tauri-plugin-devtools"]
 scheduler = ["mesoclaw-core/scheduler"]
 channels = ["mesoclaw-core/channels"]
