@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.12] - 2026-03-11
+
+### Fixed
+- Read user location/timezone from live config instead of frozen BootContext, so onboarding location changes take effect immediately without restart
+
 ## [0.0.11] - 2026-03-11
 
 ### Added
