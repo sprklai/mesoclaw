@@ -197,7 +197,7 @@ impl Default for AppConfig {
             ],
 
             // Agent
-            agent_max_turns: 20,
+            agent_max_turns: 8,
             agent_max_tokens: 4096,
             agent_system_prompt: None,
 

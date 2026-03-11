@@ -8,6 +8,7 @@ describe("Embeddings store", () => {
       provider: "none",
       model: "bge-small-en-v1.5",
       dimensions: 384,
+      model_available: true,
     };
     expect(status.provider).toBe("none");
     expect(status.model).toBe("bge-small-en-v1.5");
@@ -20,16 +21,19 @@ describe("Embeddings store", () => {
       provider: "none",
       model: "",
       dimensions: 0,
+      model_available: true,
     };
     const local: EmbeddingStatus = {
       provider: "local",
       model: "bge-small-en-v1.5",
       dimensions: 384,
+      model_available: true,
     };
     const openai: EmbeddingStatus = {
       provider: "openai",
       model: "text-embedding-3-small",
       dimensions: 384,
+      model_available: true,
     };
 
     expect(none.provider).toBe("none");

@@ -69,20 +69,20 @@
 			<Card.Description>Toggle context injection and self-evolution at runtime</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-4">
-			<div class="flex items-center justify-between">
+			<div class="flex items-center justify-between gap-4">
 				<div>
 					<p class="text-sm font-medium">Context Injection</p>
-					<p class="text-xs text-muted-foreground">Rich environment and identity context in agent preamble</p>
+					<p class="text-xs text-muted-foreground">Prepends identity files, soul, persona, environment details, and user profile into every agent prompt. Provides richer, more personalized responses at the cost of additional input tokens per message.</p>
 				</div>
 				<Switch
 					checked={configStore.config.context_injection_enabled === true}
 					onCheckedChange={(v) => toggleConfig('context_injection_enabled', v)}
 				/>
 			</div>
-			<div class="flex items-center justify-between">
+			<div class="flex items-center justify-between gap-4">
 				<div>
 					<p class="text-sm font-medium">Self-Evolution</p>
-					<p class="text-xs text-muted-foreground">Agent can learn preferences and propose skill changes</p>
+					<p class="text-xs text-muted-foreground">Agent observes your preferences and usage patterns to store learnings, refine its behavior over time, and propose skill updates. Uses additional tokens for observation analysis and memory writes.</p>
 				</div>
 				<Switch
 					checked={configStore.config.self_evolution_enabled === true}

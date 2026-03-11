@@ -37,7 +37,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "shortDescription": "AI-powered personal assistant",
+    "shortDescription": "Mesoclaw - AI-powered personal assistant",
     "longDescription": "MesoClaw is an AI-powered personal assistant with multi-provider support, memory, tools, and extensible channels.",
     "category": "Utility",
     "linux": {

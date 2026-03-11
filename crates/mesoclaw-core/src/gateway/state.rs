@@ -74,6 +74,8 @@ pub struct AppState {
     pub channel_router: Option<Arc<crate::channels::router::ChannelRouter>>,
     #[cfg(feature = "scheduler")]
     pub scheduler: Option<Arc<TokioScheduler>>,
+    /// Whether the local embedding model is downloaded and ready.
+    pub embedding_model_available: Arc<AtomicBool>,
 }
 
 impl AppState {

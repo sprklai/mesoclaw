@@ -28,9 +28,10 @@ tower-http = { workspace = true, optional = true }
 keyring = { workspace = true, optional = true }
 zeroize = { workspace = true }
 
-# HTTP client
+# HTTP / TLS
 reqwest = { workspace = true }
 tokio-tungstenite = { workspace = true }
+rustls = { version = "0.23", features = ["ring"] }
 
 # Phase 2: Memory + Tools
 sysinfo = { workspace = true }
@@ -84,4 +85,3 @@ workspace = true
 tempfile = "3"
 tokio = { workspace = true, features = ["test-util", "macros"] }
 tower = { version = "0.5", features = ["util"] }
-rustls = { version = "0.23", features = ["ring"] }

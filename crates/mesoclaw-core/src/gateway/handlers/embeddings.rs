@@ -11,15 +11,20 @@ pub struct EmbeddingStatus {
     pub provider: String,
     pub model: String,
     pub dimensions: usize,
+    pub model_available: bool,
 }
 
 /// GET /embeddings/status — returns current embedding provider info
 pub async fn embeddings_status(State(state): State<Arc<AppState>>) -> Json<EmbeddingStatus> {
     let cfg = state.config.load();
+    let model_available = state
+        .embedding_model_available
+        .load(std::sync::atomic::Ordering::SeqCst);
     Json(EmbeddingStatus {
         provider: cfg.embedding_provider.clone(),
         model: cfg.embedding_model.clone(),
         dimensions: cfg.embedding_dim,
+        model_available,
     })
 }
 

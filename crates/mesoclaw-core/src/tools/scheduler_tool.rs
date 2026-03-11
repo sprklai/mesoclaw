@@ -27,7 +27,7 @@ impl Tool for SchedulerTool {
     }
 
     fn description(&self) -> &str {
-        "Manage scheduled jobs. Use 'create' to add a new cron/interval job, 'list' to view all jobs, 'delete' to remove a job, 'toggle' to enable/disable, 'history' to see execution history."
+        "Manage scheduled jobs. Actions: 'create' (add a job), 'list' (view all), 'delete' (remove), 'toggle' (enable/disable), 'history' (execution log). IMPORTANT: Before creating a job, ALWAYS call with action='list' first to check existing jobs and avoid duplicates. For one-time reminders (e.g. 'remind me tonight', 'at 5pm today'), ALWAYS set one_shot=true so the job auto-deletes after firing. Use cron for recurring and interval for periodic jobs."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
@@ -79,7 +79,7 @@ impl Tool for SchedulerTool {
                 },
                 "one_shot": {
                     "type": "boolean",
-                    "description": "If true, job is deleted after first execution"
+                    "description": "Set to true for one-time events (e.g. 'remind me today/tonight/tomorrow at X'). The job auto-deletes after its first successful execution. ALWAYS use this for non-recurring reminders."
                 },
                 "active_hours_start": {
                     "type": "integer",
@@ -426,6 +426,25 @@ mod tests {
             .await;
 
         assert!(result.is_err());
+    }
+
+    // 17.9 — Duplicate job name returns tool error
+    #[tokio::test]
+    async fn scheduler_tool_duplicate_name_rejected() {
+        let (_dir, tool) = setup().await;
+        let args = json!({
+            "action": "create",
+            "name": "dup-job",
+            "schedule_type": "interval",
+            "interval_secs": 300,
+            "payload_type": "heartbeat"
+        });
+        let first = tool.execute(args.clone()).await.unwrap();
+        assert!(first.success);
+
+        let second = tool.execute(args).await.unwrap();
+        assert!(!second.success);
+        assert!(second.output.contains("already exists"));
     }
 
     // 17.8 — Tool name/description/schema validation

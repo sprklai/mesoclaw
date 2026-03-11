@@ -95,6 +95,9 @@ pub enum MesoError {
     #[error("plugin not found: {0}")]
     PluginNotFound(String),
 
+    #[error("model capability error: {0}")]
+    ModelCapability(String),
+
     #[error("{0}")]
     Other(String),
 }

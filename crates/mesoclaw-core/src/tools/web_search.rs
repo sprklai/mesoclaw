@@ -138,15 +138,18 @@ impl Tool for WebSearchTool {
     }
 
     fn description(&self) -> &str {
-        "Search the web using Tavily, Brave, or DuckDuckGo (automatic provider cascade)"
+        "Search the web and return multiple results (title, URL, snippet) in a single call. \
+         Use ONE call with a broad query instead of multiple calls with narrow queries. \
+         For example, use 'latest AI news from Google 2026' instead of making separate searches \
+         for each subtopic. Increase num_results if you need more coverage."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
             "properties": {
-                "query": { "type": "string", "description": "Search query" },
-                "num_results": { "type": "integer", "description": "Number of results (max 20)", "default": 5 }
+                "query": { "type": "string", "description": "Search query. Prefer a single comprehensive query over multiple narrow ones." },
+                "num_results": { "type": "integer", "description": "Number of results to return (1-20). Use a higher number for broad topics instead of making multiple searches.", "default": 5 }
             },
             "required": ["query"]
         })

@@ -128,6 +128,7 @@ pub(crate) mod tests {
                 );
                 Some(sched)
             },
+            embedding_model_available: Arc::new(std::sync::atomic::AtomicBool::new(true)),
         });
         (dir, state)
     }

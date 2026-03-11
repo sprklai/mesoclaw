@@ -296,6 +296,21 @@ pub async fn resolve_agent_with_tools(
         })?;
 
         let provider = state.provider_registry.get_provider(provider_id).await?;
+
+        // Check model capability before building agent.
+        // If model not found in registry, proceed (backwards-compatible).
+        if let Some(model_info) = state
+            .provider_registry
+            .get_model_info(provider_id, model_id)
+            .await?
+            && !model_info.supports_tools
+        {
+            return Err(MesoError::ModelCapability(format!(
+                "The model '{}' ({}) does not support tool usage. Please select a model that supports tools.",
+                model_info.display_name, spec
+            )));
+        }
+
         let tools = tool_override.unwrap_or_else(|| state.tools.to_vec());
 
         let agent = if let Some(tx) = tool_event_tx {

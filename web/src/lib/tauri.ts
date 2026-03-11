@@ -5,7 +5,8 @@
 
 /** True when running inside a Tauri webview, false in browser. */
 export const isTauri: boolean =
-  typeof window !== "undefined" && "__TAURI__" in window;
+  typeof window !== "undefined" &&
+  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 
 /** Hide the window to the system tray. */
 export async function closeToTray(): Promise<void> {

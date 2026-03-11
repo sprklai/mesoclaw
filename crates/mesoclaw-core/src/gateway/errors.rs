@@ -51,6 +51,7 @@ impl IntoResponse for MesoError {
             MesoError::Scheduler(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_SCHEDULER_ERROR"),
             MesoError::Plugin(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_PLUGIN_ERROR"),
             MesoError::PluginNotFound(_) => (StatusCode::NOT_FOUND, "MESO_PLUGIN_NOT_FOUND"),
+            MesoError::ModelCapability(_) => (StatusCode::BAD_REQUEST, "MESO_MODEL_CAPABILITY"),
             MesoError::Other(_) => (StatusCode::INTERNAL_SERVER_ERROR, "MESO_INTERNAL_ERROR"),
         };
 
@@ -230,6 +231,7 @@ mod tests {
             MesoError::Scheduler("t".into()),
             MesoError::Plugin("t".into()),
             MesoError::PluginNotFound("t".into()),
+            MesoError::ModelCapability("t".into()),
             MesoError::Other("t".into()),
         ];
 
@@ -239,8 +241,8 @@ mod tests {
             assert!(codes.insert(code.clone()), "duplicate error code: {code}");
         }
 
-        // 31 variants tested (Http skipped because reqwest::Error can't be easily constructed)
-        assert_eq!(codes.len(), 31);
+        // 32 variants tested (Http skipped because reqwest::Error can't be easily constructed)
+        assert_eq!(codes.len(), 32);
     }
 
     #[test]

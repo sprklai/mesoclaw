@@ -39,6 +39,7 @@
 	let { sessionId = undefined }: { sessionId?: string } = $props();
 
 	let providersLoaded = $state(false);
+	let activeWs = $state<WebSocket | null>(null);
 
 	onMount(async () => {
 		await providersStore.load();
@@ -99,7 +100,7 @@
 
 		const capturedSessionId = currentSessionId;
 		const capturedModel = providersStore.selectedModel || undefined;
-		createChatStream(
+		activeWs = createChatStream(
 			prompt,
 			currentSessionId,
 			{
@@ -113,12 +114,14 @@
 					messagesStore.completeToolCall(callId, output, success, durationMs);
 				},
 				onDone() {
+					activeWs = null;
 					messagesStore.finishStream(capturedSessionId);
 					if (isFirstMessage) {
 						sessionsStore.generateTitle(capturedSessionId, capturedModel);
 					}
 				},
 				onError(error) {
+					activeWs = null;
 					const friendlyError =
 						error.toLowerCase().includes('no agent configured') ||
 						error.toLowerCase().includes('no provider')
@@ -131,6 +134,17 @@
 			},
 			providersStore.selectedModel || undefined
 		);
+	}
+
+	function stopStream() {
+		if (activeWs) {
+			activeWs.close();
+			activeWs = null;
+		}
+		if (messagesStore.streaming) {
+			const sid = sessionId ?? '';
+			messagesStore.finishStream(sid);
+		}
 	}
 </script>
 
@@ -254,7 +268,8 @@
 				<div class="flex-1"></div>
 				<PromptInputSubmit
 					status={messagesStore.streaming ? 'streaming' : 'idle'}
-					disabled={messagesStore.streaming || !hasUsableModel}
+					disabled={!messagesStore.streaming && !hasUsableModel}
+					onclick={messagesStore.streaming ? stopStream : undefined}
 				/>
 			</PromptInputToolbar>
 		</PromptInput>

@@ -76,10 +76,16 @@ pub struct Services {
     pub channel_router: Option<Arc<crate::channels::router::ChannelRouter>>,
     #[cfg(feature = "scheduler")]
     pub scheduler: Option<Arc<TokioScheduler>>,
+    /// Whether the local embedding model is downloaded and ready.
+    pub embedding_model_available: Arc<AtomicBool>,
 }
 
 /// Initialize all services from config.
 pub async fn init_services(config: AppConfig) -> Result<Services> {
+    // When both ring and aws-lc-rs are in the dep tree (e.g. --all-features),
+    // rustls cannot auto-detect the CryptoProvider. Install ring explicitly.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let config = Arc::new(config);
 
     // 1. Database
@@ -123,6 +129,12 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         .await
         .map_err(|e| crate::MesoError::Database(format!("memory migration join failed: {e}")))??;
     }
+
+    // Track whether the local embedding model is downloaded and ready.
+    // Starts true for non-local providers (no model needed), false for local until warmup completes.
+    let embedding_model_available = Arc::new(AtomicBool::new(
+        config.embedding_provider.as_str() != "local",
+    ));
 
     let memory: Arc<dyn Memory> = {
         let store = crate::memory::sqlite_store::SqliteMemoryStore::new(
@@ -172,7 +184,27 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
                                     provider,
                                     config.embedding_cache_size,
                                 );
-                                Arc::new(store.with_vector(vi, Arc::new(cached)))
+                                let embedding_provider: Arc<
+                                    dyn crate::memory::embeddings::EmbeddingProvider,
+                                > = Arc::new(cached);
+
+                                // Eagerly warm up the model (triggers download if not cached)
+                                let warmup_provider = embedding_provider.clone();
+                                let warmup_flag = embedding_model_available.clone();
+                                tokio::spawn(async move {
+                                    match warmup_provider.embed("warmup").await {
+                                        Ok(_) => {
+                                            warmup_flag
+                                                .store(true, std::sync::atomic::Ordering::SeqCst);
+                                            tracing::info!("Embedding model downloaded and ready");
+                                        }
+                                        Err(e) => {
+                                            tracing::warn!("Embedding model warmup failed: {e}");
+                                        }
+                                    }
+                                });
+
+                                Arc::new(store.with_vector(vi, embedding_provider))
                             }
                             Ok(Err(e)) => {
                                 tracing::warn!(
@@ -445,16 +477,6 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         } else if let Err(e) = tg.connect().await {
             tracing::warn!("Failed to connect telegram: {e}");
         } else {
-            #[cfg(feature = "gateway")]
-            if let Some(ref router) = channel_router {
-                let tx = router.sender();
-                let ch = tg.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = ch.listen(tx).await {
-                        tracing::error!("Telegram listen failed: {e}");
-                    }
-                });
-            }
             info!("Telegram auto-connected from stored credentials");
         }
     }
@@ -473,16 +495,6 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         } else if let Err(e) = sl.connect().await {
             tracing::warn!("Failed to connect slack: {e}");
         } else {
-            #[cfg(feature = "gateway")]
-            if let Some(ref router) = channel_router {
-                let tx = router.sender();
-                let ch = sl.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = ch.listen(tx).await {
-                        tracing::error!("Slack listen failed: {e}");
-                    }
-                });
-            }
             info!("Slack auto-connected from stored credentials");
         }
     }
@@ -498,16 +510,6 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         } else if let Err(e) = dc.connect().await {
             tracing::warn!("Failed to connect discord: {e}");
         } else {
-            #[cfg(feature = "gateway")]
-            if let Some(ref router) = channel_router {
-                let tx = router.sender();
-                let ch = dc.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = ch.listen(tx).await {
-                        tracing::error!("Discord listen failed: {e}");
-                    }
-                });
-            }
             info!("Discord auto-connected from stored credentials");
         }
     }
@@ -640,6 +642,7 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         channel_router,
         #[cfg(feature = "scheduler")]
         scheduler,
+        embedding_model_available,
     })
 }
 
@@ -685,6 +688,7 @@ impl From<Services> for AppState {
             channel_router: s.channel_router,
             #[cfg(feature = "scheduler")]
             scheduler: s.scheduler,
+            embedding_model_available: s.embedding_model_available,
         }
     }
 }

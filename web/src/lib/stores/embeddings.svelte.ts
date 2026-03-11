@@ -4,6 +4,7 @@ export interface EmbeddingStatus {
   provider: string;
   model: string;
   dimensions: number;
+  model_available: boolean;
 }
 
 export interface EmbedTestResult {
@@ -18,6 +19,7 @@ function createEmbeddingsStore() {
     provider: "none",
     model: "",
     dimensions: 0,
+    model_available: true,
   });
   let loading = $state(false);
 
@@ -36,6 +38,10 @@ function createEmbeddingsStore() {
       } finally {
         loading = false;
       }
+    },
+
+    async refreshStatus() {
+      status = await apiGet<EmbeddingStatus>("/embeddings/status");
     },
 
     async test(): Promise<EmbedTestResult> {

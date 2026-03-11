@@ -32,6 +32,7 @@
 	let identityFiles = $state<IdentityFile[]>([]);
 	let skills = $state<SkillInfo[]>([]);
 	let editingFile = $state<{ name: string; content: string } | null>(null);
+	let editingSkill = $state<{ id: string; content: string } | null>(null);
 	let loading = $state(true);
 	let addSkillOpen = $state(false);
 	let newSkillId = $state('');
@@ -85,6 +86,18 @@
 		newSkillId = '';
 		newSkillContent = '';
 		addSkillOpen = false;
+		await loadAll();
+	}
+
+	async function handleEditSkill(id: string) {
+		const skill = await apiGet<{ id: string; content: string }>(`/skills/${encodeURIComponent(id)}`);
+		editingSkill = { id: skill.id, content: skill.content };
+	}
+
+	async function handleSaveSkill() {
+		if (!editingSkill) return;
+		await apiPut(`/skills/${encodeURIComponent(editingSkill.id)}`, { content: editingSkill.content });
+		editingSkill = null;
 		await loadAll();
 	}
 
@@ -156,14 +169,19 @@
 						<span class="font-medium">{skill.id}</span>
 						<Badge variant="secondary" class="ml-2">{skill.category}</Badge>
 					</div>
-					<Button
-						variant="ghost"
-						size="icon"
-						class="h-7 w-7 text-destructive"
-						onclick={() => handleDeleteSkill(skill.id)}
-					>
-						<Trash2 class="h-3.5 w-3.5" />
-					</Button>
+					<div class="flex gap-1">
+						<Button variant="ghost" size="icon" class="h-7 w-7" onclick={() => handleEditSkill(skill.id)}>
+							<Pencil class="h-3.5 w-3.5" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="h-7 w-7 text-destructive"
+							onclick={() => handleDeleteSkill(skill.id)}
+						>
+							<Trash2 class="h-3.5 w-3.5" />
+						</Button>
+					</div>
 				</div>
 			{/each}
 			{#if skills.length === 0}
@@ -181,6 +199,18 @@
 		{#if editingFile}
 			<Textarea bind:value={editingFile.content} rows={15} class="font-mono text-sm" />
 			<Button class="w-full" onclick={handleSaveFile}>Save</Button>
+		{/if}
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root open={!!editingSkill} onOpenChange={(open) => { if (!open) editingSkill = null; }}>
+	<Dialog.Content class="sm:max-w-3xl">
+		<Dialog.Header>
+			<Dialog.Title>Edit: {editingSkill?.id}</Dialog.Title>
+		</Dialog.Header>
+		{#if editingSkill}
+			<Textarea bind:value={editingSkill.content} rows={25} class="font-mono text-sm" />
+			<Button class="w-full" onclick={handleSaveSkill}>Save</Button>
 		{/if}
 	</Dialog.Content>
 </Dialog.Root>

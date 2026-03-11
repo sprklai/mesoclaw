@@ -474,6 +474,14 @@ impl Scheduler for TokioScheduler {
             job.id = Uuid::new_v4().to_string();
         }
 
+        // Check for duplicate name
+        if self.jobs.iter().any(|entry| entry.value().name == job.name) {
+            return Err(MesoError::Validation(format!(
+                "a job named '{}' already exists — use a different name or delete the existing one first",
+                job.name
+            )));
+        }
+
         // Validate cron expression if applicable
         if let Schedule::Cron { ref expr } = job.schedule {
             let full_expr = if expr.split_whitespace().count() == 5 {
@@ -880,6 +888,19 @@ mod tests {
 
         let history = sched.job_history(&id).await;
         assert!(history.is_empty(), "Disabled job should have no executions");
+    }
+
+    // 16.28 — Duplicate job name rejected
+    #[tokio::test]
+    async fn duplicate_name_rejected() {
+        let (_dir, sched) = test_scheduler();
+        sched.add_job(test_job("dup")).await.unwrap();
+        let result = sched.add_job(test_job("dup")).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("already exists"), "error: {err}");
+        // Only one job should exist
+        assert_eq!(sched.list_jobs().await.len(), 1);
     }
 
     // WS-6.1 — Scheduler tick does not hold DashMap guard across .await

@@ -211,6 +211,40 @@ impl ProviderRegistry {
         .await
     }
 
+    /// Look up a single model's info by provider and model ID.
+    /// Returns `None` if the model is not found in the registry.
+    pub async fn get_model_info(
+        &self,
+        provider_id: &str,
+        model_id: &str,
+    ) -> Result<Option<ModelInfo>> {
+        let composite_id = format!("{provider_id}:{model_id}");
+        db::with_db(&self.db, move |conn| {
+            match conn.query_row(
+                "SELECT id, provider_id, model_id, display_name, context_limit, supports_tools, is_custom, is_active
+                 FROM ai_models WHERE id = ?1",
+                [&composite_id],
+                |row| {
+                    Ok(ModelInfo {
+                        id: row.get(0)?,
+                        provider_id: row.get(1)?,
+                        model_id: row.get(2)?,
+                        display_name: row.get(3)?,
+                        context_limit: row.get(4)?,
+                        supports_tools: row.get::<_, i32>(5)? != 0,
+                        is_custom: row.get::<_, i32>(6)? != 0,
+                        is_active: row.get::<_, i32>(7)? != 0,
+                    })
+                },
+            ) {
+                Ok(info) => Ok(Some(info)),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                Err(e) => Err(MesoError::from(e)),
+            }
+        })
+        .await
+    }
+
     /// Add a user-defined provider.
     pub async fn add_user_provider(
         &self,
@@ -218,7 +252,7 @@ impl ProviderRegistry {
         name: &str,
         base_url: &str,
         requires_api_key: bool,
-        models: &[(String, String)], // (model_id, display_name)
+        models: &[(String, String, bool)], // (model_id, display_name, supports_tools)
     ) -> Result<()> {
         // Validate ID: alphanumeric + hyphens
         if id.is_empty() || !id.chars().all(|c| c.is_alphanumeric() || c == '-') {
@@ -231,7 +265,7 @@ impl ProviderRegistry {
         let id = id.to_string();
         let name = name.to_string();
         let base_url = base_url.to_string();
-        let models: Vec<(String, String)> = models.to_vec();
+        let models: Vec<(String, String, bool)> = models.to_vec();
 
         db::with_db(&self.db, move |conn| {
             conn.execute(
@@ -248,12 +282,12 @@ impl ProviderRegistry {
                 other => MesoError::from(other),
             })?;
 
-            for (model_id, display_name) in &models {
+            for (model_id, display_name, supports_tools) in &models {
                 let composite_id = format!("{id}:{model_id}");
                 conn.execute(
                     "INSERT INTO ai_models (id, provider_id, model_id, display_name, supports_tools, is_custom)
-                     VALUES (?1, ?2, ?3, ?4, 1, 1)",
-                    rusqlite::params![composite_id, id, model_id, display_name],
+                     VALUES (?1, ?2, ?3, ?4, ?5, 1)",
+                    rusqlite::params![composite_id, id, model_id, display_name, *supports_tools as i32],
                 )?;
             }
 
@@ -320,6 +354,7 @@ impl ProviderRegistry {
         provider_id: &str,
         model_id: &str,
         display_name: &str,
+        supports_tools: bool,
     ) -> Result<()> {
         let provider_id = provider_id.to_string();
         let model_id = model_id.to_string();
@@ -342,8 +377,8 @@ impl ProviderRegistry {
             let composite_id = format!("{provider_id}:{model_id}");
             conn.execute(
                 "INSERT INTO ai_models (id, provider_id, model_id, display_name, supports_tools, is_custom)
-                 VALUES (?1, ?2, ?3, ?4, 1, 1)",
-                rusqlite::params![composite_id, provider_id, model_id, display_name],
+                 VALUES (?1, ?2, ?3, ?4, ?5, 1)",
+                rusqlite::params![composite_id, provider_id, model_id, display_name, supports_tools as i32],
             )
             .map_err(|e| match e {
                 rusqlite::Error::SqliteFailure(ref err, _)
@@ -537,7 +572,7 @@ mod tests {
         let (_dir, registry) = test_registry().await;
         registry.seed_builtin_providers().await.unwrap();
 
-        let models = vec![("my-model".to_string(), "My Model".to_string())];
+        let models = vec![("my-model".to_string(), "My Model".to_string(), true)];
         registry
             .add_user_provider(
                 "my-gateway",
@@ -615,7 +650,7 @@ mod tests {
         registry.seed_builtin_providers().await.unwrap();
 
         registry
-            .add_custom_model("openai", "ft:gpt-4o:my-org", "My Fine-tuned GPT-4o")
+            .add_custom_model("openai", "ft:gpt-4o:my-org", "My Fine-tuned GPT-4o", true)
             .await
             .unwrap();
 
@@ -631,7 +666,7 @@ mod tests {
         registry.seed_builtin_providers().await.unwrap();
 
         registry
-            .add_custom_model("openai", "custom-model", "Custom")
+            .add_custom_model("openai", "custom-model", "Custom", true)
             .await
             .unwrap();
 

@@ -27,7 +27,7 @@ impl Tool for ChannelSendTool {
     }
 
     fn description(&self) -> &str {
-        "Send messages to connected channels, list available channels, or check channel status. Use 'send' to dispatch a message, 'list' to see all channels, 'status' to check a specific channel."
+        "Send messages to connected channels, list available channels, or check channel status. IMPORTANT: When asked to send a message to a channel, ALWAYS call with action='list' first to discover available channels and their status, then use the discovered channel name to send. Never ask the user for the channel name — discover it yourself. Use 'send' to dispatch a message, 'list' to see all channels, 'status' to check a specific channel."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {

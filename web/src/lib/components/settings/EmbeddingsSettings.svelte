@@ -4,25 +4,68 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { configStore } from '$lib/stores/config.svelte';
 	import { embeddingsStore } from '$lib/stores/embeddings.svelte';
-	import { onMount } from 'svelte';
+	import { providersStore } from '$lib/stores/providers.svelte';
+	import { onMount, onDestroy } from 'svelte';
 
 	let testResult = $state<{ success: boolean; dimensions?: number; latency_ms: number; error?: string } | null>(null);
 	let testing = $state(false);
-	let downloading = $state(false);
 	let reindexing = $state(false);
+	let switching = $state(false);
+	let pollInterval: ReturnType<typeof setInterval> | undefined;
 
-	onMount(() => {
-		embeddingsStore.loadStatus();
-		configStore.load();
+	let hasOpenAiKey = $derived(
+		providersStore.providers.some((p) => p.id === 'openai' && p.has_api_key)
+	);
+
+	function startPolling() {
+		stopPolling();
+		if (embeddingsStore.status.provider === 'local' && !embeddingsStore.status.model_available) {
+			pollInterval = setInterval(async () => {
+				await embeddingsStore.refreshStatus();
+				if (embeddingsStore.status.model_available) {
+					stopPolling();
+				}
+			}, 2000);
+		}
+	}
+
+	function stopPolling() {
+		if (pollInterval !== undefined) {
+			clearInterval(pollInterval);
+			pollInterval = undefined;
+		}
+	}
+
+	onMount(async () => {
+		await embeddingsStore.loadStatus();
+		await configStore.load();
+		await providersStore.load();
+
+		// Auto-migrate: local embeddings is disabled (experimental), switch to none
+		if (embeddingsStore.status.provider === 'local') {
+			await setProvider('none');
+			return;
+		}
+
+		startPolling();
+	});
+
+	onDestroy(() => {
+		stopPolling();
 	});
 
 	async function setProvider(provider: string) {
+		if (provider === embeddingsStore.status.provider || switching) return;
+		switching = true;
 		try {
 			await configStore.update({ embedding_provider: provider });
 			await configStore.load();
-			await embeddingsStore.loadStatus();
+			await embeddingsStore.refreshStatus();
+			startPolling();
 		} catch (e) {
 			console.error('[Embeddings] Failed to set provider:', e);
+		} finally {
+			switching = false;
 		}
 	}
 
@@ -34,18 +77,6 @@
 			testResult = { success: false, latency_ms: 0, error: String(e) };
 		} finally {
 			testing = false;
-		}
-	}
-
-	async function triggerDownload() {
-		downloading = true;
-		try {
-			await embeddingsStore.download();
-			await embeddingsStore.loadStatus();
-		} catch (e) {
-			console.error('[Embeddings] Download failed:', e);
-		} finally {
-			downloading = false;
 		}
 	}
 
@@ -73,18 +104,21 @@
 			<div class="flex gap-2">
 				<Button
 					variant={embeddingsStore.status.provider === 'none' ? 'default' : 'outline'}
+					disabled={switching}
 					onclick={() => setProvider('none')}
 				>
 					None (FTS5 only)
 				</Button>
 				<Button
-					variant={embeddingsStore.status.provider === 'local' ? 'default' : 'outline'}
-					onclick={() => setProvider('local')}
+					variant="outline"
+					disabled={true}
+					class="opacity-50 cursor-not-allowed"
 				>
-					Local (fastembed)
+					Local (fastembed) <span class="text-xs ml-1">(Experimental)</span>
 				</Button>
 				<Button
 					variant={embeddingsStore.status.provider === 'openai' ? 'default' : 'outline'}
+					disabled={switching}
 					onclick={() => setProvider('openai')}
 				>
 					OpenAI API
@@ -110,9 +144,17 @@
 					<p class="text-sm font-medium">Model: {embeddingsStore.status.model || 'bge-small-en-v1.5'}</p>
 					<p class="text-xs text-muted-foreground">Dimensions: {embeddingsStore.status.dimensions}</p>
 				</div>
-				<Button onclick={triggerDownload} disabled={downloading}>
-					{downloading ? 'Downloading...' : 'Download Model'}
-				</Button>
+				{#if embeddingsStore.status.model_available}
+					<p class="text-sm text-green-600 dark:text-green-400 font-medium">Available</p>
+				{:else}
+					<div class="flex items-center gap-2">
+						<svg class="h-4 w-4 animate-spin text-muted-foreground" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						<p class="text-sm text-muted-foreground">Downloading model...</p>
+					</div>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 	{/if}
@@ -121,14 +163,20 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title>OpenAI Configuration</Card.Title>
-				<Card.Description>Uses your existing OpenAI API key from Settings &gt; Services</Card.Description>
+				<Card.Description>Uses your OpenAI API key from Settings &gt; Providers</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-3">
-				<p class="text-sm text-muted-foreground">
-					Model: text-embedding-3-small ({embeddingsStore.status.dimensions} dimensions)
-				</p>
-				<Button variant="outline" onclick={() => { window.location.hash = 'services'; }}>
-					Manage API Keys
+				{#if hasOpenAiKey}
+					<p class="text-sm text-muted-foreground">
+						Model: text-embedding-3-small ({embeddingsStore.status.dimensions} dimensions)
+					</p>
+				{:else}
+					<p class="text-sm text-red-600 dark:text-red-400">
+						OpenAI API key is required. Add it in Settings &gt; Providers.
+					</p>
+				{/if}
+				<Button variant="outline" onclick={() => { window.location.hash = 'providers'; }}>
+					Manage Providers
 				</Button>
 			</Card.Content>
 		</Card.Root>
@@ -150,14 +198,14 @@
 				</div>
 
 				<div class="flex gap-2 pt-2">
-					<Button variant="outline" size="sm" onclick={runTest} disabled={testing}>
+					<Button variant="outline" size="sm" onclick={runTest} disabled={testing || !embeddingsStore.status.model_available}>
 						{testing ? 'Testing...' : 'Test Connection'}
 					</Button>
 					<Button
 						variant="outline"
 						size="sm"
 						onclick={triggerReindex}
-						disabled={reindexing}
+						disabled={reindexing || !embeddingsStore.status.model_available}
 					>
 						{reindexing ? 'Re-indexing...' : 'Re-index All Memories'}
 					</Button>

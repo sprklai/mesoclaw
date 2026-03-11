@@ -42,7 +42,7 @@
 	});
 </script>
 
-<Button class={cn("gap-1.5 rounded-lg", className)} {size} type="submit" {variant} {...props}>
+<Button class={cn("gap-1.5 rounded-lg", className)} {size} type={status === "streaming" ? "button" : "submit"} {variant} {...props}>
 	{#if children}
 		{@render children()}
 	{:else}

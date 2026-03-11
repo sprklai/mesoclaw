@@ -17,10 +17,16 @@ pub struct CreateProviderRequest {
     pub models: Vec<CreateModelEntry>,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateModelEntry {
     pub model_id: String,
     pub display_name: String,
+    #[serde(default = "default_true")]
+    pub supports_tools: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -32,6 +38,8 @@ pub struct UpdateProviderRequest {
 pub struct AddModelRequest {
     pub model_id: String,
     pub display_name: String,
+    #[serde(default = "default_true")]
+    pub supports_tools: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -99,10 +107,10 @@ pub async fn create_user_provider(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateProviderRequest>,
 ) -> crate::Result<impl IntoResponse> {
-    let models: Vec<(String, String)> = req
+    let models: Vec<(String, String, bool)> = req
         .models
         .iter()
-        .map(|m| (m.model_id.clone(), m.display_name.clone()))
+        .map(|m| (m.model_id.clone(), m.display_name.clone(), m.supports_tools))
         .collect();
 
     state
@@ -149,7 +157,12 @@ pub async fn add_model(
 ) -> crate::Result<impl IntoResponse> {
     state
         .provider_registry
-        .add_custom_model(&provider_id, &req.model_id, &req.display_name)
+        .add_custom_model(
+            &provider_id,
+            &req.model_id,
+            &req.display_name,
+            req.supports_tools,
+        )
         .await?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
@@ -332,6 +345,7 @@ mod tests {
                     models: vec![CreateModelEntry {
                         model_id: "model-1".into(),
                         display_name: "Model 1".into(),
+                        supports_tools: true,
                     }],
                 })
                 .unwrap(),
