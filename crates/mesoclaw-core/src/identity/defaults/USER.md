@@ -8,6 +8,12 @@ This file describes you, the user. Edit it to help MesoClaw understand your pref
 - Primary languages: (e.g., Rust, Python, TypeScript)
 - Experience level: (e.g., senior, intermediate, beginner)
 
+## Location & Environment
+
+- City: (e.g., Toronto, New York, London)
+- Country: (e.g., Canada, US, UK)
+- Timezone: (e.g., America/Toronto, America/New_York, Europe/London)
+
 ## Preferences
 
 - Communication style: (e.g., concise, detailed, casual, formal)

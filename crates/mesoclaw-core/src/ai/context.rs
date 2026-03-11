@@ -37,6 +37,8 @@ pub struct BootContext {
     pub working_dir: Option<String>,
     /// User-configured IANA timezone (e.g., "America/New_York"), if set.
     pub user_timezone: Option<String>,
+    /// User-configured location string (e.g., "Toronto, Canada"), if set.
+    pub user_location: Option<String>,
 }
 
 impl BootContext {
@@ -92,6 +94,8 @@ impl BootContext {
             .ok()
             .map(|p| p.to_string_lossy().into_owned());
 
+        let user_location = user_location.map(|s| s.to_string());
+
         Self {
             os,
             arch,
@@ -106,6 +110,7 @@ impl BootContext {
             data_dir,
             working_dir,
             user_timezone,
+            user_location,
         }
     }
 }
@@ -300,19 +305,48 @@ impl ContextEngine {
 
         parts.push(self.dynamic_runtime(model_display, session_id));
 
-        // Reasoning guidance
-        parts.push("## Reasoning & Discovery".into());
+        // User Location section (prominent, before reasoning)
+        let has_location = boot_context.user_location.is_some() || boot_context.user_timezone.is_some();
+        if has_location {
+            let mut loc_parts = Vec::new();
+            if let Some(ref loc) = boot_context.user_location {
+                loc_parts.push(format!("Location: {loc}"));
+            }
+            if let Some(ref tz) = boot_context.user_timezone {
+                loc_parts.push(format!("Timezone: {tz}"));
+            }
+            parts.push("## User Location".into());
+            parts.push(loc_parts.join(" | "));
+        }
+
+        // Reasoning Protocol
+        parts.push("## Reasoning Protocol".into());
         if let Some(ref custom_guidance) = self.config.agent_reasoning_guidance {
             parts.push(custom_guidance.clone());
         } else {
-            parts.push(
-                "- When you encounter an error or cannot find something, REASON about alternatives before giving up.\n\
+            let mut protocol = String::from(
+                "Before calling ANY tool, follow this protocol:\n\
+                 1. INTENT: What is the user actually asking for? What implicit context is needed?\n\
+                 2. CONTEXT CHECK: Review Environment and User Location above. Do you already have info \
+                    (location, timezone, OS) that should inform your tool call?\n\
+                 3. ENRICH: Incorporate relevant context into tool arguments. \
+                    Example: search 'weather Toronto' not 'weather today'.\n\
+                 4. EXECUTE: Call the tool with enriched arguments.\n\
+                 5. RECOVER: If a tool errors or returns no results, try at least 2 alternatives before giving up.\n\n\
+                 Additional guidelines:\n\
                  - Use ShellTool to discover paths dynamically: `ls`, `echo $HOME`, `find`.\n\
                  - If a file path fails, try common alternatives (~/Desktop, ~/desktop, $XDG_DESKTOP_DIR).\n\
-                 - Always try at least 2 approaches before telling the user you cannot do something.\n\
                  - When a tool returns an error, analyze the error message and adapt your next tool call.\n\
-                 - Do NOT describe what you would do — actually call the tools and do it.".into()
+                 - Do NOT describe what you would do — actually call the tools and do it."
             );
+            if let Some(ref loc) = boot_context.user_location {
+                protocol.push_str(&format!(
+                    "\n\nREMINDER: The user's location is '{loc}'. For ANY location-sensitive query \
+                     (weather, news, events, nearby places, time), use this location unless the user \
+                     specifies otherwise."
+                ));
+            }
+            parts.push(protocol);
         }
 
         // Identity summary (Tier 3)
@@ -332,9 +366,6 @@ impl ContextEngine {
             parts.push("## Your Capabilities".into());
             parts.push(caps.summary);
         }
-
-        // Guidance to avoid redundant tool calls
-        parts.push("You already know the current date, time, timezone, OS, hostname, and architecture from this context. Do not call tools to retrieve information already provided above.".into());
 
         // Config override
         if let Some(ref override_prompt) = self.config.agent_system_prompt {
@@ -2615,7 +2646,7 @@ mod tests {
             .compose(&ContextLevel::Full, &boot, "gpt-4o", None, None)
             .await
             .unwrap();
-        assert!(result.contains("You already know the current date"));
+        assert!(result.contains("Reasoning Protocol"));
     }
 
     // 8.9.41 — Full compose with all summaries includes all sections
@@ -3627,8 +3658,8 @@ mod tests {
             .await
             .unwrap();
         assert!(
-            result.contains("Reasoning & Discovery"),
-            "compose_full output should contain reasoning guidance"
+            result.contains("Reasoning Protocol"),
+            "compose_full output should contain reasoning protocol"
         );
     }
 }

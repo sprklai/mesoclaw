@@ -58,7 +58,7 @@ fn execute_notify(job: &ScheduledJob, message: &str, event_bus: &Arc<dyn EventBu
     JobStatus::Success
 }
 
-/// Execute an AgentTurn payload: resolve agent, run chat.
+/// Execute an AgentTurn payload: resolve agent, run chat with full context.
 #[cfg(feature = "gateway")]
 async fn execute_agent_turn(
     job: &ScheduledJob,
@@ -73,7 +73,44 @@ async fn execute_agent_turn(
         return JobStatus::Skipped;
     };
 
-    let agent = match crate::ai::resolve_agent(None, state, None, None).await {
+    // Build full preamble so the agent has identity + environment + reasoning protocol
+    let preamble = {
+        let config = state.config.load();
+        let enabled = state
+            .context_injection_enabled
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let context_engine =
+            crate::ai::context::ContextEngine::new(state.db.clone(), config.clone(), enabled);
+
+        match context_engine
+            .compose(
+                &crate::ai::context::ContextLevel::Full,
+                &state.boot_context,
+                "scheduler",
+                None,
+                None,
+            )
+            .await
+        {
+            Ok(p) => Some(p),
+            Err(e) => {
+                warn!(
+                    "Scheduler job '{}': failed to compose preamble, proceeding without: {e}",
+                    job.name
+                );
+                None
+            }
+        }
+    };
+
+    let agent = match crate::ai::resolve_agent(
+        None,
+        state,
+        None,
+        preamble.as_deref(),
+    )
+    .await
+    {
         Ok(a) => a,
         Err(e) => {
             warn!(

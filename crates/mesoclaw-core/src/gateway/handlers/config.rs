@@ -4,7 +4,6 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-
 use crate::gateway::state::AppState;
 
 /// GET /config — return the current AppConfig with secrets redacted and paths resolved.
@@ -161,6 +160,13 @@ pub async fn update_config(
         if let Some(v) = obj.get("embedding_model").and_then(|v| v.as_str()) {
             config.embedding_model = v.to_string();
         }
+        // User location & timezone
+        if let Some(v) = obj.get("user_location") {
+            config.user_location = v.as_str().map(|s| s.to_string());
+        }
+        if let Some(v) = obj.get("user_timezone") {
+            config.user_timezone = v.as_str().map(|s| s.to_string());
+        }
         // Channel config fields (Task 3.5)
         if let Some(v) = obj.get("telegram_dm_policy").and_then(|v| v.as_str()) {
             config.telegram_dm_policy = v.to_string();
@@ -223,6 +229,35 @@ pub async fn update_config(
             "fields": body
         })),
     ))
+}
+
+/// GET /config/file — return the config file path and raw TOML content.
+pub async fn get_config_file(
+    State(state): State<Arc<AppState>>,
+) -> crate::Result<impl IntoResponse> {
+    let path = state.config_path.display().to_string();
+    let content = tokio::fs::read_to_string(&state.config_path)
+        .await
+        .unwrap_or_else(|_| "# Config file not found or not yet created".into());
+    Ok(Json(serde_json::json!({ "path": path, "content": content })))
+}
+
+/// GET /setup/status — return setup completeness for onboarding.
+pub async fn setup_status(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let cfg = state.config.load();
+    let mut missing = Vec::new();
+    if cfg.user_location.is_none() {
+        missing.push("user_location");
+    }
+    if cfg.user_timezone.is_none() {
+        missing.push("user_timezone");
+    }
+    Json(serde_json::json!({
+        "needs_setup": !missing.is_empty(),
+        "missing": missing
+    }))
 }
 
 #[cfg(test)]

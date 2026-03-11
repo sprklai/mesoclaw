@@ -6,7 +6,9 @@
 	import KeyRound from '@lucide/svelte/icons/key-round';
 	import Brain from '@lucide/svelte/icons/brain';
 	import Puzzle from '@lucide/svelte/icons/puzzle';
+	import FileText from '@lucide/svelte/icons/file-text';
 	import GeneralSettings from '$lib/components/settings/GeneralSettings.svelte';
+	import ConfigurationsSettings from '$lib/components/settings/ConfigurationsSettings.svelte';
 	import ProvidersSettings from '$lib/components/settings/ProvidersSettings.svelte';
 	import PersonaSettings from '$lib/components/settings/PersonaSettings.svelte';
 	import ChannelsSettings from '$lib/components/settings/ChannelsSettings.svelte';
@@ -21,6 +23,7 @@
 		{ id: 'channels', label: 'Channels', icon: MessageSquare },
 		{ id: 'services', label: 'Services', icon: KeyRound },
 		{ id: 'embeddings', label: 'Embeddings', icon: Brain },
+		{ id: 'configurations', label: 'Configurations', icon: FileText },
 		{ id: 'plugins', label: 'Plugins', icon: Puzzle, experimental: true },
 	];
 
@@ -102,6 +105,8 @@
 			<ServicesSettings />
 		{:else if activeTab === 'embeddings'}
 			<EmbeddingsSettings />
+		{:else if activeTab === 'configurations'}
+			<ConfigurationsSettings />
 		{:else if activeTab === 'plugins'}
 			<div class="flex flex-col items-center justify-center py-16 text-center space-y-3">
 				<Puzzle class="h-10 w-10 text-muted-foreground/40" />

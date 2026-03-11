@@ -55,6 +55,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/config",
             get(handlers::config::get_config).put(handlers::config::update_config),
         )
+        .route("/config/file", get(handlers::config::get_config_file))
+        // Setup / onboarding
+        .route("/setup/status", get(handlers::config::setup_status))
         // Credentials (Phase 8)
         .route(
             "/credentials",

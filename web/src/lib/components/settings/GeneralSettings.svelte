@@ -11,9 +11,15 @@
 
 	let baseUrl = $state(getBaseUrl());
 	let token = $state(getToken() ?? '');
+	let userLocation = $state('');
+	let userTimezone = $state('');
+	let profileSaving = $state(false);
+	let profileSaved = $state(false);
 
-	onMount(() => {
-		configStore.load();
+	onMount(async () => {
+		await configStore.load();
+		userLocation = String(configStore.config.user_location ?? '');
+		userTimezone = String(configStore.config.user_timezone ?? '');
 	});
 
 	function handleSaveConnection() {
@@ -28,6 +34,25 @@
 		} catch (e) {
 			console.error(`[Settings] Failed to update ${key}:`, e);
 			await configStore.load();
+		}
+	}
+
+	async function saveProfile() {
+		profileSaving = true;
+		profileSaved = false;
+		try {
+			const updates: Record<string, string | null> = {
+				user_location: userLocation.trim() || null,
+				user_timezone: userTimezone.trim() || null,
+			};
+			await configStore.update(updates as Record<string, unknown>);
+			await configStore.load();
+			profileSaved = true;
+			setTimeout(() => { profileSaved = false; }, 2000);
+		} catch (e) {
+			console.error('[Settings] Failed to save profile:', e);
+		} finally {
+			profileSaving = false;
 		}
 	}
 
@@ -63,6 +88,31 @@
 {#if configStore.loading}
 	<Skeleton class="h-40 w-full" />
 {:else if Object.keys(configStore.config).length > 0}
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>User Profile</Card.Title>
+			<Card.Description>Your location helps the AI give relevant, context-aware responses</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<div class="space-y-1">
+				<label class="text-sm font-medium" for="user-location">Location</label>
+				<Input id="user-location" bind:value={userLocation} placeholder="e.g., Toronto, Canada" />
+			</div>
+			<div class="space-y-1">
+				<label class="text-sm font-medium" for="user-timezone">Timezone</label>
+				<Input id="user-timezone" bind:value={userTimezone} placeholder="e.g., America/Toronto" />
+			</div>
+			<div class="flex items-center gap-2">
+				<Button onclick={saveProfile} disabled={profileSaving} size="sm">
+					{profileSaving ? 'Saving...' : 'Save Profile'}
+				</Button>
+				{#if profileSaved}
+					<span class="text-sm text-green-600">Saved</span>
+				{/if}
+			</div>
+		</Card.Content>
+	</Card.Root>
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>Agent Features</Card.Title>

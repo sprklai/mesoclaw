@@ -9,14 +9,17 @@
 		getBaseUrl,
 		clearBaseUrl,
 		healthCheck,
-		healthCheckNoAuth
+		healthCheckNoAuth,
+		apiGet
 	} from '$lib/api/client';
 	import { isTauri } from '$lib/tauri';
 	import { onDestroy } from 'svelte';
+	import SetupDialog from '$lib/components/SetupDialog.svelte';
 
 	let { children } = $props();
 
 	let authenticated = $state(false);
+	let showSetup = $state(false);
 	let connecting = $state(false);
 	let booting = $state(false);
 	let tokenInput = $state('');
@@ -53,6 +56,7 @@
 			if (ok) {
 				authenticated = true;
 				booting = false;
+				checkSetupStatus();
 				return;
 			}
 
@@ -81,6 +85,7 @@
 			if (ok) {
 				authenticated = true;
 				connecting = false;
+				checkSetupStatus();
 				return;
 			}
 
@@ -97,6 +102,7 @@
 		const noAuthOk = await healthCheckNoAuth();
 		if (noAuthOk) {
 			authenticated = true;
+			checkSetupStatus();
 			return;
 		}
 
@@ -135,10 +141,22 @@
 		const ok = await healthCheck();
 		if (ok) {
 			authenticated = true;
+			checkSetupStatus();
 		} else {
 			error = 'Could not connect to daemon. Check the token and ensure the daemon is running.';
 		}
 		checking = false;
+	}
+
+	async function checkSetupStatus() {
+		try {
+			const status = await apiGet<{ needs_setup: boolean }>('/setup/status');
+			if (status.needs_setup) {
+				showSetup = true;
+			}
+		} catch {
+			// Non-fatal: if endpoint unavailable, skip onboarding
+		}
 	}
 
 	onDestroy(() => {
@@ -147,6 +165,9 @@
 </script>
 
 {#if authenticated}
+	{#if showSetup}
+		<SetupDialog bind:open={showSetup} />
+	{/if}
 	{@render children()}
 {:else if booting}
 	<div class="flex h-screen items-center justify-center">
