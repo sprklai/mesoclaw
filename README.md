@@ -49,7 +49,7 @@
 
 <!-- Row 4: Quality & i18n -->
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-1046%20Rust%20%2B%2037%20JS-success?style=flat-square" alt="1046 Rust + 37 JS Tests" />
+  <img src="https://img.shields.io/badge/tests-1137%20Rust%20%2B%20JS-success?style=flat-square" alt="1137 Rust + JS Tests" />
   <img src="https://img.shields.io/badge/i18n-EN-blue?style=flat-square" alt="English" />
 </p>
 
@@ -101,7 +101,7 @@
 | **Binary Size** | <20MB (native w/ GUI) | Node.js runtime | 3.4MB |
 | **Privacy** | 100% local, zero telemetry | Local, model-agnostic | 100% local |
 | **License** | MIT | Open source | Open source |
-| **Tests** | 1046 Rust + 37 JS | -- | -- |
+| **Tests** | 1137 Rust + JS | -- | -- |
 
 ---
 
@@ -115,6 +115,7 @@
 - **Self-evolving agent** -- AgentSelfTool (`agent_notes`) for agent-writable behavioral rules by category, stored in DB and auto-injected into context; SkillProposalTool for human-in-the-loop skill evolution
 - **Model capability validation** -- `supports_tools` pre-check prevents tool-calling errors with incompatible models
 - **Context-aware agent** -- 3-tier adaptive context injection (Full/Minimal/Summary) with hash-based cache invalidation
+- **Efficient prompt system** -- plugin-based prompt strategy with CompactStrategy (~65% token reduction), 6 built-in plugins, and token budget trimming
 - **Onboarding flow** -- first-run SetupDialog with browser timezone auto-detection and user location input, persisted to config
 - **User location awareness** -- timezone and location injected into agent context for location-sensitive queries (weather, events, news)
 - **OpenAPI interactive docs** -- Scalar UI at `/api-docs` + OpenAPI 3.1 JSON spec (feature-gated `api-docs`, built with utoipa)

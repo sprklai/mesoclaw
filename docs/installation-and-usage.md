@@ -238,57 +238,31 @@ cargo build --release -p mesoclaw-daemon -p mesoclaw-cli
 
 ### Docker / Docker Compose
 
-Docker runs the **daemon** (headless server) — ideal for servers, NAS devices, and cloud deployments.
+> **Note**: Pre-built Docker images are not currently published. Build from source instead.
 
-**Quick start:**
+#### Build from Source
 
 ```bash
-# Run directly
+git clone https://github.com/sprklai/mesoclaw.git
+cd mesoclaw
+docker build -t mesoclaw .
 docker run -d \
   --name mesoclaw \
   -p 18981:18981 \
   -v mesoclaw-data:/data \
   -e MESOCLAW_TOKEN=your-secret-token \
   -e RUST_LOG=info \
-  ghcr.io/sprklai/mesoclaw:latest
-
-# Verify
-curl http://localhost:18981/health
+  mesoclaw
 ```
 
-**Docker Compose:**
+#### Docker Compose
+
+A `docker-compose.yml` is provided in the repository root:
 
 ```bash
-# Clone the repo (or just grab docker-compose.yml)
 git clone https://github.com/sprklai/mesoclaw.git
 cd mesoclaw
-
-# Set your auth token
-echo "MESOCLAW_TOKEN=your-secret-token" > .env
-
-# Create config
-mkdir -p config
-cat > config/config.toml <<'EOF'
-gateway_host = "0.0.0.0"
-gateway_port = 18981
-provider_name = "openai"
-provider_model_id = "gpt-4o"
-EOF
-
-# Start
-docker compose up -d
-
-# Check logs
-docker compose logs -f
-
-# Stop
-docker compose down
-```
-
-**Build from source:**
-
-```bash
-docker compose build
+export MESOCLAW_TOKEN=your-secret-token
 docker compose up -d
 ```
 

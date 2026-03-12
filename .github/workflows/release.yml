@@ -322,54 +322,54 @@ jobs:
             target/${{ matrix.target }}/ci-release/labeled/mesoclaw-daemon-${{ matrix.label }}
             target/${{ matrix.target }}/ci-release/labeled/mesoclaw-tui-${{ matrix.label }}
 
-  build-docker:
-    name: Build & Push Docker Image
-    runs-on: ubuntu-22.04
-    needs: [build-linux]
-    if: >-
-      always() &&
-      needs.build-linux.result == 'success' &&
-      (startsWith(github.ref, 'refs/tags/app-v') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true'))
-    permissions:
-      packages: write
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/sprklai/mesoclaw
-          tags: |
-            type=semver,pattern={{version}},prefix=,value=${{ github.ref_name }}
-            type=raw,value=latest
-
-      - name: Build and push multi-arch image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+  # build-docker:
+  #   name: Build & Push Docker Image
+  #   runs-on: ubuntu-22.04
+  #   needs: [build-linux]
+  #   if: >-
+  #     always() &&
+  #     needs.build-linux.result == 'success' &&
+  #     (startsWith(github.ref, 'refs/tags/app-v') ||
+  #     (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true'))
+  #   permissions:
+  #     packages: write
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #
+  #     - name: Log in to GitHub Container Registry
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ github.actor }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+  #
+  #     - name: Extract metadata (tags, labels)
+  #       id: meta
+  #       uses: docker/metadata-action@v5
+  #       with:
+  #         images: ghcr.io/sprklai/mesoclaw
+  #         tags: |
+  #           type=semver,pattern={{version}},prefix=,value=${{ github.ref_name }}
+  #           type=raw,value=latest
+  #
+  #     - name: Build and push multi-arch image
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: .
+  #         platforms: linux/amd64,linux/arm64
+  #         push: true
+  #         tags: ${{ steps.meta.outputs.tags }}
+  #         labels: ${{ steps.meta.outputs.labels }}
+  #         cache-from: type=gha
+  #         cache-to: type=gha,mode=max
 
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-linux, build-windows, build-macos, build-embedded, build-docker]
+    needs: [build-linux, build-windows, build-macos, build-embedded]
     if: >-
       always() &&
       needs.build-linux.result == 'success' &&

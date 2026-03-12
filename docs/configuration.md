@@ -17,6 +17,7 @@
   - [Tools](#tools)
   - [Web Search](#web-search)
   - [Context Injection](#context-injection)
+  - [Prompt Strategy](#prompt-strategy)
   - [Context Management](#context-management)
   - [Embeddings](#embeddings)
   - [Reasoning](#reasoning)
@@ -241,6 +242,28 @@ context_summary_provider_id = "openai"
 context_reinject_gap_minutes = 30
 context_reinject_message_count = 20
 ```
+
+### Prompt Strategy
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `prompt_compact_identity` | bool | `true` | Use compact axiom-based preamble instead of verbose prose. Reduces token usage by ~60-80% while maintaining response quality |
+| `prompt_max_preamble_tokens` | usize | `1500` | Token budget for system preamble. Overflow trims lowest-priority dynamic context |
+
+```toml
+prompt_compact_identity = true
+prompt_max_preamble_tokens = 1500
+```
+
+When `prompt_compact_identity` is `true` (default), MesoClaw uses a 4-layer compact format:
+- **Layer 0**: Core identity (~80 tokens) -- name, version, location, OS, capabilities
+- **Layer 1**: Runtime state (~60 tokens) -- date, model, session, compact reasoning axioms
+- **Layer 2**: Dynamic context (variable) -- memories, user observations, skills, domain-specific details
+- **Layer 3**: Overrides -- custom system prompt, conversation summary
+
+When `false`, the legacy verbose prose mode is used (PromptComposer + ContextEngine).
+
+The token budget (`prompt_max_preamble_tokens`) acts as overflow protection. When the assembled preamble exceeds the budget, lowest-priority dynamic context fragments are trimmed first.
 
 ### Context Management
 

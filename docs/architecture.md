@@ -691,6 +691,30 @@ graph TB
 | Resumed session with prior messages | Summary | Full + prior conversation summary |
 | Toggle disabled | Fallback | Config `agent_system_prompt` or default preamble |
 
+### Prompt Strategy System
+
+The prompt strategy system (Phase 8.13) replaces the dual-compose pipeline with a plugin-based architecture that reduces preamble tokens by ~65%:
+
+```
+PromptStrategyRegistry (implements PromptStrategy)
+  ├── base: CompactStrategy or LegacyStrategy
+  │     └── Layers 0 + 1 + 3 (identity, runtime, overrides)
+  └── plugins: Vec<Arc<dyn PromptPlugin>>
+        ├── MemoryPlugin (always)
+        ├── UserObservationsPlugin (always)
+        ├── SkillsPlugin (always)
+        ├── LearnedRulesPlugin (if self_evolution)
+        ├── ChannelContextPlugin (feature: channels)
+        └── SchedulerContextPlugin (feature: scheduler)
+```
+
+Handlers call `state.prompt_strategy.assemble(&AssemblyRequest)` -- a single entry point that:
+1. Base strategy produces Layer 0 (identity), Layer 1 (runtime), Layer 3 (overrides)
+2. Plugins contribute Layer 2 fragments with domain filtering and priority
+3. Registry merges all fragments and applies token budget trimming
+
+Config: `prompt_compact_identity` (default true) selects CompactStrategy vs LegacyStrategy. `prompt_max_preamble_tokens` (default 1500) controls the overflow budget.
+
 ### DB Schema (migration v5)
 
 - `context_summaries` — cached AI-generated summaries with hash-based change detection

@@ -43,12 +43,11 @@ sequenceDiagram
 
     U->>G: Send message (REST/WS)
 
-    Note over G,CE: Context-aware preamble
+    Note over G,CE: Context-aware preamble (PromptStrategy system)
     G->>SM: get_context_info(session_id)
     SM-->>G: message_count, last_message_at, summary
-    G->>CE: determine_context_level()
-    CE-->>G: Full / Minimal / Summary
-    G->>CE: compose(level, boot_context, model)
+    G->>CE: prompt_strategy.assemble(&AssemblyRequest)
+    Note over CE: CompactStrategy or LegacyStrategy + plugins
     CE-->>G: Context preamble string
 
     G->>AI: resolve_agent(model, preamble)

@@ -194,6 +194,16 @@ sudo journalctl -u mesoclaw -b
 
 ## Docker Deployment
 
+### Build from Source
+
+Pre-built Docker images are not currently published. Build from the repository:
+
+```bash
+git clone https://github.com/sprklai/mesoclaw.git
+cd mesoclaw
+docker build -t mesoclaw .
+```
+
 ### Quick Start
 
 ```bash
@@ -203,18 +213,17 @@ docker run -d \
   -v mesoclaw-data:/data \
   -e MESOCLAW_TOKEN=your-secret-token \
   -e RUST_LOG=info \
-  ghcr.io/sprklai/mesoclaw:latest
+  mesoclaw
 ```
 
 ### Docker Compose
 
-A `docker-compose.yml` is provided in the repository root. To use it:
+A `docker-compose.yml` is provided in the repository root:
 
 ```bash
-# Set your token
+git clone https://github.com/sprklai/mesoclaw.git
+cd mesoclaw
 export MESOCLAW_TOKEN=your-secret-token
-
-# Start
 docker compose up -d
 
 # View logs
@@ -235,15 +244,8 @@ docker run -d \
   -v /path/to/config.toml:/config/config.toml:ro \
   -v mesoclaw-data:/data \
   -e MESOCLAW_TOKEN=your-secret-token \
-  ghcr.io/sprklai/mesoclaw:latest \
+  mesoclaw \
   --config /config/config.toml
-```
-
-### Build from Source
-
-```bash
-docker build -t mesoclaw .
-docker run -d -p 18981:18981 -e MESOCLAW_TOKEN=secret mesoclaw
 ```
 
 ### Environment Variables
@@ -511,7 +513,9 @@ MesoClaw runs database migrations automatically on startup. No manual migration 
 ### Docker Upgrade
 
 ```bash
-docker compose pull
+cd mesoclaw
+git pull
+docker build -t mesoclaw .
 docker compose up -d
 ```
 
