@@ -3,7 +3,7 @@ FROM rust:1.88-bookworm AS builder
 WORKDIR /app
 
 # Install SQLite dev libs
-RUN apt-get update && apt-get install -y libsqlite3-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libsqlite3-dev libdbus-1-dev pkg-config && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace manifests first for layer caching
 COPY Cargo.toml Cargo.lock ./
@@ -16,7 +16,7 @@ RUN cargo build --profile ci-release -p mesoclaw-daemon --all-features
 FROM debian:bookworm-slim
 
 RUN apt-get update && \
-    apt-get install -y ca-certificates libsqlite3-0 curl && \
+    apt-get install -y ca-certificates libsqlite3-0 libdbus-1-3 curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
