@@ -167,13 +167,15 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
                         // SAFETY: sqlite3_vec_init has the correct signature for sqlite3_auto_extension
                         #[allow(unsafe_code)]
                         unsafe {
+                            #[rustfmt::skip]
                             rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute::<
                                 *const (),
                                 unsafe extern "C" fn(
                                     *mut rusqlite::ffi::sqlite3,
                                     *mut *mut std::ffi::c_char,
                                     *const rusqlite::ffi::sqlite3_api_routines,
-                                ) -> std::ffi::c_int,
+                                )
+                                    -> std::ffi::c_int,
                             >(
                                 sqlite_vec::sqlite3_vec_init as *const (),
                             )));
