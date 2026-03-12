@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.13] - 2026-03-12
+
+### Added
+- Notification router with desktop OS notifications and channel routing
+- Per-event-type notification routing rules (desktop, channel targets)
+- Desktop notification support via Tauri IPC (`showNotification` wrapper)
+- GeneralSettings UI toggle for desktop notifications
+- Gateway config handler for notification route CRUD
+- Frontend notification store wired to WebSocket events
+- TUI client with async event loop and WebSocket streaming
+- Channel router with supervision, exponential backoff, and auto-reconnect
+- Docker multi-arch image publishing to GitHub Container Registry
+- TUI binary included in multi-platform release pipeline
+
 ## [0.0.12] - 2026-03-11
 
 ### Fixed
