@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.17] - 2026-03-13
+
+### Added
+- Top-level `zenii` crate with workspace metadata for crates.io publishing
+- Workspace-level repository, homepage, keywords, categories fields across all crates
+
+### Changed
+- macOS release builds now produce separate arm64 and x86_64 binaries instead of universal (lipo) binaries
+- README rewritten with comparison table, pain-point framing, and "What Zenii is NOT" section
+
+### Fixed
+- Window close and tray quit now both fully exit the app (no more background orphan processes)
+
 ## [0.0.16] - 2026-03-13
 
 ### Changed
