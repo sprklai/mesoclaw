@@ -48,6 +48,7 @@ impl ToolRegistry {
                     name: tool.name().to_string(),
                     description: tool.description().to_string(),
                     parameters: tool.parameters_schema(),
+                    risk_level: tool.risk_level(),
                 }
             })
             .collect()

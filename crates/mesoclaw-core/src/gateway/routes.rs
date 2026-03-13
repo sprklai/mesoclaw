@@ -111,6 +111,17 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Tools
         .route("/tools", get(handlers::tools::list_tools))
         .route("/tools/{name}/execute", post(handlers::tools::execute_tool))
+        // Permissions (Phase 19)
+        .route("/permissions", get(handlers::permissions::list_surfaces))
+        .route(
+            "/permissions/{surface}",
+            get(handlers::permissions::get_permissions),
+        )
+        .route(
+            "/permissions/{surface}/{tool}",
+            put(handlers::permissions::set_permission)
+                .delete(handlers::permissions::delete_permission),
+        )
         // System info
         .route("/system/info", get(handlers::system::system_info))
         // Models

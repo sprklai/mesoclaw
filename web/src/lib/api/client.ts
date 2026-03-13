@@ -15,9 +15,20 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+export function isValidBaseUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function getBaseUrl(): string {
   if (typeof window === "undefined") return DEFAULT_BASE_URL;
-  return localStorage.getItem(BASE_URL_KEY) ?? DEFAULT_BASE_URL;
+  const stored = localStorage.getItem(BASE_URL_KEY);
+  if (stored && isValidBaseUrl(stored)) return stored;
+  return DEFAULT_BASE_URL;
 }
 
 export function setBaseUrl(url: string): void {

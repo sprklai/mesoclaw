@@ -30,6 +30,10 @@ impl Tool for SkillProposalTool {
         "propose_skill_change"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::Medium
+    }
+
     fn description(&self) -> &str {
         "Propose creating, updating, or deleting a skill. Requires user approval before execution."
     }

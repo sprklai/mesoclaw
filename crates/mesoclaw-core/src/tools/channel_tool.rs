@@ -35,6 +35,10 @@ impl Tool for ChannelSendTool {
         "channel_send"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::Medium
+    }
+
     fn description(&self) -> &str {
         "Send messages to connected channels, list available channels, or check channel status. Your context includes available channels and known contacts. When sending, provide the recipient ID from your context. Actions: send, list, status."
     }

@@ -48,6 +48,10 @@ impl Tool for ConfigTool {
         "config"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::Medium
+    }
+
     fn description(&self) -> &str {
         "Read or update app configuration. Use 'get' to view current settings (optionally filter by key), 'update' to change whitelisted settings."
     }

@@ -18,6 +18,7 @@ pub enum AutonomyLevel {
 
 /// Risk classification for a command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum RiskLevel {
     Low,

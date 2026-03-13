@@ -6,12 +6,15 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Switch } from '$lib/components/ui/switch';
 	import { configStore } from '$lib/stores/config.svelte';
-	import { getBaseUrl, setBaseUrl, getToken, setToken } from '$lib/api/client';
+	import { getBaseUrl, setBaseUrl, getToken, setToken, isValidBaseUrl } from '$lib/api/client';
 	import { isTauri } from '$lib/tauri';
 	import { onMount } from 'svelte';
 
 	let baseUrl = $state(getBaseUrl());
 	let token = $state(getToken() ?? '');
+	let urlError = $state('');
+	let userName = $state('');
+	let assistantName = $state('');
 	let userLocation = $state('');
 	let userTimezone = $state('');
 	let profileSaving = $state(false);
@@ -59,11 +62,18 @@
 
 	onMount(async () => {
 		await configStore.load();
+		userName = String(configStore.config.user_name ?? '');
+		assistantName = String(configStore.config.identity_name ?? 'MesoClaw');
 		userLocation = String(configStore.config.user_location ?? '');
 		userTimezone = String(configStore.config.user_timezone ?? '');
 	});
 
 	function handleSaveConnection() {
+		urlError = '';
+		if (baseUrl && !isValidBaseUrl(baseUrl)) {
+			urlError = 'Invalid URL. Must be a valid http:// or https:// address.';
+			return;
+		}
 		setBaseUrl(baseUrl);
 		setToken(token);
 	}
@@ -83,6 +93,8 @@
 		profileSaved = false;
 		try {
 			const updates: Record<string, string | null> = {
+				user_name: userName.trim() || null,
+				identity_name: assistantName.trim() || 'MesoClaw',
 				user_location: userLocation.trim() || null,
 				user_timezone: userTimezone.trim() || null,
 			};
@@ -133,6 +145,9 @@
 			<label class="text-sm font-medium" for="token">Auth Token</label>
 			<Input id="token" type="password" bind:value={token} placeholder="Bearer token" />
 		</div>
+		{#if urlError}
+			<p class="text-sm text-red-500">{urlError}</p>
+		{/if}
 		<Button onclick={handleSaveConnection}>Save Connection</Button>
 	</Card.Content>
 </Card.Root>
@@ -143,9 +158,17 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>User Profile</Card.Title>
-			<Card.Description>Your location helps the AI give relevant, context-aware responses</Card.Description>
+			<Card.Description>Personalize your experience and help the AI give context-aware responses</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-3">
+			<div class="space-y-1">
+				<label class="text-sm font-medium" for="user-name">Your Name</label>
+				<Input id="user-name" bind:value={userName} placeholder="e.g., John Doe" />
+			</div>
+			<div class="space-y-1">
+				<label class="text-sm font-medium" for="assistant-name">Assistant Name</label>
+				<Input id="assistant-name" bind:value={assistantName} placeholder="MesoClaw" />
+			</div>
 			<div class="space-y-1">
 				<label class="text-sm font-medium" for="user-location">Location</label>
 				<Input id="user-location" bind:value={userLocation} placeholder="e.g., Toronto, Canada" />

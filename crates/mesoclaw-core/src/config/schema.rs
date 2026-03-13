@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::notification::routing::NotificationRouting;
+use crate::security::permissions::ToolPermissions;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -67,7 +68,10 @@ pub struct AppConfig {
     // Phase 8: Credentials
     pub keyring_service_id: String,
 
-    // Phase 8: Channels
+    // Phase 19: Tool Permissions
+    pub tool_permissions: ToolPermissions,
+
+    // Phase 8: Channels (channel_tool_policy kept for backward TOML compat)
     pub channel_tool_policy: HashMap<String, Vec<String>>,
     pub channels_enabled: Vec<String>,
     pub telegram_polling_timeout_secs: u32,
@@ -134,6 +138,8 @@ pub struct AppConfig {
     pub embedding_download_dir: Option<String>,
 
     // Environment overrides
+    /// User's display name (e.g., "Rakesh"). Used in greetings and personalization.
+    pub user_name: Option<String>,
     /// User's IANA timezone (e.g., "America/New_York"). Auto-detected if not set.
     pub user_timezone: Option<String>,
     /// User's location/region description (e.g., "New York, US"). Used for context injection.
@@ -148,6 +154,9 @@ pub struct AppConfig {
 
     // Phase 8.12: Notification Routing
     pub notification_routing: NotificationRouting,
+
+    // Tool Deduplication
+    pub tool_dedup_enabled: bool,
 
     // Phase 8.13: Prompt Efficiency
     pub prompt_max_preamble_tokens: usize,
@@ -211,7 +220,7 @@ impl Default for AppConfig {
             ],
 
             // Agent
-            agent_max_turns: 8,
+            agent_max_turns: 4,
             agent_max_tokens: 4096,
             agent_system_prompt: None,
 
@@ -225,11 +234,11 @@ impl Default for AppConfig {
             // Credentials
             keyring_service_id: "com.sprklai.mesoclaw".into(),
 
-            // Channels
-            channel_tool_policy: HashMap::from([(
-                "default".into(),
-                vec!["web_search".into(), "system_info".into()],
-            )]),
+            // Tool Permissions
+            tool_permissions: ToolPermissions::default(),
+
+            // Channels (channel_tool_policy kept for backward compat)
+            channel_tool_policy: HashMap::new(),
             channels_enabled: vec![],
             telegram_polling_timeout_secs: 30,
             telegram_http_timeout_buffer_secs: 10,
@@ -281,7 +290,7 @@ impl Default for AppConfig {
             scheduler_heartbeat_file: None,
 
             // Autonomous Reasoning
-            agent_max_continuations: 3,
+            agent_max_continuations: 1,
             agent_reasoning_guidance: None,
 
             // Inbox
@@ -295,6 +304,7 @@ impl Default for AppConfig {
             embedding_download_dir: None,
 
             // Environment overrides
+            user_name: None,
             user_timezone: None,
             user_location: None,
 
@@ -304,6 +314,9 @@ impl Default for AppConfig {
             plugin_max_restart_attempts: 3,
             plugin_execute_timeout_secs: 60,
             plugin_auto_update: false,
+
+            // Tool Deduplication
+            tool_dedup_enabled: true,
 
             // Notification Routing
             notification_routing: NotificationRouting::default(),
@@ -326,6 +339,8 @@ impl AppConfig {
     /// Call this after loading config or before saving.
     pub fn validate(&mut self) {
         self.learning_min_confidence = self.learning_min_confidence.clamp(0.0, 1.0);
+        self.agent_max_turns = self.agent_max_turns.clamp(1, 16);
+        self.agent_max_continuations = self.agent_max_continuations.clamp(0, 5);
     }
 }
 
@@ -333,37 +348,70 @@ impl AppConfig {
 mod tests {
     use super::*;
 
-    // CR.31 — channel_tool_policy defaults to default allowlist
+    // P19.12 — Default AppConfig has ToolPermissions with correct defaults
     #[test]
-    fn channel_tool_policy_default() {
+    fn config_tool_permissions_default() {
+        use crate::security::permissions::PermissionState;
         let config = AppConfig::default();
-        let default_tools = config.channel_tool_policy.get("default").unwrap();
-        assert!(default_tools.contains(&"web_search".to_string()));
-        assert!(default_tools.contains(&"system_info".to_string()));
-        assert_eq!(default_tools.len(), 2);
+        assert_eq!(
+            config.tool_permissions.low_risk_default,
+            PermissionState::Allowed
+        );
+        assert_eq!(
+            config.tool_permissions.medium_risk_default,
+            PermissionState::Allowed
+        );
+        assert_eq!(
+            config.tool_permissions.high_risk_default,
+            PermissionState::Denied
+        );
+        assert!(config.tool_permissions.overrides.contains_key("desktop"));
+        assert!(config.tool_permissions.overrides.contains_key("cli"));
+        assert!(config.tool_permissions.overrides.contains_key("tui"));
     }
 
-    // CR.32 — channel_tool_policy deserializes from TOML
+    // P19.13 — ToolPermissions deserializes from TOML
     #[test]
-    fn channel_tool_policy_from_toml() {
+    fn config_tool_permissions_toml() {
+        let toml_str = r#"
+            [tool_permissions]
+            low_risk_default = "allowed"
+            medium_risk_default = "allowed"
+            high_risk_default = "denied"
+
+            [tool_permissions.overrides.telegram]
+            memory = "denied"
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(
+            config
+                .tool_permissions
+                .overrides
+                .get("telegram")
+                .unwrap()
+                .get("memory")
+                .unwrap(),
+            &crate::security::permissions::PermissionState::Denied
+        );
+    }
+
+    // P19.14 — Old channel_tool_policy still deserializes (backward compat)
+    #[test]
+    fn config_backward_compat_channel_tool_policy() {
         let toml_str = r#"
             [channel_tool_policy]
             default = ["web_search", "system_info"]
             telegram = ["web_search"]
-            discord = []
         "#;
-
         let config: AppConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(
             config.channel_tool_policy.get("telegram").unwrap(),
             &vec!["web_search".to_string()]
         );
-        assert!(
-            config
-                .channel_tool_policy
-                .get("discord")
-                .unwrap()
-                .is_empty()
+        // tool_permissions uses defaults since not specified
+        assert_eq!(
+            config.tool_permissions.low_risk_default,
+            crate::security::permissions::PermissionState::Allowed
         );
     }
 
@@ -426,11 +474,11 @@ mod tests {
         assert!(!config.inbox_desktop_notifications);
     }
 
-    // 8.11.19 — default agent_max_continuations is 3
+    // 8.11.19 — default agent_max_continuations is 1
     #[test]
     fn default_agent_max_continuations() {
         let config = AppConfig::default();
-        assert_eq!(config.agent_max_continuations, 3);
+        assert_eq!(config.agent_max_continuations, 1);
         assert!(config.agent_reasoning_guidance.is_none());
     }
 
@@ -636,5 +684,66 @@ mod tests {
         config.learning_min_confidence = -0.5;
         config.validate();
         assert!(config.learning_min_confidence >= 0.0);
+    }
+
+    // TC-S1 — default agent_max_continuations is 1
+    #[test]
+    fn tc_s1_default_agent_max_continuations() {
+        let config = AppConfig::default();
+        assert_eq!(config.agent_max_continuations, 1);
+    }
+
+    // TC-S2 — default agent_max_turns is 4
+    #[test]
+    fn tc_s2_default_agent_max_turns() {
+        let config = AppConfig::default();
+        assert_eq!(config.agent_max_turns, 4);
+    }
+
+    // TC-S3 — default tool_dedup_enabled is true
+    #[test]
+    fn tc_s3_default_tool_dedup_enabled() {
+        let config = AppConfig::default();
+        assert!(config.tool_dedup_enabled);
+    }
+
+    // TC-S4 — TOML deser for tool_dedup_enabled
+    #[test]
+    fn tc_s4_tool_dedup_enabled_from_toml() {
+        let toml_str = r#"
+            tool_dedup_enabled = false
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert!(!config.tool_dedup_enabled);
+    }
+
+    // TC-S5 — validate clamps agent_max_turns to 1..=16
+    #[test]
+    fn tc_s5_validate_clamps_agent_max_turns() {
+        let mut config = AppConfig::default();
+        config.agent_max_turns = 0;
+        config.validate();
+        assert_eq!(config.agent_max_turns, 1);
+
+        config.agent_max_turns = 100;
+        config.validate();
+        assert_eq!(config.agent_max_turns, 16);
+
+        config.agent_max_turns = 8;
+        config.validate();
+        assert_eq!(config.agent_max_turns, 8);
+    }
+
+    // TC-S6 — validate clamps agent_max_continuations to 0..=5
+    #[test]
+    fn tc_s6_validate_clamps_agent_max_continuations() {
+        let mut config = AppConfig::default();
+        config.agent_max_continuations = 10;
+        config.validate();
+        assert_eq!(config.agent_max_continuations, 5);
+
+        config.agent_max_continuations = 0;
+        config.validate();
+        assert_eq!(config.agent_max_continuations, 0);
     }
 }

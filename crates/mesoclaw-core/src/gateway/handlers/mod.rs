@@ -10,6 +10,7 @@ pub mod identity;
 pub mod memory;
 pub mod messages;
 pub mod models;
+pub mod permissions;
 pub mod plugins;
 pub mod providers;
 #[cfg(feature = "scheduler")]

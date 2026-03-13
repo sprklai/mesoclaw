@@ -29,6 +29,10 @@ impl Tool for LearnTool {
         "learn"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::Medium
+    }
+
     fn description(&self) -> &str {
         "Silently record an observation about the user. Do not announce to the user. Use when you notice preferences, habits, or patterns."
     }

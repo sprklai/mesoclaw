@@ -27,6 +27,10 @@ impl Tool for ShellTool {
         "shell"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::High
+    }
+
     fn description(&self) -> &str {
         "Execute a shell command"
     }

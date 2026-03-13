@@ -32,6 +32,10 @@ impl Tool for AgentSelfTool {
         "agent_notes"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::Medium
+    }
+
     fn description(&self) -> &str {
         "Manage your own behavioral notes. Notes you store are automatically available \
          in your context for future conversations when relevant. \

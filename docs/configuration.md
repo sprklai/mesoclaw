@@ -22,6 +22,7 @@
   - [Embeddings](#embeddings)
   - [Reasoning](#reasoning)
   - [Plugins](#plugins)
+  - [Tool Permissions](#tool-permissions)
   - [Channels](#channels)
   - [Scheduler](#scheduler)
   - [Credentials](#credentials)
@@ -136,7 +137,7 @@ security_audit_log_capacity = 1000
 | `provider_base_url` | Option\<String\> | `null` | Custom base URL for the provider API |
 | `provider_model_id` | String | `"gpt-4o"` | Default model ID. Alias: `default_model` |
 | `provider_api_key_env` | Option\<String\> | `null` | Environment variable name for the API key |
-| `agent_max_turns` | usize | `20` | Maximum agent turns (tool call loops) per request |
+| `agent_max_turns` | usize | `4` | Maximum agent turns (tool call loops) per request |
 | `agent_max_tokens` | usize | `4096` | Maximum tokens for agent responses |
 | `agent_system_prompt` | Option\<String\> | `null` | Additional system prompt appended to identity (never replaces it) |
 
@@ -146,7 +147,7 @@ provider_type = "openai"
 provider_base_url = "https://api.openai.com/v1"
 provider_model_id = "gpt-4o"
 provider_api_key_env = "OPENAI_API_KEY"
-agent_max_turns = 20
+agent_max_turns = 4
 agent_max_tokens = 4096
 agent_system_prompt = "Always respond concisely."
 ```
@@ -303,11 +304,13 @@ embedding_model = "BAAI/bge-small-en-v1.5"
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `agent_max_continuations` | usize | `5` | Maximum autonomous continuation turns for the reasoning engine |
+| `agent_max_continuations` | usize | `1` | Maximum autonomous continuation turns for the reasoning engine |
+| `tool_dedup_enabled` | bool | `true` | Deduplicate identical tool calls within a single request. Uses a per-request cache keyed by `hash(tool_name + args)` |
 | `agent_reasoning_guidance` | Option\<String\> | `null` | Custom reasoning instructions appended to agent system prompt |
 
 ```toml
-agent_max_continuations = 5
+agent_max_continuations = 1
+tool_dedup_enabled = true
 agent_reasoning_guidance = "Think step by step before taking actions."
 ```
 
@@ -329,12 +332,41 @@ plugin_execute_timeout_secs = 60
 plugin_auto_update = false
 ```
 
+### Tool Permissions
+
+Risk-based, per-surface tool permission system. See [Architecture: Tool Permission System](architecture.md#tool-permission-system-phase-19) for details.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `tool_permissions.low_risk_default` | String | `"allowed"` | Default permission for low-risk tools |
+| `tool_permissions.medium_risk_default` | String | `"allowed"` | Default permission for medium-risk tools |
+| `tool_permissions.high_risk_default` | String | `"denied"` | Default permission for high-risk tools |
+| `tool_permissions.overrides` | HashMap | desktop/cli/tui: all high-risk allowed | Per-surface, per-tool overrides |
+
+```toml
+[tool_permissions]
+low_risk_default = "allowed"
+medium_risk_default = "allowed"
+high_risk_default = "denied"
+
+[tool_permissions.overrides.telegram]
+memory = "denied"
+web_search = "allowed"
+
+[tool_permissions.overrides.desktop]
+shell = "allowed"
+file_read = "allowed"
+file_write = "allowed"
+```
+
+Permission states: `allowed`, `denied`, `ask_once` (future), `ask_always` (future).
+
 ### Channels
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `channels_enabled` | Vec\<String\> | `[]` | List of channel names to enable on startup |
-| `channel_tool_policy` | HashMap\<String, Vec\<String\>\> | `{"default": ["web_search", "system_info"]}` | Per-channel tool allowlists. `"default"` applies to all channels unless overridden |
+| `channel_tool_policy` | HashMap\<String, Vec\<String\>\> | `{}` | Legacy per-channel tool allowlists (superseded by `tool_permissions`) |
 | `telegram_polling_timeout_secs` | u32 | `30` | Telegram long-polling timeout |
 | `telegram_dm_policy` | String | `"allowlist"` | Telegram DM policy (`allowlist`, `open`, `deny`) |
 | `telegram_retry_min_ms` | u64 | `1000` | Minimum retry delay for Telegram API errors (milliseconds) |
@@ -344,10 +376,8 @@ plugin_auto_update = false
 ```toml
 channels_enabled = ["telegram", "slack"]
 
-[channel_tool_policy]
-default = ["web_search", "system_info"]
-telegram = ["web_search"]
-discord = []
+# Tool permissions for channels are now managed via [tool_permissions]
+# See the Tool Permissions section above
 
 telegram_polling_timeout_secs = 30
 telegram_dm_policy = "allowlist"
@@ -400,6 +430,20 @@ learning_archive_threshold = 0.3
 learning_archive_after_days = 30
 ```
 
+### User Profile
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `user_name` | Option\<String\> | `null` | User's display name (e.g., "Rakesh"). Used in greetings and personalization |
+| `user_timezone` | Option\<String\> | `null` | IANA timezone (e.g., "America/New_York"). Auto-detected on first run |
+| `user_location` | Option\<String\> | `null` | Location/region description (e.g., "New York, US"). Used for context injection |
+
+```toml
+user_name = "Rakesh"
+user_timezone = "America/New_York"
+user_location = "New York, US"
+```
+
 ### Logging
 
 | Field | Type | Default | Description |
@@ -430,10 +474,10 @@ Some configuration fields are only relevant when specific feature flags are enab
 | Feature Flag | Relevant Config Fields |
 |---|---|
 | `local-embeddings` | `embedding_provider` (when set to `"local"`), `embedding_model`, `embedding_download_dir` |
-| `channels` | `channels_enabled`, `channel_tool_policy` |
+| `channels` | `channels_enabled`, `tool_permissions` (channel surface overrides) |
 | `channels-telegram` | `telegram_polling_timeout_secs`, `telegram_dm_policy`, `telegram_retry_min_ms`, `telegram_retry_max_ms`, `telegram_require_group_mention` |
-| `channels-slack` | (uses `channel_tool_policy` for Slack-specific tool allowlists) |
-| `channels-discord` | (uses `channel_tool_policy` for Discord-specific tool allowlists) |
+| `channels-slack` | (uses `tool_permissions` for Slack surface overrides) |
+| `channels-discord` | (uses `tool_permissions` for Discord surface overrides) |
 | `scheduler` | `scheduler_tick_interval_secs`, `scheduler_stuck_threshold_secs`, `scheduler_error_backoff_secs`, `scheduler_max_history_per_job`, `scheduler_agent_turn_timeout_secs`, `scheduler_heartbeat_file` |
 
 Fields can always be set in the config file regardless of feature flags -- they are simply ignored at runtime if the corresponding feature is not compiled in.
@@ -459,7 +503,7 @@ log_level = "info"
 # AI Agent
 provider_name = "openai"
 provider_model_id = "gpt-4o"
-agent_max_turns = 20
+agent_max_turns = 4
 agent_max_tokens = 4096
 
 # Identity
@@ -491,7 +535,8 @@ embedding_provider = "none"
 embedding_model = "BAAI/bge-small-en-v1.5"
 
 # Reasoning
-agent_max_continuations = 5
+agent_max_continuations = 1
+tool_dedup_enabled = true
 
 # Context
 context_injection_enabled = true
@@ -503,6 +548,17 @@ context_auto_extract = true
 learning_enabled = true
 learning_max_observations = 10000
 learning_min_confidence = 0.5
+
+# User Profile
+# user_name = "Rakesh"
+# user_timezone = "America/New_York"
+# user_location = "New York, US"
+
+# Tool Permissions
+[tool_permissions]
+low_risk_default = "allowed"
+medium_risk_default = "allowed"
+high_risk_default = "denied"
 
 # Channels (requires --features channels)
 channels_enabled = []

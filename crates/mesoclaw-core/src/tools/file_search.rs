@@ -20,6 +20,10 @@ impl Tool for FileSearchTool {
         "file_search"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::High
+    }
+
     fn description(&self) -> &str {
         "Search for files matching a pattern, respecting .gitignore"
     }

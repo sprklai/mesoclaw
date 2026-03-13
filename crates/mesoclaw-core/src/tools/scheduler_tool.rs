@@ -26,6 +26,10 @@ impl Tool for SchedulerTool {
         "scheduler"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::Medium
+    }
+
     fn description(&self) -> &str {
         "Create, list, delete, toggle, or view history of scheduled jobs. Your context shows active jobs — check before creating duplicates. Use cron for complex schedules, interval for periodic. Set one_shot=true for one-time events (e.g. 'remind me at 5pm')."
     }

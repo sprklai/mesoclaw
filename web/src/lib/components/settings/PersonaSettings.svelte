@@ -27,6 +27,8 @@
 		category: string;
 		description: string;
 		created_at: number;
+		domain?: string;
+		surface?: string;
 	}
 
 	let identityFiles = $state<IdentityFile[]>([]);
@@ -165,9 +167,15 @@
 		<Card.Content class="space-y-2">
 			{#each skills as skill (skill.id)}
 				<div class="flex items-center justify-between p-2 rounded-lg bg-muted">
-					<div>
+					<div class="flex items-center flex-wrap gap-1.5">
 						<span class="font-medium">{skill.id}</span>
-						<Badge variant="secondary" class="ml-2">{skill.category}</Badge>
+						<Badge variant="secondary">{skill.category}</Badge>
+						{#if skill.domain}
+							<Badge variant="outline" class="text-[10px]">{skill.domain}</Badge>
+						{/if}
+						{#if skill.surface}
+							<Badge variant="outline" class="text-[10px] border-blue-500/50 text-blue-600 dark:text-blue-400">{skill.surface}</Badge>
+						{/if}
 					</div>
 					<div class="flex gap-1">
 						<Button variant="ghost" size="icon" class="h-7 w-7" onclick={() => handleEditSkill(skill.id)}>

@@ -49,7 +49,7 @@
 
 <!-- Row 4: Quality & i18n -->
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-1137%20Rust%20%2B%20JS-success?style=flat-square" alt="1137 Rust + JS Tests" />
+  <img src="https://img.shields.io/badge/tests-1203%20Rust%20%2B%20JS-success?style=flat-square" alt="1203 Rust + JS Tests" />
   <img src="https://img.shields.io/badge/i18n-EN-blue?style=flat-square" alt="English" />
 </p>
 
@@ -88,7 +88,7 @@
 | **Language** | Rust | TypeScript | Rust |
 | **Desktop GUI** | Tauri 2 + Svelte 5 | -- | -- |
 | **CLI** | clap | -- | -- |
-| **Headless Daemon** | axum (92 routes) | Node.js | 3.4MB daemon |
+| **Headless Daemon** | axum (96 routes) | Node.js | 3.4MB daemon |
 | **AI Providers** | 18 via rig-core | Multi-model | 22+ |
 | **Built-in Tools** | 16 | 100+ AgentSkills | Tool orchestration |
 | **Plugin System** | JSON-RPC (any language) | AgentSkills | Trait-based adapters |
@@ -101,7 +101,7 @@
 | **Binary Size** | <20MB (native w/ GUI) | Node.js runtime | 3.4MB |
 | **Privacy** | 100% local, zero telemetry | Local, model-agnostic | 100% local |
 | **License** | MIT | Open source | Open source |
-| **Tests** | 1137 Rust + JS | -- | -- |
+| **Tests** | 1203 Rust + JS | -- | -- |
 
 ---
 
@@ -110,7 +110,7 @@
 - **18 AI providers** via rig-core (OpenAI, Anthropic, Google, Ollama, and more)
 - **Tool calling** with 16 built-in tools (14 base + 2 feature-gated) via DashMap-backed ToolRegistry: websearch, sysinfo, shell, file read/write/list/search, patch, process, learn, skill_proposal, memory, config, agent_self + feature-gated channel_send, scheduler
 - **Plugin system** -- external process plugins via JSON-RPC 2.0 protocol, installable from git or local paths, with automatic tool and skill registration
-- **Autonomous reasoning** -- ReasoningEngine with ContinuationStrategy for multi-step autonomous agent loops
+- **Autonomous reasoning** -- ReasoningEngine with tool-aware ContinuationStrategy and per-request tool call deduplication cache
 - **Context-driven auto-discovery** -- keyword-based domain detection (Channels/Scheduler/Skills/Tools) filters context injection and agent rules to only relevant domains per query
 - **Self-evolving agent** -- AgentSelfTool (`agent_notes`) for agent-writable behavioral rules by category, stored in DB and auto-injected into context; SkillProposalTool for human-in-the-loop skill evolution
 - **Model capability validation** -- `supports_tools` pre-check prevents tool-calling errors with incompatible models
@@ -124,6 +124,7 @@
 - **Soul / Persona system** -- 3 identity files (SOUL/IDENTITY/USER.md) with dynamic prompt composition
 - **Skills system** -- bundled + user markdown skills loaded into agent context (Claude Code model)
 - **Progressive user learning** -- SQLite-backed observations with category filtering, confidence scoring, and privacy controls
+- **Tool permission system** -- per-surface, risk-based tool permissions with 3 risk levels (Low/Medium/High), surface-specific overrides, and settings UI
 - **Secure credentials** via OS keyring with zeroize memory protection
 - **Messaging channels** -- Telegram, Slack, Discord with lifecycle hooks (typing indicators, status messages) and end-to-end channel router pipeline (feature-gated, trait-based with DashMap registry)
 - **Cron scheduler** -- automated recurring tasks with real payload execution (Notify, AgentTurn, Heartbeat, SendViaChannel)
@@ -343,8 +344,8 @@ mesoclaw/
 │   ├── architecture.md     # Detailed architecture diagrams
 │   ├── phases.md           # Implementation phase details
 │   ├── processes.md        # Process flow diagrams
-│   ├── api-reference.md    # All 92 REST/WS routes
-│   ├── configuration.md    # All 60+ config fields
+│   ├── api-reference.md    # All 96 REST/WS routes
+│   ├── configuration.md    # All 70+ config fields
 │   ├── cli-reference.md    # CLI command reference
 │   ├── deployment.md       # Deployment guide
 │   └── development.md      # Development guide
@@ -561,9 +562,11 @@ default_model = "gpt-4o"
 security_autonomy_level = "supervised"  # supervised | autonomous | strict
 max_tool_retries = 3
 # gateway_auth_token = "your-secret-token"  # Optional bearer token for auth
-# agent_max_turns = 20                       # Max tool-calling turns per request
-# agent_max_continuations = 5               # Max autonomous reasoning turns
+# agent_max_turns = 4                        # Max tool-calling turns per request
+# agent_max_continuations = 1               # Max autonomous reasoning turns
+# tool_dedup_enabled = true                 # Deduplicate identical tool calls per request
 # embedding_provider = "none"               # none | openai | local
+# user_name = "John"                        # Display name for greetings
 # user_timezone = "America/New_York"        # IANA timezone (auto-detected on first run)
 # user_location = "New York, US"            # User location for context-aware queries
 # plugins_dir = "/custom/plugins/path"      # Override default plugins directory
@@ -605,7 +608,7 @@ mesoclaw plugin info <name>                  # Show plugin details
 
 Global options: `--host`, `--port`, `--token` (or `MESOCLAW_TOKEN` env var)
 
-## Gateway Routes (75 base + 17 feature-gated = 92 total)
+## Gateway Routes (79 base + 17 feature-gated = 96 total)
 
 | Group | Routes | Description |
 |-------|--------|-------------|
@@ -617,6 +620,7 @@ Global options: `--host`, `--port`, `--token` (or `MESOCLAW_TOKEN` env var)
 | Credentials | `POST/GET /credentials`, `DELETE /credentials/{key}`, `GET /credentials/{key}/value`, `GET /credentials/{key}/exists` | Credential management (keyring) |
 | Providers & Models | `GET/POST /providers`, `GET /providers/with-key-status`, `GET/PUT /providers/default`, `GET/PUT/DELETE /providers/{id}`, `POST /providers/{id}/test`, `POST /providers/{id}/models`, `DELETE /providers/{id}/models/{model_id}`, `GET /models` | Multi-provider AI management |
 | Tools | `GET /tools`, `POST /tools/{name}/execute` | Tool listing and execution |
+| Permissions | `GET /permissions`, `GET /permissions/{surface}`, `PUT/DELETE /permissions/{surface}/{tool}` | Per-surface tool permissions |
 | System | `GET /system/info` | System information |
 | Identity | `GET /identity`, `GET/PUT /identity/{name}`, `POST /identity/reload` | Persona management |
 | Skills | `GET /skills`, `GET/PUT/DELETE /skills/{id}`, `POST /skills`, `POST /skills/reload` | Skill CRUD |
@@ -636,8 +640,8 @@ Global options: `--host`, `--port`, `--token` (or `MESOCLAW_TOKEN` env var)
 Detailed documentation lives in the `docs/` directory:
 
 - [CLI Reference](docs/cli-reference.md) -- All commands, options, shell completions, recipes
-- [API Reference](docs/api-reference.md) -- All 92 REST/WS routes with request/response schemas
-- [Configuration](docs/configuration.md) -- All 60+ config.toml fields with types and defaults
+- [API Reference](docs/api-reference.md) -- All 96 REST/WS routes with request/response schemas
+- [Configuration](docs/configuration.md) -- All 70+ config.toml fields with types and defaults
 - [Deployment Guide](docs/deployment.md) -- Native, Docker, systemd, Raspberry Pi, reverse proxy
 - [Development Guide](docs/development.md) -- Prerequisites, building, testing, how-to guides
 - [Architecture](docs/architecture.md) -- System diagrams, crate dependencies, project structure

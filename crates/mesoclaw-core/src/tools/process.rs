@@ -24,6 +24,10 @@ impl Tool for ProcessTool {
         "process"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::High
+    }
+
     fn description(&self) -> &str {
         "List or manage system processes"
     }

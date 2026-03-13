@@ -32,6 +32,7 @@
 - [AgentSelfTool](#agentselftool)
 - [OpenAPI Documentation](#openapi-documentation)
 - [Onboarding Flow](#onboarding-flow)
+- [Tool Permission System](#tool-permission-system-phase-19)
 - [Model Capability Validation](#model-capability-validation)
 - [Concurrency Rules](#concurrency-rules)
 - [Lessons Learned from v1](#lessons-learned-from-v1)
@@ -770,7 +771,7 @@ graph TB
 
 ## Gateway Routes
 
-All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Routes are grouped by subsystem (75 base + 17 feature-gated = 92 total).
+All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Routes are grouped by subsystem (79 base + 17 feature-gated = 96 total).
 
 ### Health (1 route, no auth)
 
@@ -854,6 +855,15 @@ All clients communicate via the HTTP+WebSocket gateway at `127.0.0.1:18981`. Rou
 |---|---|---|
 | GET | `/tools` | List available tools |
 | POST | `/tools/{name}/execute` | Execute a tool by name |
+
+### Permissions (4 routes)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/permissions` | List all known surfaces (desktop, cli, tui, telegram, slack, discord) |
+| GET | `/permissions/{surface}` | List tool permissions for a surface |
+| PUT | `/permissions/{surface}/{tool}` | Set a permission override for a tool on a surface |
+| DELETE | `/permissions/{surface}/{tool}` | Remove an override (fall back to risk-level default) |
 
 ### System (1 route)
 
@@ -1243,29 +1253,46 @@ graph TD
 
 ## Autonomous Reasoning Engine (Phase 8.11)
 
-The `ReasoningEngine` provides an extensible pipeline for autonomous multi-step agent operation:
+The `ReasoningEngine` provides an extensible pipeline for autonomous multi-step agent operation, with per-request tool call deduplication to prevent redundant API calls:
 
 ```mermaid
 flowchart TD
-    Chat([Chat request]) --> RE["ReasoningEngine::chat()"]
+    Chat([Chat request]) --> Cache["ToolCallCache<br>per-request DashMap"]
+    Cache --> RE["ReasoningEngine::chat()"]
     RE --> Agent["MesoAgent::prompt()"]
     Agent --> LLM["LLM Provider"]
     LLM --> Response["Agent response"]
     Response --> Strategies["Run strategies"]
 
-    Strategies --> CS{"ContinuationStrategy<br>check for continuation signals"}
-    CS -->|"Needs more work<br>turn less than max"| Nudge["Inject continuation nudge"]
+    Strategies --> CS{"ContinuationStrategy<br>tools used? skip text heuristic"}
+    CS -->|"No tools called<br>+ planning language"| Nudge["Inject continuation nudge"]
     Nudge --> Agent
-    CS -->|"Complete or<br>max turns reached"| Done([Final response])
+    CS -->|"Tools called OR<br>response complete"| Done([Final response])
+
+    Agent --> ToolCall{"Tool call?"}
+    ToolCall -->|cache hit| Cached["Return cached result<br>emit Cached event"]
+    ToolCall -->|cache miss| Execute["Execute tool<br>store in cache"]
+    Execute --> Agent
+    Cached --> Agent
 
     style RE fill:#4CAF50,color:#fff
     style CS fill:#FF9800,color:#fff
+    style Cache fill:#2196F3,color:#fff
 ```
 
 Key components:
 - **ReasoningEngine** -- orchestrates agent calls with pluggable strategy pipeline
-- **ContinuationStrategy** -- detects incomplete responses, injects continuation nudges, respects `agent_max_continuations` limit
+- **ToolCallCache** -- per-request `DashMap<u64, CachedResult>` keyed by `hash(tool_name + args_json)`. Shared across all `RigToolAdapter`s via `Arc`. Caches both successes and errors. Tracks execution count via `AtomicU32`. Controlled by `tool_dedup_enabled` config (default `true`)
+- **ContinuationStrategy** -- tool-aware continuation detection. If `tool_calls_made > 0`, skips the text heuristic entirely (prevents false positives like "Let me tell you about..."). Falls back to planning/refusal language detection only when no tools were called. Respects `agent_max_continuations` limit (default `1`)
 - **BootContext** -- system environment discovery (OS, arch, hostname, home dir, desktop, downloads, shell, username)
+
+### Deduplication defaults
+
+| Config | Default | Range | Description |
+|--------|---------|-------|-------------|
+| `agent_max_turns` | 4 | 1-16 | Max rig-core agentic turns per `agent.chat()` |
+| `agent_max_continuations` | 1 | 0-5 | Max ReasoningEngine continuation rounds |
+| `tool_dedup_enabled` | true | -- | Enable per-request tool call cache |
 
 ## Semantic Memory and Embeddings (Phase 8.11)
 
@@ -1517,6 +1544,61 @@ sequenceDiagram
 - `user_location: Option<String>` -- Human-readable (e.g., "New York, US")
 
 **Key files**: `gateway/handlers/config.rs` (`setup_status`), `web/src/lib/components/SetupDialog.svelte`
+
+---
+
+## Tool Permission System (Phase 19)
+
+Per-surface, risk-based tool permission system. Each tool declares a `RiskLevel` (Low, Medium, High) via the `Tool` trait. Permissions are resolved hierarchically: per-surface per-tool override > risk-level default.
+
+### Risk Level Defaults
+
+| Risk Level | Default | Examples |
+|---|---|---|
+| Low | Allowed | web_search, system_info |
+| Medium | Allowed | config, learn, memory, skill_proposal, agent_self, channel_send, scheduler |
+| High | Denied | shell, file_read, file_write, file_list, file_search, patch, process |
+
+### Surface Overrides
+
+Local surfaces (desktop, cli, tui) override all high-risk tools to `Allowed` by default. Remote surfaces (telegram, slack, discord) use risk-level defaults -- high-risk tools are denied unless explicitly overridden.
+
+### Permission States
+
+| State | Behavior |
+|---|---|
+| `allowed` | Tool can execute |
+| `denied` | Tool is blocked |
+| `ask_once` | Prompt user once, remember answer (Phase 2) |
+| `ask_always` | Prompt user every time (Phase 2) |
+
+### Resolution Flow
+
+```mermaid
+graph TD
+    A["Tool call on surface"] --> B{"Per-surface override?"}
+    B -->|yes| C["Use override state"]
+    B -->|no| D{"Check risk level"}
+    D --> E["Low: allowed"]
+    D --> F["Medium: allowed"]
+    D --> G["High: denied"]
+
+    style C fill:#4CAF50,color:#fff
+    style E fill:#4CAF50,color:#fff
+    style F fill:#FF9800,color:#fff
+    style G fill:#F44336,color:#fff
+```
+
+### Key Files
+
+| File | Purpose |
+|---|---|
+| `security/permissions.rs` | `ToolPermissions`, `PermissionResolver`, `PermissionState` |
+| `tools/traits.rs` | `risk_level()` method on `Tool` trait |
+| `config/schema.rs` | `tool_permissions` field in `AppConfig` |
+| `gateway/handlers/permissions.rs` | REST API (4 routes) |
+| `web/src/lib/components/settings/PermissionsSettings.svelte` | Settings UI |
+| `web/src/lib/stores/permissions.svelte.ts` | Frontend store |
 
 ---
 

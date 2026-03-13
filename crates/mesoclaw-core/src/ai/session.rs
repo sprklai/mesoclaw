@@ -493,6 +493,9 @@ impl SessionManager {
                         Some(*duration_ms),
                     ));
                 }
+                ToolCallPhase::Cached { .. } => {
+                    // Cached results are dedup replays — don't persist as separate records
+                }
             }
         }
 

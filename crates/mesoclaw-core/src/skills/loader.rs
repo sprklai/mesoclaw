@@ -36,6 +36,8 @@ pub fn load_skill_from_content(id: &str, content: &str, source: SkillSource) -> 
             content: body,
             source,
             enabled: true,
+            domain: fm.domain,
+            surface: fm.surface,
         },
         None => Skill {
             id: id.to_string(),
@@ -45,6 +47,8 @@ pub fn load_skill_from_content(id: &str, content: &str, source: SkillSource) -> 
             content: content.to_string(),
             source,
             enabled: true,
+            domain: None,
+            surface: None,
         },
     }
 }

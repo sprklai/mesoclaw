@@ -25,6 +25,10 @@ impl Tool for MemoryTool {
         "memory"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::Medium
+    }
+
     fn description(&self) -> &str {
         "Store, recall, or forget information in persistent memory. Use 'store' to save facts, 'recall' to search memories, 'forget' to remove a specific entry."
     }

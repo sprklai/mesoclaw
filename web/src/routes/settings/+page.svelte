@@ -8,7 +8,9 @@
 	import Puzzle from '@lucide/svelte/icons/puzzle';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Bell from '@lucide/svelte/icons/bell';
+	import Shield from '@lucide/svelte/icons/shield';
 	import GeneralSettings from '$lib/components/settings/GeneralSettings.svelte';
+	import PermissionsSettings from '$lib/components/settings/PermissionsSettings.svelte';
 	import ConfigurationsSettings from '$lib/components/settings/ConfigurationsSettings.svelte';
 	import ProvidersSettings from '$lib/components/settings/ProvidersSettings.svelte';
 	import PersonaSettings from '$lib/components/settings/PersonaSettings.svelte';
@@ -23,6 +25,7 @@
 		{ id: 'providers', label: 'Providers', icon: Building2 },
 		{ id: 'persona', label: 'Persona', icon: User },
 		{ id: 'channels', label: 'Channels', icon: MessageSquare },
+		{ id: 'permissions', label: 'Permissions', icon: Shield },
 		{ id: 'notifications', label: 'Notifications', icon: Bell },
 		{ id: 'services', label: 'Services', icon: KeyRound },
 		{ id: 'embeddings', label: 'Embeddings', icon: Brain },
@@ -104,6 +107,8 @@
 			<PersonaSettings />
 		{:else if activeTab === 'channels'}
 			<ChannelsSettings />
+		{:else if activeTab === 'permissions'}
+			<PermissionsSettings />
 		{:else if activeTab === 'notifications'}
 			<NotificationsSettings />
 		{:else if activeTab === 'services'}

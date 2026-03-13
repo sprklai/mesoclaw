@@ -514,7 +514,15 @@ impl PromptPlugin for SkillsPlugin {
         vec![] // always active
     }
 
-    async fn contribute(&self, _request: &AssemblyRequest) -> Result<Vec<PromptFragment>> {
+    async fn contribute(&self, request: &AssemblyRequest) -> Result<Vec<PromptFragment>> {
+        let detected_domains = request
+            .user_message
+            .as_deref()
+            .map(crate::ai::context::detect_relevant_domains)
+            .unwrap_or_default();
+
+        let surface = request.channel_hint.as_deref().unwrap_or("desktop");
+
         let all_skills = self.skill_registry.list().await;
         let mut fragments = Vec::new();
 
@@ -523,6 +531,22 @@ impl PromptPlugin for SkillsPlugin {
                 continue;
             }
             if let Ok(skill) = self.skill_registry.get(&info.id).await {
+                // Check surface filter
+                if let Some(ref skill_surface) = skill.surface
+                    && skill_surface != "all"
+                    && skill_surface != surface
+                {
+                    continue;
+                }
+
+                // Check domain filter (None = always active)
+                if let Some(ref domain_str) = skill.domain
+                    && let Some(d) = ContextDomain::from_domain_str(domain_str)
+                    && !detected_domains.contains(&d)
+                {
+                    continue;
+                }
+
                 fragments.push(PromptFragment {
                     section: PromptSection::DynamicContext,
                     content: format!("### Skill: {}\n{}", skill.name, skill.content),

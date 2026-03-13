@@ -91,6 +91,10 @@ impl Tool for FileReadTool {
         "file_read"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::High
+    }
+
     fn description(&self) -> &str {
         "Read the contents of a file"
     }
@@ -162,6 +166,10 @@ impl FileWriteTool {
 impl Tool for FileWriteTool {
     fn name(&self) -> &str {
         "file_write"
+    }
+
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::High
     }
 
     fn description(&self) -> &str {
@@ -236,6 +244,10 @@ impl FileListTool {
 impl Tool for FileListTool {
     fn name(&self) -> &str {
         "file_list"
+    }
+
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::High
     }
 
     fn description(&self) -> &str {

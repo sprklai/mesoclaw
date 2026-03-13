@@ -104,6 +104,12 @@ impl ReasoningStrategy for ContinuationStrategy {
     }
 
     async fn evaluate(&self, context: &StrategyContext) -> Option<String> {
+        // If tools were actually called, the response is a result, not a plan.
+        // Skip the text heuristic — false positives like "Let me tell you about..."
+        // would otherwise trigger needless continuation rounds.
+        if context.tool_calls_made > 0 {
+            return None;
+        }
         if Self::looks_incomplete(&context.response) {
             Some(self.build_nudge(context.intervention_count))
         } else {
@@ -209,11 +215,57 @@ mod tests {
             original_prompt: "find text files on my desktop".into(),
             response: "I will search for text files on your desktop".into(),
             intervention_count: 0,
+            tool_calls_made: 0,
         };
         let result = strategy.evaluate(&ctx).await;
         assert!(result.is_some());
         let nudge = result.unwrap();
         assert!(nudge.contains("attempt 1/3"));
         assert!(nudge.contains("MUST use your available tools"));
+    }
+
+    // TC-C1 — Skip nudge when tool_calls_made > 0 + planning language
+    #[tokio::test]
+    async fn tc_c1_skip_nudge_when_tools_used() {
+        let strategy = ContinuationStrategy::new(3);
+        let ctx = StrategyContext {
+            original_prompt: "what's the weather?".into(),
+            response: "Let me tell you about the weather in your area".into(),
+            intervention_count: 0,
+            tool_calls_made: 1, // tools were already called
+        };
+        let result = strategy.evaluate(&ctx).await;
+        assert!(result.is_none(), "should skip nudge when tools were used");
+    }
+
+    // TC-C2 — Nudge when tool_calls_made == 0 + planning language
+    #[tokio::test]
+    async fn tc_c2_nudge_when_no_tools_used() {
+        let strategy = ContinuationStrategy::new(3);
+        let ctx = StrategyContext {
+            original_prompt: "what's the weather?".into(),
+            response: "I will search for the weather information".into(),
+            intervention_count: 0,
+            tool_calls_made: 0, // no tools called
+        };
+        let result = strategy.evaluate(&ctx).await;
+        assert!(result.is_some(), "should nudge when no tools were used");
+    }
+
+    // TC-C3 — Skip nudge when tool_calls_made > 0 + refusal language
+    #[tokio::test]
+    async fn tc_c3_skip_nudge_refusal_when_tools_used() {
+        let strategy = ContinuationStrategy::new(3);
+        let ctx = StrategyContext {
+            original_prompt: "list files".into(),
+            response: "I can't access your filesystem directly".into(),
+            intervention_count: 0,
+            tool_calls_made: 2, // tools were called
+        };
+        let result = strategy.evaluate(&ctx).await;
+        assert!(
+            result.is_none(),
+            "should skip nudge when tools were used, even with refusal language"
+        );
     }
 }

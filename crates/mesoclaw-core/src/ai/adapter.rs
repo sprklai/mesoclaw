@@ -1,6 +1,10 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Instant;
 
+use dashmap::DashMap;
 use rig::completion::ToolDefinition;
 use rig::tool::{ToolDyn, ToolError};
 use rig::wasm_compat::WasmBoxedFuture;
@@ -8,6 +12,79 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
 use crate::tools::Tool;
+
+/// Cached result from a tool call.
+#[derive(Debug, Clone)]
+pub struct CachedResult {
+    /// Serialized output (JSON for success, error string for failure).
+    pub output: String,
+    /// Logical tool success (from ToolResult.success on Ok path, false on Err path).
+    pub success: bool,
+    /// Whether the original call() returned Ok (true) or Err (false).
+    pub is_ok: bool,
+}
+
+/// Per-request cache for deduplicating identical tool calls.
+///
+/// Keyed by `hash(tool_name + args_json)`. Shared across all adapters
+/// for a single request via `Arc`. Tracks actual execution count for
+/// continuation strategy awareness.
+pub struct ToolCallCache {
+    entries: DashMap<u64, CachedResult>,
+    call_count: AtomicU32,
+}
+
+impl Default for ToolCallCache {
+    fn default() -> Self {
+        Self {
+            entries: DashMap::new(),
+            call_count: AtomicU32::new(0),
+        }
+    }
+}
+
+impl ToolCallCache {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Compute cache key from tool name and args JSON string.
+    pub fn cache_key(tool_name: &str, args: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        tool_name.hash(&mut hasher);
+        args.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    /// Check if a result is cached.
+    pub fn get(&self, key: u64) -> Option<CachedResult> {
+        self.entries.get(&key).map(|r| r.clone())
+    }
+
+    /// Store a result in the cache.
+    pub fn insert(&self, key: u64, result: CachedResult) {
+        self.entries.insert(key, result);
+    }
+
+    /// Increment the actual execution counter (called on cache miss).
+    pub fn record_execution(&self) {
+        self.call_count.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Number of actual (non-cached) tool executions.
+    pub fn executions(&self) -> u32 {
+        self.call_count.load(Ordering::Relaxed)
+    }
+}
+
+impl std::fmt::Debug for ToolCallCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ToolCallCache")
+            .field("entries", &self.entries.len())
+            .field("call_count", &self.call_count.load(Ordering::Relaxed))
+            .finish()
+    }
+}
 
 /// Event emitted by a tool adapter during execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,6 +106,8 @@ pub enum ToolCallPhase {
         success: bool,
         duration_ms: u64,
     },
+    #[serde(rename = "cached")]
+    Cached { output: String, success: bool },
 }
 
 /// Bridges a MesoClaw `Tool` trait object to rig-core's `ToolDyn` trait,
@@ -36,6 +115,7 @@ pub enum ToolCallPhase {
 pub struct RigToolAdapter {
     tool: Arc<dyn Tool>,
     event_tx: Option<broadcast::Sender<ToolCallEvent>>,
+    cache: Option<Arc<ToolCallCache>>,
 }
 
 impl RigToolAdapter {
@@ -43,6 +123,7 @@ impl RigToolAdapter {
         Self {
             tool,
             event_tx: None,
+            cache: None,
         }
     }
 
@@ -51,7 +132,14 @@ impl RigToolAdapter {
         Self {
             tool,
             event_tx: Some(tx),
+            cache: None,
         }
+    }
+
+    /// Attach a dedup cache to this adapter (builder pattern).
+    pub fn with_cache(mut self, cache: Arc<ToolCallCache>) -> Self {
+        self.cache = Some(cache);
+        self
     }
 
     /// Convert a list of MesoClaw tools into boxed rig ToolDyn objects.
@@ -70,6 +158,36 @@ impl RigToolAdapter {
         tools
             .iter()
             .map(|t| Box::new(Self::new_with_events(Arc::clone(t), tx.clone())) as Box<dyn ToolDyn>)
+            .collect()
+    }
+
+    /// Convert tools with event broadcasting and a shared dedup cache.
+    pub fn from_tools_with_events_and_cache(
+        tools: &[Arc<dyn Tool>],
+        tx: broadcast::Sender<ToolCallEvent>,
+        cache: Arc<ToolCallCache>,
+    ) -> Vec<Box<dyn ToolDyn>> {
+        tools
+            .iter()
+            .map(|t| {
+                Box::new(
+                    Self::new_with_events(Arc::clone(t), tx.clone()).with_cache(Arc::clone(&cache)),
+                ) as Box<dyn ToolDyn>
+            })
+            .collect()
+    }
+
+    /// Convert tools with a shared dedup cache (no event broadcasting).
+    pub fn from_tools_with_cache(
+        tools: &[Arc<dyn Tool>],
+        cache: Arc<ToolCallCache>,
+    ) -> Vec<Box<dyn ToolDyn>> {
+        tools
+            .iter()
+            .map(|t| {
+                Box::new(Self::new(Arc::clone(t)).with_cache(Arc::clone(&cache)))
+                    as Box<dyn ToolDyn>
+            })
             .collect()
     }
 }
@@ -97,7 +215,32 @@ impl ToolDyn for RigToolAdapter {
             let call_id = uuid::Uuid::new_v4().to_string();
             let tool_name = self.tool.name().to_string();
 
-            // Emit Started event
+            // Check cache first (before emitting Started)
+            if let Some(ref cache) = self.cache {
+                let key = ToolCallCache::cache_key(&tool_name, &args);
+                if let Some(cached) = cache.get(key) {
+                    // Emit Cached event
+                    if let Some(ref tx) = self.event_tx {
+                        let _ = tx.send(ToolCallEvent {
+                            call_id,
+                            tool_name,
+                            phase: ToolCallPhase::Cached {
+                                output: cached.output.clone(),
+                                success: cached.success,
+                            },
+                        });
+                    }
+                    return if cached.is_ok {
+                        Ok(cached.output)
+                    } else {
+                        Err(ToolError::ToolCallError(Box::new(std::io::Error::other(
+                            cached.output,
+                        ))))
+                    };
+                }
+            }
+
+            // Emit Started event (cache miss)
             if let Some(ref tx) = self.event_tx {
                 let _ = tx.send(ToolCallEvent {
                     call_id: call_id.clone(),
@@ -116,6 +259,20 @@ impl ToolDyn for RigToolAdapter {
                 Ok(result) => {
                     let output = serde_json::to_string(&result).map_err(ToolError::JsonError)?;
 
+                    // Store in cache and record execution
+                    if let Some(ref cache) = self.cache {
+                        let key = ToolCallCache::cache_key(&tool_name, &args);
+                        cache.insert(
+                            key,
+                            CachedResult {
+                                output: output.clone(),
+                                success: result.success,
+                                is_ok: true,
+                            },
+                        );
+                        cache.record_execution();
+                    }
+
                     // Emit Completed event
                     if let Some(ref tx) = self.event_tx {
                         let _ = tx.send(ToolCallEvent {
@@ -132,6 +289,20 @@ impl ToolDyn for RigToolAdapter {
                     Ok(output)
                 }
                 Err(e) => {
+                    // Store error in cache and record execution
+                    if let Some(ref cache) = self.cache {
+                        let key = ToolCallCache::cache_key(&tool_name, &args);
+                        cache.insert(
+                            key,
+                            CachedResult {
+                                output: e.to_string(),
+                                success: false,
+                                is_ok: false,
+                            },
+                        );
+                        cache.record_execution();
+                    }
+
                     // Emit Completed with failure
                     if let Some(ref tx) = self.event_tx {
                         let _ = tx.send(ToolCallEvent {
@@ -382,5 +553,157 @@ mod tests {
         } else {
             panic!("expected Completed phase");
         }
+    }
+
+    // TC-D1 — Cache hit returns cached result
+    #[tokio::test]
+    async fn tc_d1_cache_hit_returns_cached() {
+        let cache = Arc::new(ToolCallCache::new());
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+        let adapter = RigToolAdapter::new(Arc::clone(&tool)).with_cache(Arc::clone(&cache));
+
+        let r1 = adapter
+            .call(json!({"input": "hello"}).to_string())
+            .await
+            .unwrap();
+        let r2 = adapter
+            .call(json!({"input": "hello"}).to_string())
+            .await
+            .unwrap();
+        assert_eq!(r1, r2);
+    }
+
+    // TC-D2 — Cache miss returns None
+    #[test]
+    fn tc_d2_cache_miss_returns_none() {
+        let cache = ToolCallCache::new();
+        let key = ToolCallCache::cache_key("test", r#"{"input":"hi"}"#);
+        assert!(cache.get(key).is_none());
+    }
+
+    // TC-D3 — Error results are cached
+    #[tokio::test]
+    async fn tc_d3_error_results_are_cached() {
+        let cache = Arc::new(ToolCallCache::new());
+        let tool: Arc<dyn Tool> = Arc::new(FailingTool);
+        let adapter = RigToolAdapter::new(tool).with_cache(Arc::clone(&cache));
+
+        assert!(adapter.call("{}".to_string()).await.is_err());
+        assert!(adapter.call("{}".to_string()).await.is_err());
+        assert_eq!(cache.executions(), 1);
+    }
+
+    // TC-D4 — Cache disabled (no cache attached)
+    #[tokio::test]
+    async fn tc_d4_no_cache_no_dedup() {
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+        let adapter = RigToolAdapter::new(tool);
+
+        let r1 = adapter
+            .call(json!({"input": "a"}).to_string())
+            .await
+            .unwrap();
+        let r2 = adapter
+            .call(json!({"input": "a"}).to_string())
+            .await
+            .unwrap();
+        assert_eq!(r1, r2);
+    }
+
+    // TC-D5 — call_count increments on actual exec, not cache hit
+    #[tokio::test]
+    async fn tc_d5_call_count_tracks_actual_executions() {
+        let cache = Arc::new(ToolCallCache::new());
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+        let adapter = RigToolAdapter::new(tool).with_cache(Arc::clone(&cache));
+
+        let _ = adapter.call(json!({"input": "hello"}).to_string()).await;
+        assert_eq!(cache.executions(), 1);
+
+        let _ = adapter.call(json!({"input": "hello"}).to_string()).await;
+        assert_eq!(cache.executions(), 1); // cached — no increment
+
+        let _ = adapter.call(json!({"input": "world"}).to_string()).await;
+        assert_eq!(cache.executions(), 2);
+    }
+
+    // TC-D6 — Per-request scope: separate caches are independent
+    #[tokio::test]
+    async fn tc_d6_separate_caches_independent() {
+        let cache1 = Arc::new(ToolCallCache::new());
+        let cache2 = Arc::new(ToolCallCache::new());
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+
+        let a1 = RigToolAdapter::new(Arc::clone(&tool)).with_cache(cache1.clone());
+        let a2 = RigToolAdapter::new(Arc::clone(&tool)).with_cache(cache2.clone());
+
+        let _ = a1.call(json!({"input": "hello"}).to_string()).await;
+        assert_eq!(cache1.executions(), 1);
+        assert_eq!(cache2.executions(), 0);
+
+        let _ = a2.call(json!({"input": "hello"}).to_string()).await;
+        assert_eq!(cache2.executions(), 1);
+    }
+
+    // TC-D7 — Cached event emitted on cache hit
+    #[tokio::test]
+    async fn tc_d7_cached_event_emitted() {
+        let cache = Arc::new(ToolCallCache::new());
+        let (tx, mut rx) = broadcast::channel::<ToolCallEvent>(16);
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+        let adapter = RigToolAdapter::new_with_events(tool, tx).with_cache(Arc::clone(&cache));
+
+        let _ = adapter.call(json!({"input": "hi"}).to_string()).await;
+        let _started = rx.recv().await.unwrap();
+        let _completed = rx.recv().await.unwrap();
+
+        let _ = adapter.call(json!({"input": "hi"}).to_string()).await;
+        let cached_event = rx.recv().await.unwrap();
+        assert!(matches!(
+            cached_event.phase,
+            ToolCallPhase::Cached { success: true, .. }
+        ));
+    }
+
+    // TC-D8 — Different args produce different cache keys
+    #[tokio::test]
+    async fn tc_d8_different_args_different_keys() {
+        let cache = Arc::new(ToolCallCache::new());
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+        let adapter = RigToolAdapter::new(tool).with_cache(Arc::clone(&cache));
+
+        let _ = adapter.call(json!({"input": "a"}).to_string()).await;
+        let _ = adapter.call(json!({"input": "b"}).to_string()).await;
+        assert_eq!(cache.executions(), 2);
+    }
+
+    // TC-D9 — Shared cache across adapters: same tool+args hits
+    #[tokio::test]
+    async fn tc_d9_shared_cache_across_adapters() {
+        let cache = Arc::new(ToolCallCache::new());
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+
+        let a1 = RigToolAdapter::new(Arc::clone(&tool)).with_cache(Arc::clone(&cache));
+        let a2 = RigToolAdapter::new(Arc::clone(&tool)).with_cache(Arc::clone(&cache));
+
+        let _ = a1.call(json!({"input": "hello"}).to_string()).await;
+        assert_eq!(cache.executions(), 1);
+
+        let _ = a2.call(json!({"input": "hello"}).to_string()).await;
+        assert_eq!(cache.executions(), 1); // cache hit
+    }
+
+    // TC-D10 — Adapter without cache works normally (backwards compat)
+    #[tokio::test]
+    async fn tc_d10_adapter_without_cache_backwards_compat() {
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+        let adapter = RigToolAdapter::new(tool);
+        let result = adapter
+            .call(json!({"input": "hello"}).to_string())
+            .await
+            .unwrap();
+        let parsed: ToolResult = serde_json::from_str(&result).unwrap();
+        assert!(parsed.success);
+        assert_eq!(parsed.output, "processed: hello");
     }
 }

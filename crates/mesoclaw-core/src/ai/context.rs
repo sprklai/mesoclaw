@@ -39,6 +39,19 @@ pub enum ContextDomain {
     Tools,
 }
 
+impl ContextDomain {
+    /// Parse a domain string (from skill frontmatter) to ContextDomain.
+    pub fn from_domain_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "channels" => Some(Self::Channels),
+            "scheduler" => Some(Self::Scheduler),
+            "skills" => Some(Self::Skills),
+            "tools" => Some(Self::Tools),
+            _ => None,
+        }
+    }
+}
+
 /// Detect which context domains are relevant to the user's message.
 /// Lightweight keyword matching — no LLM call.
 pub fn detect_relevant_domains(user_message: &str) -> HashSet<ContextDomain> {
@@ -4134,5 +4147,31 @@ mod tests {
             result.contains("Reasoning Protocol"),
             "compose_full output should contain reasoning protocol"
         );
+    }
+
+    // P19.25 — ContextDomain::from_domain_str parses known domains
+    #[test]
+    fn context_domain_from_str() {
+        assert_eq!(
+            ContextDomain::from_domain_str("channels"),
+            Some(ContextDomain::Channels)
+        );
+        assert_eq!(
+            ContextDomain::from_domain_str("scheduler"),
+            Some(ContextDomain::Scheduler)
+        );
+        assert_eq!(
+            ContextDomain::from_domain_str("skills"),
+            Some(ContextDomain::Skills)
+        );
+        assert_eq!(
+            ContextDomain::from_domain_str("tools"),
+            Some(ContextDomain::Tools)
+        );
+        assert_eq!(
+            ContextDomain::from_domain_str("Tools"),
+            Some(ContextDomain::Tools)
+        );
+        assert!(ContextDomain::from_domain_str("unknown").is_none());
     }
 }

@@ -172,7 +172,15 @@ pub async fn update_config(
         if let Some(v) = obj.get("embedding_model").and_then(|v| v.as_str()) {
             config.embedding_model = v.to_string();
         }
-        // User location & timezone
+        // User profile & environment
+        if let Some(v) = obj.get("user_name") {
+            config.user_name = v.as_str().map(|s| s.to_string());
+        }
+        if let Some(v) = obj.get("identity_name")
+            && let Some(s) = v.as_str()
+        {
+            config.identity_name = s.to_string();
+        }
         if let Some(v) = obj.get("user_location") {
             config.user_location = v.as_str().map(|s| s.to_string());
         }

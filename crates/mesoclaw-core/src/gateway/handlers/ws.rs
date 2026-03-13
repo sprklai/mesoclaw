@@ -346,6 +346,13 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
                                     success: *success,
                                     duration_ms: *duration_ms,
                                 },
+                                ToolCallPhase::Cached { output, success } => WsOutbound::ToolResult {
+                                    call_id: evt.call_id.clone(),
+                                    tool_name: evt.tool_name.clone(),
+                                    output: output.clone(),
+                                    success: *success,
+                                    duration_ms: 0,
+                                },
                             };
                             send_outbound(&mut socket, &outbound).await;
                             tool_events.push(evt);
@@ -373,6 +380,13 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
                                 output: output.clone(),
                                 success: *success,
                                 duration_ms: *duration_ms,
+                            },
+                            ToolCallPhase::Cached { output, success } => WsOutbound::ToolResult {
+                                call_id: evt.call_id.clone(),
+                                tool_name: evt.tool_name.clone(),
+                                output: output.clone(),
+                                success: *success,
+                                duration_ms: 0,
                             },
                         };
                         send_outbound(&mut socket, &outbound).await;
@@ -631,6 +645,37 @@ mod tests {
         let msg = WsOutbound::Done;
         let json = serde_json::to_value(&msg).unwrap();
         assert_eq!(json["type"], "done");
+    }
+
+    // TC-I1 — Cached phase maps to ToolResult with duration_ms=0
+    #[test]
+    fn tc_i1_cached_phase_maps_to_tool_result() {
+        // When a Cached event arrives, the WS handler maps it to ToolResult with duration_ms: 0
+        let cached_event = ToolCallEvent {
+            call_id: "c1".into(),
+            tool_name: "web_search".into(),
+            phase: ToolCallPhase::Cached {
+                output: "cached result".into(),
+                success: true,
+            },
+        };
+        let outbound = match &cached_event.phase {
+            ToolCallPhase::Cached { output, success } => WsOutbound::ToolResult {
+                call_id: cached_event.call_id.clone(),
+                tool_name: cached_event.tool_name.clone(),
+                output: output.clone(),
+                success: *success,
+                duration_ms: 0,
+            },
+            _ => unreachable!(),
+        };
+        let json = serde_json::to_value(&outbound).unwrap();
+        assert_eq!(json["type"], "tool_result");
+        assert_eq!(json["call_id"], "c1");
+        assert_eq!(json["tool_name"], "web_search");
+        assert_eq!(json["output"], "cached result");
+        assert_eq!(json["success"], true);
+        assert_eq!(json["duration_ms"], 0);
     }
 
     // TV.15 — WsOutbound::Error serializes with error field

@@ -16,7 +16,7 @@ use crate::{MesoError, Result};
 #[cfg(feature = "ai")]
 use crate::gateway::state::AppState;
 
-use super::adapter::{RigToolAdapter, ToolCallEvent};
+use super::adapter::{RigToolAdapter, ToolCallCache, ToolCallEvent};
 use super::providers;
 
 type OpenAIAgent = Agent<openai::completion::CompletionModel>;
@@ -32,6 +32,7 @@ enum AgentInner {
 // Debug can't be derived (Agent<M> doesn't impl Debug), use manual impl for test ergonomics.
 pub struct MesoAgent {
     inner: AgentInner,
+    cache: Option<Arc<ToolCallCache>>,
 }
 
 impl std::fmt::Debug for MesoAgent {
@@ -92,7 +93,13 @@ impl MesoAgent {
             }
         };
 
-        Ok(Self { inner })
+        Ok(Self { inner, cache: None })
+    }
+
+    /// Number of actual (non-cached) tool executions for this agent's request.
+    /// Returns 0 if no dedup cache is attached (boot-time agent or dedup disabled).
+    pub fn tool_calls_made(&self) -> u32 {
+        self.cache.as_ref().map_or(0, |c| c.executions())
     }
 
     /// Build a new MesoAgent from provider details (for dynamic per-request agent building).
@@ -111,11 +118,16 @@ impl MesoAgent {
         tools: &[Arc<dyn Tool>],
         config: &AppConfig,
         preamble_override: Option<&str>,
+        dedup_cache: Option<Arc<ToolCallCache>>,
     ) -> Result<Self> {
         let api_key =
             providers::resolve_api_key_for_provider(provider_id, requires_api_key, credentials)
                 .await?;
-        let rig_tools = RigToolAdapter::from_tools(tools);
+        let rig_tools = if let Some(ref cache) = dedup_cache {
+            RigToolAdapter::from_tools_with_cache(tools, Arc::clone(cache))
+        } else {
+            RigToolAdapter::from_tools(tools)
+        };
 
         let preamble = preamble_override.unwrap_or_else(|| {
             config
@@ -146,7 +158,10 @@ impl MesoAgent {
             AgentInner::OpenAI(agent)
         };
 
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            cache: dedup_cache,
+        })
     }
 
     /// Build a new MesoAgent from provider details with tool event broadcasting.
@@ -163,11 +178,20 @@ impl MesoAgent {
         config: &AppConfig,
         tool_event_tx: broadcast::Sender<ToolCallEvent>,
         preamble_override: Option<&str>,
+        dedup_cache: Option<Arc<ToolCallCache>>,
     ) -> Result<Self> {
         let api_key =
             providers::resolve_api_key_for_provider(provider_id, requires_api_key, credentials)
                 .await?;
-        let rig_tools = RigToolAdapter::from_tools_with_events(tools, tool_event_tx);
+        let rig_tools = if let Some(ref cache) = dedup_cache {
+            RigToolAdapter::from_tools_with_events_and_cache(
+                tools,
+                tool_event_tx,
+                Arc::clone(cache),
+            )
+        } else {
+            RigToolAdapter::from_tools_with_events(tools, tool_event_tx)
+        };
 
         let preamble = preamble_override.unwrap_or_else(|| {
             config
@@ -198,7 +222,10 @@ impl MesoAgent {
             AgentInner::OpenAI(agent)
         };
 
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            cache: dedup_cache,
+        })
     }
 
     /// Send a simple prompt and get a response.
@@ -313,6 +340,14 @@ pub async fn resolve_agent_with_tools(
 
         let tools = tool_override.unwrap_or_else(|| state.tools.to_vec());
 
+        // Create per-request dedup cache if enabled
+        let config = state.config.load();
+        let dedup_cache = if config.tool_dedup_enabled {
+            Some(Arc::new(ToolCallCache::new()))
+        } else {
+            None
+        };
+
         let agent = if let Some(tx) = tool_event_tx {
             MesoAgent::from_provider_with_events(
                 provider_id,
@@ -321,9 +356,10 @@ pub async fn resolve_agent_with_tools(
                 provider.provider.requires_api_key,
                 state.credentials.as_ref(),
                 &tools,
-                &state.config.load(),
+                &config,
                 tx,
                 preamble_override,
+                dedup_cache,
             )
             .await?
         } else {
@@ -334,8 +370,9 @@ pub async fn resolve_agent_with_tools(
                 provider.provider.requires_api_key,
                 state.credentials.as_ref(),
                 &tools,
-                &state.config.load(),
+                &config,
                 preamble_override,
+                dedup_cache,
             )
             .await?
         };
@@ -434,6 +471,7 @@ mod tests {
             &tools,
             &config,
             None,
+            None,
         )
         .await;
         assert!(agent.is_ok());
@@ -455,6 +493,7 @@ mod tests {
             &creds,
             &tools,
             &config,
+            None,
             None,
         )
         .await;
@@ -478,6 +517,7 @@ mod tests {
             &tools,
             &config,
             None,
+            None,
         )
         .await;
         assert!(agent.is_ok());
@@ -499,6 +539,7 @@ mod tests {
             &tools,
             &config,
             None,
+            None,
         )
         .await;
         assert!(agent.is_ok());
@@ -519,6 +560,7 @@ mod tests {
             &creds,
             &tools,
             &config,
+            None,
             None,
         )
         .await;

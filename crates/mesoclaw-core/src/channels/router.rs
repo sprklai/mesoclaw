@@ -196,6 +196,7 @@ impl ChannelRouter {
 
         // 3. Get allowed tools for this channel (enforced via resolve_agent_with_tools)
         let tool_policy = ChannelToolPolicy::new(state.config.load_full());
+        let allowed_tool_names = tool_policy.allowed_tool_names(&channel_name, &state.tools);
         let allowed_tools = tool_policy.allowed_tools(&channel_name, &state.tools);
 
         // 4. Build context parts + assemble preamble via PromptStrategy
@@ -233,8 +234,8 @@ impl ChannelRouter {
             .await
             .unwrap_or_default();
 
-        // 5. Merge: preamble + channel-specific formatting hint
-        let channel_hint = channel_system_context(&channel_name);
+        // 5. Merge: preamble + channel-specific formatting hint (with tool awareness)
+        let channel_hint = channel_system_context(&channel_name, &allowed_tool_names);
         let system_context = format!("{preamble}\n\n{channel_hint}");
 
         // 6. Call lifecycle hook: on_agent_start
@@ -448,9 +449,15 @@ fn supervisor_backoff(attempt: u32, min_ms: u64, max_ms: u64) -> std::time::Dura
     std::time::Duration::from_millis(delay_ms.min(max_ms))
 }
 
-/// Channel-specific system context strings injected via preamble_override.
-pub fn channel_system_context(channel_name: &str) -> &'static str {
-    match channel_name {
+/// Channel-specific system context with dynamic tool awareness.
+pub fn channel_system_context(channel_name: &str, allowed_tool_names: &[String]) -> String {
+    let tools_desc = if allowed_tool_names.is_empty() {
+        "No tools available.".to_string()
+    } else {
+        format!("Available tools: {}.", allowed_tool_names.join(", "))
+    };
+
+    let channel_hint = match channel_name {
         "telegram" => {
             "[Channel: Telegram] Keep responses concise and mobile-friendly. Avoid large code blocks. Use simple formatting."
         }
@@ -461,7 +468,11 @@ pub fn channel_system_context(channel_name: &str) -> &'static str {
             "[Channel: Discord] Keep responses under 2000 characters. Use standard markdown."
         }
         _ => "[Channel: External] Keep responses concise.",
-    }
+    };
+
+    format!(
+        "{channel_hint}\n{tools_desc}\nUse your tools when relevant. If a user requests something requiring a tool you don't have, explain it's restricted in this channel and suggest using the Desktop or CLI client."
+    )
 }
 
 #[cfg(test)]
@@ -584,18 +595,29 @@ mod tests {
     // 8.7.7 — channel_system_context returns telegram-specific prompt
     // (renamed from CR.24 to avoid duplication)
 
-    // CR.24 — channel_system_context returns telegram-specific prompt
+    // P19.17 — channel_system_context includes available tool names
     #[test]
-    fn context_telegram() {
-        let ctx = channel_system_context("telegram");
+    fn context_telegram_with_tools() {
+        let tools = vec!["web_search".to_string(), "memory".to_string()];
+        let ctx = channel_system_context("telegram", &tools);
         assert!(ctx.contains("Telegram"));
         assert!(ctx.contains("mobile-friendly"));
+        assert!(ctx.contains("web_search"));
+        assert!(ctx.contains("memory"));
+        assert!(ctx.contains("Available tools:"));
+    }
+
+    // P19.18 — channel_system_context handles empty tool list
+    #[test]
+    fn context_empty_tools() {
+        let ctx = channel_system_context("telegram", &[]);
+        assert!(ctx.contains("No tools available."));
     }
 
     // CR.25 — channel_system_context returns slack-specific prompt
     #[test]
     fn context_slack() {
-        let ctx = channel_system_context("slack");
+        let ctx = channel_system_context("slack", &["web_search".to_string()]);
         assert!(ctx.contains("Slack"));
         assert!(ctx.contains("mrkdwn"));
     }
@@ -603,7 +625,7 @@ mod tests {
     // CR.26 — channel_system_context returns discord-specific prompt
     #[test]
     fn context_discord() {
-        let ctx = channel_system_context("discord");
+        let ctx = channel_system_context("discord", &["web_search".to_string()]);
         assert!(ctx.contains("Discord"));
         assert!(ctx.contains("2000"));
     }
@@ -611,7 +633,7 @@ mod tests {
     // CR.27 — channel_system_context returns generic prompt for unknown channel
     #[test]
     fn context_unknown() {
-        let ctx = channel_system_context("matrix");
+        let ctx = channel_system_context("matrix", &[]);
         assert!(ctx.contains("External"));
         assert!(ctx.contains("concise"));
     }
@@ -640,21 +662,18 @@ mod tests {
         assert_eq!(session_id, session_id2);
     }
 
-    // 8.7.8 — Tool policy filtering returns only allowed tools
+    // 8.7.8 — Tool policy filtering returns only allowed tools (uses PermissionResolver)
     #[cfg(all(feature = "channels", feature = "gateway"))]
     #[test]
     fn pipeline_tool_policy_filters() {
         use crate::config::AppConfig;
-        use std::collections::HashMap;
         use std::sync::Arc;
 
-        let config = Arc::new(AppConfig {
-            channel_tool_policy: HashMap::from([("telegram".into(), vec!["system_info".into()])]),
-            ..Default::default()
-        });
+        // Default config: Low+Medium allowed, High denied on channels
+        let config = Arc::new(AppConfig::default());
         let policy = ChannelToolPolicy::new(config);
 
-        // Register system_info + shell in registry
+        // Register system_info (Low) + shell (High) in registry
         let registry = crate::tools::ToolRegistry::new();
         registry
             .register(Arc::new(crate::tools::system_info::SystemInfoTool::new()))
@@ -666,30 +685,32 @@ mod tests {
             )))
             .unwrap();
 
+        // On telegram: system_info passes, shell blocked
         let tools = policy.allowed_tools("telegram", &registry);
         assert_eq!(tools.len(), 1);
         assert_eq!(tools[0].name(), "system_info");
     }
 
-    // 8.7.9 — channel_system_context provides channel-specific preamble
+    // 8.7.9 — channel_system_context provides channel-specific preamble with tools
     #[test]
     fn pipeline_preamble_override() {
-        let telegram_ctx = channel_system_context("telegram");
+        let tools = vec!["web_search".to_string()];
+        let telegram_ctx = channel_system_context("telegram", &tools);
         assert!(
             telegram_ctx.contains("Telegram"),
             "Should contain channel name"
         );
         assert!(
-            telegram_ctx.contains("concise"),
-            "Should mention conciseness"
+            telegram_ctx.contains("web_search"),
+            "Should list available tools"
         );
 
-        let slack_ctx = channel_system_context("slack");
+        let slack_ctx = channel_system_context("slack", &tools);
         assert!(slack_ctx.contains("Slack"));
         assert!(slack_ctx.contains("mrkdwn"));
 
         // Unknown channel gets generic context
-        let custom_ctx = channel_system_context("custom_channel");
+        let custom_ctx = channel_system_context("custom_channel", &[]);
         assert!(custom_ctx.contains("External"));
     }
 

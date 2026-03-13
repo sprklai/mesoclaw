@@ -13,6 +13,9 @@ pub struct StrategyContext {
     pub original_prompt: String,
     pub response: String,
     pub intervention_count: u32,
+    /// Number of actual (non-cached) tool executions so far in this request.
+    /// When > 0, strategies can skip nudges since tools were already used.
+    pub tool_calls_made: u32,
 }
 
 /// Result of a reasoned chat.
@@ -91,6 +94,7 @@ impl ReasoningEngine {
                 original_prompt: prompt.to_string(),
                 response: current_response.clone(),
                 intervention_count: interventions_used,
+                tool_calls_made: agent.tool_calls_made(),
             };
 
             // Find first strategy that wants to intervene
@@ -188,6 +192,7 @@ mod tests {
             original_prompt: "hello".into(),
             response: "I will search for files".into(),
             intervention_count: 0,
+            tool_calls_made: 0,
         };
         let result = strategy.evaluate(&ctx).await;
         assert_eq!(result, Some("try again".into()));
@@ -210,5 +215,17 @@ mod tests {
         };
         assert_eq!(result.strategy_used.as_deref(), Some("continuation"));
         assert_eq!(result.interventions_used, 1);
+    }
+
+    // TC-C4 — StrategyContext includes tool_calls_made
+    #[test]
+    fn tc_c4_strategy_context_includes_tool_calls_made() {
+        let ctx = StrategyContext {
+            original_prompt: "hello".into(),
+            response: "done".into(),
+            intervention_count: 0,
+            tool_calls_made: 5,
+        };
+        assert_eq!(ctx.tool_calls_made, 5);
     }
 }

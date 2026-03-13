@@ -24,6 +24,10 @@ impl Tool for PatchTool {
         "patch"
     }
 
+    fn risk_level(&self) -> crate::security::RiskLevel {
+        crate::security::RiskLevel::High
+    }
+
     fn description(&self) -> &str {
         "Apply a unified diff patch to a file"
     }
