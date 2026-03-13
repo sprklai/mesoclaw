@@ -434,12 +434,12 @@ learning_archive_after_days = 30
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `user_name` | Option\<String\> | `null` | User's display name (e.g., "Rakesh"). Used in greetings and personalization |
+| `user_name` | Option\<String\> | `null` | User's display name (e.g., "John"). Used in greetings and personalization |
 | `user_timezone` | Option\<String\> | `null` | IANA timezone (e.g., "America/New_York"). Auto-detected on first run |
 | `user_location` | Option\<String\> | `null` | Location/region description (e.g., "New York, US"). Used for context injection |
 
 ```toml
-user_name = "Rakesh"
+user_name = "John"
 user_timezone = "America/New_York"
 user_location = "New York, US"
 ```
@@ -550,7 +550,7 @@ learning_max_observations = 10000
 learning_min_confidence = 0.5
 
 # User Profile
-# user_name = "Rakesh"
+# user_name = "John"
 # user_timezone = "America/New_York"
 # user_location = "New York, US"
 

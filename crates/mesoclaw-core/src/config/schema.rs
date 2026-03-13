@@ -138,7 +138,7 @@ pub struct AppConfig {
     pub embedding_download_dir: Option<String>,
 
     // Environment overrides
-    /// User's display name (e.g., "Rakesh"). Used in greetings and personalization.
+    /// User's display name (e.g., "John"). Used in greetings and personalization.
     pub user_name: Option<String>,
     /// User's IANA timezone (e.g., "America/New_York"). Auto-detected if not set.
     pub user_timezone: Option<String>,

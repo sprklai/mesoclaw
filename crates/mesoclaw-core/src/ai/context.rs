@@ -3383,7 +3383,7 @@ mod tests {
     }
 
     // 15.3.48 — Simulates exact production flow: POST user msg → build → verify history
-    // This tests the "my name is Rakesh" → "what is my name?" scenario
+    // This tests the "my name is John" → "what is my name?" scenario
     #[tokio::test]
     async fn build_multi_turn_production_flow() {
         let (_dir, builder) = setup_builder().await;
@@ -3396,11 +3396,11 @@ mod tests {
         // Turn 1: Frontend POSTs user message, then WS calls build
         builder
             .session_manager
-            .append_message(&session.id, "user", "my name is Rakesh")
+            .append_message(&session.id, "user", "my name is John")
             .await
             .unwrap();
         let (history_t1, _) = builder
-            .build(Some(&session.id), "my name is Rakesh")
+            .build(Some(&session.id), "my name is John")
             .await
             .unwrap();
         // First turn: history should be empty (only message is the current prompt, stripped)
@@ -3409,7 +3409,7 @@ mod tests {
         // Turn 1: Agent responds, WS handler stores assistant response
         builder
             .session_manager
-            .append_message(&session.id, "assistant", "Hello, Rakesh!")
+            .append_message(&session.id, "assistant", "Hello, John!")
             .await
             .unwrap();
 
@@ -3437,7 +3437,7 @@ mod tests {
                     UserContent::Text(t) => t.text.clone(),
                     _ => panic!("Expected text"),
                 };
-                assert_eq!(text, "my name is Rakesh");
+                assert_eq!(text, "my name is John");
             }
             _ => panic!("Expected user message at index 0"),
         }
@@ -3447,7 +3447,7 @@ mod tests {
                     AssistantContent::Text(t) => t.text.clone(),
                     _ => panic!("Expected text"),
                 };
-                assert_eq!(text, "Hello, Rakesh!");
+                assert_eq!(text, "Hello, John!");
             }
             _ => panic!("Expected assistant message at index 1"),
         }
