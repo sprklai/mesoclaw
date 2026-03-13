@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -26,12 +27,19 @@ pub struct CachedResult {
 
 /// Per-request cache for deduplicating identical tool calls.
 ///
-/// Keyed by `hash(tool_name + args_json)`. Shared across all adapters
+/// Keyed by `hash(tool_name + canonical_args_json)`. Shared across all adapters
 /// for a single request via `Arc`. Tracks actual execution count for
-/// continuation strategy awareness.
+/// continuation strategy awareness. Supports per-tool call limits to cap
+/// expensive tools (e.g. web_search) regardless of argument differences.
 pub struct ToolCallCache {
     entries: DashMap<u64, CachedResult>,
     call_count: AtomicU32,
+    /// Per-tool execution counts (tool_name → count).
+    per_tool_counts: DashMap<String, u32>,
+    /// Most recent result per tool (for returning when over limit).
+    per_tool_last: DashMap<String, CachedResult>,
+    /// Per-tool call caps. Only tools listed here are limited.
+    tool_call_limits: HashMap<String, usize>,
 }
 
 impl Default for ToolCallCache {
@@ -39,6 +47,9 @@ impl Default for ToolCallCache {
         Self {
             entries: DashMap::new(),
             call_count: AtomicU32::new(0),
+            per_tool_counts: DashMap::new(),
+            per_tool_last: DashMap::new(),
+            tool_call_limits: HashMap::new(),
         }
     }
 }
@@ -48,11 +59,24 @@ impl ToolCallCache {
         Self::default()
     }
 
+    /// Create a cache with per-tool call limits.
+    pub fn with_limits(limits: HashMap<String, usize>) -> Self {
+        Self {
+            tool_call_limits: limits,
+            ..Self::default()
+        }
+    }
+
     /// Compute cache key from tool name and args JSON string.
+    /// Canonicalizes JSON (sorted keys, normalized whitespace) before hashing.
     pub fn cache_key(tool_name: &str, args: &str) -> u64 {
+        let canonical = serde_json::from_str::<serde_json::Value>(args)
+            .ok()
+            .and_then(|v| serde_json::to_string(&v).ok())
+            .unwrap_or_else(|| args.to_string());
         let mut hasher = DefaultHasher::new();
         tool_name.hash(&mut hasher);
-        args.hash(&mut hasher);
+        canonical.hash(&mut hasher);
         hasher.finish()
     }
 
@@ -75,6 +99,31 @@ impl ToolCallCache {
     pub fn executions(&self) -> u32 {
         self.call_count.load(Ordering::Relaxed)
     }
+
+    /// Check if a tool has exceeded its per-tool call limit.
+    /// Returns `Some(last_result)` if over limit, `None` if under or no limit set.
+    pub fn check_per_tool_limit(&self, tool_name: &str) -> Option<CachedResult> {
+        let limit = self.tool_call_limits.get(tool_name)?;
+        let count = self
+            .per_tool_counts
+            .get(tool_name)
+            .map(|r| *r as usize)
+            .unwrap_or(0);
+        if count >= *limit {
+            self.per_tool_last.get(tool_name).map(|r| r.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Record a per-tool execution and store the latest result.
+    pub fn record_per_tool(&self, tool_name: &str, result: CachedResult) {
+        self.per_tool_counts
+            .entry(tool_name.to_string())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
+        self.per_tool_last.insert(tool_name.to_string(), result);
+    }
 }
 
 impl std::fmt::Debug for ToolCallCache {
@@ -82,6 +131,7 @@ impl std::fmt::Debug for ToolCallCache {
         f.debug_struct("ToolCallCache")
             .field("entries", &self.entries.len())
             .field("call_count", &self.call_count.load(Ordering::Relaxed))
+            .field("tool_call_limits", &self.tool_call_limits)
             .finish()
     }
 }
@@ -218,8 +268,8 @@ impl ToolDyn for RigToolAdapter {
             // Check cache first (before emitting Started)
             if let Some(ref cache) = self.cache {
                 let key = ToolCallCache::cache_key(&tool_name, &args);
+                // 1. Exact-match dedup (same tool + same canonical args)
                 if let Some(cached) = cache.get(key) {
-                    // Emit Cached event
                     if let Some(ref tx) = self.event_tx {
                         let _ = tx.send(ToolCallEvent {
                             call_id,
@@ -235,6 +285,27 @@ impl ToolDyn for RigToolAdapter {
                     } else {
                         Err(ToolError::ToolCallError(Box::new(std::io::Error::other(
                             cached.output,
+                        ))))
+                    };
+                }
+
+                // 2. Per-tool limit check (different args but same tool over limit)
+                if let Some(last) = cache.check_per_tool_limit(&tool_name) {
+                    if let Some(ref tx) = self.event_tx {
+                        let _ = tx.send(ToolCallEvent {
+                            call_id,
+                            tool_name,
+                            phase: ToolCallPhase::Cached {
+                                output: last.output.clone(),
+                                success: last.success,
+                            },
+                        });
+                    }
+                    return if last.is_ok {
+                        Ok(last.output)
+                    } else {
+                        Err(ToolError::ToolCallError(Box::new(std::io::Error::other(
+                            last.output,
                         ))))
                     };
                 }
@@ -262,14 +333,13 @@ impl ToolDyn for RigToolAdapter {
                     // Store in cache and record execution
                     if let Some(ref cache) = self.cache {
                         let key = ToolCallCache::cache_key(&tool_name, &args);
-                        cache.insert(
-                            key,
-                            CachedResult {
-                                output: output.clone(),
-                                success: result.success,
-                                is_ok: true,
-                            },
-                        );
+                        let cached = CachedResult {
+                            output: output.clone(),
+                            success: result.success,
+                            is_ok: true,
+                        };
+                        cache.insert(key, cached.clone());
+                        cache.record_per_tool(&tool_name, cached);
                         cache.record_execution();
                     }
 
@@ -292,14 +362,13 @@ impl ToolDyn for RigToolAdapter {
                     // Store error in cache and record execution
                     if let Some(ref cache) = self.cache {
                         let key = ToolCallCache::cache_key(&tool_name, &args);
-                        cache.insert(
-                            key,
-                            CachedResult {
-                                output: e.to_string(),
-                                success: false,
-                                is_ok: false,
-                            },
-                        );
+                        let cached = CachedResult {
+                            output: e.to_string(),
+                            success: false,
+                            is_ok: false,
+                        };
+                        cache.insert(key, cached.clone());
+                        cache.record_per_tool(&tool_name, cached);
                         cache.record_execution();
                     }
 
@@ -705,5 +774,162 @@ mod tests {
         let parsed: ToolResult = serde_json::from_str(&result).unwrap();
         assert!(parsed.success);
         assert_eq!(parsed.output, "processed: hello");
+    }
+
+    // =========================================================================
+    // Per-Tool Limit Tests (TC-PL*)
+    // =========================================================================
+
+    // TC-PL1 — Per-tool limit blocks second call to same tool with different args
+    #[tokio::test]
+    async fn tc_pl1_per_tool_limit_blocks_different_args() {
+        use std::collections::HashMap;
+        let limits = HashMap::from([("test".to_string(), 1)]);
+        let cache = Arc::new(ToolCallCache::with_limits(limits));
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+        let adapter = RigToolAdapter::new(tool).with_cache(Arc::clone(&cache));
+
+        let r1 = adapter
+            .call(json!({"input": "alpha"}).to_string())
+            .await
+            .unwrap();
+        let r2 = adapter
+            .call(json!({"input": "beta"}).to_string())
+            .await
+            .unwrap();
+
+        // Second call should return same result as first (per-tool limit hit)
+        assert_eq!(r1, r2);
+        assert_eq!(cache.executions(), 1);
+    }
+
+    // TC-PL2 — Per-tool limit returns last result (not first or error)
+    #[tokio::test]
+    async fn tc_pl2_per_tool_limit_returns_last_result() {
+        use std::collections::HashMap;
+        let limits = HashMap::from([("test".to_string(), 2)]);
+        let cache = Arc::new(ToolCallCache::with_limits(limits));
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+        let adapter = RigToolAdapter::new(tool).with_cache(Arc::clone(&cache));
+
+        let _ = adapter
+            .call(json!({"input": "first"}).to_string())
+            .await
+            .unwrap();
+        let r2 = adapter
+            .call(json!({"input": "second"}).to_string())
+            .await
+            .unwrap();
+        let r3 = adapter
+            .call(json!({"input": "third"}).to_string())
+            .await
+            .unwrap();
+
+        // r3 should be the same as r2 (last executed result before limit hit)
+        assert_eq!(r2, r3);
+        assert_eq!(cache.executions(), 2);
+    }
+
+    // TC-PL3 — Per-tool limit does not affect unlisted tools
+    #[tokio::test]
+    async fn tc_pl3_per_tool_limit_unlisted_tools_unaffected() {
+        use std::collections::HashMap;
+        let limits = HashMap::from([("web_search".to_string(), 1)]);
+        let cache = Arc::new(ToolCallCache::with_limits(limits));
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+        let adapter = RigToolAdapter::new(tool).with_cache(Arc::clone(&cache));
+
+        let _ = adapter.call(json!({"input": "a"}).to_string()).await;
+        let _ = adapter.call(json!({"input": "b"}).to_string()).await;
+        let _ = adapter.call(json!({"input": "c"}).to_string()).await;
+
+        // "test" is not in limits, so all 3 calls should execute
+        assert_eq!(cache.executions(), 3);
+    }
+
+    // TC-PL4 — Per-tool limit emits Cached event when blocking
+    #[tokio::test]
+    async fn tc_pl4_per_tool_limit_emits_cached_event() {
+        use std::collections::HashMap;
+        let limits = HashMap::from([("test".to_string(), 1)]);
+        let cache = Arc::new(ToolCallCache::with_limits(limits));
+        let (tx, mut rx) = broadcast::channel::<ToolCallEvent>(16);
+        let tool: Arc<dyn Tool> = Arc::new(MockTool { name: "test" });
+        let adapter = RigToolAdapter::new_with_events(tool, tx).with_cache(Arc::clone(&cache));
+
+        let _ = adapter.call(json!({"input": "a"}).to_string()).await;
+        let _started = rx.recv().await.unwrap();
+        let _completed = rx.recv().await.unwrap();
+
+        // Second call with different args — should be blocked by per-tool limit
+        let _ = adapter.call(json!({"input": "b"}).to_string()).await;
+        let event = rx.recv().await.unwrap();
+        assert!(matches!(event.phase, ToolCallPhase::Cached { .. }));
+    }
+
+    // TC-PL5 — check_per_tool_limit returns None when under limit
+    #[test]
+    fn tc_pl5_check_per_tool_limit_under() {
+        use std::collections::HashMap;
+        let limits = HashMap::from([("web_search".to_string(), 2)]);
+        let cache = ToolCallCache::with_limits(limits);
+
+        assert!(cache.check_per_tool_limit("web_search").is_none());
+
+        cache.record_per_tool(
+            "web_search",
+            CachedResult {
+                output: "ok".into(),
+                success: true,
+                is_ok: true,
+            },
+        );
+        assert!(cache.check_per_tool_limit("web_search").is_none()); // 1 < 2
+    }
+
+    // TC-PL6 — record_per_tool increments count correctly
+    #[test]
+    fn tc_pl6_record_per_tool_increments() {
+        use std::collections::HashMap;
+        let limits = HashMap::from([("web_search".to_string(), 2)]);
+        let cache = ToolCallCache::with_limits(limits);
+
+        let result = CachedResult {
+            output: "r1".into(),
+            success: true,
+            is_ok: true,
+        };
+        cache.record_per_tool("web_search", result);
+        assert!(cache.check_per_tool_limit("web_search").is_none()); // 1 < 2
+
+        let result2 = CachedResult {
+            output: "r2".into(),
+            success: true,
+            is_ok: true,
+        };
+        cache.record_per_tool("web_search", result2);
+        let blocked = cache.check_per_tool_limit("web_search");
+        assert!(blocked.is_some()); // 2 >= 2
+        assert_eq!(blocked.unwrap().output, "r2"); // returns last result
+    }
+
+    // =========================================================================
+    // Canonicalization Tests (TC-CK*)
+    // =========================================================================
+
+    // TC-CK1 — Same JSON with different key order → same cache key
+    #[test]
+    fn tc_ck1_different_key_order_same_cache_key() {
+        let k1 = ToolCallCache::cache_key("web_search", r#"{"query":"rust","num_results":5}"#);
+        let k2 = ToolCallCache::cache_key("web_search", r#"{"num_results":5,"query":"rust"}"#);
+        assert_eq!(k1, k2);
+    }
+
+    // TC-CK2 — Same JSON with different whitespace → same cache key
+    #[test]
+    fn tc_ck2_different_whitespace_same_cache_key() {
+        let k1 = ToolCallCache::cache_key("web_search", r#"{"query":"rust"}"#);
+        let k2 = ToolCallCache::cache_key("web_search", r#"{ "query" : "rust" }"#);
+        assert_eq!(k1, k2);
     }
 }

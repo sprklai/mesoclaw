@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "MesoClaw",
+  "productName": "Mesoclaw",
   "version": "0.0.14",
   "identifier": "com.sprklai.mesoclaw",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "MesoClaw",
+        "title": "Mesoclaw",
         "width": 1280,
         "height": 720,
         "minWidth": 800,

@@ -1,3 +1,4 @@
+pub mod contacts;
 pub mod format;
 pub mod message;
 pub mod policy;

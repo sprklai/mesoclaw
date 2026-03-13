@@ -1,5 +1,5 @@
 [Desktop Entry]
-Name=MesoClaw
+Name=Mesoclaw
 GenericName=AI Assistant
 Comment=AI-powered personal assistant
 Exec=mesoclaw-desktop
@@ -8,4 +8,4 @@ Terminal=false
 Type=Application
 Categories=Utility;Office;
 Keywords=ai;assistant;chat;llm;
-StartupWMClass=MesoClaw
+StartupWMClass=Mesoclaw

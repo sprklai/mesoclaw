@@ -157,6 +157,10 @@ pub struct AppConfig {
 
     // Tool Deduplication
     pub tool_dedup_enabled: bool,
+    /// Per-tool call limits within a single request. Tools listed here are capped
+    /// at the specified number of executions per request, regardless of args.
+    /// Unlisted tools are unlimited. Default: `{"web_search": 1}`.
+    pub tool_call_limits: HashMap<String, usize>,
 
     // Phase 8.13: Prompt Efficiency
     pub prompt_max_preamble_tokens: usize,
@@ -317,6 +321,7 @@ impl Default for AppConfig {
 
             // Tool Deduplication
             tool_dedup_enabled: true,
+            tool_call_limits: HashMap::from([("web_search".into(), 5)]),
 
             // Notification Routing
             notification_routing: NotificationRouting::default(),
@@ -745,5 +750,25 @@ mod tests {
         config.agent_max_continuations = 0;
         config.validate();
         assert_eq!(config.agent_max_continuations, 0);
+    }
+
+    // TC-CL1 — Default tool_call_limits contains web_search: 5
+    #[test]
+    fn tc_cl1_default_tool_call_limits() {
+        let config = AppConfig::default();
+        assert_eq!(config.tool_call_limits.get("web_search"), Some(&5));
+    }
+
+    // TC-CL2 — TOML deser for tool_call_limits
+    #[test]
+    fn tc_cl2_tool_call_limits_from_toml() {
+        let toml_str = r#"
+            [tool_call_limits]
+            web_search = 2
+            file_read = 10
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.tool_call_limits.get("web_search"), Some(&2));
+        assert_eq!(config.tool_call_limits.get("file_read"), Some(&10));
     }
 }

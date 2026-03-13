@@ -47,7 +47,7 @@ pub fn markdown_to_html(markdown: &str) -> String {
                 _ => {}
             },
             Event::End(tag) => match tag {
-                TagEnd::Paragraph => html.push('\n'),
+                TagEnd::Paragraph => html.push_str("\n\n"),
                 TagEnd::Strong => html.push_str("</b>"),
                 TagEnd::Emphasis => html.push_str("</i>"),
                 TagEnd::Strikethrough => html.push_str("</s>"),
@@ -75,9 +75,8 @@ pub fn markdown_to_html(markdown: &str) -> String {
         }
     }
 
-    // Trim trailing newlines
-    let trimmed = html.trim_end_matches('\n');
-    trimmed.to_string()
+    // Trim trailing whitespace/newlines
+    html.trim_end().to_string()
 }
 
 /// Split a message into chunks that fit within Telegram's 4096-char limit.
@@ -218,6 +217,17 @@ mod tests {
     fn html_plain_text() {
         let result = markdown_to_html("Just plain text");
         assert_eq!(result, "Just plain text");
+    }
+
+    #[test]
+    fn html_paragraph_spacing_preserved() {
+        let result = markdown_to_html("First paragraph.\n\nSecond paragraph.");
+        assert!(
+            result.contains("\n\n"),
+            "Paragraph break should produce double newline, got: {result}"
+        );
+        assert!(result.contains("First paragraph."));
+        assert!(result.contains("Second paragraph."));
     }
 
     #[test]

@@ -3,8 +3,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::json;
 
+use crate::channels::contacts;
 use crate::channels::message::ChannelMessage;
 use crate::channels::registry::ChannelRegistry;
+use crate::db::DbPool;
 use crate::{MesoError, Result};
 
 use super::traits::{Tool, ToolResult};
@@ -19,13 +21,15 @@ fn recipient_metadata_key(channel: &str) -> &'static str {
 }
 
 /// Agent tool for sending messages to channels and querying channel status.
+/// Supports discovering known contacts and auto-resolving recipients.
 pub struct ChannelSendTool {
     registry: Arc<ChannelRegistry>,
+    db: DbPool,
 }
 
 impl ChannelSendTool {
-    pub fn new(registry: Arc<ChannelRegistry>) -> Self {
-        Self { registry }
+    pub fn new(registry: Arc<ChannelRegistry>, db: DbPool) -> Self {
+        Self { registry, db }
     }
 }
 
@@ -40,7 +44,7 @@ impl Tool for ChannelSendTool {
     }
 
     fn description(&self) -> &str {
-        "Send messages to connected channels, list available channels, or check channel status. Your context includes available channels and known contacts. When sending, provide the recipient ID from your context. Actions: send, list, status."
+        "Send messages to connected channels, list channels, check status, or discover known contacts. When sending without a recipient, auto-resolves if only one contact exists. Use 'contacts' action to list known recipients. Actions: send, list, status, contacts."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
@@ -49,12 +53,12 @@ impl Tool for ChannelSendTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["send", "list", "status"],
+                    "enum": ["send", "list", "status", "contacts"],
                     "description": "The channel operation to perform"
                 },
                 "channel": {
                     "type": "string",
-                    "description": "Channel name (required for send/status)"
+                    "description": "Channel name (required for send/status, optional filter for contacts)"
                 },
                 "message": {
                     "type": "string",
@@ -62,7 +66,7 @@ impl Tool for ChannelSendTool {
                 },
                 "recipient": {
                     "type": "string",
-                    "description": "Recipient ID (e.g. chat_id for telegram, channel_id for slack/discord)"
+                    "description": "Recipient ID (e.g. chat_id for telegram, channel_id for slack/discord). If omitted for send, auto-resolves when only one contact exists."
                 }
             },
             "required": ["action"]
@@ -85,12 +89,44 @@ impl Tool for ChannelSendTool {
 
                 let mut msg = ChannelMessage::new(channel, message).with_sender("agent");
 
-                // If recipient provided, inject into metadata with channel-specific key
+                // If recipient provided, inject into metadata with channel-specific key.
+                // If not provided, try to auto-resolve from known contacts.
                 if let Some(recipient) = args["recipient"].as_str() {
                     let meta_key = recipient_metadata_key(channel);
                     let mut metadata = std::collections::HashMap::new();
                     metadata.insert(meta_key.to_string(), recipient.to_string());
                     msg = msg.with_metadata(metadata);
+                } else {
+                    // Auto-resolve: query known contacts for this channel
+                    let known = contacts::query_channel_contacts(&self.db, channel)
+                        .await
+                        .unwrap_or_default();
+                    match known.len() {
+                        0 => {
+                            return Ok(ToolResult::err(format!(
+                                "No known contacts for '{channel}'. \
+                                 The recipient needs to message the bot first, \
+                                 or provide a recipient ID explicitly."
+                            )));
+                        }
+                        1 => {
+                            let meta_key = recipient_metadata_key(channel);
+                            let mut metadata = std::collections::HashMap::new();
+                            metadata.insert(meta_key.to_string(), known[0].recipient_id.clone());
+                            msg = msg.with_metadata(metadata);
+                        }
+                        _ => {
+                            let listing = known
+                                .iter()
+                                .map(|c| format!("  - {} (id: {})", c.label, c.recipient_id))
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            return Ok(ToolResult::err(format!(
+                                "Multiple contacts found for '{channel}'. \
+                                 Please specify a recipient:\n{listing}"
+                            )));
+                        }
+                    }
                 }
 
                 match self.registry.send(channel, msg).await {
@@ -125,8 +161,28 @@ impl Tool for ChannelSendTool {
                     None => Ok(ToolResult::err(format!("Channel '{channel}' not found"))),
                 }
             }
+            "contacts" => {
+                let result = if let Some(channel) = args["channel"].as_str() {
+                    contacts::query_channel_contacts(&self.db, channel).await?
+                } else {
+                    contacts::query_all_channel_contacts(&self.db).await?
+                };
+                let entries: Vec<serde_json::Value> = result
+                    .iter()
+                    .map(|c| {
+                        json!({
+                            "channel": c.channel,
+                            "recipient_id": c.recipient_id,
+                            "label": c.label
+                        })
+                    })
+                    .collect();
+                Ok(ToolResult::ok(
+                    serde_json::to_string_pretty(&entries).unwrap_or_default(),
+                ))
+            }
             other => Ok(ToolResult::err(format!(
-                "Unknown action '{other}'. Valid actions: send, list, status"
+                "Unknown action '{other}'. Valid actions: send, list, status, contacts"
             ))),
         }
     }
@@ -136,8 +192,10 @@ impl Tool for ChannelSendTool {
 mod tests {
     use super::*;
     use crate::channels::traits::{Channel, ChannelLifecycle, ChannelSender, ChannelStatus};
+    use crate::db;
+    use rusqlite::{Connection, params};
     use std::sync::atomic::{AtomicBool, Ordering};
-    use tokio::sync::mpsc;
+    use tokio::sync::{Mutex, mpsc};
 
     struct MockChannel {
         name: String,
@@ -212,12 +270,44 @@ mod tests {
         }
     }
 
+    fn setup_db() -> DbPool {
+        let conn = Connection::open_in_memory().expect("open in-memory db");
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                channel_key TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );",
+        )
+        .expect("create sessions table");
+        Arc::new(Mutex::new(conn))
+    }
+
+    async fn insert_session(pool: &DbPool, id: &str, title: Option<&str>, channel_key: &str) {
+        let id = id.to_string();
+        let title = title.map(|t| t.to_string());
+        let channel_key = channel_key.to_string();
+        let pool = pool.clone();
+        db::with_db(&pool, move |conn| {
+            conn.execute(
+                "INSERT INTO sessions (id, title, channel_key) VALUES (?1, ?2, ?3)",
+                params![id, title, channel_key],
+            )?;
+            Ok(())
+        })
+        .await
+        .expect("insert session");
+    }
+
     fn setup_with_channel() -> ChannelSendTool {
         let registry = Arc::new(ChannelRegistry::new());
         registry
             .register(Arc::new(MockChannel::new("telegram")))
             .unwrap();
-        ChannelSendTool::new(registry)
+        let db = setup_db();
+        ChannelSendTool::new(registry, db)
     }
 
     // 17.15 — List channels returns registered channels
@@ -251,7 +341,8 @@ mod tests {
             .execute(json!({
                 "action": "send",
                 "channel": "nonexistent",
-                "message": "hello"
+                "message": "hello",
+                "recipient": "12345"
             }))
             .await
             .unwrap();
@@ -274,14 +365,95 @@ mod tests {
     #[test]
     fn channel_tool_schema() {
         let registry = Arc::new(ChannelRegistry::new());
-        let tool = ChannelSendTool::new(registry);
+        let db = setup_db();
+        let tool = ChannelSendTool::new(registry, db);
 
         assert_eq!(tool.name(), "channel_send");
         assert!(tool.description().contains("channel"));
+        assert!(tool.description().contains("contacts"));
 
         let schema = tool.parameters_schema();
         assert_eq!(schema["type"], "object");
         let required = schema["required"].as_array().unwrap();
         assert!(required.contains(&json!("action")));
+        let action_enum = schema["properties"]["action"]["enum"].as_array().unwrap();
+        assert!(action_enum.contains(&json!("contacts")));
+    }
+
+    // Contacts action returns known contacts
+    #[tokio::test]
+    async fn contacts_action() {
+        let tool = setup_with_channel();
+        insert_session(&tool.db, "s1", Some("Mario Chat"), "telegram:12345").await;
+        insert_session(&tool.db, "s2", Some("DevTeam"), "telegram:-98765").await;
+
+        let result = tool
+            .execute(json!({ "action": "contacts", "channel": "telegram" }))
+            .await
+            .unwrap();
+
+        assert!(result.success);
+        assert!(result.output.contains("12345"));
+        assert!(result.output.contains("-98765"));
+        assert!(result.output.contains("Mario Chat"));
+    }
+
+    // Send without recipient auto-resolves when single contact
+    #[tokio::test]
+    async fn send_auto_resolve_single() {
+        let tool = setup_with_channel();
+        insert_session(&tool.db, "s1", Some("Mario Chat"), "telegram:12345").await;
+
+        let result = tool
+            .execute(json!({
+                "action": "send",
+                "channel": "telegram",
+                "message": "hello mario"
+            }))
+            .await
+            .unwrap();
+
+        assert!(result.success);
+        assert!(result.output.contains("Message sent"));
+    }
+
+    // Send without recipient errors when no contacts
+    #[tokio::test]
+    async fn send_no_contacts_error() {
+        let tool = setup_with_channel();
+
+        let result = tool
+            .execute(json!({
+                "action": "send",
+                "channel": "telegram",
+                "message": "hello"
+            }))
+            .await
+            .unwrap();
+
+        assert!(!result.success);
+        assert!(result.output.contains("No known contacts"));
+    }
+
+    // Send without recipient lists options when multiple contacts
+    #[tokio::test]
+    async fn send_multiple_contacts_lists() {
+        let tool = setup_with_channel();
+        insert_session(&tool.db, "s1", Some("Mario Chat"), "telegram:12345").await;
+        insert_session(&tool.db, "s2", Some("DevTeam"), "telegram:-98765").await;
+
+        let result = tool
+            .execute(json!({
+                "action": "send",
+                "channel": "telegram",
+                "message": "hello"
+            }))
+            .await
+            .unwrap();
+
+        assert!(!result.success);
+        assert!(result.output.contains("Multiple contacts"));
+        assert!(result.output.contains("12345"));
+        assert!(result.output.contains("-98765"));
     }
 }

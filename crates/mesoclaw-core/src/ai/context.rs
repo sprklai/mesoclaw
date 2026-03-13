@@ -241,12 +241,6 @@ pub struct ContextSummary {
     pub model_id: String,
 }
 
-/// A known contact discovered from the sessions table.
-struct ChannelContact {
-    recipient_id: String,
-    label: String,
-}
-
 /// Manages context injection for the AI agent.
 pub struct ContextEngine {
     db: DbPool,
@@ -601,7 +595,9 @@ impl ContextEngine {
                 .filter(|c| matches!(registry.status(c), Some(ChannelStatus::Connected)))
                 .collect();
             if !connected.is_empty() {
-                let contact_count = self.count_channel_contacts().await.unwrap_or(0);
+                let contact_count = crate::channels::contacts::count_channel_contacts(&self.db)
+                    .await
+                    .unwrap_or(0);
                 parts.push(format!(
                     "Channels: {} connected ({} known contacts)",
                     connected
@@ -645,7 +641,8 @@ impl ContextEngine {
                         .status(name)
                         .map(|s| format!("{s}"))
                         .unwrap_or_else(|| "unknown".into());
-                    let contacts = self.query_channel_contacts(name).await?;
+                    let contacts =
+                        crate::channels::contacts::query_channel_contacts(&self.db, name).await?;
                     let contact_str = if contacts.is_empty() {
                         "no known contacts".into()
                     } else {
@@ -708,51 +705,6 @@ impl ContextEngine {
         }
 
         Ok(sections.join("\n\n"))
-    }
-
-    /// Query known contacts for a channel from the sessions table.
-    /// Uses channel_key column (format: "channel_name:recipient_id").
-    async fn query_channel_contacts(&self, channel_name: &str) -> Result<Vec<ChannelContact>> {
-        let prefix = format!("{}:", channel_name);
-        let channel_name_owned = channel_name.to_string();
-        let pool = self.db.clone();
-        db::with_db(&pool, move |conn| {
-            let mut stmt = conn.prepare(
-                "SELECT DISTINCT channel_key, title FROM sessions \
-                 WHERE channel_key LIKE ?1 AND channel_key IS NOT NULL \
-                 ORDER BY updated_at DESC LIMIT 20",
-            )?;
-            let rows = stmt.query_map([format!("{prefix}%")], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
-            })?;
-            let mut result = Vec::new();
-            for row in rows {
-                let (key, title) = row.map_err(crate::MesoError::from)?;
-                let recipient_id = key.strip_prefix(&prefix).unwrap_or(&key).to_string();
-                let label =
-                    title.unwrap_or_else(|| format!("{}:{}", channel_name_owned, recipient_id));
-                result.push(ChannelContact {
-                    recipient_id,
-                    label,
-                });
-            }
-            Ok(result)
-        })
-        .await
-    }
-
-    /// Count total known contacts across all channels.
-    async fn count_channel_contacts(&self) -> Result<usize> {
-        let pool = self.db.clone();
-        db::with_db(&pool, move |conn| {
-            let count: i64 = conn.query_row(
-                "SELECT COUNT(DISTINCT channel_key) FROM sessions WHERE channel_key IS NOT NULL",
-                [],
-                |row| row.get(0),
-            )?;
-            Ok(count as usize)
-        })
-        .await
     }
 
     // ========================================================================

@@ -296,7 +296,8 @@ impl CompactStrategy {
         // Compact reasoning axioms (replaces ~300 token protocol)
         lines.push(
             "Rules: Enrich tool args with context. Recover on failure (2 retries). \
-             Use shell for path discovery. Act, don't describe."
+             Use shell for path discovery. Act, don't describe. \
+             Use multiple tool calls for multi-step tasks. Avoid redundant identical calls."
                 .into(),
         );
 
@@ -630,12 +631,16 @@ impl PromptPlugin for LearnedRulesPlugin {
 #[cfg(feature = "channels")]
 pub struct ChannelContextPlugin {
     channel_registry: Arc<ChannelRegistry>,
+    db: crate::db::DbPool,
 }
 
 #[cfg(feature = "channels")]
 impl ChannelContextPlugin {
-    pub fn new(channel_registry: Arc<ChannelRegistry>) -> Self {
-        Self { channel_registry }
+    pub fn new(channel_registry: Arc<ChannelRegistry>, db: crate::db::DbPool) -> Self {
+        Self {
+            channel_registry,
+            db,
+        }
     }
 }
 
@@ -660,7 +665,19 @@ impl PromptPlugin for ChannelContextPlugin {
         for name in &channels {
             if let Some(ch) = self.channel_registry.get_channel(name) {
                 let status = ch.status();
-                lines.push(format!("- {name}: {status:?}"));
+                let contacts =
+                    crate::channels::contacts::query_channel_contacts(&self.db, name).await;
+                let contact_info = match contacts {
+                    Ok(ref c) if !c.is_empty() => {
+                        let items: Vec<String> = c
+                            .iter()
+                            .map(|ct| format!("{} (id: {})", ct.label, ct.recipient_id))
+                            .collect();
+                        format!("\n  Contacts: {}", items.join(", "))
+                    }
+                    _ => String::new(),
+                };
+                lines.push(format!("- {name}: {status:?}{contact_info}"));
             }
         }
 

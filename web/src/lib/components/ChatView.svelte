@@ -8,6 +8,7 @@
 	import { Message, MessageContent } from '$lib/components/ai-elements/message';
 	import { Response } from '$lib/components/ai-elements/response';
 	import { Loader } from '$lib/components/ai-elements/loader';
+	import { Shimmer } from '$lib/components/ai-elements/shimmer';
 	import {
 		Tool,
 		ToolHeader,
@@ -204,6 +205,10 @@
 											<ToolInput input={tc.args} />
 											{#if tc.output !== undefined}
 												<ToolOutput output={tc.output} />
+											{:else if tc.state === 'input-available'}
+												<div class="px-3 pb-3">
+													<Shimmer content_length={40} duration={1.5}>Processing...</Shimmer>
+												</div>
 											{/if}
 										</ToolContent>
 									</Tool>

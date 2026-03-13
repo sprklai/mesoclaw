@@ -343,7 +343,9 @@ pub async fn resolve_agent_with_tools(
         // Create per-request dedup cache if enabled
         let config = state.config.load();
         let dedup_cache = if config.tool_dedup_enabled {
-            Some(Arc::new(ToolCallCache::new()))
+            Some(Arc::new(ToolCallCache::with_limits(
+                config.tool_call_limits.clone(),
+            )))
         } else {
             None
         };

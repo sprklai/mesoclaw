@@ -459,13 +459,32 @@ pub fn channel_system_context(channel_name: &str, allowed_tool_names: &[String])
 
     let channel_hint = match channel_name {
         "telegram" => {
-            "[Channel: Telegram] Keep responses concise and mobile-friendly. Avoid large code blocks. Use simple formatting."
+            "[Channel: Telegram] Format for mobile chat:\n\
+            - Use **bold** for labels, separate label from value with a space or colon\n\
+            - Put each distinct item on its own line (use markdown line breaks)\n\
+            - Use bullet points (- or •) for lists, one item per line\n\
+            - Separate sections with a blank line\n\
+            - Keep code blocks short (<10 lines). Prefer inline `code` for brief values\n\
+            - Avoid wide tables — use line-per-item layout instead\n\
+            - Max ~300 words per response"
         }
         "slack" => {
-            "[Channel: Slack] Format using Slack mrkdwn. Use *bold* not **bold**. Keep responses professional."
+            "[Channel: Slack] Format using Slack mrkdwn:\n\
+            - Use *bold* not **bold**, _italic_ not *italic*\n\
+            - Put each distinct item on its own line\n\
+            - Use bullet points for lists, one item per line\n\
+            - Separate sections with a blank line\n\
+            - Keep code blocks short. Prefer inline `code` for brief values\n\
+            - Max ~400 words per response"
         }
         "discord" => {
-            "[Channel: Discord] Keep responses under 2000 characters. Use standard markdown."
+            "[Channel: Discord] Format for Discord chat:\n\
+            - Keep responses under 2000 characters\n\
+            - Use standard markdown (**bold**, *italic*, `code`)\n\
+            - Put each distinct item on its own line\n\
+            - Use bullet points for lists, one item per line\n\
+            - Separate sections with a blank line\n\
+            - Keep code blocks short with language tags"
         }
         _ => "[Channel: External] Keep responses concise.",
     };
@@ -601,7 +620,7 @@ mod tests {
         let tools = vec!["web_search".to_string(), "memory".to_string()];
         let ctx = channel_system_context("telegram", &tools);
         assert!(ctx.contains("Telegram"));
-        assert!(ctx.contains("mobile-friendly"));
+        assert!(ctx.contains("mobile chat"));
         assert!(ctx.contains("web_search"));
         assert!(ctx.contains("memory"));
         assert!(ctx.contains("Available tools:"));

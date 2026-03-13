@@ -531,6 +531,7 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
     tools
         .register(Arc::new(crate::tools::channel_tool::ChannelSendTool::new(
             channel_registry.clone(),
+            pool.clone(),
         )))
         .unwrap_or_else(|e| tracing::warn!("Failed to register channel_send tool: {e}"));
 
@@ -594,6 +595,7 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         registry
             .register_plugin(Arc::new(prompt::ChannelContextPlugin::new(
                 channel_registry.clone(),
+                pool.clone(),
             )))
             .await;
 
