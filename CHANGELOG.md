@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.16] - 2026-03-13
+
+### Changed
+- Full rebrand from MesoClaw to Zenii across entire codebase
+- Renamed all crate directories (`mesoclaw-*` → `zenii-*`) and package names
+- Updated binary names, config paths, keyring service IDs, and desktop app metadata
+- Updated CI/CD workflows, documentation, scripts, and frontend references
+- Replaced obsolete `logo.png` with new Zenii branding assets
+
 ## [0.0.15] - 2026-03-13
 
 ### Added
