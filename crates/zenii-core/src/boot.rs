@@ -418,6 +418,7 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         soul_loader.clone(),
         user_learner.clone(),
         config.clone(),
+        credentials.clone(),
     ));
     #[cfg(feature = "ai")]
     info!("Context builder initialized");

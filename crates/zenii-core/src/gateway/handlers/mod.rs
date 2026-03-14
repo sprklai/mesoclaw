@@ -73,12 +73,16 @@ pub(crate) mod tests {
         let memory: Arc<dyn crate::memory::traits::Memory> = Arc::new(InMemoryStore::new());
         let session_manager = Arc::new(crate::ai::session::SessionManager::new(pool.clone()));
 
+        let credentials: Arc<dyn crate::credential::CredentialStore> =
+            Arc::new(InMemoryCredentialStore::new());
+
         let context_builder = Arc::new(crate::ai::context::ContextBuilder::new(
             session_manager.clone(),
             memory.clone(),
             soul_loader.clone(),
             user_learner.clone(),
             config.clone(),
+            credentials.clone(),
         ));
 
         let plugins_dir = dir.path().join("plugins");
@@ -99,7 +103,7 @@ pub(crate) mod tests {
             db: pool.clone(),
             event_bus: Arc::new(crate::event_bus::TokioBroadcastBus::new(16)),
             memory,
-            credentials: Arc::new(InMemoryCredentialStore::new()),
+            credentials: credentials.clone(),
             security: Arc::new(SecurityPolicy::default_policy()),
             tools: tool_registry,
             session_manager,

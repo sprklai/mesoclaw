@@ -5,6 +5,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use rig::OneOrMany;
+use rig::client::CompletionClient;
+use rig::completion::Prompt;
 use rig::message::Message as RigMessage;
 use rig::message::{AssistantContent, Text, UserContent};
 use serde::{Deserialize, Serialize};
@@ -14,6 +16,7 @@ use tracing::{debug, info, warn};
 use crate::Result;
 use crate::ai::session::SessionManager;
 use crate::config::AppConfig;
+use crate::credential::CredentialStore;
 use crate::db::{self, DbPool};
 use crate::identity::SoulLoader;
 use crate::memory::traits::Memory;
@@ -1081,6 +1084,7 @@ pub struct ContextBuilder {
     soul_loader: Arc<SoulLoader>,
     user_learner: Arc<UserLearner>,
     config: Arc<AppConfig>,
+    credentials: Arc<dyn CredentialStore>,
 }
 
 impl ContextBuilder {
@@ -1090,6 +1094,7 @@ impl ContextBuilder {
         soul_loader: Arc<SoulLoader>,
         user_learner: Arc<UserLearner>,
         config: Arc<AppConfig>,
+        credentials: Arc<dyn CredentialStore>,
     ) -> Self {
         Self {
             session_manager,
@@ -1097,6 +1102,7 @@ impl ContextBuilder {
             soul_loader,
             user_learner,
             config,
+            credentials,
         }
     }
 
@@ -1299,8 +1305,8 @@ impl ContextBuilder {
     /// This is fire-and-forget — errors are logged but not propagated.
     pub async fn extract_facts(
         &self,
-        _prompt: &str,
-        _response: &str,
+        prompt: &str,
+        response: &str,
         session_id: Option<&str>,
     ) -> Result<()> {
         if !self.config.context_auto_extract {
@@ -1323,10 +1329,96 @@ impl ContextBuilder {
             }
         }
 
-        // Auto-extraction would call an LLM here to extract facts.
-        // For now, this is a placeholder — actual LLM-based extraction
-        // requires a configured summary model and is deferred to handler integration.
-        debug!("Auto-extraction triggered (LLM call deferred to handler)");
+        // Build a lightweight completion model for fact extraction
+        let api_key = match super::providers::resolve_api_key_for_provider(
+            &self.config.context_summary_provider_id,
+            true,
+            self.credentials.as_ref(),
+        )
+        .await
+        {
+            Ok(key) => key,
+            Err(e) => {
+                debug!("Skipping fact extraction — no API key for summary provider: {e}");
+                return Ok(());
+            }
+        };
+
+        let extraction_prompt = format!(
+            "Extract key facts about the user from this conversation exchange. \
+             Focus on preferences, habits, knowledge level, and contextual information.\n\n\
+             User: {prompt}\n\
+             Assistant: {response}\n\n\
+             Output each fact on a separate line in the format:\n\
+             category|key|value\n\n\
+             Valid categories: preference, knowledge, context, workflow\n\
+             Rules:\n\
+             - Only extract concrete, reusable facts (not greetings or filler)\n\
+             - Keys should be short identifiers (e.g., \"preferred_language\", \"expertise_level\")\n\
+             - Values should be concise\n\
+             - If no meaningful facts can be extracted, output exactly: NONE"
+        );
+
+        let llm_response = if self.config.context_summary_provider_id == "anthropic" {
+            let client = super::providers::build_anthropic_client(&api_key)?;
+            let agent = client
+                .agent(&self.config.context_summary_model_id)
+                .preamble("You extract structured facts from conversations. Output only the requested format, nothing else.")
+                .max_tokens(512)
+                .build();
+            agent
+                .prompt(&extraction_prompt)
+                .await
+                .map_err(|e| crate::ZeniiError::Agent(format!("fact extraction failed: {e}")))?
+        } else {
+            let client = super::providers::build_openai_client(&api_key, None)?;
+            let agent = client
+                .agent(&self.config.context_summary_model_id)
+                .preamble("You extract structured facts from conversations. Output only the requested format, nothing else.")
+                .max_tokens(512)
+                .build();
+            agent
+                .prompt(&extraction_prompt)
+                .await
+                .map_err(|e| crate::ZeniiError::Agent(format!("fact extraction failed: {e}")))?
+        };
+
+        let trimmed = llm_response.trim();
+        if trimmed.eq_ignore_ascii_case("NONE") || trimmed.is_empty() {
+            debug!("No facts extracted from exchange");
+            return Ok(());
+        }
+
+        // Parse and store each extracted fact
+        let mut stored = 0usize;
+        for line in trimmed.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = line.splitn(3, '|').collect();
+            if parts.len() != 3 {
+                debug!("Skipping malformed fact line: {line}");
+                continue;
+            }
+            let (category, key, value) = (parts[0].trim(), parts[1].trim(), parts[2].trim());
+            if category.is_empty() || key.is_empty() || value.is_empty() {
+                continue;
+            }
+
+            match self
+                .user_learner
+                .observe(category, key, value, self.config.learning_min_confidence)
+                .await
+            {
+                Ok(()) => stored += 1,
+                Err(e) => debug!("Failed to store extracted fact '{key}': {e}"),
+            }
+        }
+
+        if stored > 0 {
+            info!("Auto-extracted {stored} facts from conversation exchange");
+        }
         Ok(())
     }
 }
@@ -2069,9 +2161,17 @@ mod tests {
         let identity_dir = dir.path().join("identity");
         let soul_loader = Arc::new(SoulLoader::new(&identity_dir).unwrap());
         let user_learner = Arc::new(UserLearner::new(pool, &config));
+        let credentials: Arc<dyn crate::credential::CredentialStore> =
+            Arc::new(crate::credential::InMemoryCredentialStore::new());
 
-        let builder =
-            ContextBuilder::new(session_manager, memory, soul_loader, user_learner, config);
+        let builder = ContextBuilder::new(
+            session_manager,
+            memory,
+            soul_loader,
+            user_learner,
+            config,
+            credentials,
+        );
         (dir, builder)
     }
 
@@ -2292,8 +2392,16 @@ mod tests {
         let identity_dir = dir.path().join("identity");
         let soul_loader = Arc::new(SoulLoader::new(&identity_dir).unwrap());
         let user_learner = Arc::new(UserLearner::new(pool, &config));
-        let builder =
-            ContextBuilder::new(session_manager, memory, soul_loader, user_learner, config);
+        let credentials: Arc<dyn crate::credential::CredentialStore> =
+            Arc::new(crate::credential::InMemoryCredentialStore::new());
+        let builder = ContextBuilder::new(
+            session_manager,
+            memory,
+            soul_loader,
+            user_learner,
+            config,
+            credentials,
+        );
 
         // Create session with 10 messages
         let session = builder
@@ -2350,8 +2458,16 @@ mod tests {
         let identity_dir = dir.path().join("identity");
         let soul_loader = Arc::new(SoulLoader::new(&identity_dir).unwrap());
         let user_learner = Arc::new(UserLearner::new(pool, &config));
-        let builder =
-            ContextBuilder::new(session_manager, memory, soul_loader, user_learner, config);
+        let credentials: Arc<dyn crate::credential::CredentialStore> =
+            Arc::new(crate::credential::InMemoryCredentialStore::new());
+        let builder = ContextBuilder::new(
+            session_manager,
+            memory,
+            soul_loader,
+            user_learner,
+            config,
+            credentials,
+        );
 
         // Should return Ok without doing anything
         let result = builder.extract_facts("prompt", "response", None).await;
