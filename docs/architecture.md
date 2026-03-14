@@ -1499,43 +1499,152 @@ The spec is assembled at runtime from `#[utoipa::path]` annotations on handler f
 
 ## Onboarding Flow
 
-First-run setup flow that collects user location and timezone for context-aware agent behavior.
+Multi-step onboarding wizard that collects AI provider setup (provider selection, API key, model) and user profile (name, location, timezone). Available across Desktop, CLI, and TUI interfaces.
+
+### SetupStatus
+
+The `check_setup_status()` function (in `onboarding.rs`) determines whether onboarding is needed:
+
+- `needs_setup: bool` -- true if `user_name`, `user_location`, or API key is missing
+- `missing: Vec<String>` -- list of missing fields (e.g., `["user_name", "api_key"]`)
+- `detected_timezone: Option<String>` -- auto-detected IANA timezone via `iana-time-zone` crate
+- `has_usable_model: bool` -- true if at least one provider has a stored API key
+
+### Desktop (OnboardingWizard)
 
 ```mermaid
 sequenceDiagram
-    participant FE as Frontend (AuthGate)
+    participant FE as Frontend - AuthGate
+    participant WZ as OnboardingWizard
+    participant PS as ProvidersSettings
     participant GW as Gateway
     participant Cfg as Config
+    participant Cred as Credentials
 
     FE->>GW: GET /setup/status
-    GW->>Cfg: Check user_location + user_timezone
-    Cfg-->>GW: { needs_setup, missing fields }
-    GW-->>FE: SetupStatus response
+    GW->>Cfg: Check user_name + user_location
+    GW->>Cred: Check has_any_api_key
+    GW-->>FE: SetupStatus
 
     alt needs_setup = true
-        FE->>FE: Show SetupDialog
-        FE->>FE: Auto-detect timezone via Intl.DateTimeFormat
-        FE->>FE: User enters location
-        FE->>GW: PUT /config { user_location, user_timezone }
-        GW->>Cfg: Update config.toml + ArcSwap
-        GW-->>FE: 200 OK
-        FE->>FE: Dismiss dialog
+        FE->>WZ: Show OnboardingWizard
+
+        Note over WZ: Step 1 -- AI Provider
+        WZ->>PS: Embed ProvidersSettings
+        PS->>GW: GET /providers/with-key-status
+        PS->>PS: User selects provider + enters API key
+        PS->>GW: POST /credentials
+        PS->>GW: PUT /providers/default
+
+        Note over WZ: Step 2 -- Your Profile
+        WZ->>WZ: User enters name, location, timezone
+        WZ->>GW: PUT /config
+        GW->>Cfg: Update ArcSwap + persist TOML
+        GW-->>WZ: 200 OK
+        WZ->>FE: oncomplete - dismiss wizard
     else needs_setup = false
         FE->>FE: Proceed to chat
     end
 ```
 
+### CLI (Interactive Flow)
+
+The `zenii setup` command runs an interactive 7-step onboarding:
+
+1. Fetch providers from `GET /providers/with-key-status`
+2. User selects provider via `dialoguer::Select`
+3. Prompt for API key via `dialoguer::Password`, save to `POST /credentials`
+4. Refresh providers to get updated models
+5. User selects model, set default via `PUT /providers/default`
+6. Prompt for name, location, timezone (auto-detected default)
+7. Save profile to `PUT /config`
+
+### TUI (4-Step Overlay Modal)
+
+Centered ratatui modal (60% x 70%) with step indicator:
+
+1. **ProviderSelect** -- list providers, j/k navigate, Enter select
+2. **ApiKey** -- masked password input, Enter save, Esc back
+3. **ModelSelect** -- list models for selected provider, Enter select
+4. **Profile** -- three text fields (Name/Location/Timezone), Tab switch, Enter save
+
 ### Detection
 
-- **Timezone**: `Intl.DateTimeFormat().resolvedOptions().timeZone` (browser JS API)
+- **Timezone (server)**: `iana-time-zone` crate (Rust) -- returned in `SetupStatus.detected_timezone`
+- **Timezone (browser)**: `Intl.DateTimeFormat().resolvedOptions().timeZone` -- fallback in AuthGate
 - **Location**: Manual user input (e.g., "Toronto, Canada")
 
 ### Config Fields
 
+- `user_name: Option<String>` -- display name for greetings
 - `user_timezone: Option<String>` -- IANA format (e.g., "America/New_York")
-- `user_location: Option<String>` -- Human-readable (e.g., "New York, US")
+- `user_location: Option<String>` -- human-readable (e.g., "New York, US")
 
-**Key files**: `gateway/handlers/config.rs` (`setup_status`), `web/src/lib/components/SetupDialog.svelte`
+**Key files**: `onboarding.rs`, `gateway/handlers/config.rs` (`setup_status`), `web/src/lib/components/OnboardingWizard.svelte`, `web/src/lib/components/AuthGate.svelte`, `crates/zenii-cli/src/commands/onboard.rs`, `crates/zenii-tui/src/ui/onboard.rs`
+
+---
+
+## LLM-Based Auto Fact Extraction
+
+Automatically extracts structured facts about the user from conversation exchanges and persists them via `UserLearner::observe()`. Fire-and-forget design -- errors are logged, never propagated to the user.
+
+### Flow
+
+```mermaid
+sequenceDiagram
+    participant Chat as Chat Handler
+    participant CB as ContextBuilder
+    participant SM as SessionManager
+    participant LLM as Summary LLM
+    participant UL as UserLearner
+
+    Chat->>Chat: reasoning_engine.chat completes
+    Chat->>CB: extract_facts - prompt, response, session_id
+
+    CB->>CB: Check context_auto_extract enabled
+    alt disabled
+        CB-->>Chat: Ok - no-op
+    end
+
+    CB->>SM: get_context_info - session_id
+    SM-->>CB: message count
+    CB->>CB: Check count % context_extract_interval == 0
+    alt not at interval
+        CB-->>Chat: Ok - skip
+    end
+
+    CB->>CB: Resolve API key for summary provider
+    CB->>LLM: Extraction prompt with conversation
+    LLM-->>CB: category pipe key pipe value lines
+
+    loop Each extracted fact
+        CB->>UL: observe - category, key, value, confidence
+        UL->>UL: Check learning_enabled + category allowed + max not reached
+        UL-->>CB: Ok or logged error
+    end
+
+    CB-->>Chat: Ok
+```
+
+### Extraction Prompt
+
+The LLM receives the user prompt and assistant response, asked to extract facts in `category|key|value` format (one per line). Valid categories: `preference`, `knowledge`, `context`, `workflow`. If no meaningful facts, the LLM outputs `NONE`.
+
+### Config Fields
+
+| Field | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `context_auto_extract` | bool | `true` | Enable/disable fact extraction |
+| `context_extract_interval` | usize | `3` | Extract every N messages |
+| `context_summary_provider_id` | String | `"openai"` | LLM provider for extraction |
+| `context_summary_model_id` | String | `"gpt-4o-mini"` | LLM model for extraction |
+
+### Integration Points
+
+- **HTTP chat** (`gateway/handlers/chat.rs`): called after `reasoning_engine.chat()`, before storing assistant message
+- **WebSocket chat** (`gateway/handlers/ws.rs`): called after streaming completes
+
+**Key files**: `ai/context.rs` (`ContextBuilder::extract_facts`), `user/learner.rs` (`UserLearner::observe`), `config/schema.rs`
 
 ---
 

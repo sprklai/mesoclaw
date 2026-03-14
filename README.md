@@ -50,7 +50,7 @@
 
 <!-- Row 4: Quality & i18n -->
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-1203%20Rust%20%2B%20JS-success?style=flat-square" alt="1203 Rust + JS Tests" />
+  <img src="https://img.shields.io/badge/tests-1206%20Rust%20%2B%20JS-success?style=flat-square" alt="1206 Rust + JS Tests" />
   <img src="https://img.shields.io/badge/i18n-EN-blue?style=flat-square" alt="English" />
 </p>
 
@@ -125,7 +125,8 @@
 - **Model capability validation** -- `supports_tools` pre-check prevents tool-calling errors with incompatible models
 - **Context-aware agent** -- 3-tier adaptive context injection (Full/Minimal/Summary) with hash-based cache invalidation
 - **Efficient prompt system** -- plugin-based prompt strategy with CompactStrategy (~65% token reduction), 6 built-in plugins, and token budget trimming
-- **Onboarding flow** -- first-run SetupDialog with browser timezone auto-detection and user location input, persisted to config
+- **Onboarding wizard** -- multi-step first-run setup across Desktop (2-step wizard), CLI (`zenii setup` interactive flow), and TUI (4-step overlay modal) collecting AI provider selection, API key, default model, and user profile (name, location, timezone)
+- **LLM-based auto fact extraction** -- automatically extracts structured facts (preferences, knowledge, context, workflow) from conversations via a configurable LLM, persisted to user observations for progressive learning
 - **User location awareness** -- timezone and location injected into agent context for location-sensitive queries (weather, events, news)
 - **OpenAPI interactive docs** -- Scalar UI at `/api-docs` + OpenAPI 3.1 JSON spec (feature-gated `api-docs`, built with utoipa)
 - **Streaming responses** via WebSocket
@@ -157,7 +158,7 @@
 | Content | serde_yaml (YAML frontmatter parsing) |
 | i18n | paraglide-js (compile-time, tree-shakeable) |
 | Mobile | Tauri 2 (iOS + Android) -- future release |
-| TUI | ratatui -- future release |
+| TUI | ratatui |
 
 ---
 
@@ -168,7 +169,7 @@
 ```mermaid
 graph TD
     subgraph Clients["Clients"]
-        Desktop[Desktop] & Mobile["Mobile<br>#40;future#41;"] & CLI[CLI] & TUI["TUI<br>#40;future#41;"] & Daemon[Daemon]
+        Desktop[Desktop] & Mobile["Mobile<br>#40;future#41;"] & CLI[CLI] & TUI[TUI] & Daemon[Daemon]
         Web["Frontend<br>Svelte 5"]
     end
 
@@ -225,7 +226,7 @@ graph TD
     cli[zenii-cli]
     cli --> reqwest["reqwest<br>#40;HTTP client#41;"]
     cli --> tungstenite["tokio-tungstenite<br>#40;WS#41;"]
-    tui["zenii-tui<br>#40;future#41;"] -.-> core
+    tui[zenii-tui] --> core
     daemon[zenii-daemon] --> core
 
     core --> axum["axum<br>#40;gateway#41;"]
@@ -297,7 +298,7 @@ sequenceDiagram
         App->>App: Open Tauri window
     else CLI
         App->>App: Enter REPL loop
-    else TUI (future release)
+    else TUI
         App->>App: Render ratatui UI
     else Daemon
         App->>App: Wait for connections
@@ -362,7 +363,7 @@ zenii/
 │   ├── zenii-desktop/   # Tauri 2.10 shell (macOS, Windows, Linux)
 │   ├── zenii-mobile/    # Tauri 2 shell (iOS, Android) (future release)
 │   ├── zenii-cli/       # clap CLI
-│   ├── zenii-tui/       # ratatui TUI (future release)
+│   ├── zenii-tui/       # ratatui TUI
 │   └── zenii-daemon/    # Headless daemon
 └── web/                    # Svelte 5 SPA frontend (shared by desktop + mobile)
 ```
@@ -549,8 +550,8 @@ log_level = "info"
 # db_path = "/custom/path/zenii.db" # Override database file path
 identity_name = "Zenii"
 identity_description = "AI-powered assistant"
-default_provider = "openai"
-default_model = "gpt-4o"
+default_provider = "anthropic"
+default_model = "claude-sonnet-4-6"
 security_autonomy_level = "supervised"  # supervised | autonomous | strict
 max_tool_retries = 3
 # gateway_auth_token = "your-secret-token"  # Optional bearer token for auth
@@ -568,6 +569,7 @@ max_tool_retries = 3
 ## CLI Commands
 
 ```bash
+zenii setup                        # First-run onboarding wizard (provider, API key, model, profile)
 zenii daemon start|stop|status     # Manage the daemon process
 zenii chat [--session ID] [--model M]  # Interactive WS streaming chat
 zenii run "prompt" [--session] [--model]  # Single prompt, print response

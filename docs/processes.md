@@ -744,37 +744,108 @@ sequenceDiagram
 
 ## Onboarding / First-Run Setup Flow
 
-On first launch, the frontend checks if user location and timezone are configured. If not, a setup dialog collects these values for context-aware agent behavior.
+On first launch, all interfaces check `GET /setup/status` to determine if onboarding is needed. The `SetupStatus` response includes `needs_setup`, `missing` fields, `detected_timezone`, and `has_usable_model`. If setup is needed, a multi-step wizard collects AI provider configuration (provider, API key, model) and user profile (name, location, timezone).
 
 ```mermaid
 sequenceDiagram
-    participant FE as Frontend (AuthGate)
-    participant SD as SetupDialog
+    participant App as App - Desktop/CLI/TUI
     participant GW as Gateway
-    participant Cfg as Config (ArcSwap)
+    participant Cfg as Config
+    participant Cred as Credentials
+    participant Prov as ProviderRegistry
 
-    FE->>GW: GET /setup/status
-    GW->>Cfg: Check user_location + user_timezone
-    Cfg-->>GW: SetupStatus
-    GW-->>FE: { needs_setup: bool, missing: [...] }
+    App->>GW: GET /setup/status
+    GW->>Cfg: Check user_name + user_location
+    GW->>Cred: has_any_api_key?
+    GW->>Prov: list_providers
+    GW-->>App: SetupStatus
 
     alt needs_setup = true
-        FE->>SD: Show SetupDialog
-        SD->>SD: Auto-detect timezone via Intl.DateTimeFormat
-        Note over SD: Browser IANA timezone (e.g., "America/Toronto")
-        SD->>SD: User enters location manually
-        SD->>GW: PUT /config { user_location, user_timezone }
-        GW->>Cfg: Update ArcSwap config + persist TOML
-        GW-->>SD: 200 OK
-        SD->>FE: Dismiss dialog, proceed to chat
+        Note over App: Step 1 -- Provider Selection
+        App->>GW: GET /providers/with-key-status
+        GW-->>App: Provider list with key status
+        App->>App: User selects provider
+
+        Note over App: Step 2 -- API Key
+        App->>GW: POST /credentials
+        GW->>Cred: Store api_key:provider_id
+        GW-->>App: Ok
+
+        Note over App: Step 3 -- Model Selection
+        App->>GW: PUT /providers/default
+        GW->>Prov: Set default provider + model
+        GW-->>App: Ok
+
+        Note over App: Step 4 -- Profile
+        App->>GW: PUT /config
+        GW->>Cfg: Update name, location, timezone
+        GW-->>App: Ok
+        App->>App: Proceed to main interface
     else needs_setup = false
-        FE->>FE: Proceed directly to chat
+        App->>App: Proceed directly
     end
 ```
 
-**Config fields**: `user_timezone: Option<String>` (IANA format), `user_location: Option<String>` (human-readable)
+### Interface Variants
 
-**Key files**: `gateway/handlers/config.rs` (`setup_status`), `web/src/lib/components/SetupDialog.svelte`, `web/src/lib/components/AuthGate.svelte`
+- **Desktop**: 2-step `OnboardingWizard` component (provider setup via embedded `ProvidersSettings`, then profile fields)
+- **CLI**: `zenii setup` command -- 7-step interactive flow using `dialoguer` (Select, Password, Input prompts)
+- **TUI**: 4-step overlay modal (ProviderSelect, ApiKey, ModelSelect, Profile) with j/k navigation
+
+**Config fields**: `user_name: Option<String>`, `user_timezone: Option<String>` (IANA format), `user_location: Option<String>` (human-readable)
+
+**Key files**: `onboarding.rs`, `gateway/handlers/config.rs` (`setup_status`), `web/src/lib/components/OnboardingWizard.svelte`, `crates/zenii-cli/src/commands/onboard.rs`, `crates/zenii-tui/src/ui/onboard.rs`
+
+## Auto Fact Extraction Flow
+
+After each chat response, `ContextBuilder::extract_facts()` optionally calls an LLM to extract structured facts about the user and stores them via `UserLearner::observe()`. Fire-and-forget -- errors are logged, not propagated.
+
+```mermaid
+sequenceDiagram
+    participant H as Chat/WS Handler
+    participant CB as ContextBuilder
+    participant SM as SessionManager
+    participant LLM as Summary Provider
+    participant UL as UserLearner
+    participant DB as SQLite
+
+    H->>CB: extract_facts - prompt, response, session_id
+
+    CB->>CB: context_auto_extract enabled?
+    alt disabled
+        CB-->>H: Ok - no-op
+    end
+
+    CB->>SM: get_context_info - session_id
+    SM-->>CB: message count
+    CB->>CB: count % extract_interval == 0?
+    alt not at interval
+        CB-->>H: Ok - skip
+    end
+
+    CB->>CB: Resolve API key for summary provider
+    alt no key found
+        CB-->>H: Ok - silent skip
+    end
+
+    CB->>LLM: Extraction prompt
+    LLM-->>CB: category pipe key pipe value lines
+
+    alt response is NONE or empty
+        CB-->>H: Ok - no facts
+    end
+
+    loop Each parsed fact line
+        CB->>UL: observe - category, key, value, confidence
+        UL->>DB: UPSERT user_observations
+    end
+
+    CB-->>H: Ok
+```
+
+**Output format**: `category|key|value` per line. Categories: `preference`, `knowledge`, `context`, `workflow`.
+
+**Key files**: `ai/context.rs` (`ContextBuilder::extract_facts`), `user/learner.rs` (`UserLearner::observe`)
 
 ## Auto-Discovery Flow
 

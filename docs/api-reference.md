@@ -422,6 +422,38 @@ Update configuration. Accepts a partial or full `AppConfig` object.
 
 ---
 
+### Setup
+
+#### GET /setup/status
+
+Check first-run onboarding status. **No authentication required.**
+
+Returns whether the user needs to complete onboarding (missing provider API key, name, or location).
+
+**Response:**
+```json
+{
+  "needs_setup": true,
+  "missing": ["user_name", "user_location", "api_key"],
+  "detected_timezone": "America/New_York",
+  "has_usable_model": false
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `needs_setup` | bool | `true` if any required field is missing |
+| `missing` | string[] | List of missing fields (e.g., `"user_name"`, `"user_location"`, `"api_key"`) |
+| `detected_timezone` | string or null | Auto-detected IANA timezone from the server OS |
+| `has_usable_model` | bool | `true` if at least one provider has a stored API key |
+
+**Example:**
+```bash
+curl http://127.0.0.1:18981/setup/status
+```
+
+---
+
 ### Credentials
 
 #### POST /credentials

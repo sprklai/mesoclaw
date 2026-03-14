@@ -100,6 +100,33 @@ zenii daemon status
 
 ---
 
+### `setup` -- First-run onboarding wizard
+
+Run the interactive onboarding wizard to configure your AI provider and user profile. This is automatically triggered on first launch if setup is incomplete.
+
+```bash
+zenii setup
+```
+
+The wizard walks through these steps:
+
+1. **Provider selection** -- choose from available AI providers (OpenAI, Anthropic, Google, Ollama, etc.)
+2. **API key** -- enter your API key (stored securely in OS keyring). Skipped for providers that don't require a key (e.g., Ollama)
+3. **Model selection** -- choose a default model from the selected provider
+4. **Profile** -- enter your name, location, and timezone (timezone is auto-detected)
+
+Examples:
+
+```bash
+# Run the onboarding wizard
+zenii setup
+
+# Re-run setup to change provider or profile
+zenii setup
+```
+
+---
+
 ### `chat` -- Interactive chat (WebSocket)
 
 Open an interactive streaming chat session with the AI agent. Messages are streamed token-by-token over WebSocket.
