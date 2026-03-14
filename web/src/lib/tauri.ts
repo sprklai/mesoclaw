@@ -42,3 +42,20 @@ export async function showNotification(
     console.warn("Native notification failed:", e);
   }
 }
+
+/** Open a URL in the native browser via Tauri opener plugin. Falls back to window.open. */
+export async function openInBrowser(url: string): Promise<void> {
+  if (isTauri) {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
+  } else {
+    window.open(url, "_blank");
+  }
+}
+
+/** Open the config file in the default editor, creating a backup first. Returns backup path or null. */
+export async function openConfigFile(): Promise<string | null> {
+  if (!isTauri) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string>("open_config_file");
+}

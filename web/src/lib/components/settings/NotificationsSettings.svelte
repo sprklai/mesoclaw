@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import * as Card from '$lib/components/ui/card';
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Label } from '$lib/components/ui/label';
 	import { configStore } from '$lib/stores/config.svelte';
 	import { channelsStore } from '$lib/stores/channels.svelte';
@@ -97,14 +98,13 @@
 							{#each TARGETS as target}
 								{@const configured = isChannelConfigured(target.channelId)}
 								<td class="text-center py-3 px-3">
-									<input
-										type="checkbox"
-										checked={isEnabled(event.key, target.key)}
-										disabled={saving || !configured}
-										onchange={() => toggle(event.key, target.key)}
-										title={configured ? '' : `${target.label} not configured`}
-										class="h-4 w-4 rounded border-muted-foreground/30"
-									/>
+									<div class="flex justify-center">
+										<Checkbox
+											checked={isEnabled(event.key, target.key)}
+											disabled={saving || !configured}
+											onCheckedChange={() => toggle(event.key, target.key)}
+										/>
+									</div>
 									{#if !configured}
 										<p class="text-[10px] text-muted-foreground mt-0.5">N/A</p>
 									{/if}

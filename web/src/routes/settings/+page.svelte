@@ -9,6 +9,7 @@
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Bell from '@lucide/svelte/icons/bell';
 	import Shield from '@lucide/svelte/icons/shield';
+	import Info from '@lucide/svelte/icons/info';
 	import GeneralSettings from '$lib/components/settings/GeneralSettings.svelte';
 	import PermissionsSettings from '$lib/components/settings/PermissionsSettings.svelte';
 	import ConfigurationsSettings from '$lib/components/settings/ConfigurationsSettings.svelte';
@@ -18,6 +19,9 @@
 	import ServicesSettings from '$lib/components/settings/ServicesSettings.svelte';
 	import EmbeddingsSettings from '$lib/components/settings/EmbeddingsSettings.svelte';
 	import NotificationsSettings from '$lib/components/settings/NotificationsSettings.svelte';
+	import { Separator } from '$lib/components/ui/separator';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import { getAppVersion } from '$lib/tauri';
 	import { onMount } from 'svelte';
 
 	const tabs = [
@@ -34,6 +38,8 @@
 	];
 
 	let activeTab = $state('general');
+	let appVersion = $state<string | null>(null);
+	let aboutOpen = $state(false);
 
 	function getHashTab(): string {
 		const hash = window.location.hash.slice(1);
@@ -45,8 +51,9 @@
 		activeTab = id;
 	}
 
-	onMount(() => {
+	onMount(async () => {
 		activeTab = getHashTab();
+		appVersion = await getAppVersion();
 	});
 
 	$effect(() => {
@@ -75,6 +82,16 @@
 				{/if}
 			</button>
 		{/each}
+
+		<Separator class="my-2" />
+
+		<button
+			class="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-left text-muted-foreground hover:bg-muted hover:text-foreground"
+			onclick={() => { aboutOpen = true; }}
+		>
+			<Info class="h-4 w-4" />
+			About
+		</button>
 	</nav>
 
 	<!-- Mobile horizontal tabs -->
@@ -93,6 +110,13 @@
 				{/if}
 			</button>
 		{/each}
+		<button
+			class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors text-muted-foreground hover:bg-muted"
+			onclick={() => { aboutOpen = true; }}
+		>
+			<Info class="h-3.5 w-3.5" />
+			About
+		</button>
 	</div>
 
 	<!-- Content area -->
@@ -126,3 +150,30 @@
 		{/if}
 	</div>
 </div>
+
+<Dialog.Root bind:open={aboutOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<div class="flex items-center gap-3">
+				<img src="/app-icon-32.png" alt="Zenii" class="h-10 w-10" />
+				<div>
+					<Dialog.Title class="text-xl">Zenii</Dialog.Title>
+					{#if appVersion}
+						<p class="text-sm text-muted-foreground">v{appVersion}</p>
+					{/if}
+				</div>
+			</div>
+		</Dialog.Header>
+		<Dialog.Description class="space-y-3">
+			<p>AI-powered personal assistant</p>
+			<div class="text-xs text-muted-foreground space-y-1">
+				<p>SprklAI by NSRTech</p>
+				<p>MIT License</p>
+			</div>
+			<div class="flex gap-3 text-sm">
+				<a href="https://zenii.sprklai.com" target="_blank" rel="noopener" class="text-primary hover:underline">Website</a>
+				<a href="https://github.com/sprklai/zenii" target="_blank" rel="noopener" class="text-primary hover:underline">GitHub</a>
+			</div>
+		</Dialog.Description>
+	</Dialog.Content>
+</Dialog.Root>

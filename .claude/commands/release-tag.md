@@ -80,7 +80,7 @@ Run the version-bump script:
 ./scripts/version-bump.sh <patch|minor|major>
 ```
 
-This updates 7 files (Cargo.toml, tauri.conf.json, package.json, environment.ts, identity/types.rs, IDENTITY.md, CHANGELOG.md header) and verifies them.
+This updates 8 files (Cargo.toml, tauri.conf.json, package.json, environment.ts, identity/types.rs, IDENTITY.md, CHANGELOG.md header, openapi.rs) and verifies them.
 
 If the script exits with a non-zero code, STOP and report the error.
 

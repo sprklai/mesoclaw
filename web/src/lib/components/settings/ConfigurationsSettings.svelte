@@ -3,8 +3,11 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { apiGet } from '$lib/api/client';
+	import { isTauri, openConfigFile } from '$lib/tauri';
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+	import ExternalLink from '@lucide/svelte/icons/external-link';
 
 	let configFile = $state<{ path: string; content: string } | null>(null);
 	let loading = $state(false);
@@ -22,6 +25,21 @@
 		}
 	}
 
+	async function handleOpenInEditor() {
+		try {
+			const backupPath = await openConfigFile();
+			if (backupPath) {
+				toast.success('Config file opened in editor', {
+					description: `Backup saved to ${backupPath}`
+				});
+			}
+		} catch (e) {
+			toast.error('Failed to open config file', {
+				description: e instanceof Error ? e.message : String(e)
+			});
+		}
+	}
+
 	onMount(() => {
 		loadConfigFile();
 	});
@@ -34,9 +52,16 @@
 				<Card.Title>Configuration File</Card.Title>
 				<Card.Description>Raw TOML configuration — edit directly on disk or use settings above</Card.Description>
 			</div>
-			<Button variant="ghost" size="icon" onclick={loadConfigFile} disabled={loading}>
-				<RefreshCw class="h-4 w-4 {loading ? 'animate-spin' : ''}" />
-			</Button>
+			<div class="flex items-center gap-1">
+				{#if isTauri}
+					<Button variant="ghost" size="icon" onclick={handleOpenInEditor} title="Open in editor">
+						<ExternalLink class="h-4 w-4" />
+					</Button>
+				{/if}
+				<Button variant="ghost" size="icon" onclick={loadConfigFile} disabled={loading}>
+					<RefreshCw class="h-4 w-4 {loading ? 'animate-spin' : ''}" />
+				</Button>
+			</div>
 		</div>
 	</Card.Header>
 	<Card.Content class="space-y-3">

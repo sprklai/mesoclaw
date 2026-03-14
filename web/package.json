@@ -38,6 +38,7 @@
     "@shikijs/langs": "^4.0.1",
     "@shikijs/themes": "^4.0.1",
     "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-opener": "^2.5.3",
     "ai": "^6.0.116",
     "bits-ui": "^2.16.3",
     "clsx": "^2.1.1",

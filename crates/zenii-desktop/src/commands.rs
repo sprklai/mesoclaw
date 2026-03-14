@@ -145,6 +145,17 @@ pub fn open_data_dir() -> Result<(), String> {
     opener::open(data_dir.to_string_lossy().as_ref()).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn open_config_file() -> Result<String, String> {
+    let config_path = zenii_core::config::default_config_path();
+    let backup_path = config_path.with_extension("toml.bak");
+    if config_path.exists() {
+        std::fs::copy(&config_path, &backup_path).map_err(|e| e.to_string())?;
+    }
+    opener::open(config_path.to_string_lossy().as_ref()).map_err(|e| e.to_string())?;
+    Ok(backup_path.to_string_lossy().into_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

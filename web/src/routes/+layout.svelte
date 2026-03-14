@@ -1,28 +1,29 @@
 <script lang="ts">
 	import '../app.css';
 	import * as Sidebar from '$lib/components/ui/sidebar';
-	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
 	import AuthGate from '$lib/components/AuthGate.svelte';
 	import SessionList from '$lib/components/SessionList.svelte';
-	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { Toaster } from 'svelte-sonner';
 	import Home from '@lucide/svelte/icons/home';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import Database from '@lucide/svelte/icons/database';
 	import Settings from '@lucide/svelte/icons/settings';
 	import Calendar from '@lucide/svelte/icons/calendar';
+	import BookOpen from '@lucide/svelte/icons/book-open';
 	import { inboxStore } from '$lib/stores/inbox.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { sessionsStore } from '$lib/stores/sessions.svelte';
 	import { notificationStore } from '$lib/stores/notifications.svelte';
 	import { getBaseUrl, getToken } from '$lib/api/client';
+	import { getAppVersion, openInBrowser } from '$lib/tauri';
 	import { onMount, onDestroy } from 'svelte';
 
 	let { children } = $props();
+	let appVersion = $state<string | null>(null);
 
-	onMount(() => {
+	onMount(async () => {
 		sessionsStore.load();
 		const baseUrl = getBaseUrl();
 		const wsBase = baseUrl.replace(/^http/, 'ws');
@@ -31,6 +32,8 @@
 			? `${wsBase}/ws/notifications?token=${encodeURIComponent(token)}`
 			: `${wsBase}/ws/notifications`;
 		notificationStore.connect(wsUrl);
+
+		appVersion = await getAppVersion();
 	});
 
 	onDestroy(() => {
@@ -43,6 +46,11 @@
 		{ href: '/memory', icon: Database, label: 'Memory' },
 		{ href: '/schedule', icon: Calendar, label: 'Schedule' }
 	];
+
+	function handleApiDocs() {
+		const baseUrl = getBaseUrl();
+		openInBrowser(`${baseUrl}/api-docs`);
+	}
 </script>
 
 <Toaster richColors />
@@ -53,6 +61,9 @@
 				<div class="flex items-center gap-2 px-2 py-1">
 					<img src="/app-icon-32.png" alt="Zenii" class="h-6 w-6" />
 					<span class="font-semibold text-lg">Zenii</span>
+					{#if appVersion}
+						<span class="text-xs text-muted-foreground">v{appVersion}</span>
+					{/if}
 				</div>
 			</Sidebar.Header>
 
@@ -88,6 +99,12 @@
 			<Sidebar.Footer class="sticky bottom-0 z-10 bg-sidebar-accent/50 border-t border-sidebar-border">
 				<Sidebar.Menu>
 					<Sidebar.MenuItem>
+						<Sidebar.MenuButton onclick={handleApiDocs}>
+							<BookOpen class="h-4 w-4" />
+							<span>API Docs</span>
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
 							isActive={page.url.pathname.startsWith('/settings')}
 							onclick={() => goto('/settings')}
@@ -97,7 +114,6 @@
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
-				<ThemeToggle />
 			</Sidebar.Footer>
 		</Sidebar.Root>
 

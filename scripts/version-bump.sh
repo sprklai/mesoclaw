@@ -12,6 +12,7 @@ ENV_TS="$ROOT_DIR/web/src/test-mocks/environment.ts"
 IDENTITY_TYPES="$ROOT_DIR/crates/zenii-core/src/identity/types.rs"
 IDENTITY_MD="$ROOT_DIR/crates/zenii-core/src/identity/defaults/IDENTITY.md"
 CHANGELOG="$ROOT_DIR/CHANGELOG.md"
+OPENAPI_RS="$ROOT_DIR/crates/zenii-core/src/gateway/openapi.rs"
 
 usage() {
     echo "Usage: $0 <patch|minor|major|set VERSION>"
@@ -67,6 +68,9 @@ update_files() {
 
     # 6. IDENTITY.md
     sed -i "s/^version: \"${old}\"/version: \"${new}\"/" "$IDENTITY_MD"
+
+    # 7. OpenAPI spec version
+    sed -i "s/version = \"${old}\"/version = \"${new}\"/" "$OPENAPI_RS"
 }
 
 update_changelog_bump() {
@@ -112,6 +116,7 @@ verify() {
     check_file "$IDENTITY_TYPES"   "version: \"${version}\".into()" "identity/types.rs"
     check_file "$IDENTITY_MD"      "^version: \"${version}\"" "IDENTITY.md"
     check_file "$CHANGELOG"        "## \[${version}\]" "CHANGELOG.md"
+    check_file "$OPENAPI_RS"       "version = \"${version}\"" "openapi.rs"
 
     if [ "$errors" -gt 0 ]; then
         echo ""
@@ -120,7 +125,7 @@ verify() {
     fi
 
     echo ""
-    echo "All 7 files verified."
+    echo "All 8 files verified."
 }
 
 # --- Main ---

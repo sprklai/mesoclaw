@@ -8,7 +8,17 @@
 	import { configStore } from '$lib/stores/config.svelte';
 	import { getBaseUrl, setBaseUrl, getToken, setToken, isValidBaseUrl } from '$lib/api/client';
 	import { isTauri } from '$lib/tauri';
+	import { themeStore, type Theme } from '$lib/stores/theme.svelte';
+	import Sun from '@lucide/svelte/icons/sun';
+	import Moon from '@lucide/svelte/icons/moon';
+	import Monitor from '@lucide/svelte/icons/monitor';
 	import { onMount } from 'svelte';
+
+	const themeOptions: { value: Theme; label: string; icon: typeof Sun }[] = [
+		{ value: 'light', label: 'Light', icon: Sun },
+		{ value: 'dark', label: 'Dark', icon: Moon },
+		{ value: 'system', label: 'System', icon: Monitor },
+	];
 
 	let baseUrl = $state(getBaseUrl());
 	let token = $state(getToken() ?? '');
@@ -130,6 +140,29 @@
 		{ id: 'desktop', label: 'Desktop', requiresTauri: true },
 	];
 </script>
+
+<Card.Root>
+	<Card.Header>
+		<Card.Title>Appearance</Card.Title>
+		<Card.Description>Choose your preferred color theme</Card.Description>
+	</Card.Header>
+	<Card.Content>
+		<div class="flex gap-2">
+			{#each themeOptions as opt (opt.value)}
+				<button
+					class="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+						{themeStore.theme === opt.value
+							? 'bg-primary text-primary-foreground'
+							: 'bg-muted text-muted-foreground hover:bg-muted/80'}"
+					onclick={() => themeStore.set(opt.value)}
+				>
+					<opt.icon class="h-4 w-4" />
+					{opt.label}
+				</button>
+			{/each}
+		</div>
+	</Card.Content>
+</Card.Root>
 
 <Card.Root>
 	<Card.Header>
