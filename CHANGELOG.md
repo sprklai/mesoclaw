@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.18] - 2026-03-14
+
+### Added
+- Onboarding wizard across Desktop, CLI, and TUI with provider selection and API key setup
+- LLM-based automatic fact extraction from conversations
+
+### Changed
+- UI polish — sidebar, settings, and consistency improvements
+- README comparison table trimmed to OpenClaw and ZeroClaw only
+
+### Fixed
+- Ignore fastembed tests that require ONNX model download in CI
+
 ## [0.0.17] - 2026-03-13
 
 ### Added
