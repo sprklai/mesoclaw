@@ -57,6 +57,9 @@ futures = { workspace = true }
 # Phase 4: Agent Intelligence
 serde_yaml = { workspace = true }
 
+# Timezone detection
+iana-time-zone = { workspace = true }
+
 # Phase 8: Channels (optional)
 teloxide = { workspace = true, optional = true }
 serenity = { workspace = true, optional = true }

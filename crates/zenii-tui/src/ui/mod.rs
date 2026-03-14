@@ -1,6 +1,7 @@
 mod chat;
 mod help;
 mod input;
+mod onboard;
 mod sessions;
 mod status;
 
@@ -35,6 +36,12 @@ pub fn render(frame: &mut Frame, app: &App) {
     chat::render_chat(frame, vertical[0], app);
     input::render_input(frame, vertical[1], app);
     status::render_status(frame, vertical[2], app);
+
+    // Onboard overlay
+    if app.mode == crate::app::AppMode::Onboard {
+        onboard::render_onboard(frame, size, app);
+        return;
+    }
 
     // Help overlay on top
     if app.show_help {

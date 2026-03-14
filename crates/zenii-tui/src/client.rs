@@ -35,7 +35,7 @@ impl ZeniiClient {
         format!("{}/ws/chat", self.ws_url)
     }
 
-    async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, String> {
+    pub async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, String> {
         let mut req = self.http.get(format!("{}{path}", self.base_url));
         if let Some(ref val) = self.auth_header_value() {
             req = req.header("authorization", val);
@@ -49,7 +49,7 @@ impl ZeniiClient {
         resp.json().await.map_err(|e| e.to_string())
     }
 
-    async fn post<B: Serialize, T: DeserializeOwned>(
+    pub async fn post<B: Serialize, T: DeserializeOwned>(
         &self,
         path: &str,
         body: &B,
@@ -58,6 +58,24 @@ impl ZeniiClient {
             .http
             .post(format!("{}{path}", self.base_url))
             .json(body);
+        if let Some(ref val) = self.auth_header_value() {
+            req = req.header("authorization", val);
+        }
+        let resp = req.send().await.map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("HTTP {status}: {body}"));
+        }
+        resp.json().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn put<B: Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, String> {
+        let mut req = self.http.put(format!("{}{path}", self.base_url)).json(body);
         if let Some(ref val) = self.auth_header_value() {
             req = req.header("authorization", val);
         }

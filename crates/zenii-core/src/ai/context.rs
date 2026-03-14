@@ -119,6 +119,16 @@ pub(crate) fn domains_to_rule_categories(domains: &HashSet<ContextDomain>) -> Ve
 }
 
 // ============================================================================
+// Timezone Detection
+// ============================================================================
+
+/// Detect the system's IANA timezone (e.g., "America/Toronto").
+/// Returns `None` if detection fails.
+pub fn detect_system_timezone() -> Option<String> {
+    iana_time_zone::get_timezone().ok()
+}
+
+// ============================================================================
 // Boot Context
 // ============================================================================
 
@@ -161,7 +171,10 @@ impl BootContext {
             .or_else(|_| std::env::var("LC_ALL"))
             .unwrap_or_else(|_| "en_US.UTF-8".into());
         let region = infer_region_from_timezone_with_config(user_location);
-        let user_timezone = user_timezone.map(|s| s.to_string());
+        // Auto-detect timezone if not provided by user config
+        let user_timezone = user_timezone
+            .map(|s| s.to_string())
+            .or_else(detect_system_timezone);
 
         let home_dir = std::env::var("HOME")
             .or_else(|_| std::env::var("USERPROFILE"))
@@ -483,6 +496,14 @@ impl ContextEngine {
             }
             parts.push("## User Location".into());
             parts.push(loc_parts.join(" | "));
+        }
+
+        // User name injection
+        if let Some(ref name) = self.config.user_name
+            && !name.is_empty()
+        {
+            parts.push("## User".into());
+            parts.push(format!("Name: {name}"));
         }
 
         // Reasoning Protocol

@@ -7,6 +7,22 @@ pub enum AppMode {
     Chat,
     Input,
     Help,
+    Onboard,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OnboardStep {
+    ProviderSelect,
+    ApiKey,
+    ModelSelect,
+    Profile,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OnboardField {
+    Name,
+    Location,
+    Timezone,
 }
 
 /// Chat streaming status.
@@ -206,6 +222,20 @@ pub struct App {
     pub theme: Theme,
     pub current_session_id: Option<String>,
     pub confirm_delete: bool,
+    pub onboard_step: OnboardStep,
+    pub onboard_providers: Vec<serde_json::Value>,
+    pub onboard_selected_provider: usize,
+    pub onboard_models: Vec<serde_json::Value>,
+    pub onboard_selected_model: usize,
+    pub onboard_api_key: TextInput,
+    pub onboard_name: TextInput,
+    pub onboard_location: TextInput,
+    pub onboard_timezone: TextInput,
+    pub onboard_error: Option<String>,
+    pub onboard_saving: bool,
+    pub onboard_field: OnboardField,
+    pub onboard_provider_id: String,
+    pub onboard_requires_key: bool,
 }
 
 impl App {
@@ -229,6 +259,20 @@ impl App {
             theme: Theme::default(),
             current_session_id: None,
             confirm_delete: false,
+            onboard_step: OnboardStep::ProviderSelect,
+            onboard_providers: Vec::new(),
+            onboard_selected_provider: 0,
+            onboard_models: Vec::new(),
+            onboard_selected_model: 0,
+            onboard_api_key: TextInput::new(),
+            onboard_name: TextInput::new(),
+            onboard_location: TextInput::new(),
+            onboard_timezone: TextInput::new(),
+            onboard_error: None,
+            onboard_saving: false,
+            onboard_field: OnboardField::Name,
+            onboard_provider_id: String::new(),
+            onboard_requires_key: true,
         }
     }
 
@@ -484,5 +528,14 @@ mod tests {
         let mut app = App::new();
         app.chat_status = ChatStatus::Error("oops".into());
         assert_eq!(app.chat_status, ChatStatus::Error("oops".into()));
+    }
+
+    #[test]
+    fn onboard_mode_initial_state() {
+        let app = App::new();
+        // Default mode is SessionList, not Onboard
+        assert_eq!(app.mode, AppMode::SessionList);
+        assert_eq!(app.onboard_step, OnboardStep::ProviderSelect);
+        assert!(app.onboard_providers.is_empty());
     }
 }

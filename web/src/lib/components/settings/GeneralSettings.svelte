@@ -24,7 +24,6 @@
 	let token = $state(getToken() ?? '');
 	let urlError = $state('');
 	let userName = $state('');
-	let assistantName = $state('');
 	let userLocation = $state('');
 	let userTimezone = $state('');
 	let profileSaving = $state(false);
@@ -73,7 +72,6 @@
 	onMount(async () => {
 		await configStore.load();
 		userName = String(configStore.config.user_name ?? '');
-		assistantName = String(configStore.config.identity_name ?? 'Zenii');
 		userLocation = String(configStore.config.user_location ?? '');
 		userTimezone = String(configStore.config.user_timezone ?? '');
 	});
@@ -104,7 +102,7 @@
 		try {
 			const updates: Record<string, string | null> = {
 				user_name: userName.trim() || null,
-				identity_name: assistantName.trim() || 'Zenii',
+	
 				user_location: userLocation.trim() || null,
 				user_timezone: userTimezone.trim() || null,
 			};
@@ -197,10 +195,6 @@
 			<div class="space-y-1">
 				<label class="text-sm font-medium" for="user-name">Your Name</label>
 				<Input id="user-name" bind:value={userName} placeholder="e.g., John Doe" />
-			</div>
-			<div class="space-y-1">
-				<label class="text-sm font-medium" for="assistant-name">Assistant Name</label>
-				<Input id="assistant-name" bind:value={assistantName} placeholder="Zenii" />
 			</div>
 			<div class="space-y-1">
 				<label class="text-sm font-medium" for="user-location">Location</label>

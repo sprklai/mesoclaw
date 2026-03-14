@@ -123,6 +123,26 @@ async fn run_app(
     load_sessions(&mut app, client).await;
     load_default_model(&mut app, client).await;
 
+    // Check if onboarding is needed
+    if app.connection_status == ConnectionStatus::Connected
+        && let Ok(status) = client.get::<serde_json::Value>("/setup/status").await
+        && status.get("needs_setup").and_then(|v| v.as_bool()) == Some(true)
+    {
+        // Pre-fill timezone
+        if let Some(tz) = status.get("detected_timezone").and_then(|v| v.as_str()) {
+            app.onboard_timezone.content = tz.to_string();
+            app.onboard_timezone.cursor_pos = tz.len();
+        }
+        // Fetch providers
+        if let Ok(providers) = client
+            .get::<Vec<serde_json::Value>>("/providers/with-key-status")
+            .await
+        {
+            app.onboard_providers = providers;
+        }
+        app.mode = app::AppMode::Onboard;
+    }
+
     // Set up event handler with WS sender
     let (mut events, ws_tx) = EventHandler::new_with_ws_sender(Duration::from_millis(250));
 
@@ -154,6 +174,95 @@ async fn run_app(
                         "__send_message__" => {
                             app.notification_text = None;
                             send_message(&mut app, client, &ws_tx).await;
+                        }
+                        "__onboard_save_key__" => {
+                            app.notification_text = None;
+                            let key_val = app.onboard_api_key.content.clone();
+                            let provider_id = app.onboard_provider_id.clone();
+                            let body = serde_json::json!({
+                                "key": format!("api_key:{provider_id}"),
+                                "value": key_val,
+                            });
+                            match client
+                                .post::<_, serde_json::Value>("/credentials", &body)
+                                .await
+                            {
+                                Ok(_) => {
+                                    app.onboard_api_key.clear();
+                                    // Refresh provider models
+                                    if let Ok(providers) = client
+                                        .get::<Vec<serde_json::Value>>("/providers/with-key-status")
+                                        .await
+                                    {
+                                        if let Some(p) = providers
+                                            .iter()
+                                            .find(|p| p["id"].as_str() == Some(&provider_id))
+                                        {
+                                            app.onboard_models =
+                                                p["models"].as_array().cloned().unwrap_or_default();
+                                        }
+                                        app.onboard_providers = providers;
+                                    }
+                                    app.onboard_selected_model = 0;
+                                    app.onboard_step = app::OnboardStep::ModelSelect;
+                                    app.onboard_error = None;
+                                }
+                                Err(e) => {
+                                    app.onboard_error = Some(format!("Failed to save key: {e}"));
+                                }
+                            }
+                        }
+                        "__onboard_save_model__" => {
+                            app.notification_text = None;
+                            if let Some(model) = app.onboard_models.get(app.onboard_selected_model)
+                            {
+                                let model_id = model["model_id"].as_str().unwrap_or("").to_string();
+                                let provider_id = app.onboard_provider_id.clone();
+                                let body = serde_json::json!({
+                                    "provider_id": provider_id,
+                                    "model_id": model_id,
+                                });
+                                match client
+                                    .put::<_, serde_json::Value>("/providers/default", &body)
+                                    .await
+                                {
+                                    Ok(_) => {
+                                        app.current_model = format!("{provider_id}:{model_id}");
+                                        app.onboard_step = app::OnboardStep::Profile;
+                                        app.onboard_error = None;
+                                    }
+                                    Err(e) => {
+                                        app.onboard_error =
+                                            Some(format!("Failed to set model: {e}"));
+                                    }
+                                }
+                            }
+                        }
+                        "__onboard_save_profile__" => {
+                            app.notification_text = None;
+                            app.onboard_saving = true;
+                            let body = serde_json::json!({
+                                "user_name": app.onboard_name.content.trim(),
+                                "user_location": app.onboard_location.content.trim(),
+                                "user_timezone": if app.onboard_timezone.content.trim().is_empty() {
+                                    serde_json::Value::Null
+                                } else {
+                                    serde_json::Value::String(
+                                        app.onboard_timezone.content.trim().to_string(),
+                                    )
+                                },
+                            });
+                            match client.put::<_, serde_json::Value>("/config", &body).await {
+                                Ok(_) => {
+                                    app.onboard_saving = false;
+                                    app.mode = app::AppMode::SessionList;
+                                    app.notification_text = Some("Setup complete!".into());
+                                }
+                                Err(e) => {
+                                    app.onboard_saving = false;
+                                    app.onboard_error = Some(format!("Failed to save: {e}"));
+                                }
+                            }
                         }
                         _ => {}
                     }

@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::{App, AppMode, ChatStatus};
+use crate::app::{App, AppMode, ChatStatus, OnboardField, OnboardStep};
 
 /// Handle a keyboard event, dispatching by current mode.
 pub fn handle_key_event(app: &mut App, key: KeyEvent) {
@@ -36,6 +36,7 @@ pub fn handle_key_event(app: &mut App, key: KeyEvent) {
         AppMode::SessionList => handle_session_list(app, key),
         AppMode::Chat => handle_chat(app, key),
         AppMode::Input => handle_input(app, key),
+        AppMode::Onboard => handle_onboard(app, key),
     }
 }
 
@@ -116,6 +117,127 @@ fn handle_input(app: &mut App, key: KeyEvent) {
         (KeyCode::End, _) => app.input.move_end(),
         (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => app.input.insert(c),
         _ => {}
+    }
+}
+
+fn handle_onboard(app: &mut App, key: KeyEvent) {
+    // Allow quit from provider select step
+    if key.code == KeyCode::Char('q') && app.onboard_step == OnboardStep::ProviderSelect {
+        app.should_quit = true;
+        return;
+    }
+
+    match app.onboard_step {
+        OnboardStep::ProviderSelect => match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                if !app.onboard_providers.is_empty() {
+                    app.onboard_selected_provider =
+                        (app.onboard_selected_provider + 1).min(app.onboard_providers.len() - 1);
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                app.onboard_selected_provider = app.onboard_selected_provider.saturating_sub(1);
+            }
+            KeyCode::Enter => {
+                if let Some(provider) = app.onboard_providers.get(app.onboard_selected_provider) {
+                    app.onboard_provider_id = provider["id"].as_str().unwrap_or("").to_string();
+                    app.onboard_requires_key =
+                        provider["requires_api_key"].as_bool().unwrap_or(true);
+                    app.onboard_models = provider["models"].as_array().cloned().unwrap_or_default();
+                    if app.onboard_requires_key {
+                        app.onboard_step = OnboardStep::ApiKey;
+                    } else {
+                        // Skip API key for providers that don't need it (e.g. Ollama)
+                        app.onboard_selected_model = 0;
+                        app.onboard_step = OnboardStep::ModelSelect;
+                    }
+                }
+            }
+            _ => {}
+        },
+        OnboardStep::ApiKey => match (key.code, key.modifiers) {
+            (KeyCode::Esc, _) => {
+                app.onboard_step = OnboardStep::ProviderSelect;
+                app.onboard_api_key.clear();
+                app.onboard_error = None;
+            }
+            (KeyCode::Enter, _) => {
+                if !app.onboard_api_key.content.trim().is_empty() {
+                    // Signal to save API key — handled by main loop
+                    app.notification_text = Some("__onboard_save_key__".into());
+                }
+            }
+            (KeyCode::Backspace, _) => app.onboard_api_key.delete_back(),
+            (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+                app.onboard_api_key.insert(c);
+            }
+            _ => {}
+        },
+        OnboardStep::ModelSelect => match key.code {
+            KeyCode::Esc => {
+                if app.onboard_requires_key {
+                    app.onboard_step = OnboardStep::ApiKey;
+                } else {
+                    app.onboard_step = OnboardStep::ProviderSelect;
+                }
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                if !app.onboard_models.is_empty() {
+                    app.onboard_selected_model =
+                        (app.onboard_selected_model + 1).min(app.onboard_models.len() - 1);
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                app.onboard_selected_model = app.onboard_selected_model.saturating_sub(1);
+            }
+            KeyCode::Enter => {
+                // Signal to save model — handled by main loop
+                app.notification_text = Some("__onboard_save_model__".into());
+            }
+            _ => {}
+        },
+        OnboardStep::Profile => match (key.code, key.modifiers) {
+            (KeyCode::Esc, _) => {
+                app.onboard_step = OnboardStep::ModelSelect;
+                app.onboard_error = None;
+            }
+            (KeyCode::Tab, _) => {
+                app.onboard_field = match app.onboard_field {
+                    OnboardField::Name => OnboardField::Location,
+                    OnboardField::Location => OnboardField::Timezone,
+                    OnboardField::Timezone => OnboardField::Name,
+                };
+            }
+            (KeyCode::BackTab, _) => {
+                app.onboard_field = match app.onboard_field {
+                    OnboardField::Name => OnboardField::Timezone,
+                    OnboardField::Location => OnboardField::Name,
+                    OnboardField::Timezone => OnboardField::Location,
+                };
+            }
+            (KeyCode::Enter, _) => {
+                if !app.onboard_name.content.trim().is_empty()
+                    && !app.onboard_location.content.trim().is_empty()
+                {
+                    app.notification_text = Some("__onboard_save_profile__".into());
+                } else {
+                    app.onboard_error = Some("Name and location are required".into());
+                }
+            }
+            (KeyCode::Backspace, _) => match app.onboard_field {
+                OnboardField::Name => app.onboard_name.delete_back(),
+                OnboardField::Location => app.onboard_location.delete_back(),
+                OnboardField::Timezone => app.onboard_timezone.delete_back(),
+            },
+            (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+                match app.onboard_field {
+                    OnboardField::Name => app.onboard_name.insert(c),
+                    OnboardField::Location => app.onboard_location.insert(c),
+                    OnboardField::Timezone => app.onboard_timezone.insert(c),
+                }
+            }
+            _ => {}
+        },
     }
 }
 

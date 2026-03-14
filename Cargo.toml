@@ -92,6 +92,9 @@ fastembed = "4"
 utoipa = { version = "5", features = ["axum_extras", "chrono"] }
 utoipa-scalar = { version = "0.3", features = ["axum"] }
 
+# Timezone detection
+iana-time-zone = "0.1"
+
 # Phase 8: Channels (optional)
 teloxide = { version = "0.17.0", features = ["macros"] }
 serenity = { version = "0.12.5", default-features = false, features = ["client", "gateway", "model", "rustls_backend"] }

@@ -5,6 +5,7 @@ pub mod daemon;
 pub mod embedding;
 pub mod key;
 pub mod memory;
+pub mod onboard;
 pub mod plugin;
 pub mod provider;
 pub mod run;

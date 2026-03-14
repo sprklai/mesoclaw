@@ -14,12 +14,13 @@
 	} from '$lib/api/client';
 	import { isTauri } from '$lib/tauri';
 	import { onDestroy } from 'svelte';
-	import SetupDialog from '$lib/components/SetupDialog.svelte';
+	import OnboardingWizard from '$lib/components/OnboardingWizard.svelte';
 
 	let { children } = $props();
 
 	let authenticated = $state(false);
 	let showSetup = $state(false);
+	let detectedTimezone = $state('');
 	let connecting = $state(false);
 	let booting = $state(false);
 	let tokenInput = $state('');
@@ -150,8 +151,12 @@
 
 	async function checkSetupStatus() {
 		try {
-			const status = await apiGet<{ needs_setup: boolean }>('/setup/status');
+			const status = await apiGet<{
+				needs_setup: boolean;
+				detected_timezone?: string;
+			}>('/setup/status');
 			if (status.needs_setup) {
+				detectedTimezone = status.detected_timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? '';
 				showSetup = true;
 			}
 		} catch {
@@ -166,9 +171,13 @@
 
 {#if authenticated}
 	{#if showSetup}
-		<SetupDialog bind:open={showSetup} />
+		<OnboardingWizard
+			{detectedTimezone}
+			oncomplete={() => (showSetup = false)}
+		/>
+	{:else}
+		{@render children()}
 	{/if}
-	{@render children()}
 {:else if booting}
 	<div class="flex h-screen items-center justify-center">
 		<div class="flex flex-col items-center gap-4">

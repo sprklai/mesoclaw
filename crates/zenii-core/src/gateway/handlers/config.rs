@@ -288,17 +288,22 @@ pub async fn get_config_file(
 ))]
 pub async fn setup_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let cfg = state.config.load();
-    let mut missing = Vec::new();
-    if cfg.user_location.is_none() {
-        missing.push("user_location");
-    }
-    if cfg.user_timezone.is_none() {
-        missing.push("user_timezone");
-    }
-    Json(serde_json::json!({
-        "needs_setup": !missing.is_empty(),
-        "missing": missing
-    }))
+
+    // Collect provider IDs from registry
+    let provider_ids: Vec<String> = state
+        .provider_registry
+        .list_providers()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|p| p.provider.id)
+        .collect();
+
+    let status =
+        crate::onboarding::check_setup_status(&cfg, state.credentials.as_ref(), &provider_ids)
+            .await;
+
+    Json(serde_json::json!(status))
 }
 
 #[cfg(test)]

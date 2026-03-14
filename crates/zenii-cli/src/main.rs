@@ -22,6 +22,10 @@ struct Cli {
     #[arg(long, global = true, env = "ZENII_TOKEN")]
     token: Option<String>,
 
+    /// Skip automatic setup check before chat/run
+    #[arg(long, global = true)]
+    no_setup: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -93,6 +97,8 @@ enum Commands {
         #[command(subcommand)]
         action: ChannelAction,
     },
+    /// Interactive onboarding wizard
+    Onboard,
     /// Generate shell completions (hidden from --help)
     #[command(hide = true)]
     Completions {
@@ -366,6 +372,17 @@ async fn main() {
     let cli = Cli::parse();
     let client = ZeniiClient::new(&cli.host, cli.port, cli.token);
 
+    // Auto-trigger onboarding for interactive commands if setup is incomplete
+    if !cli.no_setup
+        && std::io::IsTerminal::is_terminal(&std::io::stdin())
+        && matches!(cli.command, Commands::Chat { .. } | Commands::Run { .. })
+        && let Ok(status) = client.get::<serde_json::Value>("/setup/status").await
+        && status.get("needs_setup").and_then(|v| v.as_bool()) == Some(true)
+        && let Err(e) = commands::onboard::run(&client).await
+    {
+        eprintln!("Onboarding failed: {e}");
+    }
+
     let result = match cli.command {
         Commands::Daemon { action } => match action {
             DaemonAction::Start => commands::daemon::start().await,
@@ -473,6 +490,7 @@ async fn main() {
                 before,
             } => commands::channel::messages(&client, &session_id, limit, before.as_deref()).await,
         },
+        Commands::Onboard => commands::onboard::run(&client).await,
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "zenii", &mut std::io::stdout());
             Ok(())
@@ -1021,5 +1039,17 @@ mod tests {
             }
             _ => panic!("expected Plugin Update"),
         }
+    }
+
+    #[test]
+    fn parse_onboard() {
+        let cli = parse(&["zenii", "onboard"]);
+        assert!(matches!(cli.command, Commands::Onboard));
+    }
+
+    #[test]
+    fn parse_no_setup_flag() {
+        let cli = parse(&["zenii", "--no-setup", "chat"]);
+        assert!(cli.no_setup);
     }
 }
