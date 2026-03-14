@@ -8,6 +8,7 @@ pub enum AppMode {
     Input,
     Help,
     Onboard,
+    PluginList,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -202,6 +203,17 @@ impl TextInput {
     }
 }
 
+/// Plugin info for display in TUI.
+#[derive(Debug, Clone)]
+pub struct PluginListItem {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub enabled: bool,
+    pub tools_count: usize,
+    pub skills_count: usize,
+}
+
 /// Top-level application state.
 pub struct App {
     pub mode: AppMode,
@@ -236,6 +248,12 @@ pub struct App {
     pub onboard_field: OnboardField,
     pub onboard_provider_id: String,
     pub onboard_requires_key: bool,
+    pub plugins: Vec<PluginListItem>,
+    pub selected_plugin: Option<usize>,
+    pub plugin_install_input: TextInput,
+    pub plugin_install_local: bool,
+    pub plugin_error: Option<String>,
+    pub plugin_loading: bool,
 }
 
 impl App {
@@ -273,6 +291,12 @@ impl App {
             onboard_field: OnboardField::Name,
             onboard_provider_id: String::new(),
             onboard_requires_key: true,
+            plugins: Vec::new(),
+            selected_plugin: None,
+            plugin_install_input: TextInput::new(),
+            plugin_install_local: false,
+            plugin_error: None,
+            plugin_loading: false,
         }
     }
 
@@ -364,6 +388,31 @@ impl App {
 
     pub fn enter_session_list_mode(&mut self) {
         self.mode = AppMode::SessionList;
+    }
+
+    pub fn enter_plugin_list(&mut self) {
+        self.mode = AppMode::PluginList;
+    }
+
+    pub fn select_next_plugin(&mut self) {
+        if self.plugins.is_empty() {
+            return;
+        }
+        self.selected_plugin = Some(match self.selected_plugin {
+            None => 0,
+            Some(i) => (i + 1).min(self.plugins.len() - 1),
+        });
+    }
+
+    pub fn select_prev_plugin(&mut self) {
+        if self.plugins.is_empty() {
+            return;
+        }
+        self.selected_plugin = Some(match self.selected_plugin {
+            None => 0,
+            Some(0) => 0,
+            Some(i) => i - 1,
+        });
     }
 
     /// Append streaming text.

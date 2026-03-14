@@ -44,7 +44,7 @@
 ```mermaid
 graph TD
     subgraph Clients["Clients"]
-        Desktop[Desktop] & Mobile["Mobile<br>#40;future#41;"] & CLI[CLI] & TUI["TUI<br>#40;future#41;"] & Daemon[Daemon]
+        Desktop[Desktop] & Mobile["Mobile<br>#40;future#41;"] & CLI[CLI] & TUI[TUI] & Daemon[Daemon]
         Web["Frontend<br>Svelte 5"]
     end
 
@@ -211,7 +211,7 @@ zenii/
 │   │       └── tray.rs      # Show/Hide/Quit menu + 1 test
 │   ├── zenii-mobile/    # Tauri 2 shell (iOS + Android) (future release)
 │   ├── zenii-cli/       # clap CLI
-│   ├── zenii-tui/       # ratatui TUI (future release)
+│   ├── zenii-tui/       # ratatui TUI
 │   └── zenii-daemon/    # Headless daemon (full gateway server)
 └── web/                    # Svelte 5 frontend (SPA)
     ├── src/
@@ -1345,6 +1345,8 @@ graph TD
         SkillReg["SkillRegistry<br>bundled + plugin skills"]
         GWHandlers["Gateway Handlers<br>8 REST endpoints"]
         CLICmds["CLI Commands<br>7 subcommands"]
+        WebUI["Web/Desktop UI<br>PluginsSettings.svelte"]
+        TUIUI["TUI<br>PluginList mode"]
     end
 
     Installer -->|parses| Manifest
@@ -1356,6 +1358,8 @@ graph TD
     GWHandlers -->|queries| Registry
     GWHandlers -->|calls| Installer
     CLICmds -->|HTTP| GWHandlers
+    WebUI -->|HTTP| GWHandlers
+    TUIUI -->|HTTP| GWHandlers
 
     style PluginSystem fill:#FF9800,color:#fff
     style Integration fill:#4CAF50,color:#fff
@@ -1368,6 +1372,14 @@ graph TD
 - **Execution**: When a tool is called, `PluginProcess` spawns the plugin binary, communicates via JSON-RPC 2.0 over stdio
 - **Recovery**: Crashed plugins are automatically restarted up to `plugin_max_restart_attempts` times
 - **Idle Shutdown**: Inactive plugin processes are terminated after `plugin_idle_timeout_secs`
+
+### Client Interfaces
+
+Plugin management is available across all interfaces:
+
+- **CLI**: `zenii plugin <cmd>` (list, install, remove, update, enable, disable, info) -- HTTP calls to gateway
+- **Web/Desktop**: `PluginsSettings.svelte` component with full install/remove/enable/disable UI via `pluginsStore`
+- **TUI**: `PluginList` mode (press `p` from session list) with keybindings: `j`/`k` navigate, `e` toggle enable/disable, `d` remove, `i` install, `r` refresh, `Esc` back
 
 ### Plugin Manifest Format (plugin.toml)
 

@@ -116,7 +116,7 @@ sequenceDiagram
         App->>App: Open Tauri mobile view (in-process gateway)
     else CLI
         App->>App: Connect to daemon via HTTP/WS (ZeniiClient)
-    else TUI (future release)
+    else TUI
         App->>App: Render ratatui UI
     else Daemon
         App->>App: Wait for connections
@@ -700,34 +700,40 @@ sequenceDiagram
 
 ## Plugin Lifecycle Flow
 
+Plugins are managed through all three client interfaces, each communicating with the gateway over HTTP:
+
+- **CLI**: `zenii plugin <cmd>` -- direct HTTP calls to gateway plugin endpoints
+- **Web/Desktop**: `PluginsSettings.svelte` component -- `pluginsStore` fetches/mutates via HTTP
+- **TUI**: `PluginList` mode -- `ZeniiClient` HTTP calls (keybindings: `p` open, `j`/`k` nav, `e` toggle, `d` remove, `i` install, `r` refresh, `Esc` back)
+
 ```mermaid
 sequenceDiagram
-    participant User as User / CLI
+    participant CLI as CLI / Web / TUI
     participant GW as Gateway
     participant Inst as PluginInstaller
     participant Reg as PluginRegistry
     participant Proc as PluginProcess
     participant Ext as External Binary
 
-    Note over User,Ext: Installation
-    User->>GW: POST /plugins/install
+    Note over CLI,Ext: Installation
+    CLI->>GW: POST /plugins/install
     GW->>Inst: install_from_git(url)
     Inst->>Inst: git clone + parse plugin.toml
     Inst->>Reg: register(manifest)
     Inst->>GW: Register tools in ToolRegistry
-    GW-->>User: 201 Created
+    GW-->>CLI: 201 Created
 
-    Note over User,Ext: Tool Execution
-    User->>GW: POST /tools/get_weather/execute
+    Note over CLI,Ext: Tool Execution
+    CLI->>GW: POST /tools/get_weather/execute
     GW->>Proc: spawn if not running
     Proc->>Ext: Start binary + JSON-RPC handshake
     Ext-->>Proc: capabilities response
     Proc->>Ext: JSON-RPC call
     Ext-->>Proc: JSON-RPC result
     Proc-->>GW: ToolResult
-    GW-->>User: Response
+    GW-->>CLI: Response
 
-    Note over User,Ext: Crash Recovery
+    Note over CLI,Ext: Crash Recovery
     Ext--xProc: Process crash
     Proc->>Proc: Detect exit, increment restart count
     alt restart_count < max_restart_attempts
@@ -736,7 +742,7 @@ sequenceDiagram
         Proc->>Reg: Mark plugin as errored
     end
 
-    Note over User,Ext: Idle Shutdown
+    Note over CLI,Ext: Idle Shutdown
     Proc->>Proc: No calls for idle_timeout_secs
     Proc->>Ext: SIGTERM
     Ext-->>Proc: Process exits

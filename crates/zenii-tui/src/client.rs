@@ -88,7 +88,7 @@ impl ZeniiClient {
         resp.json().await.map_err(|e| e.to_string())
     }
 
-    async fn delete_req(&self, path: &str) -> Result<(), String> {
+    pub async fn delete_req(&self, path: &str) -> Result<(), String> {
         let mut req = self.http.delete(format!("{}{path}", self.base_url));
         if let Some(ref val) = self.auth_header_value() {
             req = req.header("authorization", val);

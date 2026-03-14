@@ -39,6 +39,7 @@ pub fn render_help(frame: &mut Frame, area: Rect) {
         help_line("d", "Delete session"),
         help_line("g", "Jump to first"),
         help_line("G", "Jump to last"),
+        help_line("p", "Plugin list"),
         Line::from(""),
         Line::from(Span::styled(
             "Chat",

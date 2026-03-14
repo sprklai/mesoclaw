@@ -19,6 +19,7 @@
 	import ServicesSettings from '$lib/components/settings/ServicesSettings.svelte';
 	import EmbeddingsSettings from '$lib/components/settings/EmbeddingsSettings.svelte';
 	import NotificationsSettings from '$lib/components/settings/NotificationsSettings.svelte';
+	import PluginsSettings from '$lib/components/settings/PluginsSettings.svelte';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { getAppVersion } from '$lib/tauri';
@@ -34,7 +35,7 @@
 		{ id: 'services', label: 'Services', icon: KeyRound },
 		{ id: 'embeddings', label: 'Embeddings', icon: Brain },
 		{ id: 'configurations', label: 'Configurations', icon: FileText },
-		{ id: 'plugins', label: 'Plugins', icon: Puzzle, experimental: true },
+		{ id: 'plugins', label: 'Plugins', icon: Puzzle },
 	];
 
 	let activeTab = $state('general');
@@ -71,15 +72,11 @@
 		{#each tabs as tab (tab.id)}
 			<button
 				class="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors text-left
-					{activeTab === tab.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
-					{tab.experimental ? ' opacity-60' : ''}"
+					{activeTab === tab.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 				onclick={() => setTab(tab.id)}
 			>
 				<tab.icon class="h-4 w-4" />
 				{tab.label}
-				{#if tab.experimental}
-					<span class="text-[10px] leading-none bg-muted-foreground/20 text-muted-foreground px-1 py-0.5 rounded">Exp</span>
-				{/if}
 			</button>
 		{/each}
 
@@ -99,15 +96,11 @@
 		{#each tabs as tab (tab.id)}
 			<button
 				class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors
-					{activeTab === tab.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted'}
-					{tab.experimental ? ' opacity-60' : ''}"
+					{activeTab === tab.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted'}"
 				onclick={() => setTab(tab.id)}
 			>
 				<tab.icon class="h-3.5 w-3.5" />
 				{tab.label}
-				{#if tab.experimental}
-					<span class="text-[10px] leading-none bg-muted-foreground/20 text-muted-foreground px-1 py-0.5 rounded">Exp</span>
-				{/if}
 			</button>
 		{/each}
 		<button
@@ -142,11 +135,7 @@
 		{:else if activeTab === 'configurations'}
 			<ConfigurationsSettings />
 		{:else if activeTab === 'plugins'}
-			<div class="flex flex-col items-center justify-center py-16 text-center space-y-3">
-				<Puzzle class="h-10 w-10 text-muted-foreground/40" />
-				<p class="text-lg font-medium text-muted-foreground">Plugins are experimental</p>
-				<p class="text-sm text-muted-foreground/70 max-w-sm">This feature is under active development and not yet available. Stay tuned for updates.</p>
-			</div>
+			<PluginsSettings />
 		{/if}
 	</div>
 </div>

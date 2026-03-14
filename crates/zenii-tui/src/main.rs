@@ -25,7 +25,9 @@ use ratatui::backend::CrosstermBackend;
 use tokio_tungstenite::tungstenite;
 use tracing::{error, info, warn};
 
-use crate::app::{App, ChatMessage, ChatStatus, ConnectionStatus, SessionSummary, ToolEvent};
+use crate::app::{
+    App, ChatMessage, ChatStatus, ConnectionStatus, PluginListItem, SessionSummary, ToolEvent,
+};
 use crate::client::ZeniiClient;
 use crate::event::{AppEvent, EventHandler, WsInbound};
 
@@ -264,6 +266,53 @@ async fn run_app(
                                 }
                             }
                         }
+                        "__plugin_load__" => {
+                            app.notification_text = None;
+                            load_plugins(&mut app, client).await;
+                        }
+                        "__plugin_toggle__" => {
+                            app.notification_text = None;
+                            if let Some(idx) = app.selected_plugin
+                                && let Some(plugin) = app.plugins.get(idx)
+                            {
+                                let name = plugin.name.clone();
+                                match client
+                                    .put::<_, serde_json::Value>(
+                                        &format!("/plugins/{name}/toggle"),
+                                        &serde_json::json!({}),
+                                    )
+                                    .await
+                                {
+                                    Ok(_) => {
+                                        load_plugins(&mut app, client).await;
+                                    }
+                                    Err(e) => {
+                                        app.plugin_error = Some(format!("Toggle failed: {e}"));
+                                    }
+                                }
+                            }
+                        }
+                        "__plugin_remove__" => {
+                            app.notification_text = None;
+                            if let Some(idx) = app.selected_plugin
+                                && let Some(plugin) = app.plugins.get(idx)
+                            {
+                                let name = plugin.name.clone();
+                                match client.delete_req(&format!("/plugins/{name}")).await {
+                                    Ok(()) => {
+                                        load_plugins(&mut app, client).await;
+                                        app.selected_plugin = None;
+                                    }
+                                    Err(e) => {
+                                        app.plugin_error = Some(format!("Remove failed: {e}"));
+                                    }
+                                }
+                            }
+                        }
+                        "__plugin_install_mode__" => {
+                            app.notification_text =
+                                Some("Enter plugin source URL or path, then press Enter:".into());
+                        }
                         _ => {}
                     }
                 }
@@ -395,6 +444,34 @@ async fn load_sessions(app: &mut App, client: &ZeniiClient) {
             warn!("Failed to load sessions: {e}");
         }
     }
+}
+
+async fn load_plugins(app: &mut App, client: &ZeniiClient) {
+    app.plugin_loading = true;
+    app.plugin_error = None;
+    match client.get::<Vec<serde_json::Value>>("/plugins").await {
+        Ok(list) => {
+            app.plugins = list
+                .into_iter()
+                .map(|v| PluginListItem {
+                    name: v["name"].as_str().unwrap_or("").to_string(),
+                    version: v["version"].as_str().unwrap_or("0.0.0").to_string(),
+                    description: v["description"].as_str().unwrap_or("").to_string(),
+                    enabled: v["enabled"].as_bool().unwrap_or(false),
+                    tools_count: v["tools_count"].as_u64().unwrap_or(0) as usize,
+                    skills_count: v["skills_count"].as_u64().unwrap_or(0) as usize,
+                })
+                .collect();
+            if !app.plugins.is_empty() && app.selected_plugin.is_none() {
+                app.selected_plugin = Some(0);
+            }
+        }
+        Err(e) => {
+            app.plugin_error = Some(format!("Failed to load plugins: {e}"));
+            warn!("Failed to load plugins: {e}");
+        }
+    }
+    app.plugin_loading = false;
 }
 
 async fn load_default_model(app: &mut App, client: &ZeniiClient) {

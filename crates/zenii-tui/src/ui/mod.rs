@@ -2,6 +2,7 @@ mod chat;
 mod help;
 mod input;
 mod onboard;
+mod plugins;
 mod sessions;
 mod status;
 
@@ -40,6 +41,13 @@ pub fn render(frame: &mut Frame, app: &App) {
     // Onboard overlay
     if app.mode == crate::app::AppMode::Onboard {
         onboard::render_onboard(frame, size, app);
+        return;
+    }
+
+    // Plugin list overlay
+    if app.mode == crate::app::AppMode::PluginList {
+        let overlay = centered_rect(80, 80, size);
+        plugins::render_plugins(frame, overlay, app);
         return;
     }
 

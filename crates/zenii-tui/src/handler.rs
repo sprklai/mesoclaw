@@ -37,6 +37,7 @@ pub fn handle_key_event(app: &mut App, key: KeyEvent) {
         AppMode::Chat => handle_chat(app, key),
         AppMode::Input => handle_input(app, key),
         AppMode::Onboard => handle_onboard(app, key),
+        AppMode::PluginList => handle_plugin_list(app, key),
     }
 }
 
@@ -60,6 +61,10 @@ fn handle_session_list(app: &mut App, key: KeyEvent) {
                 app.confirm_delete = true;
                 app.notification_text = Some("Delete session? (y/n)".into());
             }
+        }
+        KeyCode::Char('p') => {
+            app.notification_text = Some("__plugin_load__".into());
+            app.enter_plugin_list();
         }
         KeyCode::Char('q') => app.should_quit = true,
         KeyCode::Char('?') => app.toggle_help(),
@@ -116,6 +121,36 @@ fn handle_input(app: &mut App, key: KeyEvent) {
         (KeyCode::Home, _) => app.input.move_home(),
         (KeyCode::End, _) => app.input.move_end(),
         (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => app.input.insert(c),
+        _ => {}
+    }
+}
+
+fn handle_plugin_list(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => app.select_next_plugin(),
+        KeyCode::Char('k') | KeyCode::Up => app.select_prev_plugin(),
+        KeyCode::Char('e') => {
+            if app.selected_plugin.is_some() {
+                app.notification_text = Some("__plugin_toggle__".into());
+            }
+        }
+        KeyCode::Char('d') => {
+            if app.selected_plugin.is_some() {
+                app.notification_text = Some("__plugin_remove__".into());
+            }
+        }
+        KeyCode::Char('i') => {
+            app.notification_text = Some("__plugin_install_mode__".into());
+        }
+        KeyCode::Char('l') => {
+            app.plugin_install_local = !app.plugin_install_local;
+        }
+        KeyCode::Char('r') => {
+            app.notification_text = Some("__plugin_load__".into());
+        }
+        KeyCode::Esc | KeyCode::Tab => app.enter_session_list_mode(),
+        KeyCode::Char('q') => app.should_quit = true,
+        KeyCode::Char('?') => app.toggle_help(),
         _ => {}
     }
 }
