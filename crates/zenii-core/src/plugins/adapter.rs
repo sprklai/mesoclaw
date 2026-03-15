@@ -59,6 +59,7 @@ impl Tool for PluginToolAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::plugins::test_helpers::{has_interpreter, real_plugins_path};
     use std::path::PathBuf;
 
     fn mock_plugin_script() -> (tempfile::TempDir, PathBuf) {
@@ -92,6 +93,10 @@ done
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
+
+        // Sync to avoid "Text file busy" race on Linux
+        let f = std::fs::File::open(&script_path).unwrap();
+        f.sync_all().unwrap();
 
         (dir, script_path)
     }
@@ -154,5 +159,197 @@ done
             let mut proc = process.lock().await;
             assert!(proc.is_running());
         }
+    }
+
+    // 9.1.31 — Adapter end-to-end: real word-count plugin
+    #[tokio::test]
+    async fn adapter_real_word_count() {
+        let Some(plugins_path) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("python3") {
+            eprintln!("SKIP: python3 interpreter not available");
+            return;
+        }
+
+        let binary = plugins_path.join("word-count/word-count.py");
+        let process = PluginProcess::new("word-count", binary, 30, 1);
+        let process_arc = Arc::new(Mutex::new(process));
+
+        // Spawn first
+        {
+            let mut proc = process_arc.lock().await;
+            proc.spawn().await.unwrap();
+        }
+
+        let adapter = PluginToolAdapter::new(
+            "word-count".into(),
+            "Count words".into(),
+            serde_json::json!({}),
+            process_arc,
+        );
+
+        let result = adapter
+            .execute(serde_json::json!({"action": "count", "text": "hello world"}))
+            .await
+            .unwrap();
+        assert!(result.success, "expected success=true, got: {:?}", result);
+        assert!(
+            result.output.contains("Words: 2"),
+            "expected output to contain 'Words: 2', got: {}",
+            result.output
+        );
+    }
+
+    // 9.1.32 — Adapter end-to-end: real json-formatter plugin
+    #[tokio::test]
+    async fn adapter_real_json_formatter() {
+        let Some(plugins_path) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("node") {
+            eprintln!("SKIP: node interpreter not available");
+            return;
+        }
+
+        let binary = plugins_path.join("json-formatter/json-formatter.js");
+        let process = PluginProcess::new("json-formatter", binary, 30, 1);
+        let process_arc = Arc::new(Mutex::new(process));
+
+        {
+            let mut proc = process_arc.lock().await;
+            proc.spawn().await.unwrap();
+        }
+
+        let adapter = PluginToolAdapter::new(
+            "json-formatter".into(),
+            "Format JSON".into(),
+            serde_json::json!({}),
+            process_arc,
+        );
+
+        let result = adapter
+            .execute(serde_json::json!({"action": "validate", "json": "{\"a\":1}"}))
+            .await
+            .unwrap();
+        assert!(result.success, "expected success=true, got: {:?}", result);
+        assert!(
+            result.output.to_lowercase().contains("valid"),
+            "expected output to contain 'valid', got: {}",
+            result.output
+        );
+    }
+
+    // 9.1.33 — Adapter end-to-end: real uuid-gen plugin
+    #[tokio::test]
+    async fn adapter_real_uuid_gen() {
+        let Some(plugins_path) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("bash") {
+            eprintln!("SKIP: bash interpreter not available");
+            return;
+        }
+
+        let binary = plugins_path.join("uuid-gen/uuid-gen.sh");
+        let process = PluginProcess::new("uuid-gen", binary, 30, 1);
+        let process_arc = Arc::new(Mutex::new(process));
+
+        {
+            let mut proc = process_arc.lock().await;
+            proc.spawn().await.unwrap();
+        }
+
+        let adapter = PluginToolAdapter::new(
+            "uuid-gen".into(),
+            "Generate UUIDs".into(),
+            serde_json::json!({}),
+            process_arc,
+        );
+
+        let result = adapter
+            .execute(serde_json::json!({"action": "generate", "count": 1}))
+            .await
+            .unwrap();
+        assert!(result.success, "expected success=true, got: {:?}", result);
+        assert!(
+            result.output.contains('-') && result.output.len() > 10,
+            "expected hyphenated UUID string, got: {}",
+            result.output
+        );
+    }
+
+    // 9.1.34 — Adapter end-to-end: real timestamp plugin
+    #[tokio::test]
+    async fn adapter_real_timestamp() {
+        let Some(plugins_path) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("node") {
+            eprintln!("SKIP: node interpreter not available");
+            return;
+        }
+
+        let binary = plugins_path.join("timestamp/timestamp.js");
+        let process = PluginProcess::new("timestamp", binary, 30, 1);
+        let process_arc = Arc::new(Mutex::new(process));
+
+        {
+            let mut proc = process_arc.lock().await;
+            proc.spawn().await.unwrap();
+        }
+
+        let adapter = PluginToolAdapter::new(
+            "timestamp".into(),
+            "Get timestamps".into(),
+            serde_json::json!({}),
+            process_arc,
+        );
+
+        let result = adapter
+            .execute(serde_json::json!({"action": "now"}))
+            .await
+            .unwrap();
+        assert!(result.success, "expected success=true, got: {:?}", result);
+    }
+
+    // 9.1.35 — Adapter end-to-end: lazy-start with real plugin
+    #[tokio::test]
+    async fn adapter_real_lazy_start() {
+        let Some(plugins_path) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("python3") {
+            eprintln!("SKIP: python3 interpreter not available");
+            return;
+        }
+
+        let binary = plugins_path.join("word-count/word-count.py");
+        let process = PluginProcess::new("word-count", binary, 30, 1);
+        // Do NOT spawn — adapter should lazy-start
+        let process_arc = Arc::new(Mutex::new(process));
+
+        let adapter = PluginToolAdapter::new(
+            "word-count".into(),
+            "Count words".into(),
+            serde_json::json!({}),
+            process_arc,
+        );
+
+        let result = adapter
+            .execute(serde_json::json!({"action": "count", "text": "one two three"}))
+            .await
+            .unwrap();
+        assert!(result.success, "expected success=true, got: {:?}", result);
+        assert!(
+            result.output.contains("Words"),
+            "expected output to contain 'Words', got: {}",
+            result.output
+        );
     }
 }

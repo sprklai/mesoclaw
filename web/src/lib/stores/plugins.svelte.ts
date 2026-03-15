@@ -27,21 +27,40 @@ export interface PluginDetail {
   source: Record<string, unknown>;
 }
 
+export interface AvailablePlugin {
+  name: string;
+  version: string;
+  description: string;
+  author: string | null;
+  tools_count: number;
+  skills_count: number;
+  installed: boolean;
+}
+
 function createPluginsStore() {
   let plugins = $state<PluginListItem[]>([]);
+  let available = $state<AvailablePlugin[]>([]);
+  let repoUrl = "";
   let loading = $state(false);
   let installing = $state(false);
+  let browsing = $state(false);
   let error = $state<string | null>(null);
 
   return {
     get plugins() {
       return plugins;
     },
+    get available() {
+      return available;
+    },
     get loading() {
       return loading;
     },
     get installing() {
       return installing;
+    },
+    get browsing() {
+      return browsing;
     },
     get error() {
       return error;
@@ -60,11 +79,59 @@ function createPluginsStore() {
       }
     },
 
-    async install(source: string, local: boolean): Promise<boolean> {
+    async loadAvailable() {
+      browsing = true;
+      error = null;
+      try {
+        const resp = await apiGet<{
+          repo_url: string;
+          plugins: AvailablePlugin[];
+        }>("/plugins/available");
+        available = resp.plugins;
+        repoUrl = resp.repo_url;
+      } catch (e) {
+        error =
+          e instanceof Error ? e.message : "Failed to fetch plugin catalog";
+        available = [];
+      } finally {
+        browsing = false;
+      }
+    },
+
+    async installSelected(names: string[]): Promise<boolean> {
       installing = true;
       error = null;
       try {
-        await apiPost("/plugins/install", { source, local });
+        for (const name of names) {
+          const source = `${repoUrl}#plugins/${name}`;
+          await apiPost("/plugins/install", {
+            source,
+            local: false,
+            all: false,
+          });
+        }
+        await this.load();
+        await this.loadAvailable();
+        return true;
+      } catch (e) {
+        error = e instanceof Error ? e.message : "Install failed";
+        await this.load();
+        await this.loadAvailable();
+        return false;
+      } finally {
+        installing = false;
+      }
+    },
+
+    async install(
+      source: string,
+      local: boolean,
+      all = false,
+    ): Promise<boolean> {
+      installing = true;
+      error = null;
+      try {
+        await apiPost("/plugins/install", { source, local, all });
         await this.load();
         return true;
       } catch (e) {

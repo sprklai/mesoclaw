@@ -664,22 +664,29 @@ zenii plugin list
 Install a plugin from a git URL or local path.
 
 ```
-zenii plugin install <SOURCE> [--local]
+zenii plugin install <SOURCE> [--local] [--all]
 ```
 
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `<SOURCE>` | Yes | Git URL or local path to the plugin |
 | `--local` | No | Treat source as a local directory path |
+| `--all` | No | Install all plugins found in a local directory (requires `--local`) |
 
 Examples:
 
 ```bash
-# Install from git
-zenii plugin install https://github.com/user/weather-plugin
+# Install a single-repo plugin from git
+zenii plugin install https://github.com/sprklai/word-count
+
+# Install a specific plugin from a monorepo subdirectory (use #subdir fragment)
+zenii plugin install https://github.com/sprklai/zenii-plugins#plugins/json-formatter
 
 # Install from local directory
 zenii plugin install ./my-plugin --local
+
+# Install all plugins from a local directory
+zenii plugin install ./plugins-dir --local --all
 ```
 
 #### `plugin remove`

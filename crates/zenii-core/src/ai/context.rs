@@ -608,6 +608,10 @@ impl ContextEngine {
     /// Build compact one-line system state index (~50-100 tokens).
     /// This is Tier 1: always injected when enabled.
     async fn build_state_index(&self) -> String {
+        #[cfg_attr(
+            not(any(feature = "channels", feature = "scheduler")),
+            allow(unused_mut)
+        )]
         let mut parts: Vec<String> = Vec::new();
 
         #[cfg(feature = "channels")]

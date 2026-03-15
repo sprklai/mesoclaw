@@ -6,6 +6,14 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { providersStore, type ProviderWithKeyStatus } from '$lib/stores/providers.svelte';
+	import { configStore } from '$lib/stores/config.svelte';
+	import {
+		PromptInputModelSelect,
+		PromptInputModelSelectTrigger,
+		PromptInputModelSelectContent,
+		PromptInputModelSelectItem,
+		PromptInputModelSelectValue
+	} from '$lib/components/ai-elements/prompt-input';
 	import { onMount } from 'svelte';
 
 	let expandedId = $state<string | null>(null);
@@ -25,7 +33,35 @@
 
 	onMount(() => {
 		providersStore.load();
+		providersStore.loadDefault();
+		configStore.load();
 	});
+
+	const currentModelLabel = $derived(
+		providersStore.configuredModels.find((m) => m.value === providersStore.selectedModel)?.label ??
+			''
+	);
+
+	const defaultProviderMissingKey = $derived.by(() => {
+		const providerName = configStore.get('provider_name') as string | undefined;
+		if (!providerName) return false;
+		const provider = providersStore.providers.find((p) => p.id === providerName);
+		if (!provider) return false;
+		return provider.requires_api_key && !provider.has_api_key;
+	});
+
+	async function handleDefaultModelChange(value: string | undefined) {
+		if (!value) return;
+		providersStore.selectedModel = value;
+		const [providerId, ...rest] = value.split(':');
+		const modelId = rest.join(':');
+		await providersStore.setDefault(providerId, modelId);
+		await configStore.update({
+			provider_name: providerId,
+			provider_type: providerId,
+			provider_model_id: modelId
+		});
+	}
 
 	function toggle(id: string) {
 		expandedId = expandedId === id ? null : id;
@@ -157,11 +193,51 @@
 </script>
 
 <div class="flex items-center justify-between mb-4">
-	<h2 class="text-lg font-semibold">Providers</h2>
+	<h2 class="text-lg font-semibold">AI Providers</h2>
 	<Button size="sm" variant="outline" onclick={() => (showAddProvider = !showAddProvider)}>
 		{showAddProvider ? 'Cancel' : '+ Add Provider'}
 	</Button>
 </div>
+
+{#if defaultProviderMissingKey}
+	<div class="mb-4 rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+		<strong>No API key for default provider.</strong> Your config defaults to
+		<code class="rounded bg-amber-500/20 px-1">{configStore.get('provider_name')}</code> /
+		<code class="rounded bg-amber-500/20 px-1">{configStore.get('provider_model_id')}</code>,
+		but no API key is configured for that provider. Add a key below or select a different default model.
+	</div>
+{/if}
+
+{#if providersStore.configuredModels.length > 0}
+	<Card.Root class="mb-4">
+		<Card.Header class="py-3">
+			<Card.Title class="text-base">Default Model</Card.Title>
+			<Card.Description class="text-sm">
+				The model Zenii uses by default. You can override this per-conversation in the chat toolbar.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content class="pt-0">
+			<PromptInputModelSelect
+				value={providersStore.selectedModel}
+				onValueChange={handleDefaultModelChange}
+			>
+				<PromptInputModelSelectTrigger class="w-full border border-border">
+					<PromptInputModelSelectValue
+						value={currentModelLabel}
+						placeholder="Select default model"
+					/>
+				</PromptInputModelSelectTrigger>
+				<PromptInputModelSelectContent>
+					{#each providersStore.configuredModels as model}
+						<PromptInputModelSelectItem value={model.value}>
+							{model.label}
+						</PromptInputModelSelectItem>
+					{/each}
+				</PromptInputModelSelectContent>
+			</PromptInputModelSelect>
+		</Card.Content>
+	</Card.Root>
+{/if}
 
 {#if showAddProvider}
 	<Card.Root>

@@ -144,6 +144,15 @@ pub async fn run(client: &ZeniiClient) -> Result<(), String> {
             "model_id": model.model_id,
         });
         let _resp: serde_json::Value = client.put("/providers/default", &body).await?;
+
+        // Sync default model to config.toml
+        let config_body = json!({
+            "provider_name": provider.id,
+            "provider_type": provider.id,
+            "provider_model_id": model.model_id,
+        });
+        let _: serde_json::Value = client.put("/config", &config_body).await?;
+
         println!(
             "  Default model set to {}:{}\n",
             provider.id, model.model_id

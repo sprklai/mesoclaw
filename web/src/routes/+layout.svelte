@@ -12,6 +12,7 @@
 	import Calendar from '@lucide/svelte/icons/calendar';
 	import BookOpen from '@lucide/svelte/icons/book-open';
 	import { inboxStore } from '$lib/stores/inbox.svelte';
+	import '$lib/stores/theme.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { sessionsStore } from '$lib/stores/sessions.svelte';

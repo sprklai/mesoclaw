@@ -592,7 +592,7 @@ zenii embedding status                    # Show embedding provider status
 zenii embedding test                      # Test embedding generation
 zenii embedding reindex                   # Re-embed all memories
 zenii plugin list                         # List installed plugins
-zenii plugin install <source> [--local]   # Install from git URL or local path
+zenii plugin install <source> [--local] [--all]  # Install from git, monorepo subdir, or local path
 zenii plugin remove <name>                # Remove a plugin
 zenii plugin update <name>                # Update a plugin
 zenii plugin enable <name>                # Enable a plugin

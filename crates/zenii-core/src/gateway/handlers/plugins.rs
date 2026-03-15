@@ -4,9 +4,11 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::ZeniiError;
 use crate::gateway::state::AppState;
+use crate::plugins::PluginManifest;
 use crate::plugins::registry::InstalledPlugin;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -70,6 +72,16 @@ pub struct InstallRequest {
     pub source: String,
     #[serde(default)]
     pub local: bool,
+    /// Install all plugins found in a local directory
+    #[serde(default)]
+    pub all: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum InstallResponse {
+    Single(Box<InstalledPlugin>),
+    Batch(Vec<InstalledPlugin>),
 }
 
 /// POST /plugins/install — Install a plugin from source.
@@ -84,16 +96,29 @@ pub struct InstallRequest {
 pub async fn install_plugin(
     State(state): State<Arc<AppState>>,
     Json(req): Json<InstallRequest>,
-) -> Result<(StatusCode, Json<InstalledPlugin>), ZeniiError> {
-    let installed = if req.local {
-        state
+) -> Result<(StatusCode, Json<InstallResponse>), ZeniiError> {
+    if req.local && req.all {
+        let installed = state
+            .plugin_installer
+            .install_all_from_local(std::path::Path::new(&req.source))
+            .await?;
+        Ok((StatusCode::CREATED, Json(InstallResponse::Batch(installed))))
+    } else if req.local {
+        let installed = state
             .plugin_installer
             .install_from_local(std::path::Path::new(&req.source))
-            .await?
+            .await?;
+        Ok((
+            StatusCode::CREATED,
+            Json(InstallResponse::Single(Box::new(installed))),
+        ))
     } else {
-        state.plugin_installer.install_from_git(&req.source).await?
-    };
-    Ok((StatusCode::CREATED, Json(installed)))
+        let installed = state.plugin_installer.install_from_git(&req.source).await?;
+        Ok((
+            StatusCode::CREATED,
+            Json(InstallResponse::Single(Box::new(installed))),
+        ))
+    }
 }
 
 /// DELETE /plugins/{name} — Uninstall a plugin.
@@ -220,6 +245,119 @@ pub async fn update_plugin_config(
     Ok(Json(config))
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
+pub struct AvailablePlugin {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub author: Option<String>,
+    pub tools_count: usize,
+    pub skills_count: usize,
+    pub installed: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
+pub struct AvailablePluginsResponse {
+    pub repo_url: String,
+    pub plugins: Vec<AvailablePlugin>,
+}
+
+/// GET /plugins/available — List plugins from official repo.
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    get, path = "/plugins/available", tag = "Plugins",
+    responses(
+        (status = 200, description = "List of available plugins from official repo", body = AvailablePluginsResponse),
+        (status = 500, description = "Failed to fetch plugin catalog")
+    )
+))]
+pub async fn list_available_plugins(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<AvailablePluginsResponse>, ZeniiError> {
+    let config = state.config.load();
+    let repo_url = &config.official_plugins_repo;
+
+    // Clone to temp dir (shallow)
+    let temp_path = std::env::temp_dir().join(format!(
+        "zenii-browse-plugins-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+
+    let output = tokio::process::Command::new("git")
+        .args([
+            "clone",
+            "--depth",
+            "1",
+            repo_url,
+            temp_path.to_str().unwrap_or("."),
+        ])
+        .output()
+        .await
+        .map_err(|e| ZeniiError::Plugin(format!("git clone failed: {e}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let _ = std::fs::remove_dir_all(&temp_path);
+        return Err(ZeniiError::Plugin(format!(
+            "failed to fetch plugin catalog: {stderr}"
+        )));
+    }
+
+    // Scan plugins/ subdirectory for manifests
+    let plugins_root = temp_path.join("plugins");
+    let scan_dir = if plugins_root.is_dir() {
+        &plugins_root
+    } else {
+        &temp_path
+    };
+
+    let mut available = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(scan_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let manifest_path = path.join("zenii-plugin.toml");
+            if !manifest_path.exists() {
+                continue;
+            }
+            if let Ok(manifest) = PluginManifest::from_file(&manifest_path) {
+                let name = manifest.plugin.name.clone();
+                let installed = state.plugin_registry.get(&name).is_some();
+                available.push(AvailablePlugin {
+                    name,
+                    version: manifest.plugin.version,
+                    description: manifest.plugin.description,
+                    author: manifest.plugin.author,
+                    tools_count: manifest.tools.len(),
+                    skills_count: manifest.skills.len(),
+                    installed,
+                });
+            }
+        }
+    }
+
+    // Cleanup
+    let _ = std::fs::remove_dir_all(&temp_path);
+
+    available.sort_by(|a, b| a.name.cmp(&b.name));
+    info!(
+        "Fetched {} available plugins from official repo",
+        available.len()
+    );
+
+    Ok(Json(AvailablePluginsResponse {
+        repo_url: repo_url.clone(),
+        plugins: available,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,6 +415,7 @@ description = "Test plugin"
                 serde_json::to_string(&InstallRequest {
                     source: source.to_string_lossy().to_string(),
                     local: true,
+                    all: false,
                 })
                 .unwrap(),
             ))

@@ -650,6 +650,17 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         }
         for tool_def in &plugin.manifest.tools {
             let binary = plugin.install_path.join(&tool_def.binary);
+
+            // Fetch real schema from the plugin's info() JSON-RPC method
+            let schema = crate::plugins::fetch_plugin_schema(
+                &binary,
+                &tool_def.name,
+                config.plugin_execute_timeout_secs,
+                config.plugin_max_restart_attempts,
+            )
+            .await;
+
+            // Create a fresh process for the adapter (the one used for schema fetch is consumed)
             let process = crate::plugins::process::PluginProcess::new(
                 &tool_def.name,
                 binary,
@@ -659,7 +670,7 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
             let adapter = crate::plugins::adapter::PluginToolAdapter::new(
                 tool_def.name.clone(),
                 tool_def.description.clone(),
-                serde_json::json!({}),
+                schema,
                 Arc::new(tokio::sync::Mutex::new(process)),
             );
             tools.register(Arc::new(adapter)).unwrap_or_else(|e| {

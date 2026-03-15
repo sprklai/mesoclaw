@@ -449,4 +449,257 @@ done
             );
         }
     }
+
+    // ── Group D: Real plugin integration tests (9.1.21–9.1.30) ──
+
+    use crate::plugins::test_helpers::{has_interpreter, real_plugins_path};
+
+    // 9.1.21 — real_word_count_info
+    #[tokio::test]
+    async fn real_word_count_info() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("python3") {
+            eprintln!("SKIP: python3 interpreter not available");
+            return;
+        }
+        let binary = plugins.join("word-count/word-count.py");
+        let mut proc = PluginProcess::new("word-count", binary, 30, 1);
+        proc.spawn().await.unwrap();
+        let info = proc.info().await.unwrap();
+        assert_eq!(info.name, "word-count");
+        assert_eq!(info.version, "1.0.0");
+        assert!(info.parameters_schema.get("properties").is_some());
+        proc.shutdown().await.unwrap();
+    }
+
+    // 9.1.22 — real_word_count_execute
+    #[tokio::test]
+    async fn real_word_count_execute() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("python3") {
+            eprintln!("SKIP: python3 interpreter not available");
+            return;
+        }
+        let binary = plugins.join("word-count/word-count.py");
+        let mut proc = PluginProcess::new("word-count", binary, 30, 1);
+        proc.spawn().await.unwrap();
+        let result = proc
+            .execute(serde_json::json!({"action": "count", "text": "hello world"}))
+            .await
+            .unwrap();
+        assert!(result.success);
+        assert!(
+            result.output.contains("Words: 2"),
+            "Expected output to contain 'Words: 2', got: {}",
+            result.output
+        );
+        proc.shutdown().await.unwrap();
+    }
+
+    // 9.1.23 — real_json_formatter_info
+    #[tokio::test]
+    async fn real_json_formatter_info() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("node") {
+            eprintln!("SKIP: node interpreter not available");
+            return;
+        }
+        let binary = plugins.join("json-formatter/json-formatter.js");
+        let mut proc = PluginProcess::new("json-formatter", binary, 30, 1);
+        proc.spawn().await.unwrap();
+        let info = proc.info().await.unwrap();
+        assert_eq!(info.name, "json-formatter");
+        assert_eq!(info.version, "1.0.0");
+        proc.shutdown().await.unwrap();
+    }
+
+    // 9.1.24 — real_json_formatter_execute
+    #[tokio::test]
+    async fn real_json_formatter_execute() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("node") {
+            eprintln!("SKIP: node interpreter not available");
+            return;
+        }
+        let binary = plugins.join("json-formatter/json-formatter.js");
+        let mut proc = PluginProcess::new("json-formatter", binary, 30, 1);
+        proc.spawn().await.unwrap();
+        let result = proc
+            .execute(serde_json::json!({"action": "validate", "json": "{\"a\":1}"}))
+            .await
+            .unwrap();
+        assert!(result.success);
+        assert!(
+            result.output.to_lowercase().contains("valid"),
+            "Expected output to contain 'valid' (case-insensitive), got: {}",
+            result.output
+        );
+        proc.shutdown().await.unwrap();
+    }
+
+    // 9.1.25 — real_uuid_gen_info
+    #[tokio::test]
+    async fn real_uuid_gen_info() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("bash") {
+            eprintln!("SKIP: bash interpreter not available");
+            return;
+        }
+        let binary = plugins.join("uuid-gen/uuid-gen.sh");
+        let mut proc = PluginProcess::new("uuid-gen", binary, 30, 1);
+        proc.spawn().await.unwrap();
+        let info = proc.info().await.unwrap();
+        assert_eq!(info.name, "uuid-gen");
+        assert_eq!(info.version, "1.0.0");
+        proc.shutdown().await.unwrap();
+    }
+
+    // 9.1.26 — real_uuid_gen_execute
+    #[tokio::test]
+    async fn real_uuid_gen_execute() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("bash") {
+            eprintln!("SKIP: bash interpreter not available");
+            return;
+        }
+        let binary = plugins.join("uuid-gen/uuid-gen.sh");
+        let mut proc = PluginProcess::new("uuid-gen", binary, 30, 1);
+        proc.spawn().await.unwrap();
+        let result = proc
+            .execute(serde_json::json!({"action": "generate", "count": 1}))
+            .await
+            .unwrap();
+        assert!(result.success);
+        // Check for UUID v4 pattern (8-4-4-4-12 hex format) using simple string validation
+        let output_lower = result.output.to_lowercase();
+        let has_uuid = output_lower.split_whitespace().any(|word| {
+            let word = word.trim_matches(|c: char| !c.is_ascii_hexdigit() && c != '-');
+            let parts: Vec<&str> = word.split('-').collect();
+            parts.len() == 5
+                && parts[0].len() == 8
+                && parts[1].len() == 4
+                && parts[2].len() == 4
+                && parts[2].starts_with('4')
+                && parts[3].len() == 4
+                && parts[4].len() == 12
+                && word.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
+        });
+        assert!(
+            has_uuid,
+            "Expected output to contain a UUID v4, got: {}",
+            result.output
+        );
+        proc.shutdown().await.unwrap();
+    }
+
+    // 9.1.27 — real_timestamp_info
+    #[tokio::test]
+    async fn real_timestamp_info() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("node") {
+            eprintln!("SKIP: node interpreter not available");
+            return;
+        }
+        let binary = plugins.join("timestamp/timestamp.js");
+        let mut proc = PluginProcess::new("timestamp", binary, 30, 1);
+        proc.spawn().await.unwrap();
+        let info = proc.info().await.unwrap();
+        assert_eq!(info.name, "timestamp");
+        assert_eq!(info.version, "1.0.0");
+        proc.shutdown().await.unwrap();
+    }
+
+    // 9.1.28 — real_timestamp_execute
+    #[tokio::test]
+    async fn real_timestamp_execute() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        if !has_interpreter("node") {
+            eprintln!("SKIP: node interpreter not available");
+            return;
+        }
+        let binary = plugins.join("timestamp/timestamp.js");
+        let mut proc = PluginProcess::new("timestamp", binary, 30, 1);
+        proc.spawn().await.unwrap();
+        let result = proc
+            .execute(serde_json::json!({"action": "now"}))
+            .await
+            .unwrap();
+        assert!(result.success);
+        assert!(
+            result.output.to_lowercase().contains("epoch"),
+            "Expected output to contain 'epoch' (case-insensitive), got: {}",
+            result.output
+        );
+        proc.shutdown().await.unwrap();
+    }
+
+    // 9.1.29 — real_base64_info
+    #[tokio::test]
+    async fn real_base64_info() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let base64_bin = plugins.join("base64-tool/base64-tool");
+        if !base64_bin.exists() {
+            eprintln!("SKIP: base64-tool binary not built");
+            return;
+        }
+        let mut proc = PluginProcess::new("base64-tool", base64_bin, 30, 1);
+        proc.spawn().await.unwrap();
+        let info = proc.info().await.unwrap();
+        assert_eq!(info.name, "base64-tool");
+        proc.shutdown().await.unwrap();
+    }
+
+    // 9.1.30 — real_base64_execute
+    #[tokio::test]
+    async fn real_base64_execute() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let base64_bin = plugins.join("base64-tool/base64-tool");
+        if !base64_bin.exists() {
+            eprintln!("SKIP: base64-tool binary not built");
+            return;
+        }
+        let mut proc = PluginProcess::new("base64-tool", base64_bin, 30, 1);
+        proc.spawn().await.unwrap();
+        let result = proc
+            .execute(serde_json::json!({"action": "encode", "input": "hello"}))
+            .await
+            .unwrap();
+        assert!(result.success);
+        assert!(
+            result.output.contains("aGVsbG8"),
+            "Expected output to contain 'aGVsbG8' (base64 of 'hello'), got: {}",
+            result.output
+        );
+        proc.shutdown().await.unwrap();
+    }
 }

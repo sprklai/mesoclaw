@@ -203,6 +203,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/plugins", get(handlers::plugins::list_plugins))
         .route("/plugins/install", post(handlers::plugins::install_plugin))
         .route(
+            "/plugins/available",
+            get(handlers::plugins::list_available_plugins),
+        )
+        .route(
             "/plugins/{name}",
             get(handlers::plugins::get_plugin).delete(handlers::plugins::remove_plugin),
         )

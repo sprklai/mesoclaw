@@ -11,11 +11,16 @@
 
 	let installSource = $state('');
 	let installLocal = $state(false);
+	let installAll = $state(false);
 	let expandedName = $state<string | null>(null);
 	let detail = $state<PluginDetail | null>(null);
 	let confirmOpen = $state(false);
 	let removeTarget = $state<string | null>(null);
 	let toggling = $state<Record<string, boolean>>({});
+
+	// Browse state
+	let showBrowse = $state(false);
+	let selected = $state<Set<string>>(new Set());
 
 	onMount(async () => {
 		await pluginsStore.load();
@@ -24,10 +29,11 @@
 	async function handleInstall() {
 		const source = installSource.trim();
 		if (!source) return;
-		const ok = await pluginsStore.install(source, installLocal);
+		const ok = await pluginsStore.install(source, installLocal, installAll);
 		if (ok) {
 			installSource = '';
 			installLocal = false;
+			installAll = false;
 		}
 	}
 
@@ -63,6 +69,46 @@
 			detail = await pluginsStore.getDetail(name);
 		}
 	}
+
+	async function handleBrowse() {
+		showBrowse = true;
+		selected = new Set();
+		await pluginsStore.loadAvailable();
+	}
+
+	function toggleSelect(name: string) {
+		const next = new Set(selected);
+		if (next.has(name)) {
+			next.delete(name);
+		} else {
+			next.add(name);
+		}
+		selected = next;
+	}
+
+	function toggleSelectAll() {
+		const installable = pluginsStore.available.filter((p) => !p.installed);
+		if (selected.size === installable.length) {
+			selected = new Set();
+		} else {
+			selected = new Set(installable.map((p) => p.name));
+		}
+	}
+
+	async function handleInstallSelected() {
+		const names = [...selected];
+		if (names.length === 0) return;
+		await pluginsStore.installSelected(names);
+		selected = new Set();
+	}
+
+	const installableCount = $derived(
+		pluginsStore.available.filter((p) => !p.installed).length
+	);
+
+	const allSelected = $derived(
+		installableCount > 0 && selected.size === installableCount
+	);
 </script>
 
 <!-- Install form -->
@@ -87,22 +133,125 @@
 				{pluginsStore.installing ? 'Installing...' : 'Install'}
 			</Button>
 		</div>
-		<div class="flex items-center gap-2">
-			<input
-				id="install-local"
-				type="checkbox"
-				class="h-4 w-4 rounded border-input"
-				bind:checked={installLocal}
-			/>
-			<label class="text-sm text-muted-foreground" for="install-local">
-				Install from local directory
-			</label>
+		<div class="flex items-center gap-4">
+			<div class="flex items-center gap-2">
+				<input
+					id="install-local"
+					type="checkbox"
+					class="h-4 w-4 rounded border-input"
+					bind:checked={installLocal}
+					onchange={() => { if (!installLocal) installAll = false; }}
+				/>
+				<label class="text-sm text-muted-foreground" for="install-local">
+					Local directory
+				</label>
+			</div>
+			{#if installLocal}
+				<div class="flex items-center gap-2">
+					<input
+						id="install-all"
+						type="checkbox"
+						class="h-4 w-4 rounded border-input"
+						bind:checked={installAll}
+					/>
+					<label class="text-sm text-muted-foreground" for="install-all">
+						Install all plugins in directory
+					</label>
+				</div>
+			{/if}
 		</div>
 		{#if pluginsStore.error}
 			<p class="text-sm text-destructive">{pluginsStore.error}</p>
 		{/if}
 	</Card.Content>
 </Card.Root>
+
+<!-- Browse Official Plugins -->
+{#if !showBrowse}
+	<div class="flex justify-center py-2">
+		<Button variant="outline" onclick={handleBrowse}>
+			Browse Official Plugins
+		</Button>
+	</div>
+{:else}
+	<Card.Root>
+		<Card.Header class="py-3">
+			<div class="flex items-center justify-between">
+				<Card.Title class="text-base">Official Plugins</Card.Title>
+				<div class="flex items-center gap-2">
+					{#if pluginsStore.available.length > 0 && !pluginsStore.browsing}
+						<label class="flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer">
+							<input
+								type="checkbox"
+								class="h-4 w-4 rounded border-input"
+								checked={allSelected}
+								onchange={toggleSelectAll}
+							/>
+							Select all
+						</label>
+						<Button
+							size="sm"
+							disabled={selected.size === 0 || pluginsStore.installing}
+							onclick={handleInstallSelected}
+						>
+							{pluginsStore.installing
+								? 'Installing...'
+								: `Install Selected (${selected.size})`}
+						</Button>
+					{/if}
+					<Button
+						size="sm"
+						variant="ghost"
+						onclick={() => { showBrowse = false; }}
+					>
+						Close
+					</Button>
+				</div>
+			</div>
+		</Card.Header>
+		<Card.Content>
+			{#if pluginsStore.browsing}
+				<div class="space-y-2">
+					<Skeleton class="h-12 w-full" />
+					<Skeleton class="h-12 w-full" />
+					<Skeleton class="h-12 w-full" />
+				</div>
+			{:else if pluginsStore.available.length === 0}
+				<p class="text-sm text-muted-foreground">No plugins found in official repository.</p>
+			{:else}
+				<div class="space-y-2">
+					{#each pluginsStore.available as plugin (plugin.name)}
+						<div
+							class="flex items-center gap-3 rounded-md border p-3"
+							class:opacity-60={plugin.installed}
+						>
+							<input
+								type="checkbox"
+								class="h-4 w-4 rounded border-input"
+								checked={plugin.installed || selected.has(plugin.name)}
+								disabled={plugin.installed}
+								onchange={() => toggleSelect(plugin.name)}
+							/>
+							<div class="flex-1 min-w-0">
+								<div class="flex items-center gap-2">
+									<span class="font-medium text-sm">{plugin.name}</span>
+									<Badge variant="outline" class="text-xs">v{plugin.version}</Badge>
+									{#if plugin.installed}
+										<Badge variant="secondary" class="text-xs">Installed</Badge>
+									{/if}
+									<span class="text-xs text-muted-foreground">
+										{plugin.tools_count} tool{plugin.tools_count !== 1 ? 's' : ''}{#if plugin.skills_count > 0}, {plugin.skills_count} skill{plugin.skills_count !== 1 ? 's' : ''}{/if}
+									</span>
+								</div>
+								<p class="text-xs text-muted-foreground mt-0.5 truncate">{plugin.description}</p>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</Card.Content>
+	</Card.Root>
+{/if}
 
 <!-- Plugin list -->
 {#if pluginsStore.loading}

@@ -151,6 +151,7 @@ pub struct AppConfig {
     pub plugin_max_restart_attempts: u32,
     pub plugin_execute_timeout_secs: u64,
     pub plugin_auto_update: bool,
+    pub official_plugins_repo: String,
 
     // Phase 8.12: Notification Routing
     pub notification_routing: NotificationRouting,
@@ -318,6 +319,7 @@ impl Default for AppConfig {
             plugin_max_restart_attempts: 3,
             plugin_execute_timeout_secs: 60,
             plugin_auto_update: false,
+            official_plugins_repo: "https://github.com/sprklai/zenii-plugins.git".into(),
 
             // Tool Deduplication
             tool_dedup_enabled: true,

@@ -280,4 +280,217 @@ binary = "/usr/bin/test"
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("relative"));
     }
+
+    // --- Phase 9.1: Real plugin manifest tests ---
+
+    use crate::plugins::test_helpers::real_plugins_path;
+
+    // 9.1.1 — word-count manifest
+    #[test]
+    fn real_manifest_word_count() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let m = PluginManifest::from_file(&plugins.join("word-count/zenii-plugin.toml")).unwrap();
+        assert_eq!(m.plugin.name, "word-count");
+        assert_eq!(m.plugin.version, "1.0.0");
+        assert_eq!(m.plugin.author.as_deref(), Some("Zenii Team"));
+        assert_eq!(m.plugin.license.as_deref(), Some("MIT"));
+        assert_eq!(m.tools.len(), 1);
+        assert_eq!(m.tools[0].binary, "word-count.py");
+        assert_eq!(m.skills.len(), 1);
+        assert_eq!(m.skills[0].name, "writing-tips");
+        assert_eq!(m.skills[0].file, "skills/writing-tips.md");
+        assert!(m.config.is_empty());
+        assert!(m.tools[0].permissions.network.is_empty());
+        assert!(m.tools[0].permissions.filesystem.is_empty());
+    }
+
+    // 9.1.2 — json-formatter manifest
+    #[test]
+    fn real_manifest_json_formatter() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let m =
+            PluginManifest::from_file(&plugins.join("json-formatter/zenii-plugin.toml")).unwrap();
+        assert_eq!(m.plugin.name, "json-formatter");
+        assert_eq!(m.plugin.version, "1.0.0");
+        assert_eq!(m.tools.len(), 1);
+        assert_eq!(m.tools[0].binary, "json-formatter.js");
+        assert!(m.skills.is_empty());
+        assert!(m.tools[0].permissions.network.is_empty());
+        assert!(m.config.is_empty());
+    }
+
+    // 9.1.3 — uuid-gen manifest
+    #[test]
+    fn real_manifest_uuid_gen() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let m = PluginManifest::from_file(&plugins.join("uuid-gen/zenii-plugin.toml")).unwrap();
+        assert_eq!(m.plugin.name, "uuid-gen");
+        assert_eq!(m.plugin.version, "1.0.0");
+        assert_eq!(m.tools.len(), 1);
+        assert_eq!(m.tools[0].binary, "uuid-gen.sh");
+        assert!(m.skills.is_empty());
+    }
+
+    // 9.1.4 — timestamp manifest
+    #[test]
+    fn real_manifest_timestamp() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let m = PluginManifest::from_file(&plugins.join("timestamp/zenii-plugin.toml")).unwrap();
+        assert_eq!(m.plugin.name, "timestamp");
+        assert_eq!(m.plugin.version, "1.0.0");
+        assert_eq!(m.tools.len(), 1);
+        assert_eq!(m.tools[0].binary, "timestamp.js");
+    }
+
+    // 9.1.5 — http-client manifest
+    #[test]
+    fn real_manifest_http_client() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let m = PluginManifest::from_file(&plugins.join("http-client/zenii-plugin.toml")).unwrap();
+        assert_eq!(m.plugin.name, "http-client");
+        assert_eq!(m.tools[0].binary, "target/release/http-client");
+        assert_eq!(m.tools[0].permissions.network, vec!["*"]);
+    }
+
+    // 9.1.6 — hash-tool manifest
+    #[test]
+    fn real_manifest_hash_tool() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let m = PluginManifest::from_file(&plugins.join("hash-tool/zenii-plugin.toml")).unwrap();
+        assert_eq!(m.plugin.name, "hash-tool");
+        assert_eq!(m.tools[0].binary, "hash-tool");
+        assert_eq!(m.tools[0].permissions.filesystem, vec!["*"]);
+    }
+
+    // 9.1.7 — base64-tool manifest
+    #[test]
+    fn real_manifest_base64_tool() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let m = PluginManifest::from_file(&plugins.join("base64-tool/zenii-plugin.toml")).unwrap();
+        assert_eq!(m.plugin.name, "base64-tool");
+        assert_eq!(m.tools[0].binary, "base64-tool");
+        assert!(m.tools[0].permissions.network.is_empty());
+        assert!(m.tools[0].permissions.filesystem.is_empty());
+    }
+
+    // 9.1.8 — regex-tester manifest
+    #[test]
+    fn real_manifest_regex_tester() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let m = PluginManifest::from_file(&plugins.join("regex-tester/zenii-plugin.toml")).unwrap();
+        assert_eq!(m.plugin.name, "regex-tester");
+        assert_eq!(m.tools[0].binary, "bin/Release/net8.0/regex-tester");
+        assert_eq!(m.config.len(), 1);
+        let timeout = m.config.get("default_timeout_ms").unwrap();
+        assert_eq!(timeout.field_type, "int");
+        assert_eq!(timeout.default, Some(toml::Value::Integer(5000)));
+    }
+
+    // 9.1.9 — csv-analyzer manifest
+    #[test]
+    fn real_manifest_csv_analyzer() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let m = PluginManifest::from_file(&plugins.join("csv-analyzer/zenii-plugin.toml")).unwrap();
+        assert_eq!(m.plugin.name, "csv-analyzer");
+        assert_eq!(m.tools[0].binary, "csv-analyzer.py");
+        assert_eq!(m.tools[0].permissions.filesystem, vec!["*"]);
+    }
+
+    // 9.1.10 — color-converter manifest
+    #[test]
+    fn real_manifest_color_converter() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let m =
+            PluginManifest::from_file(&plugins.join("color-converter/zenii-plugin.toml")).unwrap();
+        assert_eq!(m.plugin.name, "color-converter");
+        assert_eq!(m.tools[0].binary, "color-converter.rb");
+    }
+
+    // 9.1.11 — All 10 manifests parse successfully
+    #[test]
+    fn real_all_manifests_parse() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let dirs = [
+            "word-count",
+            "json-formatter",
+            "uuid-gen",
+            "timestamp",
+            "http-client",
+            "hash-tool",
+            "base64-tool",
+            "regex-tester",
+            "csv-analyzer",
+            "color-converter",
+        ];
+        for dir in dirs {
+            let path = plugins.join(dir).join("zenii-plugin.toml");
+            let m = PluginManifest::from_file(&path)
+                .unwrap_or_else(|e| panic!("Failed to parse {dir}: {e}"));
+            assert!(!m.plugin.name.is_empty(), "{dir}: name empty");
+            assert!(!m.plugin.version.is_empty(), "{dir}: version empty");
+            assert!(!m.plugin.description.is_empty(), "{dir}: description empty");
+            assert!(!m.tools.is_empty(), "{dir}: no tools");
+        }
+    }
+
+    // 9.1.12 — All plugin names are unique
+    #[test]
+    fn real_all_plugin_names_unique() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let dirs = [
+            "word-count",
+            "json-formatter",
+            "uuid-gen",
+            "timestamp",
+            "http-client",
+            "hash-tool",
+            "base64-tool",
+            "regex-tester",
+            "csv-analyzer",
+            "color-converter",
+        ];
+        let mut names = std::collections::HashSet::new();
+        for dir in dirs {
+            let m =
+                PluginManifest::from_file(&plugins.join(dir).join("zenii-plugin.toml")).unwrap();
+            names.insert(m.plugin.name);
+        }
+        assert_eq!(names.len(), 10);
+    }
 }

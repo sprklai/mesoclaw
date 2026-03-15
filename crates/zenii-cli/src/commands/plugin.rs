@@ -79,24 +79,52 @@ pub async fn list(client: &ZeniiClient) -> Result<(), String> {
     Ok(())
 }
 
-pub async fn install(client: &ZeniiClient, source: &str, local: bool) -> Result<(), String> {
+pub async fn install(
+    client: &ZeniiClient,
+    source: &str,
+    local: bool,
+    all: bool,
+) -> Result<(), String> {
     #[derive(serde::Serialize)]
     struct InstallReq<'a> {
         source: &'a str,
         local: bool,
+        #[serde(skip_serializing_if = "std::ops::Not::not")]
+        all: bool,
     }
 
-    let plugin: PluginDetail = client
-        .post("/plugins/install", &InstallReq { source, local })
-        .await?;
+    if all {
+        let plugins: Vec<PluginDetail> = client
+            .post("/plugins/install", &InstallReq { source, local, all })
+            .await?;
 
-    println!(
-        "Installed plugin '{}' v{} ({} tool(s), {} skill(s))",
-        plugin.manifest.plugin.name,
-        plugin.manifest.plugin.version,
-        plugin.manifest.tools.len(),
-        plugin.manifest.skills.len(),
-    );
+        if plugins.is_empty() {
+            println!("No plugins found in '{source}'");
+        } else {
+            for plugin in &plugins {
+                println!(
+                    "Installed plugin '{}' v{} ({} tool(s), {} skill(s))",
+                    plugin.manifest.plugin.name,
+                    plugin.manifest.plugin.version,
+                    plugin.manifest.tools.len(),
+                    plugin.manifest.skills.len(),
+                );
+            }
+            println!("\n{} plugin(s) installed", plugins.len());
+        }
+    } else {
+        let plugin: PluginDetail = client
+            .post("/plugins/install", &InstallReq { source, local, all })
+            .await?;
+
+        println!(
+            "Installed plugin '{}' v{} ({} tool(s), {} skill(s))",
+            plugin.manifest.plugin.name,
+            plugin.manifest.plugin.version,
+            plugin.manifest.tools.len(),
+            plugin.manifest.skills.len(),
+        );
+    }
     Ok(())
 }
 

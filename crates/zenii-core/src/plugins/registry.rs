@@ -402,4 +402,138 @@ description = "Test""#,
         let result = registry.unregister("nonexistent");
         assert!(result.is_err());
     }
+
+    // --- Phase 9.1: Real plugin registry tests ---
+
+    use crate::plugins::test_helpers::real_plugins_path;
+
+    /// Recursively copy a directory (test-only helper).
+    fn copy_dir_recursive(src: &Path, dst: &Path) {
+        std::fs::create_dir_all(dst).unwrap();
+        for entry in std::fs::read_dir(src).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            let dest = dst.join(entry.file_name());
+            if path.is_dir() {
+                if path.file_name().is_some_and(|n| n == ".git") {
+                    continue;
+                }
+                copy_dir_recursive(&path, &dest);
+            } else {
+                std::fs::copy(&path, &dest).unwrap();
+            }
+        }
+    }
+
+    // 9.1.18 — Registry discovers real plugins via scan
+    #[test]
+    fn registry_scan_real_plugins() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let dir = TempDir::new().unwrap();
+
+        // Copy all real plugin dirs into temp dir
+        let dirs = [
+            "word-count",
+            "json-formatter",
+            "uuid-gen",
+            "timestamp",
+            "http-client",
+            "hash-tool",
+            "base64-tool",
+            "regex-tester",
+            "csv-analyzer",
+            "color-converter",
+        ];
+        for d in dirs {
+            copy_dir_recursive(&plugins.join(d), &dir.path().join(d));
+        }
+
+        // Create registry WITHOUT registry.json — forces scan
+        let registry = PluginRegistry::new(dir.path().to_path_buf()).unwrap();
+        let all = registry.list();
+        assert_eq!(all.len(), 10, "Expected 10 plugins, got {}", all.len());
+    }
+
+    // 9.1.19 — Registry persist and reload real plugins
+    #[test]
+    fn registry_persist_reload_real() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let dir = TempDir::new().unwrap();
+
+        // Copy plugins and register them
+        let plugin_names = ["word-count", "json-formatter", "uuid-gen"];
+        {
+            let registry = PluginRegistry::new(dir.path().to_path_buf()).unwrap();
+            for name in &plugin_names {
+                copy_dir_recursive(&plugins.join(name), &dir.path().join(name));
+                let manifest =
+                    PluginManifest::from_file(&dir.path().join(name).join("zenii-plugin.toml"))
+                        .unwrap();
+                registry
+                    .register(InstalledPlugin {
+                        manifest,
+                        install_path: dir.path().join(name),
+                        enabled: true,
+                        installed_at: "2026-01-01T00:00:00Z".into(),
+                        source: PluginSource::Local {
+                            path: plugins.join(name),
+                        },
+                    })
+                    .unwrap();
+            }
+            // save_index is called by register, but let's be explicit
+            registry.save_index().unwrap();
+        }
+
+        // Reload from same dir
+        let registry = PluginRegistry::new(dir.path().to_path_buf()).unwrap();
+        assert_eq!(registry.list().len(), 3);
+        for name in &plugin_names {
+            let p = registry
+                .get(name)
+                .expect(&format!("{name} not found after reload"));
+            assert_eq!(p.manifest.plugin.name, *name);
+        }
+    }
+
+    // 9.1.20 — Toggle real plugin enable/disable and persist
+    #[test]
+    fn registry_toggle_real_plugin() {
+        let Some(plugins) = real_plugins_path() else {
+            eprintln!("SKIP: real plugins path not available");
+            return;
+        };
+        let dir = TempDir::new().unwrap();
+
+        // Copy word-count into temp dir
+        copy_dir_recursive(&plugins.join("word-count"), &dir.path().join("word-count"));
+
+        // Registry::new auto-discovers the plugin via scan (no registry.json)
+        let registry = PluginRegistry::new(dir.path().to_path_buf()).unwrap();
+        assert!(
+            registry.get("word-count").is_some(),
+            "word-count should be discovered by scan"
+        );
+
+        // Disable
+        registry.disable("word-count").unwrap();
+        assert!(!registry.get("word-count").unwrap().enabled);
+
+        // Enable
+        registry.enable("word-count").unwrap();
+        assert!(registry.get("word-count").unwrap().enabled);
+
+        // Persist & reload — state should survive
+        registry.save_index().unwrap();
+        drop(registry);
+
+        let registry2 = PluginRegistry::new(dir.path().to_path_buf()).unwrap();
+        assert!(registry2.get("word-count").unwrap().enabled);
+    }
 }

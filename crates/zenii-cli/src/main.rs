@@ -258,11 +258,15 @@ enum PluginAction {
     List,
     /// Install a plugin from a git URL or local path
     Install {
-        /// Git URL or local path to the plugin
+        /// Git URL or local path. Use #subdir for monorepo plugins
+        /// (e.g., https://github.com/org/plugins#plugins/weather)
         source: String,
         /// Install from a local directory instead of git
         #[arg(long)]
         local: bool,
+        /// Install all plugins found in a local directory
+        #[arg(long, requires = "local")]
+        all: bool,
     },
     /// Remove an installed plugin
     Remove {
@@ -471,8 +475,8 @@ async fn main() {
         },
         Commands::Plugin { action } => match action {
             PluginAction::List => commands::plugin::list(&client).await,
-            PluginAction::Install { source, local } => {
-                commands::plugin::install(&client, &source, local).await
+            PluginAction::Install { source, local, all } => {
+                commands::plugin::install(&client, &source, local, all).await
             }
             PluginAction::Remove { name } => commands::plugin::remove(&client, &name).await,
             PluginAction::Update { name } => commands::plugin::update(&client, &name).await,
@@ -951,10 +955,11 @@ mod tests {
         let cli = parse(&["zenii", "plugin", "install", "github.com/user/weather"]);
         match cli.command {
             Commands::Plugin {
-                action: PluginAction::Install { source, local },
+                action: PluginAction::Install { source, local, all },
             } => {
                 assert_eq!(source, "github.com/user/weather");
                 assert!(!local);
+                assert!(!all);
             }
             _ => panic!("expected Plugin Install"),
         }
@@ -966,12 +971,36 @@ mod tests {
         let cli = parse(&["zenii", "plugin", "install", "./my-plugin", "--local"]);
         match cli.command {
             Commands::Plugin {
-                action: PluginAction::Install { source, local },
+                action: PluginAction::Install { source, local, all },
             } => {
                 assert_eq!(source, "./my-plugin");
                 assert!(local);
+                assert!(!all);
             }
             _ => panic!("expected Plugin Install Local"),
+        }
+    }
+
+    // 9.0 — parse plugin install all from local directory
+    #[test]
+    fn parse_plugin_install_all_local() {
+        let cli = parse(&[
+            "zenii",
+            "plugin",
+            "install",
+            "./plugins-dir",
+            "--local",
+            "--all",
+        ]);
+        match cli.command {
+            Commands::Plugin {
+                action: PluginAction::Install { source, local, all },
+            } => {
+                assert_eq!(source, "./plugins-dir");
+                assert!(local);
+                assert!(all);
+            }
+            _ => panic!("expected Plugin Install All Local"),
         }
     }
 

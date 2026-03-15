@@ -1,6 +1,6 @@
 <script lang="ts">
 	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import Building2 from '@lucide/svelte/icons/building-2';
+	import Cpu from '@lucide/svelte/icons/cpu';
 	import User from '@lucide/svelte/icons/user';
 	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import KeyRound from '@lucide/svelte/icons/key-round';
@@ -27,7 +27,7 @@
 
 	const tabs = [
 		{ id: 'general', label: 'General', icon: SettingsIcon },
-		{ id: 'providers', label: 'Providers', icon: Building2 },
+		{ id: 'providers', label: 'AI Providers', icon: Cpu },
 		{ id: 'persona', label: 'Persona', icon: User },
 		{ id: 'channels', label: 'Channels', icon: MessageSquare },
 		{ id: 'permissions', label: 'Permissions', icon: Shield },

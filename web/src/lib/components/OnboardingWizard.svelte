@@ -7,6 +7,13 @@
 	import { configStore } from '$lib/stores/config.svelte';
 	import ProvidersSettings from '$lib/components/settings/ProvidersSettings.svelte';
 	import ChannelsSettings from '$lib/components/settings/ChannelsSettings.svelte';
+	import {
+		PromptInputModelSelect,
+		PromptInputModelSelectTrigger,
+		PromptInputModelSelectContent,
+		PromptInputModelSelectItem,
+		PromptInputModelSelectValue
+	} from '$lib/components/ai-elements/prompt-input';
 	import { onMount } from 'svelte';
 
 	let {
@@ -17,7 +24,7 @@
 		oncomplete: () => void;
 	} = $props();
 
-	const TOTAL_STEPS = 3;
+	const TOTAL_STEPS = 4;
 	let step = $state(1);
 	let userName = $state('');
 	let userLocation = $state('');
@@ -25,7 +32,31 @@
 	let saving = $state(false);
 	let error = $state('');
 
-	const stepLabels = ['AI Provider', 'Channels', 'Your Profile'];
+	const stepLabels = ['AI Provider', 'Default Model', 'Channels', 'Your Profile'];
+
+	const currentModelLabel = $derived(
+		providersStore.configuredModels.find((m) => m.value === providersStore.selectedModel)?.label ??
+			''
+	);
+
+	const anthropicMissingKey = $derived.by(() => {
+		const anthropic = providersStore.providers.find((p) => p.id === 'anthropic');
+		return anthropic ? anthropic.requires_api_key && !anthropic.has_api_key : false;
+	});
+
+	async function handleModelNext() {
+		const selected = providersStore.selectedModel;
+		if (!selected) return;
+		const [providerId, ...rest] = selected.split(':');
+		const modelId = rest.join(':');
+		await providersStore.setDefault(providerId, modelId);
+		await configStore.update({
+			provider_name: providerId,
+			provider_type: providerId,
+			provider_model_id: modelId
+		});
+		step = 3;
+	}
 
 	onMount(async () => {
 		userTimezone = detectedTimezone;
@@ -131,6 +162,54 @@
 			<div class="space-y-4">
 				<Card.Root>
 					<Card.Header>
+						<Card.Title>Choose Your Default Model</Card.Title>
+						<Card.Description>
+							Select the AI model Zenii will use by default. You can always switch models later in the
+							chat toolbar.
+						</Card.Description>
+					</Card.Header>
+					<Card.Content>
+						<PromptInputModelSelect
+							value={providersStore.selectedModel}
+							onValueChange={(v) => {
+								if (v) providersStore.selectedModel = v;
+							}}
+						>
+							<PromptInputModelSelectTrigger class="w-full border border-border">
+								<PromptInputModelSelectValue
+									value={currentModelLabel}
+									placeholder="Select a model"
+								/>
+							</PromptInputModelSelectTrigger>
+							<PromptInputModelSelectContent>
+								{#each providersStore.configuredModels as model}
+									<PromptInputModelSelectItem value={model.value}>
+										{model.label}
+									</PromptInputModelSelectItem>
+								{/each}
+							</PromptInputModelSelectContent>
+						</PromptInputModelSelect>
+					</Card.Content>
+				</Card.Root>
+
+				{#if anthropicMissingKey}
+					<div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+						<strong>No Anthropic API key.</strong> The default configuration uses Anthropic (claude-sonnet-4-6).
+						Go back to add an Anthropic key, or select a different model below to update the defaults.
+					</div>
+				{/if}
+
+				<div class="flex justify-between">
+					<Button variant="ghost" onclick={() => (step = 1)}>Back</Button>
+					<Button onclick={handleModelNext} disabled={!providersStore.selectedModel} size="lg">
+						Next
+					</Button>
+				</div>
+			</div>
+		{:else if step === 3}
+			<div class="space-y-4">
+				<Card.Root>
+					<Card.Header>
 						<div class="flex items-center justify-between">
 							<div>
 								<Card.Title>Connect Channels</Card.Title>
@@ -140,10 +219,10 @@
 								</Card.Description>
 							</div>
 							<div class="flex gap-2 shrink-0 ml-4">
-								<Button variant="ghost" onclick={() => (step = 3)}>
+								<Button variant="ghost" onclick={() => (step = 4)}>
 									Skip
 								</Button>
-								<Button onclick={() => (step = 3)}>
+								<Button onclick={() => (step = 4)}>
 									Next
 								</Button>
 							</div>
@@ -196,7 +275,7 @@
 			</Card.Root>
 
 			<div class="flex justify-between">
-				<Button variant="ghost" onclick={() => (step = 2)}>Back</Button>
+				<Button variant="ghost" onclick={() => (step = 3)}>Back</Button>
 				<Button onclick={handleFinish} disabled={saving} size="lg">
 					{saving ? 'Saving...' : 'Get Started'}
 				</Button>

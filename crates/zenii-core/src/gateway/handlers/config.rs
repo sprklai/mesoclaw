@@ -169,6 +169,16 @@ pub async fn update_config(
         if let Some(v) = obj.get("embedding_model").and_then(|v| v.as_str()) {
             config.embedding_model = v.to_string();
         }
+        // Provider / model defaults
+        if let Some(v) = obj.get("provider_name").and_then(|v| v.as_str()) {
+            config.provider_name = v.to_string();
+        }
+        if let Some(v) = obj.get("provider_type").and_then(|v| v.as_str()) {
+            config.provider_type = v.to_string();
+        }
+        if let Some(v) = obj.get("provider_model_id").and_then(|v| v.as_str()) {
+            config.provider_model_id = v.to_string();
+        }
         // User profile & environment
         if let Some(v) = obj.get("user_name") {
             config.user_name = v.as_str().map(|s| s.to_string());

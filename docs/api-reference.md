@@ -1109,25 +1109,95 @@ Returns all installed plugins with their status.
 ]
 ```
 
+#### GET /plugins/available
+
+Fetches the catalog of official plugins from the configured repository. Clones the repo, scans for plugin manifests, and cross-references with installed plugins.
+
+**Response:**
+```json
+{
+  "repo_url": "https://github.com/sprklai/zenii-plugins.git",
+  "plugins": [
+    {
+      "name": "word-count",
+      "version": "1.0.0",
+      "description": "Count words, characters, and lines in text",
+      "author": "Zenii Team",
+      "tools_count": 1,
+      "skills_count": 1,
+      "installed": false
+    }
+  ]
+}
+```
+
 #### POST /plugins/install
 
-Install a plugin from a git URL or local path.
+Install a plugin from a git URL, monorepo subdirectory, or local path.
 
 **Request Body:**
 ```json
 {
-  "source": "https://github.com/user/weather-plugin",
-  "local": false
+  "source": "https://github.com/sprklai/zenii-plugins#plugins/json-formatter",
+  "local": false,
+  "all": false
 }
 ```
 
-**Response (201):**
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `source` | string | *required* | Git URL, git URL with `#subdir` fragment, or local path |
+| `local` | bool | `false` | Treat source as a local directory path |
+| `all` | bool | `false` | Install all plugins found in a local directory (requires `local: true`) |
+
+**Examples:**
+
+Install a single-repo plugin from git:
+```json
+{ "source": "https://github.com/sprklai/word-count" }
+```
+
+Install a specific plugin from a monorepo using `#subdir` fragment:
+```json
+{ "source": "https://github.com/sprklai/zenii-plugins#plugins/json-formatter" }
+```
+
+Install all plugins from a git monorepo:
+```json
+{ "source": "https://github.com/sprklai/zenii-plugins" }
+```
+
+Install a single local plugin:
+```json
+{ "source": "./my-plugin", "local": true }
+```
+
+Install all plugins from a local directory:
+```json
+{ "source": "./plugins-dir", "local": true, "all": true }
+```
+
+**Response (201) — single plugin:**
 ```json
 {
-  "name": "weather",
-  "version": "1.0.0",
-  "installed": true
+  "manifest": {
+    "name": "json-formatter",
+    "version": "1.0.0",
+    "description": "Format and validate JSON"
+  },
+  "install_path": "/home/user/.local/share/zenii/plugins/json-formatter",
+  "enabled": true,
+  "installed_at": "2026-03-15T00:00:00Z",
+  "source": { "Git": { "url": "https://github.com/sprklai/zenii-plugins", "commit": "abc1234" } }
 }
+```
+
+**Response (201) — batch (`all: true`):**
+```json
+[
+  { "manifest": { "name": "plugin-a", ... }, "enabled": true, ... },
+  { "manifest": { "name": "plugin-b", ... }, "enabled": true, ... }
+]
 ```
 
 #### GET /plugins/{name}

@@ -717,9 +717,18 @@ sequenceDiagram
 
     Note over CLI,Ext: Installation
     CLI->>GW: POST /plugins/install
-    GW->>Inst: install_from_git(url)
-    Inst->>Inst: git clone + parse plugin.toml
-    Inst->>Reg: register(manifest)
+    alt Git URL
+        GW->>Inst: install_from_git#40;url#41;
+        Inst->>Inst: git clone + parse plugin.toml
+        Note right of Inst: Supports #subdir fragment<br>for monorepo subdirectories
+    else Local path
+        GW->>Inst: install_from_local#40;path#41;
+        Inst->>Inst: copy dir + parse plugin.toml
+    else Local batch #40;all: true#41;
+        GW->>Inst: install_all_from_local#40;path#41;
+        Inst->>Inst: scan subdirs + install each
+    end
+    Inst->>Reg: register#40;manifest#41;
     Inst->>GW: Register tools in ToolRegistry
     GW-->>CLI: 201 Created
 

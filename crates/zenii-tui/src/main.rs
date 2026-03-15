@@ -229,6 +229,15 @@ async fn run_app(
                                     .await
                                 {
                                     Ok(_) => {
+                                        // Sync default model to config.toml
+                                        let config_body = serde_json::json!({
+                                            "provider_name": provider_id,
+                                            "provider_type": provider_id,
+                                            "provider_model_id": model_id,
+                                        });
+                                        let _ = client
+                                            .put::<_, serde_json::Value>("/config", &config_body)
+                                            .await;
                                         app.current_model = format!("{provider_id}:{model_id}");
                                         app.onboard_step = app::OnboardStep::Channels;
                                         app.onboard_error = None;
