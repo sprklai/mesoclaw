@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.21] - 2026-03-15
+
+### Added
+- Token usage logging with date-rotated JSONL files for tracking AI API consumption
+- Browse official plugins UI and plugin integration tests
+
 ## [0.0.20] - 2026-03-14
 
 ### Added
