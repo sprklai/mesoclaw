@@ -86,7 +86,7 @@
 
 ```bash
 # Download (Linux/macOS)
-curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | bash
 
 # Start the daemon
 zenii-daemon &

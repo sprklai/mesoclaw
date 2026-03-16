@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Zenii -- Install Script
-# Usage: curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | bash
 #
 # Options:
 #   --help          Show this help message
@@ -42,7 +42,7 @@ show_help() {
 Zenii Installer
 
 Usage:
-  curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | bash
   bash install.sh [OPTIONS]
 
 Options:
