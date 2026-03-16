@@ -16,7 +16,7 @@ name = "zenii-tui"
 path = "src/main.rs"
 
 [dependencies]
-ratatui = { version = "0.29", features = ["crossterm"] }
+ratatui = { version = "0.30", features = ["crossterm"] }
 crossterm = "0.28"
 reqwest = { workspace = true }
 tokio-tungstenite = { workspace = true }
