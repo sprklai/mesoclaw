@@ -64,7 +64,7 @@ iana-time-zone = { workspace = true }
 # Phase 8: Channels (optional)
 teloxide = { workspace = true, optional = true }
 serenity = { workspace = true, optional = true }
-pulldown-cmark = { version = "0.12", optional = true, default-features = false, features = ["html"] }
+pulldown-cmark = { version = "0.13", optional = true, default-features = false, features = ["html"] }
 
 # Phase 8.11: Local Embeddings (optional)
 fastembed = { workspace = true, optional = true }
