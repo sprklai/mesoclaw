@@ -24,7 +24,7 @@ tokio-tungstenite = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-dialoguer = "0.11"
+dialoguer = "0.12"
 iana-time-zone = { workspace = true }
 clap_complete = "4"
 openssl = { version = "0.10", features = ["vendored"], optional = true }
