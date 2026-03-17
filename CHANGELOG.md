@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.24] - 2026-03-17
+
+### Added
+- Top navigation arrows (chevron left/right) in onboarding wizard step indicator
+- Clickable completed-step circles to jump back to previous steps
+- Auto-select first available model when entering step 2
+
+### Changed
+- Replaced hardcoded Anthropic API key warning with provider-agnostic guidance message that reads the actual default provider from config
+
 ## [0.0.23] - 2026-03-16
 
 ### Changed
