@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.23] - 2026-03-16
+
+### Changed
+- README Quick Start now leads with GitHub Release installer download table (Linux, macOS, Windows, ARM)
+- "Getting Started" section renamed to "Building from Source"
+- Website and docs header links displayed on separate lines
+
 ## [0.0.22] - 2026-03-16
 
 ### Added
