@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.22] - 2026-03-16
+
+### Added
+- Disclaimer to onboarding, about dialog, and README
+- Docusaurus documentation site with frontmatter for all docs
+- Install script and updated README with quick start guide
+- Architecture diagram images (system architecture, 6 layers of defense)
+- Documentation badge in README
+- Comprehensive docs site landing page with feature tables and quick links
+
+### Fixed
+- Incorrect API fields, org names, and URLs across all documentation
+- Use `| bash` instead of `| sh` in install instructions
+
+### Changed
+- README hero text revised for broader audience ("Powered by Rust" instead of "Just Rust")
+- Replaced mermaid architecture diagram in README with PNG image
+- Dependency updates:
+  - crossterm 0.28.1 → 0.29.0
+  - rusqlite 0.38.0 → 0.39.0
+  - dialoguer 0.11.0 → 0.12.0
+  - ratatui 0.29.0 → 0.30.0
+  - pulldown-cmark 0.12.2 → 0.13.1
+  - vite 7.3.1 → 8.0.0
+  - jsdom 28.1.0 → 29.0.0
+  - @lucide/svelte 0.561.0 → 0.577.0
+  - @sveltejs/vite-plugin-svelte → 7.0.0
+
 ## [0.0.21] - 2026-03-15
 
 ### Added

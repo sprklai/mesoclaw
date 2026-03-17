@@ -7,8 +7,8 @@
 <h1 align="center">20 megabytes. AI everywhere.</h1>
 
 <p align="center">
-  Install one binary. Now your scripts have AI memory. Your cron jobs reason. Your Telegram bot thinks.<br>
-  A private AI backend for everything on your machine — native desktop app, plugins in any language, and an API your <code>curl</code> can call. Just Rust.<br>
+  Install one binary. Now your scripts have <strong>AI memory</strong>. Your cron jobs <strong>reason</strong>. Your Telegram bot <strong>thinks</strong>.<br>
+  A private AI backend for everything on your machine — native desktop app, plugins in <strong>any language</strong>, and an API your <code>curl</code> can call. Powered by Rust.<br>
   <a href="https://zenii.sprklai.com">https://zenii.sprklai.com</a>
 </p>
 
@@ -25,6 +25,9 @@
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License" />
+  </a>
+  <a href="https://docs.zenii.sprklai.com">
+    <img src="https://img.shields.io/badge/docs-zenii-blue?style=flat-square" alt="Documentation" />
   </a>
 </p>
 
@@ -260,56 +263,15 @@ Your AI gets smarter. You stay in control. No surprises.
 
 ### System Architecture
 
-```mermaid
-graph TD
-    subgraph Clients["Clients"]
-        Desktop[Desktop] & Mobile["Mobile<br>#40;future#41;"] & CLI[CLI] & TUI[TUI] & Daemon[Daemon]
-        Web["Frontend<br>Svelte 5"]
-    end
+<p align="center">
+  <img src="docs/assets/system-architecture.png" alt="Zenii System Architecture" width="720" />
+</p>
 
-    subgraph Core["zenii-core"]
-        BootEntry["boot.rs<br>init_services"]
+### 6 Layers of Defense
 
-        subgraph App["Application Layer"]
-            Gateway["Gateway<br>axum :18981"]
-            AI["AI Engine<br>rig-core"]
-            Context["Context Engine<br>3-tier injection"]
-            DB["Database<br>rusqlite + sqlite-vec"]
-        end
-
-        subgraph Domain["Domain Layer"]
-            Identity["Identity<br>SoulLoader"]
-            Skills["Skills<br>SkillRegistry"]
-            UserL["User Profile<br>UserLearner"]
-            Channels["Channels"]
-            PluginReg["Plugins<br>PluginRegistry"]
-        end
-
-        subgraph Support["Support Layer"]
-            Tools["Agent Tools"]
-            Security["Security"]
-            Creds2["Credentials"]
-            Config["Config"]
-            EventBus["EventBus"]
-        end
-    end
-
-    Desktop -->|embedded gateway| Gateway
-    Mobile & CLI & TUI & Daemon --> Gateway
-    Web -->|HTTP/WS| Gateway
-
-    BootEntry --> Gateway & DB & EventBus
-    Gateway --> AI & DB & Context
-    Gateway --> Identity & Skills & UserL & Channels & PluginReg
-    AI --> Tools & Security & DB
-    AI --> Identity & Skills
-    Context --> DB & Identity & UserL & Skills
-
-    style Clients fill:#2196F3,color:#fff
-    style App fill:#4CAF50,color:#fff
-    style Domain fill:#FF9800,color:#fff
-    style Support fill:#9E9E9E,color:#fff
-```
+<p align="center">
+  <img src="docs/assets/6-layers-of-defense.png" alt="Zenii 6 Layers of Defense" width="720" />
+</p>
 
 ### Crate Dependency Graph
 
