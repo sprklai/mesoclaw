@@ -74,6 +74,8 @@
 ---
 
 > *"ChatGPT is a tab you open. Zenii is a capability your machine gains."*
+>
+> If Zenii looks useful, consider giving it a [star on GitHub](https://github.com/sprklai/zenii) — it helps others discover the project.
 
 <!-- DEMO GIF HERE — 30-second terminal recording showing:
   1. curl health check
@@ -727,9 +729,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines. Quick summary:
 
 ---
 
-<!-- ## Star History
+## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=sprklai/zenii&type=Date)](https://star-history.com/#sprklai/zenii&Date) -->
+[![Star History Chart](https://api.star-history.com/svg?repos=sprklai/zenii&type=Date)](https://star-history.com/#sprklai/zenii&Date)
 
 ---
 

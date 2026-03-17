@@ -14,6 +14,8 @@
 		PromptInputModelSelectItem,
 		PromptInputModelSelectValue
 	} from '$lib/components/ai-elements/prompt-input';
+	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import { onMount } from 'svelte';
 
 	let {
@@ -40,9 +42,26 @@
 			''
 	);
 
-	const anthropicMissingKey = $derived.by(() => {
-		const anthropic = providersStore.providers.find((p) => p.id === 'anthropic');
-		return anthropic ? anthropic.requires_api_key && !anthropic.has_api_key : false;
+	const defaultProviderName = $derived(
+		(configStore.get('provider_name') as string) || 'anthropic'
+	);
+
+	const defaultProviderMissing = $derived.by(() => {
+		const provider = providersStore.providers.find((p) => p.id === defaultProviderName);
+		return provider ? provider.requires_api_key && !provider.has_api_key : false;
+	});
+
+	function canAdvance(fromStep: number): boolean {
+		if (fromStep === 1) return providersStore.hasUsableModel;
+		if (fromStep === 2) return !!providersStore.selectedModel;
+		if (fromStep === 3) return true;
+		return false;
+	}
+
+	$effect(() => {
+		if (step === 2 && !providersStore.selectedModel && providersStore.configuredModels.length > 0) {
+			providersStore.selectedModel = providersStore.configuredModels[0].value;
+		}
 	});
 
 	async function handleModelNext() {
@@ -110,18 +129,31 @@
 
 		<!-- Step Indicator -->
 		<div class="flex items-center justify-center gap-3">
+			<Button
+				variant="ghost"
+				size="icon"
+				onclick={() => (step = step - 1)}
+				disabled={step === 1}
+				aria-label="Previous step"
+			>
+				<ChevronLeft class="h-5 w-5" />
+			</Button>
+
 			{#each stepLabels as label, i (label)}
 				{@const state = stepState(i)}
 				<div class="flex items-center gap-2">
-					<div
-						class="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium {state === 'active'
+					<button
+						type="button"
+						class="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors {state === 'active'
 							? 'bg-primary text-primary-foreground'
 							: state === 'done'
-								? 'bg-green-600 text-white'
+								? 'bg-green-600 text-white hover:bg-green-500 cursor-pointer'
 								: 'bg-muted text-muted-foreground'}"
+						disabled={state !== 'done'}
+						onclick={() => { if (state === 'done') step = i + 1; }}
 					>
 						{state === 'done' ? '\u2713' : i + 1}
-					</div>
+					</button>
 					<span class="text-sm font-medium {state === 'active' ? 'text-foreground' : 'text-muted-foreground'}">
 						{label}
 					</span>
@@ -130,6 +162,16 @@
 					<div class="h-px w-12 bg-muted-foreground/40"></div>
 				{/if}
 			{/each}
+
+			<Button
+				variant="ghost"
+				size="icon"
+				onclick={() => (step = step + 1)}
+				disabled={step === TOTAL_STEPS || !canAdvance(step)}
+				aria-label="Next step"
+			>
+				<ChevronRight class="h-5 w-5" />
+			</Button>
 		</div>
 
 		<!-- Step Content -->
@@ -193,10 +235,9 @@
 					</Card.Content>
 				</Card.Root>
 
-				{#if anthropicMissingKey}
-					<div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-						<strong>No Anthropic API key.</strong> The default configuration uses Anthropic (claude-sonnet-4-6).
-						Go back to add an Anthropic key, or select a different model below to update the defaults.
+				{#if defaultProviderMissing}
+					<div class="rounded-md border border-blue-500/50 bg-blue-500/10 px-4 py-3 text-sm text-blue-700 dark:text-blue-400">
+						Your current default uses <strong>{defaultProviderName}</strong>, which doesn't have an API key configured. Select any available model below to update your default.
 					</div>
 				{/if}
 
@@ -247,7 +288,7 @@
 						<Input
 							id="onboard-name"
 							bind:value={userName}
-							placeholder="e.g., Rakesh"
+							placeholder="e.g., John"
 						/>
 					</div>
 					<div class="space-y-1">
