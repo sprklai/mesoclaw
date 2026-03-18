@@ -10061,11 +10061,11 @@ dependencies = [
 
 [[package]]
 name = "zenii"
-version = "0.0.25"
+version = "0.0.26"
 
 [[package]]
 name = "zenii-cli"
-version = "0.0.25"
+version = "0.0.26"
 dependencies = [
  "clap",
  "clap_complete",
@@ -10084,7 +10084,7 @@ dependencies = [
 
 [[package]]
 name = "zenii-core"
-version = "0.0.25"
+version = "0.0.26"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -10135,7 +10135,7 @@ dependencies = [
 
 [[package]]
 name = "zenii-daemon"
-version = "0.0.25"
+version = "0.0.26"
 dependencies = [
  "clap",
  "tokio",
@@ -10146,7 +10146,7 @@ dependencies = [
 
 [[package]]
 name = "zenii-desktop"
-version = "0.0.25"
+version = "0.0.26"
 dependencies = [
  "opener",
  "serde",
@@ -10167,7 +10167,7 @@ dependencies = [
 
 [[package]]
 name = "zenii-tui"
-version = "0.0.25"
+version = "0.0.26"
 dependencies = [
  "clap",
  "crossterm",

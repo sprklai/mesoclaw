@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.26] - 2026-03-18
+
+### Fixed
+- Correct boot.rs test assertions for CI feature unification
+
+### Changed
+- Updated README
+- Updated Tauri ACL manifests schema for latest plugin versions
+- Added provider setup description in Settings AI Providers page (matching onboarding step 1)
+
 ## [0.0.25] - 2026-03-17
 
 ### Fixed
