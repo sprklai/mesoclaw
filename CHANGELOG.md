@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.25] - 2026-03-17
+
+### Fixed
+- Removed redundant "No API key" warning from onboarding step 1 (still shown in Settings)
+- Replaced confusing blue "missing key" warning in step 2 with green model confirmation message
+
+### Changed
+- Added custom provider guidance note in onboarding step 1 pointing to "+ Add Provider" button
+- Updated contact email in CODE_OF_CONDUCT.md and SECURITY.md
+
 ## [0.0.24] - 2026-03-17
 
 ### Added
