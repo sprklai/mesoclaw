@@ -40,7 +40,7 @@ cargo install --path crates/zenii-cli
 # 1. Start the daemon
 zenii daemon start
 
-# 2. Set your API key (stored in OS keyring)
+# 2. Set your API key (stored securely: OS keyring or encrypted file)
 zenii key set openai sk-your-key-here
 
 # 3. Set the default model
@@ -291,7 +291,7 @@ zenii config set gateway_port 9090
 
 ### `key` -- Manage API keys and credentials
 
-All credentials are stored in the OS keyring (or in-memory fallback).
+All credentials are stored securely using a 3-tier fallback: OS keyring, encrypted file (`credentials.enc`), or in-memory (volatile).
 
 #### `key set`
 

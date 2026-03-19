@@ -150,7 +150,7 @@ graph TD
     core --> rusqlite["rusqlite<br>#40;database#41;"]
     core --> rigcore["rig-core<br>#40;AI#41;"]
     core --> tokio["tokio<br>#40;async runtime#41;"]
-    core --> keyring["keyring<br>#40;credentials#41;"]
+    core --> keyring["keyring + aes-gcm<br>#40;credentials#41;"]
     core --> sysinfo["sysinfo<br>#40;system info + processes#41;"]
     core --> ignore["ignore<br>#40;file search#41;"]
     core --> diffy["diffy<br>#40;patch/diff#41;"]
@@ -189,7 +189,7 @@ zenii/
 │   │   │   ├── db/         # rusqlite pool + WAL + migrations + spawn_blocking
 │   │   │   ├── event_bus/  # EventBus trait + TokioBroadcastBus (12 events)
 │   │   │   ├── memory/     # Memory trait + SqliteMemoryStore (FTS5 + vectors) + InMemoryStore
-│   │   │   ├── credential/ # CredentialStore trait + KeyringStore + InMemoryCredentialStore
+│   │   │   ├── credential/ # CredentialStore trait + KeyringStore + FileCredentialStore + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
 │   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 16 tools (14 base + 2 feature-gated)
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter, context engine
@@ -307,7 +307,7 @@ All major subsystems are abstracted behind traits, allowing swappable implementa
 graph TB
     subgraph TraitAbstractions["Trait Abstractions - zenii-core"]
         Memory["dyn Memory<br>SQLite now<br>PostgreSQL + pgvector later"]
-        CredStore["dyn CredentialStore<br>Keyring now<br>Vault / cloud KMS later"]
+        CredStore["dyn CredentialStore<br>Keyring / encrypted file now<br>Vault / cloud KMS later"]
         Channel["dyn Channel<br>openclaw-channels"]
         EvBus["dyn EventBus<br>tokio::broadcast now<br>NATS / Redis later"]
         CompModel["Rig CompletionModel<br>built-in providers now<br>custom providers later"]
@@ -358,6 +358,7 @@ graph TB
     subgraph CredModule["Credential Module"]
         Mod["mod.rs<br>CredentialStore trait<br>get / set / delete / list"]
         KR["keyring.rs<br>KeyringStore #40;production#41;<br>OS keychain integration"]
+        FS["file_store.rs<br>FileCredentialStore #40;fallback#41;<br>AES-256-GCM encrypted JSON"]
         Mem["memory.rs<br>InMemoryStore #40;tests/CI#41;<br>DashMap-backed"]
     end
 
@@ -370,7 +371,10 @@ graph TB
     end
 
     Mod --> KR
+    Mod --> FS
     Mod --> Mem
+    KR -.->|fallback| FS
+    FS -.->|fallback| Mem
     Desktop --> KR
     CLI --> KR
     Daemon --> KR
@@ -393,6 +397,16 @@ graph TB
 | **Daemon** | Direct | Headless, runs as service |
 
 All credential values are wrapped with `zeroize` for secure memory cleanup.
+
+### Fallback Chain
+
+The credential system uses a 3-tier fallback chain, determined at boot time:
+
+1. **KeyringStore** (preferred) -- Uses the OS keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service). Selected when the OS keyring is available and functional.
+2. **FileCredentialStore** (fallback) -- AES-256-GCM encrypted JSON file at `{data_dir}/credentials.enc`. Activates when the OS keyring is unavailable (e.g., macOS code-signature revocation, Linux without Secret Service/gnome-keyring, headless environments like Raspberry Pi). The encryption key is derived from `SHA-256(hostname:username:data_dir:service_id)`. File permissions are set to `0o600` on Unix. Writes are atomic (tmp + rename).
+3. **InMemoryCredentialStore** (last resort) -- Volatile DashMap-backed store. Used only when both keyring and file store fail, or in tests/CI. Credentials are lost on restart.
+
+The `credential_file_path` config option allows overriding the default file location. Dependencies: `aes-gcm` and `sha2` crates (pure Rust, no C dependencies).
 
 ## Provider Registry
 

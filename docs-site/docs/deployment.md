@@ -80,7 +80,7 @@ gateway_auth_token = "your-secret-token"
 
 ### 4. Set API Keys
 
-Store your AI provider API key in the OS keyring. Zenii uses the keyring service ID `com.sprklai.zenii` with key format `api_key:{provider_id}`:
+Store your AI provider API key securely. Zenii uses the OS keyring when available, falling back to an AES-256-GCM encrypted file (`credentials.enc`) on headless systems. The keyring service ID is `com.sprklai.zenii` with key format `api_key:{provider_id}`:
 
 ```bash
 # The daemon will prompt or you can use the CLI:
@@ -435,7 +435,7 @@ sudo systemctl start zenii
 
 ### Credential Migration
 
-OS keyring credentials (API keys stored via `keyring` crate) cannot be exported directly. When migrating to a new machine:
+OS keyring credentials (API keys stored via `keyring` crate) cannot be exported directly. If using the encrypted file fallback (`credentials.enc`), you can copy the file to the new machine (it is tied to hostname, username, data directory, and service ID -- the decryption key will only work if these match). When migrating to a new machine:
 
 1. Back up your config and databases as described above
 2. On the new machine, re-enter API keys via the CLI (`zenii key set openai`) or the gateway API

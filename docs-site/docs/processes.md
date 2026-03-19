@@ -89,7 +89,7 @@ sequenceDiagram
     App->>App: Initialize tracing/logging
     App->>DB: Open/create database
     DB->>DB: Run pending migrations
-    App->>Cred: Initialize credential store (KeyringStore / InMemoryStore)
+    App->>Cred: Initialize credential store (KeyringStore / FileCredentialStore / InMemoryStore)
     App->>AI: Register providers + load API keys
     App->>AI: Register 14 base + 2 feature-gated agent tools into ToolRegistry (DashMap)
     App->>App: Load identity (SoulLoader from data_dir/identity/)
@@ -424,6 +424,7 @@ sequenceDiagram
     CS-->>AG: API key
 
     Note over KS: All binaries share same keyring namespace (same OS user)
+    Note over KS: Fallback chain: KeyringStore -> FileCredentialStore -> InMemoryStore
     Note over KS: CI/test: InMemoryStore used instead of keyring
 ```
 

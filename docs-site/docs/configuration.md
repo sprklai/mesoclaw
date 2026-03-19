@@ -417,9 +417,11 @@ scheduler_heartbeat_file = "/tmp/zenii-heartbeat"
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `keyring_service_id` | String | `"com.sprklai.zenii"` | OS keyring service identifier for credential storage |
+| `credential_file_path` | Optional\<String\> | `None` (auto: `{data_dir}/credentials.enc`) | Override path for the encrypted credential file (used when OS keyring is unavailable) |
 
 ```toml
 keyring_service_id = "com.sprklai.zenii"
+# credential_file_path = "/custom/path/credentials.enc"  # Optional override
 ```
 
 ### Self-Evolution
@@ -575,6 +577,7 @@ scheduler_tick_interval_secs = 1
 
 # Credentials
 keyring_service_id = "com.sprklai.zenii"
+# credential_file_path = "/custom/path/credentials.enc"  # Optional override
 
 # Self-Evolution
 self_evolution_enabled = true

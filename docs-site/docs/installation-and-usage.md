@@ -1778,7 +1778,7 @@ sudo chown -R zenii:zenii /home/zenii/.config/zenii /home/zenii/.local/share/zen
 - Or use Docker-based cross-compilation: `./scripts/build.sh --target linux-arm64 --docker`
 
 **Keyring not available (headless/Docker):**
-- Zenii falls back to in-memory credential storage automatically
+- Zenii falls back to encrypted file storage (`{data_dir}/credentials.enc`, AES-256-GCM), then to in-memory storage as a last resort
 - Set API keys via the HTTP API after startup:
   ```bash
   curl -X POST http://localhost:18981/credentials \

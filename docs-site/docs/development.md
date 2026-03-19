@@ -544,7 +544,7 @@ PRAGMA journal_mode;
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| "Failed to initialize keyring" | No keyring daemon on Linux | Install `gnome-keyring` or `kwallet`, or the daemon falls back to in-memory store |
+| "Failed to initialize keyring" | No keyring daemon on Linux | Install `gnome-keyring` or `kwallet`, or the daemon falls back to encrypted file store (`credentials.enc`), then to in-memory store |
 | "Address already in use" | Port 18981 occupied | Stop the other process or change `gateway_port` in config |
 | "ZENII_TOKEN not set" | CLI requires auth token | Set `gateway_auth_token` in config or `ZENII_TOKEN` env var |
 | Frontend shows "Connection refused" | Daemon not running | Start daemon: `cargo run -p zenii-daemon` |

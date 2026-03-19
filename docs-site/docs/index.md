@@ -20,7 +20,7 @@ Zenii is a local AI backend that gives every tool on your machine access to AI �
 
 - **For developers** — `curl` the API from scripts, cron jobs, CI pipelines, or any language
 - **For power users** — desktop app, CLI, and TUI for interactive AI chat with persistent memory
-- **For teams** — self-hosted, MIT licensed, zero telemetry, OS keyring for secrets
+- **For teams** — self-hosted, MIT licensed, zero telemetry, encrypted credential storage
 - **For tinkerers** — plugin system in any language (Python, Go, JS) via JSON-RPC over stdio
 
 ### Key capabilities
@@ -34,7 +34,7 @@ Zenii is a local AI backend that gives every tool on your machine access to AI �
 | **Plugin system** | Any language, JSON-RPC 2.0 over stdio — a plugin is ~15 lines |
 | **Self-evolution** | AI proposes skill changes, you approve — like a PR from your assistant |
 | **Cron scheduler** | Automated recurring AI tasks without external orchestration |
-| **6-layer security** | OS keyring, autonomy levels, FS sandbox, injection detection, rate limits, audit trail |
+| **6-layer security** | OS keyring with encrypted file fallback, autonomy levels, FS sandbox, injection detection, rate limits, audit trail |
 | **Cross-platform** | macOS, Linux, Windows, ARM — desktop, CLI, TUI, or headless daemon |
 | **Under 20 MB** | Native Tauri 2 + Svelte 5 desktop app — not Electron |
 
