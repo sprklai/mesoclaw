@@ -5,6 +5,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
 	import { providersStore, type ProviderWithKeyStatus } from '$lib/stores/providers.svelte';
 	import { configStore } from '$lib/stores/config.svelte';
 	import {
@@ -17,6 +18,15 @@
 	import { onMount } from 'svelte';
 
 	let { hideDefaultModel = false }: { hideDefaultModel?: boolean } = $props();
+
+	const providerDocsUrls: Record<string, string> = {
+		'openai': 'https://developers.openai.com/api/docs/models',
+		'anthropic': 'https://platform.claude.com/docs/en/about-claude/models/overview',
+		'gemini': 'https://ai.google.dev/gemini-api/docs/models',
+		'openrouter': 'https://openrouter.ai/models',
+		'vercel-ai-gateway': 'https://vercel.com/ai-gateway/models',
+		'ollama': 'https://ollama.com/search',
+	};
 
 	let expandedId = $state<string | null>(null);
 	let apiKeyInputs = $state<Record<string, string>>({});
@@ -194,20 +204,28 @@
 	}
 </script>
 
-<div class="flex items-center justify-between mb-2">
-	<h2 class="text-lg font-semibold">AI Providers</h2>
-	<Button size="sm" variant="outline" onclick={() => (showAddProvider = !showAddProvider)}>
-		{showAddProvider ? 'Cancel' : '+ Add Provider'}
-	</Button>
-</div>
-<p class="mb-1 text-sm text-muted-foreground">
-	Add an API key for at least one provider to enable chat. Expand a provider below, enter
-	your key, and save it.
-</p>
-<p class="mb-4 text-xs text-muted-foreground">
-	Need a different provider? Any OpenAI API-compatible service can be added via the
-	<strong>+ Add Provider</strong> button above the list.
-</p>
+{#if !hideDefaultModel}
+	<div class="flex items-center justify-between mb-2">
+		<h2 class="text-lg font-semibold">AI Providers</h2>
+		<Button size="sm" variant="outline" onclick={() => (showAddProvider = !showAddProvider)}>
+			{showAddProvider ? 'Cancel' : '+ Add Provider'}
+		</Button>
+	</div>
+	<p class="mb-1 text-sm text-muted-foreground">
+		Add an API key for at least one provider to enable chat. Expand a provider below, enter
+		your key, and save it.
+	</p>
+	<p class="mb-4 text-xs text-muted-foreground">
+		Need a different provider? Any OpenAI API-compatible service can be added via the
+		<strong>+ Add Provider</strong> button above the list.
+	</p>
+{:else}
+	<div class="flex justify-end mb-2">
+		<Button size="sm" variant="outline" onclick={() => (showAddProvider = !showAddProvider)}>
+			{showAddProvider ? 'Cancel' : '+ Add Provider'}
+		</Button>
+	</div>
+{/if}
 
 {#if !hideDefaultModel && defaultProviderMissingKey}
 	<div class="mb-4 rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
@@ -398,7 +416,20 @@
 						{/if}
 
 						<div class="space-y-2">
-							<span class="text-sm font-medium">Models</span>
+							<span class="text-sm font-medium inline-flex items-center gap-1.5">
+								Models
+								{#if providerDocsUrls[provider.id]}
+									<a
+										href={providerDocsUrls[provider.id]}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="text-muted-foreground hover:text-primary transition-colors"
+										title="Browse model IDs"
+									>
+										<ArrowUpRight class="h-3.5 w-3.5" />
+									</a>
+								{/if}
+							</span>
 							{#if provider.models.length > 0}
 								<div class="flex flex-wrap gap-1">
 									{#each provider.models as model (model.id)}

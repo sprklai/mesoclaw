@@ -20,9 +20,11 @@
 
 	let {
 		detectedTimezone = '',
+		missing = [] as string[],
 		oncomplete
 	}: {
 		detectedTimezone: string;
+		missing?: string[];
 		oncomplete: () => void;
 	} = $props();
 
@@ -60,19 +62,35 @@
 		if (!selected) return;
 		const [providerId, ...rest] = selected.split(':');
 		const modelId = rest.join(':');
-		await providersStore.setDefault(providerId, modelId);
-		await configStore.update({
-			provider_name: providerId,
-			provider_type: providerId,
-			provider_model_id: modelId
-		});
-		step = 3;
+		try {
+			await providersStore.setDefault(providerId, modelId);
+			await configStore.update({
+				provider_name: providerId,
+				provider_type: providerId,
+				provider_model_id: modelId
+			});
+			step = 3;
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		}
 	}
 
 	onMount(async () => {
 		userTimezone = detectedTimezone;
 		await providersStore.load();
 		await channelsStore.load();
+
+		// Auto-skip to first incomplete step based on missing fields
+		if (missing.length > 0) {
+			const needsApiKey = missing.includes('api_key');
+			const needsProfile = missing.includes('user_name') || missing.includes('user_location');
+
+			if (needsApiKey) {
+				step = 1; // Start at provider setup
+			} else if (needsProfile) {
+				step = 4; // Skip directly to profile
+			}
+		}
 	});
 
 	function stepState(i: number): 'done' | 'active' | 'upcoming' {

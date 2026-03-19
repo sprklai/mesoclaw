@@ -61,12 +61,15 @@ async fn has_any_api_key<C: CredentialStore + ?Sized>(
 ) -> bool {
     for id in provider_ids {
         let key = format!("api_key:{id}");
-        if credentials
-            .get(&key)
-            .await
-            .is_ok_and(|v| v.is_some_and(|s| !s.is_empty()))
-        {
-            return true;
+        match credentials.get(&key).await {
+            Ok(Some(v)) if !v.is_empty() => return true,
+            Ok(_) => {} // None or empty — no key stored
+            Err(e) => {
+                tracing::warn!(
+                    "Credential access error for {key}: {e} \
+                     (on macOS, this may indicate keychain access was revoked after binary recompilation)"
+                );
+            }
         }
     }
     false

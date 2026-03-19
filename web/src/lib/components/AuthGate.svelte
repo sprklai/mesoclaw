@@ -21,6 +21,7 @@
 	let authenticated = $state(false);
 	let showSetup = $state(false);
 	let detectedTimezone = $state('');
+	let missingFields = $state<string[]>([]);
 	let connecting = $state(false);
 	let booting = $state(false);
 	let tokenInput = $state('');
@@ -153,10 +154,12 @@
 		try {
 			const status = await apiGet<{
 				needs_setup: boolean;
+				missing: string[];
 				detected_timezone?: string;
 			}>('/setup/status');
 			if (status.needs_setup) {
 				detectedTimezone = status.detected_timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? '';
+				missingFields = status.missing ?? [];
 				showSetup = true;
 			}
 		} catch {
@@ -173,6 +176,7 @@
 	{#if showSetup}
 		<OnboardingWizard
 			{detectedTimezone}
+			missing={missingFields}
 			oncomplete={() => (showSetup = false)}
 		/>
 	{:else}

@@ -245,8 +245,10 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
     let credentials: Arc<dyn CredentialStore> =
         crate::credential::keyring_store::keyring_or_fallback(&config).await;
     #[cfg(not(feature = "keyring"))]
-    let credentials: Arc<dyn CredentialStore> =
-        Arc::new(crate::credential::InMemoryCredentialStore::new());
+    let credentials: Arc<dyn CredentialStore> = {
+        info!("Credential store: in-memory (keyring feature disabled)");
+        Arc::new(crate::credential::InMemoryCredentialStore::new())
+    };
 
     // 5. Security
     let security = Arc::new(SecurityPolicy::default_policy());

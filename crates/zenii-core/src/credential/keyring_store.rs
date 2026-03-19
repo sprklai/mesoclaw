@@ -211,7 +211,11 @@ pub async fn keyring_or_fallback(config: &AppConfig) -> std::sync::Arc<dyn Crede
         }
     }
 
-    tracing::warn!("Keyring async probe failed, using in-memory credentials");
+    tracing::warn!(
+        "Keyring async probe failed, using in-memory credentials. \
+         API keys will NOT persist across restarts. \
+         On macOS, this may occur after binary recompilation changes the code signature."
+    );
     std::sync::Arc::new(super::InMemoryCredentialStore::new())
 }
 

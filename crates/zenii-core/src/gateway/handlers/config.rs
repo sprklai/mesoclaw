@@ -313,6 +313,12 @@ pub async fn setup_status(State(state): State<Arc<AppState>>) -> impl IntoRespon
         crate::onboarding::check_setup_status(&cfg, state.credentials.as_ref(), &provider_ids)
             .await;
 
+    tracing::info!(
+        "Setup status: needs_setup={}, missing={:?}",
+        status.needs_setup,
+        status.missing
+    );
+
     Json(serde_json::json!(status))
 }
 
