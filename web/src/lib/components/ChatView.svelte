@@ -126,7 +126,7 @@
 					const friendlyError =
 						error.toLowerCase().includes('no agent configured') ||
 						error.toLowerCase().includes('no provider')
-							? 'No AI provider configured. Go to Settings > Providers to set up a provider and model.'
+							? '__NO_PROVIDER__'
 							: error;
 					messagesStore.setError(friendlyError);
 					messagesStore.finishStream(capturedSessionId);
@@ -224,7 +224,13 @@
 
 					{#if messagesStore.error}
 						<div class="mx-auto max-w-xl rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-							{messagesStore.error}
+							{#if messagesStore.error === '__NO_PROVIDER__'}
+								No AI provider configured.
+								<a href="/settings#providers" class="underline font-medium hover:text-red-900 dark:hover:text-red-200">Go to Settings &rarr; Providers</a>
+								to set up a provider and model.
+							{:else}
+								{messagesStore.error}
+							{/if}
 						</div>
 					{/if}
 				</div>
@@ -237,7 +243,7 @@
 		{#if providersLoaded && !hasUsableModel}
 			<div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
 				No API key found — your key may not have persisted across restarts.
-				<a href="/settings/providers" class="underline font-medium hover:text-amber-900 dark:hover:text-amber-200">
+				<a href="/settings#providers" class="underline font-medium hover:text-amber-900 dark:hover:text-amber-200">
 					Add one in Settings &rarr; Providers
 				</a>
 				to start chatting.

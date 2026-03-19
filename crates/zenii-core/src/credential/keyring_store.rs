@@ -186,15 +186,17 @@ impl CredentialStore for KeyringStore {
     }
 }
 
-/// Try to create a KeyringStore, falling back to InMemoryCredentialStore if unavailable.
+/// Try to create a KeyringStore, falling back to FileCredentialStore then InMemoryCredentialStore.
+///
+/// Fallback chain: KeyringStore (OS keyring) → FileCredentialStore (encrypted JSON) → InMemory (volatile).
 /// Performs an async probe (set+get+delete via spawn_blocking) to verify the keyring
 /// actually works end-to-end, since some Linux backends pass sync probes but fail async.
 pub async fn keyring_or_fallback(config: &AppConfig) -> std::sync::Arc<dyn CredentialStore> {
     let store = match KeyringStore::new(config) {
         Ok(ks) => ks,
         Err(e) => {
-            tracing::warn!("Keyring unavailable ({e}), using in-memory credentials");
-            return std::sync::Arc::new(super::InMemoryCredentialStore::new());
+            tracing::warn!("Keyring unavailable ({e}), trying file-based credential store");
+            return file_or_in_memory_fallback(config);
         }
     };
 
@@ -212,11 +214,44 @@ pub async fn keyring_or_fallback(config: &AppConfig) -> std::sync::Arc<dyn Crede
     }
 
     tracing::warn!(
-        "Keyring async probe failed, using in-memory credentials. \
-         API keys will NOT persist across restarts. \
+        "Keyring async probe failed, trying file-based credential store. \
          On macOS, this may occur after binary recompilation changes the code signature."
     );
-    std::sync::Arc::new(super::InMemoryCredentialStore::new())
+    file_or_in_memory_fallback(config)
+}
+
+/// Try FileCredentialStore, then fall back to InMemoryCredentialStore.
+fn file_or_in_memory_fallback(config: &AppConfig) -> std::sync::Arc<dyn CredentialStore> {
+    use std::path::PathBuf;
+
+    use super::file_store::FileCredentialStore;
+
+    let result = if let Some(ref path) = config.credential_file_path {
+        FileCredentialStore::with_path(PathBuf::from(path), &config.keyring_service_id)
+    } else {
+        let data_dir = config
+            .data_dir
+            .as_deref()
+            .map(PathBuf::from)
+            .unwrap_or_else(crate::config::default_data_dir);
+        FileCredentialStore::new(&data_dir, &config.keyring_service_id)
+    };
+
+    match result {
+        Ok(store) => {
+            tracing::info!(
+                "Using encrypted file credential store at {}",
+                store.path().display()
+            );
+            std::sync::Arc::new(store)
+        }
+        Err(e) => {
+            tracing::warn!(
+                "All persistent credential stores failed ({e}) — using in-memory (volatile)"
+            );
+            std::sync::Arc::new(super::InMemoryCredentialStore::new())
+        }
+    }
 }
 
 #[cfg(test)]

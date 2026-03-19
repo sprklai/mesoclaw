@@ -35,6 +35,8 @@ tower-http = { workspace = true, optional = true }
 # Credentials
 keyring = { workspace = true, optional = true }
 zeroize = { workspace = true }
+aes-gcm = { workspace = true }
+sha2 = { workspace = true }
 
 # HTTP / TLS
 reqwest = { workspace = true }

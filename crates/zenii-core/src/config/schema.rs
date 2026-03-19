@@ -67,6 +67,8 @@ pub struct AppConfig {
 
     // Phase 8: Credentials
     pub keyring_service_id: String,
+    /// Override path for encrypted credential file. Default: {data_dir}/credentials.enc
+    pub credential_file_path: Option<String>,
 
     // Phase 19: Tool Permissions
     pub tool_permissions: ToolPermissions,
@@ -247,6 +249,7 @@ impl Default for AppConfig {
 
             // Credentials
             keyring_service_id: "com.sprklai.zenii".into(),
+            credential_file_path: None,
 
             // Tool Permissions
             tool_permissions: ToolPermissions::default(),

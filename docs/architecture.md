@@ -185,7 +185,7 @@ zenii/
 │   │   │   ├── db/         # rusqlite pool + WAL + migrations + spawn_blocking
 │   │   │   ├── event_bus/  # EventBus trait + TokioBroadcastBus (12 events)
 │   │   │   ├── memory/     # Memory trait + SqliteMemoryStore (FTS5 + vectors) + InMemoryStore
-│   │   │   ├── credential/ # CredentialStore trait + KeyringStore + InMemoryCredentialStore
+│   │   │   ├── credential/ # CredentialStore trait + KeyringStore + FileCredentialStore + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
 │   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 16 tools (14 base + 2 feature-gated)
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter, context engine
@@ -354,6 +354,7 @@ graph TB
     subgraph CredModule["Credential Module"]
         Mod["mod.rs<br>CredentialStore trait<br>get / set / delete / list"]
         KR["keyring.rs<br>KeyringStore #40;production#41;<br>OS keychain integration"]
+        FS["file_store.rs<br>FileCredentialStore<br>AES-256-GCM encrypted JSON"]
         Mem["memory.rs<br>InMemoryStore #40;tests/CI#41;<br>DashMap-backed"]
     end
 
@@ -366,7 +367,10 @@ graph TB
     end
 
     Mod --> KR
+    Mod --> FS
     Mod --> Mem
+    KR -.->|fallback| FS
+    FS -.->|fallback| Mem
     Desktop --> KR
     CLI --> KR
     Daemon --> KR
@@ -387,6 +391,14 @@ graph TB
 | **CLI** | Direct | Runs as user process |
 | **TUI** | Via gateway | Connects to daemon over HTTP |
 | **Daemon** | Direct | Headless, runs as service |
+
+### Fallback Chain
+
+At boot, the credential store is selected via a three-tier fallback:
+
+1. **KeyringStore** — OS keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service). Preferred when available.
+2. **FileCredentialStore** — AES-256-GCM encrypted JSON file at `{data_dir}/credentials.enc`. Key derived from SHA-256 of machine characteristics (hostname, username, data_dir, service_id). Activated when keyring is unavailable (e.g., macOS after binary recompilation changes code signature).
+3. **InMemoryCredentialStore** — Volatile RAM-only store. Last resort when both persistent stores fail.
 
 All credential values are wrapped with `zeroize` for secure memory cleanup.
 

@@ -1,3 +1,4 @@
+pub mod file_store;
 #[cfg(feature = "keyring")]
 pub mod keyring_store;
 

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- FileCredentialStore: AES-256-GCM encrypted file-based credential storage as persistent fallback when OS keyring is unavailable
+- Credential fallback chain: KeyringStore → FileCredentialStore → InMemoryCredentialStore
+- `credential_file_path` config option to override default credential file location
+
+### Fixed
+- API keys no longer lost on macOS after binary recompilation or app update (keyring signature revocation now falls back to encrypted file instead of volatile RAM)
+
 ## [0.0.29] - 2026-03-19
 
 ### Fixed

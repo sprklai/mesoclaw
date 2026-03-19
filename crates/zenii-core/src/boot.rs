@@ -246,8 +246,28 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         crate::credential::keyring_store::keyring_or_fallback(&config).await;
     #[cfg(not(feature = "keyring"))]
     let credentials: Arc<dyn CredentialStore> = {
-        info!("Credential store: in-memory (keyring feature disabled)");
-        Arc::new(crate::credential::InMemoryCredentialStore::new())
+        use std::path::PathBuf;
+
+        use crate::credential::file_store::FileCredentialStore;
+
+        let data_dir = config
+            .data_dir
+            .as_deref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| crate::config::default_data_dir());
+        match FileCredentialStore::new(&data_dir, &config.keyring_service_id) {
+            Ok(store) => {
+                info!(
+                    "Credential store: encrypted file at {} (keyring feature disabled)",
+                    store.path().display()
+                );
+                Arc::new(store)
+            }
+            Err(e) => {
+                info!("Credential store: in-memory (keyring disabled, file store failed: {e})");
+                Arc::new(crate::credential::InMemoryCredentialStore::new())
+            }
+        }
     };
 
     // 5. Security
