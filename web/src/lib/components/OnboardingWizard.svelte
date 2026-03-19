@@ -111,9 +111,10 @@
 		saving = true;
 		error = '';
 		try {
-			const updates: Record<string, string | null> = {
+			const updates: Record<string, string | boolean | null> = {
 				user_name: userName.trim(),
-				user_location: userLocation.trim()
+				user_location: userLocation.trim(),
+				onboarding_completed: true
 			};
 			if (userTimezone.trim()) {
 				updates.user_timezone = userTimezone.trim();

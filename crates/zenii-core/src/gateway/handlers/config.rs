@@ -194,6 +194,12 @@ pub async fn update_config(
         if let Some(v) = obj.get("user_timezone") {
             config.user_timezone = v.as_str().map(|s| s.to_string());
         }
+        if let Some(v) = obj
+            .get("onboarding_completed")
+            .and_then(|v| v.as_bool())
+        {
+            config.onboarding_completed = v;
+        }
         // Channel config fields (Task 3.5)
         if let Some(v) = obj.get("telegram_dm_policy").and_then(|v| v.as_str()) {
             config.telegram_dm_policy = v.to_string();

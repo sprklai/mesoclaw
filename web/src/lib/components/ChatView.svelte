@@ -235,10 +235,10 @@
 
 	<div class="p-4">
 		{#if providersLoaded && !hasUsableModel}
-			<div class="rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-700 dark:bg-yellow-950 dark:text-yellow-200">
-				No AI provider configured.
-				<a href="/settings/providers" class="underline font-medium hover:text-yellow-900 dark:hover:text-yellow-100">
-					Set up a provider
+			<div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+				No API key found — your key may not have persisted across restarts.
+				<a href="/settings/providers" class="underline font-medium hover:text-amber-900 dark:hover:text-amber-200">
+					Add one in Settings &rarr; Providers
 				</a>
 				to start chatting.
 			</div>

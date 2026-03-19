@@ -18,7 +18,12 @@ pub struct SetupStatus {
 
 /// Check the current setup status.
 ///
-/// `needs_setup` is true when:
+/// If `onboarding_completed` is true in config, returns `needs_setup: false`
+/// immediately — the user has already completed onboarding, even if the
+/// credential store has lost API keys (e.g., macOS Keychain after dev
+/// recompilation, or in-memory fallback on Linux/headless).
+///
+/// Otherwise, `needs_setup` is true when:
 /// - `user_name` is not set, OR
 /// - `user_location` is not set, OR
 /// - no provider has an API key configured
@@ -29,6 +34,20 @@ pub async fn check_setup_status<C: CredentialStore + ?Sized>(
     credentials: &C,
     provider_ids: &[String],
 ) -> SetupStatus {
+    let detected_timezone = crate::ai::context::detect_system_timezone();
+
+    // If onboarding was explicitly completed, don't re-trigger it.
+    // The `missing` array is still populated for informational purposes.
+    if config.onboarding_completed {
+        let has_usable_model = has_any_api_key(credentials, provider_ids).await;
+        return SetupStatus {
+            needs_setup: false,
+            missing: vec![],
+            detected_timezone,
+            has_usable_model,
+        };
+    }
+
     let mut missing = Vec::new();
 
     if config.user_name.is_none() || config.user_name.as_deref() == Some("") {
@@ -43,8 +62,6 @@ pub async fn check_setup_status<C: CredentialStore + ?Sized>(
     if !has_usable_model {
         missing.push("api_key".to_string());
     }
-
-    let detected_timezone = crate::ai::context::detect_system_timezone();
 
     SetupStatus {
         needs_setup: !missing.is_empty(),

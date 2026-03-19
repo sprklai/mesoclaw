@@ -144,6 +144,10 @@ pub struct AppConfig {
     pub user_timezone: Option<String>,
     /// User's location/region description (e.g., "New York, US"). Used for context injection.
     pub user_location: Option<String>,
+    /// Explicit flag set to true when the onboarding wizard completes successfully.
+    /// Prevents re-triggering onboarding when the credential store loses API keys
+    /// (e.g., macOS Keychain after dev recompilation, in-memory fallback on Linux).
+    pub onboarding_completed: bool,
 
     // Phase 9: Plugins
     pub plugins_dir: Option<String>,
@@ -317,6 +321,7 @@ impl Default for AppConfig {
             user_name: None,
             user_timezone: None,
             user_location: None,
+            onboarding_completed: false,
 
             // Plugins
             plugins_dir: None,
