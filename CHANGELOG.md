@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.30] - 2026-03-19
+
 ### Added
 - FileCredentialStore: AES-256-GCM encrypted file-based credential storage as persistent fallback when OS keyring is unavailable
 - Credential fallback chain: KeyringStore → FileCredentialStore → InMemoryCredentialStore
@@ -14,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - API keys no longer lost on macOS after binary recompilation or app update (keyring signature revocation now falls back to encrypted file instead of volatile RAM)
+
+### Changed
+- Updated docs-site with FileCredentialStore fallback chain documentation
+- Updated README with FileCredentialStore fallback chain details
+
+### CI
+- Added GitHub Actions workflow to auto-deploy docs-site to Vercel
+- Fixed Vercel deployment pipeline to use pull/build/deploy --prebuilt pattern
 
 ## [0.0.29] - 2026-03-19
 
