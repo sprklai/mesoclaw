@@ -45,6 +45,9 @@ enum Commands {
         /// Model override
         #[arg(long)]
         model: Option<String>,
+        /// Enable multi-agent delegation for parallel task execution
+        #[arg(long)]
+        delegate: bool,
     },
     /// Send a single prompt and print the response
     Run {
@@ -210,6 +213,35 @@ enum ScheduleAction {
     /// Create a new scheduled job
     Create {
         /// Job name
+        name: String,
+        /// Schedule type: interval or cron
+        #[arg(long, default_value = "interval")]
+        schedule_type: String,
+        /// Interval in seconds (for interval schedule)
+        #[arg(long)]
+        interval_secs: Option<u64>,
+        /// Cron expression (for cron schedule)
+        #[arg(long)]
+        cron_expr: Option<String>,
+        /// Payload type: heartbeat, notify, or agent_turn
+        #[arg(long, default_value = "heartbeat")]
+        payload: String,
+        /// Message for notify payload
+        #[arg(long)]
+        message: Option<String>,
+        /// Prompt for agent_turn payload
+        #[arg(long)]
+        prompt: Option<String>,
+        /// Delete after first run (one-shot)
+        #[arg(long)]
+        one_shot: bool,
+    },
+    /// Update an existing scheduled job
+    Update {
+        /// Job ID
+        id: String,
+        /// New job name
+        #[arg(long)]
         name: String,
         /// Schedule type: interval or cron
         #[arg(long, default_value = "interval")]
@@ -409,9 +441,11 @@ async fn main() {
             DaemonAction::Stop => commands::daemon::stop().await,
             DaemonAction::Status => commands::daemon::status(&client).await,
         },
-        Commands::Chat { session, model } => {
-            commands::chat::run(&client, session.as_deref(), model.as_deref()).await
-        }
+        Commands::Chat {
+            session,
+            model,
+            delegate,
+        } => commands::chat::run(&client, session.as_deref(), model.as_deref(), delegate).await,
         Commands::Run {
             prompt,
             session,
@@ -461,6 +495,33 @@ async fn main() {
             } => {
                 commands::schedule::create(
                     &client,
+                    commands::schedule::CreateJobArgs {
+                        name: &name,
+                        schedule_type: &schedule_type,
+                        interval_secs,
+                        cron_expr: cron_expr.as_deref(),
+                        payload_type: &payload,
+                        message: message.as_deref(),
+                        prompt: prompt.as_deref(),
+                        one_shot,
+                    },
+                )
+                .await
+            }
+            ScheduleAction::Update {
+                id,
+                name,
+                schedule_type,
+                interval_secs,
+                cron_expr,
+                payload,
+                message,
+                prompt,
+                one_shot,
+            } => {
+                commands::schedule::update(
+                    &client,
+                    &id,
                     commands::schedule::CreateJobArgs {
                         name: &name,
                         schedule_type: &schedule_type,
@@ -576,9 +637,14 @@ mod tests {
     fn parse_chat_default() {
         let cli = parse(&["zenii", "chat"]);
         match cli.command {
-            Commands::Chat { session, model } => {
+            Commands::Chat {
+                session,
+                model,
+                delegate,
+            } => {
                 assert!(session.is_none());
                 assert!(model.is_none());
+                assert!(!delegate);
             }
             _ => panic!("expected Chat"),
         }
@@ -588,9 +654,31 @@ mod tests {
     fn parse_chat_with_options() {
         let cli = parse(&["zenii", "chat", "--session", "abc", "--model", "gpt-4o"]);
         match cli.command {
-            Commands::Chat { session, model } => {
+            Commands::Chat {
+                session,
+                model,
+                delegate,
+            } => {
                 assert_eq!(session.as_deref(), Some("abc"));
                 assert_eq!(model.as_deref(), Some("gpt-4o"));
+                assert!(!delegate);
+            }
+            _ => panic!("expected Chat"),
+        }
+    }
+
+    #[test]
+    fn parse_chat_with_delegate() {
+        let cli = parse(&["zenii", "chat", "--delegate"]);
+        match cli.command {
+            Commands::Chat {
+                session,
+                model,
+                delegate,
+            } => {
+                assert!(session.is_none());
+                assert!(model.is_none());
+                assert!(delegate);
             }
             _ => panic!("expected Chat"),
         }

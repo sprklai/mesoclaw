@@ -54,6 +54,53 @@ pub async fn get_workflow(
         .ok_or_else(|| ZeniiError::NotFound(format!("workflow '{id}' not found")))
 }
 
+pub async fn update_workflow(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(req): Json<CreateWorkflowRequest>,
+) -> Result<impl IntoResponse> {
+    let registry = state
+        .workflow_registry
+        .as_ref()
+        .ok_or_else(|| ZeniiError::Workflow("workflow feature not initialized".into()))?;
+
+    let mut workflow: Workflow = toml::from_str(&req.toml_content)?;
+
+    // Validate ID in TOML matches path ID
+    if workflow.id != id {
+        return Err(ZeniiError::Validation(format!(
+            "workflow ID in TOML ('{}') does not match path ID ('{id}')",
+            workflow.id
+        )));
+    }
+
+    // Verify workflow exists
+    let existing = registry
+        .get(&id)
+        .ok_or_else(|| ZeniiError::NotFound(format!("workflow '{id}' not found")))?;
+
+    // Preserve created_at, update updated_at
+    workflow.created_at = existing.created_at;
+    workflow.updated_at = chrono::Utc::now().to_rfc3339();
+
+    registry.save(workflow.clone())?;
+    Ok(Json(workflow))
+}
+
+pub async fn get_workflow_raw(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse> {
+    let registry = state
+        .workflow_registry
+        .as_ref()
+        .ok_or_else(|| ZeniiError::Workflow("workflow feature not initialized".into()))?;
+
+    registry
+        .get_raw_toml(&id)
+        .ok_or_else(|| ZeniiError::NotFound(format!("workflow '{id}' not found")))
+}
+
 pub async fn delete_workflow(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,

@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import Pencil from '@lucide/svelte/icons/pencil';
 	import Calendar from '@lucide/svelte/icons/calendar';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -24,6 +25,7 @@
 	let historyEntries = $state<JobExecution[]>([]);
 	let confirmOpen = $state(false);
 	let deleteTarget = $state<string | null>(null);
+	let editTarget = $state<string | null>(null);
 
 	// Form state
 	let jobName = $state('');
@@ -65,6 +67,7 @@
 		activeStartHour = 9;
 		activeEndHour = 17;
 		formError = '';
+		editTarget = null;
 	}
 
 	async function handleCreate() {
@@ -134,7 +137,7 @@
 		}
 
 		try {
-			await schedulerStore.createJob({
+			const jobData = {
 				name: jobName.trim(),
 				schedule,
 				payload,
@@ -143,12 +146,58 @@
 				active_hours: activeHoursEnabled
 					? { start_hour: activeStartHour, end_hour: activeEndHour }
 					: null
-			});
+			};
+			if (editTarget) {
+				await schedulerStore.updateJob(editTarget, jobData);
+			} else {
+				await schedulerStore.createJob(jobData);
+			}
 			resetForm();
 			showForm = false;
 		} catch (e) {
-			formError = e instanceof Error ? e.message : 'Failed to create job';
+			formError = e instanceof Error ? e.message : editTarget ? 'Failed to update job' : 'Failed to create job';
 		}
+	}
+
+	function handleStartEdit(job: ScheduledJob) {
+		editTarget = job.id;
+		jobName = job.name;
+		if (job.schedule.type === 'interval') {
+			scheduleType = 'interval';
+			intervalSecs = job.schedule.secs;
+		} else if (job.schedule.type === 'cron') {
+			scheduleType = 'cron';
+			cronExpr = job.schedule.expr;
+		} else if (job.schedule.type === 'human') {
+			scheduleType = 'human';
+			const dt = job.schedule.datetime;
+			humanDate = dt.split('T')[0] ?? '';
+			humanTime = dt.split('T')[1]?.slice(0, 5) ?? '';
+		}
+		if (job.payload.type === 'heartbeat') {
+			payloadType = 'heartbeat';
+		} else if (job.payload.type === 'agent_turn') {
+			payloadType = 'agent_turn';
+			payloadPrompt = job.payload.prompt;
+		} else if (job.payload.type === 'notify') {
+			payloadType = 'notify';
+			payloadMessage = job.payload.message;
+		} else if (job.payload.type === 'send_via_channel') {
+			payloadType = 'send_via_channel';
+			payloadChannel = job.payload.channel;
+			payloadMessage = job.payload.message;
+		}
+		sessionTarget = job.session_target;
+		deleteAfterRun = job.delete_after_run;
+		if (job.active_hours) {
+			activeHoursEnabled = true;
+			activeStartHour = job.active_hours.start_hour;
+			activeEndHour = job.active_hours.end_hour;
+		} else {
+			activeHoursEnabled = false;
+		}
+		formError = '';
+		showForm = true;
 	}
 
 	async function handleToggle(id: string) {
@@ -227,7 +276,7 @@
 	{#if showForm}
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>Create Scheduled Job</Card.Title>
+				<Card.Title>{editTarget ? 'Edit Job' : 'Create Scheduled Job'}</Card.Title>
 			</Card.Header>
 			<Card.Content class="space-y-4">
 				{#if formError}
@@ -410,7 +459,7 @@
 					{/if}
 				</div>
 
-				<Button onclick={handleCreate} class="w-full">Create Job</Button>
+				<Button onclick={handleCreate} class="w-full">{editTarget ? 'Update Job' : 'Create Job'}</Button>
 			</Card.Content>
 		</Card.Root>
 	{/if}
@@ -471,6 +520,14 @@
 								</div>
 							</div>
 							<div class="flex items-center gap-1">
+								<Button
+									variant="ghost"
+									size="icon"
+									onclick={() => handleStartEdit(job)}
+									title="Edit"
+								>
+									<Pencil class="h-4 w-4" />
+								</Button>
 								<Button
 									variant="ghost"
 									size="icon"

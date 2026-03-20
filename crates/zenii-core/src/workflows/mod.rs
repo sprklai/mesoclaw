@@ -70,6 +70,11 @@ impl WorkflowRegistry {
         Ok(())
     }
 
+    pub fn get_raw_toml(&self, id: &str) -> Option<String> {
+        let path = self.directory.join(format!("{id}.toml"));
+        std::fs::read_to_string(path).ok()
+    }
+
     pub fn delete(&self, id: &str) -> Result<bool> {
         let path = self.directory.join(format!("{id}.toml"));
         if path.exists() {

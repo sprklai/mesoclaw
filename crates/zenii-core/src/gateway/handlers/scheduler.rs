@@ -91,6 +91,29 @@ pub async fn toggle_job(
     Ok(Json(ToggleResponse { id, enabled }))
 }
 
+/// PUT /scheduler/jobs/:id
+#[cfg_attr(feature = "api-docs", utoipa::path(
+    put, path = "/scheduler/jobs/{id}", tag = "Scheduler",
+    params(("id" = String, Path, description = "Job ID")),
+    request_body = CreateJobRequest,
+    responses(
+        (status = 200, description = "Job updated"),
+        (status = 404, description = "Job not found")
+    )
+))]
+pub async fn update_job(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(req): Json<CreateJobRequest>,
+) -> Result<Json<serde_json::Value>, ZeniiError> {
+    let scheduler = state
+        .scheduler
+        .as_ref()
+        .ok_or_else(|| ZeniiError::Scheduler("scheduler not initialized".into()))?;
+    scheduler.update_job(&id, req.job).await?;
+    Ok(Json(serde_json::json!({ "id": id, "updated": true })))
+}
+
 /// DELETE /scheduler/jobs/:id
 #[cfg_attr(feature = "api-docs", utoipa::path(
     delete, path = "/scheduler/jobs/{id}", tag = "Scheduler",
@@ -350,6 +373,74 @@ mod tests {
             .unwrap();
         let history: Vec<crate::scheduler::JobExecution> = serde_json::from_slice(&body).unwrap();
         assert!(history.is_empty());
+    }
+
+    // UPD.7 — PUT /scheduler/jobs/:id updates job
+    #[tokio::test]
+    async fn update_job() {
+        let (_dir, state) = test_state().await;
+
+        let id = if let Some(ref sched) = state.scheduler {
+            sched
+                .add_job(crate::scheduler::ScheduledJob {
+                    id: String::new(),
+                    name: "to_update".into(),
+                    schedule: crate::scheduler::Schedule::Interval { secs: 60 },
+                    session_target: crate::scheduler::SessionTarget::Main,
+                    payload: crate::scheduler::JobPayload::Notify {
+                        message: "hi".into(),
+                    },
+                    enabled: true,
+                    error_count: 0,
+                    next_run: None,
+                    active_hours: None,
+                    delete_after_run: false,
+                })
+                .await
+                .unwrap()
+        } else {
+            panic!("scheduler not initialized");
+        };
+
+        let app = build_router(state);
+        let body = serde_json::json!({
+            "id": id,
+            "name": "updated_name",
+            "schedule": {"type": "interval", "secs": 120},
+            "payload": {"type": "notify", "message": "updated"}
+        });
+
+        let req = Request::builder()
+            .method("PUT")
+            .uri(format!("/scheduler/jobs/{id}"))
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    // UPD.8 — PUT /scheduler/jobs/nonexistent returns error
+    #[tokio::test]
+    async fn update_job_not_found() {
+        let (_dir, state) = test_state().await;
+        let app = build_router(state);
+
+        let body = serde_json::json!({
+            "id": "nonexistent",
+            "name": "test",
+            "schedule": {"type": "interval", "secs": 60},
+            "payload": {"type": "heartbeat"}
+        });
+
+        let req = Request::builder()
+            .method("PUT")
+            .uri("/scheduler/jobs/nonexistent")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     // 16.37 — GET /scheduler/status returns running status

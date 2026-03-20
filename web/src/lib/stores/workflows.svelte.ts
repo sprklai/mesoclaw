@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiDelete } from "$lib/api/client";
+import { apiGet, apiPost, apiPut, apiDelete, getToken, getBaseUrl } from "$lib/api/client";
 
 export interface WorkflowStep {
   name: string;
@@ -61,9 +61,29 @@ function createWorkflowsStore() {
     },
 
     async create(tomlContent: string): Promise<Workflow> {
-      const result = await apiPost<Workflow>("/workflows", { toml: tomlContent });
+      const result = await apiPost<Workflow>("/workflows", { toml_content: tomlContent });
       await this.load();
       return result;
+    },
+
+    async update(id: string, tomlContent: string): Promise<Workflow> {
+      const result = await apiPut<Workflow>(`/workflows/${encodeURIComponent(id)}`, {
+        toml_content: tomlContent,
+      });
+      await this.load();
+      return result;
+    },
+
+    async getRawToml(id: string): Promise<string> {
+      const baseUrl = getBaseUrl();
+      const token = getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const response = await fetch(`${baseUrl}/workflows/${encodeURIComponent(id)}/raw`, {
+        headers,
+      });
+      if (!response.ok) throw new Error(`Failed to fetch raw TOML: ${response.statusText}`);
+      return response.text();
     },
 
     async remove(id: string): Promise<void> {

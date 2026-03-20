@@ -7,6 +7,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Play from '@lucide/svelte/icons/play';
 	import History from '@lucide/svelte/icons/history';
+	import Pencil from '@lucide/svelte/icons/pencil';
 	import X from '@lucide/svelte/icons/x';
 	import Clock from '@lucide/svelte/icons/clock';
 	import CheckCircle2 from '@lucide/svelte/icons/check-circle-2';
@@ -27,6 +28,7 @@
 	let expandedRun = $state<string | null>(null);
 	let confirmOpen = $state(false);
 	let deleteTarget = $state<string | null>(null);
+	let editTarget = $state<string | null>(null);
 
 	// Form state
 	let tomlContent = $state('');
@@ -39,6 +41,7 @@
 	function resetForm() {
 		tomlContent = '';
 		formError = '';
+		editTarget = null;
 	}
 
 	async function handleCreate() {
@@ -49,11 +52,27 @@
 		}
 
 		try {
-			await workflowsStore.create(tomlContent.trim());
+			if (editTarget) {
+				await workflowsStore.update(editTarget, tomlContent.trim());
+			} else {
+				await workflowsStore.create(tomlContent.trim());
+			}
 			resetForm();
 			showForm = false;
 		} catch (e) {
-			formError = e instanceof Error ? e.message : 'Failed to create workflow';
+			formError = e instanceof Error ? e.message : editTarget ? 'Failed to update workflow' : 'Failed to create workflow';
+		}
+	}
+
+	async function handleStartEdit(wf: Workflow) {
+		try {
+			const raw = await workflowsStore.getRawToml(wf.id);
+			editTarget = wf.id;
+			tomlContent = raw;
+			formError = '';
+			showForm = true;
+		} catch (e) {
+			// Fallback: could show error
 		}
 	}
 
@@ -127,7 +146,7 @@
 	{#if showForm}
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>Create Workflow</Card.Title>
+				<Card.Title>{editTarget ? 'Edit Workflow' : 'Create Workflow'}</Card.Title>
 			</Card.Header>
 			<Card.Content class="space-y-4">
 				{#if formError}
@@ -145,7 +164,7 @@
 					></textarea>
 				</div>
 
-				<Button onclick={handleCreate} class="w-full">Create Workflow</Button>
+				<Button onclick={handleCreate} class="w-full">{editTarget ? 'Update Workflow' : 'Create Workflow'}</Button>
 			</Card.Content>
 		</Card.Root>
 	{/if}
@@ -186,6 +205,14 @@
 								</div>
 							</div>
 							<div class="flex items-center gap-1">
+								<Button
+									variant="ghost"
+									size="icon"
+									onclick={() => handleStartEdit(workflow)}
+									title="Edit"
+								>
+									<Pencil class="h-4 w-4" />
+								</Button>
 								<Button
 									variant="ghost"
 									size="icon"

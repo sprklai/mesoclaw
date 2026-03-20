@@ -30,7 +30,7 @@ impl Tool for MemoryTool {
     }
 
     fn description(&self) -> &str {
-        "Store, recall, or forget information in persistent memory. Use 'store' to save facts, 'recall' to search memories, 'forget' to remove a specific entry."
+        "Store, recall, or forget information in persistent memory. Use 'store' or 'update' to save facts, 'recall' to search memories, 'forget' to remove a specific entry."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
@@ -39,7 +39,7 @@ impl Tool for MemoryTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["store", "recall", "forget"],
+                    "enum": ["store", "update", "recall", "forget"],
                     "description": "The memory operation to perform"
                 },
                 "key": {
@@ -74,7 +74,7 @@ impl Tool for MemoryTool {
             .ok_or_else(|| ZeniiError::Validation("missing 'action' field".into()))?;
 
         match action {
-            "store" => {
+            "store" | "update" => {
                 let key = args["key"]
                     .as_str()
                     .ok_or_else(|| ZeniiError::Validation("missing 'key' for store".into()))?;

@@ -79,6 +79,19 @@ function createSchedulerStore() {
       return result.id;
     },
 
+    async updateJob(id: string, job: Partial<ScheduledJob>): Promise<void> {
+      await apiPut(`/scheduler/jobs/${encodeURIComponent(id)}`, {
+        id,
+        name: job.name ?? "",
+        schedule: job.schedule,
+        session_target: job.session_target ?? "main",
+        payload: job.payload,
+        active_hours: job.active_hours ?? null,
+        delete_after_run: job.delete_after_run ?? false,
+      });
+      await this.load();
+    },
+
     async toggleJob(id: string): Promise<boolean> {
       const result = await apiPut<{ id: string; enabled: boolean }>(
         `/scheduler/jobs/${encodeURIComponent(id)}/toggle`,

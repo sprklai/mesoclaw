@@ -333,6 +333,37 @@ impl TokioScheduler {
         backoff_schedule[idx]
     }
 
+    /// Shared validation for add_job and update_job.
+    fn validate_job(job: &mut ScheduledJob) -> Result<()> {
+        // Human schedules always auto-delete after execution
+        if matches!(job.schedule, Schedule::Human { .. }) {
+            job.delete_after_run = true;
+        }
+
+        // Validate active hours: start == end would block all hours
+        if let Some(ref hours) = job.active_hours
+            && hours.start_hour == hours.end_hour
+        {
+            return Err(ZeniiError::Validation(format!(
+                "active_hours start_hour ({}) cannot equal end_hour — job would never fire",
+                hours.start_hour
+            )));
+        }
+
+        // Validate cron expression if applicable
+        if let Schedule::Cron { ref expr } = job.schedule {
+            let full_expr = if expr.split_whitespace().count() == 5 {
+                format!("0 {expr}")
+            } else {
+                expr.clone()
+            };
+            cron::Schedule::from_str(&full_expr)
+                .map_err(|e| ZeniiError::Scheduler(format!("invalid cron expression: {e}")))?;
+        }
+
+        Ok(())
+    }
+
     /// Record an execution in the history ring buffer.
     pub fn record_execution(&self, exec: JobExecution) {
         let job_id = exec.job_id.clone();
@@ -574,32 +605,7 @@ impl Scheduler for TokioScheduler {
             )));
         }
 
-        // Human schedules always auto-delete after execution
-        if matches!(job.schedule, Schedule::Human { .. }) {
-            job.delete_after_run = true;
-        }
-
-        // Validate active hours: start == end would block all hours
-        if let Some(ref hours) = job.active_hours
-            && hours.start_hour == hours.end_hour
-        {
-            return Err(ZeniiError::Validation(format!(
-                "active_hours start_hour ({}) cannot equal end_hour — job would never fire",
-                hours.start_hour
-            )));
-        }
-
-        // Validate cron expression if applicable
-        if let Schedule::Cron { ref expr } = job.schedule {
-            let full_expr = if expr.split_whitespace().count() == 5 {
-                format!("0 {expr}")
-            } else {
-                expr.clone()
-            };
-            cron::Schedule::from_str(&full_expr)
-                .map_err(|e| ZeniiError::Scheduler(format!("invalid cron expression: {e}")))?;
-        }
-
+        Self::validate_job(&mut job)?;
         job.next_run = Some(Self::compute_next_run(&job.schedule)?);
 
         Self::persist_job(&self.db, &job).await?;
@@ -607,6 +613,38 @@ impl Scheduler for TokioScheduler {
         let id = job.id.clone();
         self.jobs.insert(id.clone(), job);
         Ok(id)
+    }
+
+    async fn update_job(&self, id: &str, mut job: ScheduledJob) -> Result<()> {
+        // Verify job exists
+        let existing = self
+            .jobs
+            .get(id)
+            .ok_or_else(|| ZeniiError::NotFound(format!("job '{id}' not found")))?
+            .clone();
+
+        // Duplicate name check — skip if name unchanged, otherwise exclude self
+        if job.name != existing.name
+            && self
+                .jobs
+                .iter()
+                .any(|entry| entry.key() != id && entry.value().name == job.name)
+        {
+            return Err(ZeniiError::Validation(format!(
+                "a job named '{}' already exists — use a different name",
+                job.name
+            )));
+        }
+
+        Self::validate_job(&mut job)?;
+
+        // Path ID is authoritative
+        job.id = id.to_string();
+        job.next_run = Some(Self::compute_next_run(&job.schedule)?);
+
+        Self::persist_job(&self.db, &job).await?;
+        self.jobs.insert(id.to_string(), job);
+        Ok(())
     }
 
     async fn remove_job(&self, id: &str) -> Result<()> {
@@ -1137,5 +1175,90 @@ mod tests {
         });
         let result = sched.add_job(job).await;
         assert!(result.is_ok());
+    }
+
+    // UPD.1 — update_job changes name and schedule
+    #[tokio::test]
+    async fn update_job_success() {
+        let (_dir, sched) = test_scheduler();
+        let id = sched.add_job(test_job("original")).await.unwrap();
+
+        let mut updated = test_job("renamed");
+        updated.schedule = Schedule::Interval { secs: 120 };
+        sched.update_job(&id, updated).await.unwrap();
+
+        let jobs = sched.list_jobs().await;
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].name, "renamed");
+        assert!(matches!(jobs[0].schedule, Schedule::Interval { secs: 120 }));
+    }
+
+    // UPD.2 — update_job on nonexistent returns NotFound
+    #[tokio::test]
+    async fn update_job_not_found() {
+        let (_dir, sched) = test_scheduler();
+        let result = sched.update_job("nonexistent", test_job("x")).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ZeniiError::NotFound(_)));
+    }
+
+    // UPD.3 — update_job duplicate name rejected
+    #[tokio::test]
+    async fn update_job_duplicate_name() {
+        let (_dir, sched) = test_scheduler();
+        let id1 = sched.add_job(test_job("first")).await.unwrap();
+        let _id2 = sched.add_job(test_job("second")).await.unwrap();
+
+        let updated = test_job("second"); // rename to conflict
+        let result = sched.update_job(&id1, updated).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ZeniiError::Validation(_)));
+    }
+
+    // UPD.4 — update_job same name succeeds
+    #[tokio::test]
+    async fn update_job_same_name_ok() {
+        let (_dir, sched) = test_scheduler();
+        let id = sched.add_job(test_job("keep-name")).await.unwrap();
+
+        let mut job = test_job("keep-name");
+        job.schedule = Schedule::Interval { secs: 999 };
+        sched.update_job(&id, job).await.unwrap();
+
+        let jobs = sched.list_jobs().await;
+        assert_eq!(jobs[0].name, "keep-name");
+    }
+
+    // UPD.5 — update_job validates cron
+    #[tokio::test]
+    async fn update_job_validates_cron() {
+        let (_dir, sched) = test_scheduler();
+        let id = sched.add_job(test_job("cron-test")).await.unwrap();
+
+        let mut job = test_job("cron-test");
+        job.schedule = Schedule::Cron {
+            expr: "not valid".into(),
+        };
+        let result = sched.update_job(&id, job).await;
+        assert!(result.is_err());
+    }
+
+    // UPD.6 — update_job validates active hours
+    #[tokio::test]
+    async fn update_job_validates_active_hours() {
+        let (_dir, sched) = test_scheduler();
+        let id = sched.add_job(test_job("hours-test")).await.unwrap();
+
+        let mut job = test_job("hours-test");
+        job.active_hours = Some(super::super::traits::ActiveHours {
+            start_hour: 9,
+            end_hour: 9,
+        });
+        let result = sched.update_job(&id, job).await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ZeniiError::Validation(msg) if msg.contains("cannot equal")
+        ));
     }
 }

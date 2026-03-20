@@ -324,7 +324,7 @@ fn scheduler_routes() -> Router<Arc<AppState>> {
             )
             .route(
                 "/scheduler/jobs/{id}",
-                delete(handlers::scheduler::delete_job),
+                put(handlers::scheduler::update_job).delete(handlers::scheduler::delete_job),
             )
             .route(
                 "/scheduler/jobs/{id}/history",
@@ -364,7 +364,13 @@ fn workflow_routes() -> Router<Arc<AppState>> {
             )
             .route(
                 "/workflows/{id}",
-                get(handlers::workflows::get_workflow).delete(handlers::workflows::delete_workflow),
+                get(handlers::workflows::get_workflow)
+                    .put(handlers::workflows::update_workflow)
+                    .delete(handlers::workflows::delete_workflow),
+            )
+            .route(
+                "/workflows/{id}/raw",
+                get(handlers::workflows::get_workflow_raw),
             )
             .route(
                 "/workflows/{id}/run",

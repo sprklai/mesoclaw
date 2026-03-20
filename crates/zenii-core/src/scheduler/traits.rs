@@ -110,6 +110,7 @@ pub trait Scheduler: Send + Sync {
     async fn start(&self);
     async fn stop(&self);
     async fn add_job(&self, job: ScheduledJob) -> crate::Result<JobId>;
+    async fn update_job(&self, id: &str, job: ScheduledJob) -> crate::Result<()>;
     async fn remove_job(&self, id: &str) -> crate::Result<()>;
     async fn toggle_job(&self, id: &str) -> crate::Result<bool>;
     async fn list_jobs(&self) -> Vec<ScheduledJob>;

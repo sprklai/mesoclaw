@@ -31,7 +31,7 @@ impl Tool for SchedulerTool {
     }
 
     fn description(&self) -> &str {
-        "Create, list, delete, toggle, or view history of scheduled jobs. Your context shows active jobs — check before creating duplicates. Use cron for complex schedules, interval for periodic, human for one-time events at a specific local datetime (e.g. schedule_type='human', datetime='2026-03-20T00:53'). Human schedules auto-delete after execution."
+        "Create, list, update, delete, toggle, or view history of scheduled jobs. Your context shows active jobs — check before creating duplicates. Use cron for complex schedules, interval for periodic, human for one-time events at a specific local datetime (e.g. schedule_type='human', datetime='2026-03-20T00:53'). Human schedules auto-delete after execution. Use update to modify an existing job's name, schedule, or payload."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
@@ -40,7 +40,7 @@ impl Tool for SchedulerTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["create", "list", "delete", "toggle", "history"],
+                    "enum": ["create", "list", "update", "delete", "toggle", "history"],
                     "description": "The scheduler operation to perform"
                 },
                 "job_id": {
@@ -109,6 +109,7 @@ impl Tool for SchedulerTool {
 
         match action {
             "create" => self.create_job(&args).await,
+            "update" => self.update_job(&args).await,
             "list" => self.list_jobs().await,
             "delete" => {
                 let id = args["job_id"]
@@ -140,7 +141,7 @@ impl Tool for SchedulerTool {
                 Ok(ToolResult::ok(json))
             }
             other => Ok(ToolResult::err(format!(
-                "Unknown action '{other}'. Valid actions: create, list, delete, toggle, history"
+                "Unknown action '{other}'. Valid actions: create, update, list, delete, toggle, history"
             ))),
         }
     }
@@ -255,6 +256,120 @@ impl SchedulerTool {
         match self.scheduler.add_job(job).await {
             Ok(id) => Ok(ToolResult::ok(format!("Job created with ID: {id}"))),
             Err(e) => Ok(ToolResult::err(format!("Failed to create job: {e}"))),
+        }
+    }
+
+    async fn update_job(&self, args: &serde_json::Value) -> Result<ToolResult> {
+        let job_id = args["job_id"]
+            .as_str()
+            .ok_or_else(|| ZeniiError::Validation("missing 'job_id' for update".into()))?;
+        let name = args["name"]
+            .as_str()
+            .ok_or_else(|| ZeniiError::Validation("missing 'name' for update".into()))?;
+        let schedule_type = args["schedule_type"]
+            .as_str()
+            .ok_or_else(|| ZeniiError::Validation("missing 'schedule_type' for update".into()))?;
+        let payload_type = args["payload_type"]
+            .as_str()
+            .ok_or_else(|| ZeniiError::Validation("missing 'payload_type' for update".into()))?;
+
+        let schedule = match schedule_type {
+            "cron" => {
+                let expr = args["cron_expr"].as_str().ok_or_else(|| {
+                    ZeniiError::Validation("missing 'cron_expr' for cron schedule".into())
+                })?;
+                Schedule::Cron {
+                    expr: expr.to_string(),
+                }
+            }
+            "interval" => {
+                let secs = args["interval_secs"].as_u64().ok_or_else(|| {
+                    ZeniiError::Validation("missing 'interval_secs' for interval schedule".into())
+                })?;
+                Schedule::Interval { secs }
+            }
+            "human" => {
+                let datetime = args["datetime"].as_str().ok_or_else(|| {
+                    ZeniiError::Validation("missing 'datetime' for human schedule".into())
+                })?;
+                Schedule::Human {
+                    datetime: datetime.to_string(),
+                }
+            }
+            other => {
+                return Ok(ToolResult::err(format!(
+                    "Unknown schedule_type '{other}'. Valid: cron, interval, human"
+                )));
+            }
+        };
+
+        let payload = match payload_type {
+            "heartbeat" => JobPayload::Heartbeat,
+            "agent_turn" => {
+                let prompt = args["prompt"].as_str().ok_or_else(|| {
+                    ZeniiError::Validation("missing 'prompt' for agent_turn payload".into())
+                })?;
+                JobPayload::AgentTurn {
+                    prompt: prompt.to_string(),
+                }
+            }
+            "notify" => {
+                let message = args["message"].as_str().ok_or_else(|| {
+                    ZeniiError::Validation("missing 'message' for notify payload".into())
+                })?;
+                JobPayload::Notify {
+                    message: message.to_string(),
+                }
+            }
+            "send_via_channel" => {
+                let channel = args["channel"].as_str().ok_or_else(|| {
+                    ZeniiError::Validation("missing 'channel' for send_via_channel".into())
+                })?;
+                let message = args["message"].as_str().ok_or_else(|| {
+                    ZeniiError::Validation("missing 'message' for send_via_channel".into())
+                })?;
+                JobPayload::SendViaChannel {
+                    channel: channel.to_string(),
+                    message: message.to_string(),
+                }
+            }
+            other => {
+                return Ok(ToolResult::err(format!(
+                    "Unknown payload_type '{other}'. Valid: heartbeat, agent_turn, notify, send_via_channel"
+                )));
+            }
+        };
+
+        let active_hours = match (
+            args["active_hours_start"].as_u64(),
+            args["active_hours_end"].as_u64(),
+        ) {
+            (Some(start), Some(end)) => Some(ActiveHours {
+                start_hour: start as u8,
+                end_hour: end as u8,
+            }),
+            _ => None,
+        };
+
+        let delete_after_run =
+            args["one_shot"].as_bool().unwrap_or(false) || schedule_type == "human";
+
+        let job = ScheduledJob {
+            id: job_id.to_string(),
+            name: name.to_string(),
+            schedule,
+            session_target: Default::default(),
+            payload,
+            enabled: true,
+            error_count: 0,
+            next_run: None,
+            active_hours,
+            delete_after_run,
+        };
+
+        match self.scheduler.update_job(job_id, job).await {
+            Ok(()) => Ok(ToolResult::ok(format!("Job '{job_id}' updated"))),
+            Err(e) => Ok(ToolResult::err(format!("Failed to update job: {e}"))),
         }
     }
 
@@ -462,6 +577,65 @@ mod tests {
         let second = tool.execute(args).await.unwrap();
         assert!(!second.success);
         assert!(second.output.contains("already exists"));
+    }
+
+    // UPD.9 — Update job via tool succeeds
+    #[tokio::test]
+    async fn scheduler_tool_update_job() {
+        let (_dir, tool) = setup().await;
+
+        let create_result = tool
+            .execute(json!({
+                "action": "create",
+                "name": "update-me",
+                "schedule_type": "interval",
+                "interval_secs": 300,
+                "payload_type": "heartbeat"
+            }))
+            .await
+            .unwrap();
+
+        let id = create_result
+            .output
+            .strip_prefix("Job created with ID: ")
+            .unwrap();
+
+        let result = tool
+            .execute(json!({
+                "action": "update",
+                "job_id": id,
+                "name": "updated-name",
+                "schedule_type": "interval",
+                "interval_secs": 600,
+                "payload_type": "notify",
+                "message": "updated msg"
+            }))
+            .await
+            .unwrap();
+
+        assert!(result.success);
+        assert!(result.output.contains("updated"));
+    }
+
+    // UPD.10 — Update nonexistent job returns error
+    #[tokio::test]
+    async fn scheduler_tool_update_nonexistent() {
+        let (_dir, tool) = setup().await;
+
+        let result = tool
+            .execute(json!({
+                "action": "update",
+                "job_id": "nonexistent",
+                "name": "test",
+                "schedule_type": "interval",
+                "interval_secs": 60,
+                "payload_type": "heartbeat"
+            }))
+            .await
+            .unwrap();
+
+        assert!(!result.success);
+        assert!(result.output.contains("not found"));
     }
 
     // 17.8 — Tool name/description/schema validation

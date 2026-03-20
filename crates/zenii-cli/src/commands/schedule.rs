@@ -106,6 +106,61 @@ pub async fn create(client: &ZeniiClient, args: CreateJobArgs<'_>) -> Result<(),
     Ok(())
 }
 
+pub async fn update(
+    client: &ZeniiClient,
+    id: &str,
+    args: CreateJobArgs<'_>,
+) -> Result<(), String> {
+    let schedule = match args.schedule_type {
+        "interval" => {
+            let secs = args
+                .interval_secs
+                .ok_or("--interval-secs required for interval schedule")?;
+            json!({ "type": "interval", "secs": secs })
+        }
+        "cron" => {
+            let expr = args
+                .cron_expr
+                .ok_or("--cron-expr required for cron schedule")?;
+            json!({ "type": "cron", "expr": expr })
+        }
+        _ => return Err(format!("Unknown schedule type: {}", args.schedule_type)),
+    };
+
+    let payload = match args.payload_type {
+        "heartbeat" => json!({ "type": "heartbeat" }),
+        "notify" => {
+            let msg = args
+                .message
+                .ok_or("--message required for notify payload")?;
+            json!({ "type": "notify", "message": msg })
+        }
+        "agent_turn" => {
+            let p = args
+                .prompt
+                .ok_or("--prompt required for agent_turn payload")?;
+            json!({ "type": "agent_turn", "prompt": p })
+        }
+        _ => return Err(format!("Unknown payload type: {}", args.payload_type)),
+    };
+
+    let body = json!({
+        "id": id,
+        "name": args.name,
+        "schedule": schedule,
+        "session_target": "main",
+        "payload": payload,
+        "active_hours": null,
+        "delete_after_run": args.one_shot,
+    });
+
+    let _result: serde_json::Value = client
+        .put(&format!("/scheduler/jobs/{id}"), &body)
+        .await?;
+    println!("Job {id} updated.");
+    Ok(())
+}
+
 pub async fn toggle(client: &ZeniiClient, id: &str) -> Result<(), String> {
     let result: serde_json::Value = client
         .put(&format!("/scheduler/jobs/{id}/toggle"), &json!({}))
