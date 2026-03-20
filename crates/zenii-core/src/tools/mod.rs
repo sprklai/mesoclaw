@@ -17,6 +17,8 @@ pub mod web_search;
 pub mod channel_tool;
 #[cfg(feature = "scheduler")]
 pub mod scheduler_tool;
+#[cfg(feature = "workflows")]
+pub mod workflow_tool;
 
 pub use registry::ToolRegistry;
 pub use traits::*;

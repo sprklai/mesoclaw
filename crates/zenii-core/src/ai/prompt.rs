@@ -745,6 +745,59 @@ impl PromptPlugin for SchedulerContextPlugin {
     }
 }
 
+/// Contributes workflow state (always active — no domain gating).
+#[cfg(feature = "workflows")]
+pub struct WorkflowContextPlugin {
+    registry: Arc<crate::workflows::WorkflowRegistry>,
+}
+
+#[cfg(feature = "workflows")]
+impl WorkflowContextPlugin {
+    pub fn new(registry: Arc<crate::workflows::WorkflowRegistry>) -> Self {
+        Self { registry }
+    }
+}
+
+#[cfg(feature = "workflows")]
+#[async_trait]
+impl PromptPlugin for WorkflowContextPlugin {
+    fn id(&self) -> &str {
+        "workflows"
+    }
+
+    fn domains(&self) -> Vec<ContextDomain> {
+        vec![] // Always active — LLM decides relevance semantically
+    }
+
+    async fn contribute(&self, _request: &AssemblyRequest) -> Result<Vec<PromptFragment>> {
+        let workflows = self.registry.list();
+        if workflows.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut lines = vec![format!("### Workflows ({} available)", workflows.len())];
+        for wf in &workflows {
+            let step_names: Vec<&str> = wf.steps.iter().map(|s| s.name.as_str()).collect();
+            let schedule_info = match &wf.schedule {
+                Some(expr) => format!(", scheduled: {expr}"),
+                None => ", manual only".into(),
+            };
+            lines.push(format!(
+                "- {}: {} steps ({}){schedule_info}",
+                wf.id,
+                wf.steps.len(),
+                step_names.join(" → ")
+            ));
+        }
+
+        Ok(vec![PromptFragment {
+            section: PromptSection::DynamicContext,
+            content: lines.join("\n"),
+            priority: 5,
+        }])
+    }
+}
+
 // ============================================================================
 // Tests
 // ============================================================================

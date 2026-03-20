@@ -589,8 +589,55 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
             .unwrap_or_else(|e| tracing::warn!("Failed to register scheduler tool: {e}"));
     }
 
+    // 14a. Workflow engine (feature-gated) — must be before prompt strategy so plugin can reference it
+    #[cfg(feature = "workflows")]
+    let workflow_registry_init = {
+        let wf_dir = config
+            .workflow_dir
+            .as_ref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| data_dir.join("workflows"));
+        match crate::workflows::WorkflowRegistry::new(wf_dir) {
+            Ok(r) => {
+                info!(
+                    "Workflow registry initialized ({} workflows)",
+                    r.list().len()
+                );
+                Some(Arc::new(r))
+            }
+            Err(e) => {
+                tracing::warn!("Workflow registry init failed: {e}");
+                None
+            }
+        }
+    };
+    #[cfg(feature = "workflows")]
+    let workflow_executor_init = Some(Arc::new(crate::workflows::executor::WorkflowExecutor::new(
+        pool.clone(),
+        config.workflow_max_steps,
+        config.workflow_step_timeout_secs,
+        config.workflow_step_max_retries,
+    )));
+
+    // Register WorkflowTool (post-Arc, DashMap allows it)
+    #[cfg(feature = "workflows")]
+    if let (Some(wf_reg), Some(wf_exec)) =
+        (&workflow_registry_init, &workflow_executor_init)
+    {
+        tools
+            .register(Arc::new(crate::tools::workflow_tool::WorkflowTool::new(
+                wf_reg.clone(),
+                wf_exec.clone(),
+                tools.clone(),
+                event_bus.clone(),
+                #[cfg(feature = "scheduler")]
+                scheduler.clone(),
+            )))
+            .unwrap_or_else(|e| tracing::warn!("Failed to register workflows tool: {e}"));
+    }
+
     // 14b. Prompt Strategy (compact or legacy based on config)
-    // Must be after channels + scheduler so plugins can reference them.
+    // Must be after channels + scheduler + workflows so plugins can reference them.
     #[cfg(feature = "ai")]
     let prompt_strategy: Arc<dyn PromptStrategy> = if config.prompt_compact_identity {
         let base = Arc::new(prompt::CompactStrategy::new(
@@ -633,6 +680,14 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         if let Some(ref sched) = scheduler {
             registry
                 .register_plugin(Arc::new(prompt::SchedulerContextPlugin::new(sched.clone())))
+                .await;
+        }
+
+        // Feature-gated: workflows
+        #[cfg(feature = "workflows")]
+        if let Some(wf_reg) = &workflow_registry_init {
+            registry
+                .register_plugin(Arc::new(prompt::WorkflowContextPlugin::new(wf_reg.clone())))
                 .await;
         }
 
@@ -763,36 +818,6 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         crate::ai::delegation::DelegationConfig::from_app_config(&config),
     ));
     info!("Delegation coordinator initialized");
-
-    // 18. Workflow engine (feature-gated)
-    #[cfg(feature = "workflows")]
-    let workflow_registry_init = {
-        let wf_dir = config
-            .workflow_dir
-            .as_ref()
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| data_dir.join("workflows"));
-        match crate::workflows::WorkflowRegistry::new(wf_dir) {
-            Ok(r) => {
-                info!(
-                    "Workflow registry initialized ({} workflows)",
-                    r.list().len()
-                );
-                Some(Arc::new(r))
-            }
-            Err(e) => {
-                tracing::warn!("Workflow registry init failed: {e}");
-                None
-            }
-        }
-    };
-    #[cfg(feature = "workflows")]
-    let workflow_executor_init = Some(Arc::new(crate::workflows::executor::WorkflowExecutor::new(
-        pool.clone(),
-        config.workflow_max_steps,
-        config.workflow_step_timeout_secs,
-        config.workflow_step_max_retries,
-    )));
 
     info!("All services initialized");
 
@@ -967,6 +992,10 @@ mod tests {
         #[cfg(feature = "scheduler")]
         {
             expected += 1; // scheduler
+        }
+        #[cfg(feature = "workflows")]
+        {
+            expected += 1; // workflows
         }
         assert_eq!(services.tools.len(), expected);
     }
