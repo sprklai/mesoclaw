@@ -4,6 +4,8 @@ pub mod task;
 
 pub use coordinator::Coordinator;
 pub use task::{DelegationResult, DelegationTask, TaskResult, TaskStatus};
+// Re-export from event_bus for convenience
+pub use crate::event_bus::DelegationAgentInfo;
 
 use serde::{Deserialize, Serialize};
 

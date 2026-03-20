@@ -30,12 +30,49 @@ export interface WsToolResultMessage {
   duration_ms: number;
 }
 
+export interface WsDelegationStartedMessage {
+  type: "delegation_started";
+  delegation_id: string;
+  agent_count: number;
+  agents: Array<{ id: string; description: string }>;
+}
+
+export interface WsAgentProgressMessage {
+  type: "agent_progress";
+  delegation_id: string;
+  agent_id: string;
+  tool_uses: number;
+  tokens_used: number;
+  current_activity: string;
+}
+
+export interface WsAgentCompletedMessage {
+  type: "agent_completed";
+  delegation_id: string;
+  agent_id: string;
+  status: string;
+  duration_ms: number;
+  tool_uses: number;
+  tokens_used: number;
+}
+
+export interface WsDelegationCompletedMessage {
+  type: "delegation_completed";
+  delegation_id: string;
+  total_duration_ms: number;
+  total_tokens: number;
+}
+
 export type WsMessage =
   | WsTextMessage
   | WsDoneMessage
   | WsErrorMessage
   | WsToolCallMessage
-  | WsToolResultMessage;
+  | WsToolResultMessage
+  | WsDelegationStartedMessage
+  | WsAgentProgressMessage
+  | WsAgentCompletedMessage
+  | WsDelegationCompletedMessage;
 
 export interface ChatStreamCallbacks {
   onToken: (content: string) => void;
@@ -46,6 +83,30 @@ export interface ChatStreamCallbacks {
     output: string,
     success: boolean,
     durationMs: number,
+  ) => void;
+  onDelegationStarted?: (
+    delegationId: string,
+    agents: Array<{ id: string; description: string }>,
+  ) => void;
+  onAgentProgress?: (
+    delegationId: string,
+    agentId: string,
+    toolUses: number,
+    tokensUsed: number,
+    activity: string,
+  ) => void;
+  onAgentCompleted?: (
+    delegationId: string,
+    agentId: string,
+    status: string,
+    durationMs: number,
+    toolUses: number,
+    tokensUsed: number,
+  ) => void;
+  onDelegationCompleted?: (
+    delegationId: string,
+    totalDurationMs: number,
+    totalTokens: number,
   ) => void;
   onDone: () => void;
   onError: (error: string) => void;
@@ -93,6 +154,38 @@ export function createChatStream(
             msg.output,
             msg.success,
             msg.duration_ms,
+          );
+          break;
+        case "delegation_started":
+          callbacks.onDelegationStarted?.(
+            msg.delegation_id,
+            msg.agents,
+          );
+          break;
+        case "agent_progress":
+          callbacks.onAgentProgress?.(
+            msg.delegation_id,
+            msg.agent_id,
+            msg.tool_uses,
+            msg.tokens_used,
+            msg.current_activity,
+          );
+          break;
+        case "agent_completed":
+          callbacks.onAgentCompleted?.(
+            msg.delegation_id,
+            msg.agent_id,
+            msg.status,
+            msg.duration_ms,
+            msg.tool_uses,
+            msg.tokens_used,
+          );
+          break;
+        case "delegation_completed":
+          callbacks.onDelegationCompleted?.(
+            msg.delegation_id,
+            msg.total_duration_ms,
+            msg.total_tokens,
           );
           break;
         case "done":

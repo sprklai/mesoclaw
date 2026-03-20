@@ -24,10 +24,52 @@ pub enum WsInbound {
         success: bool,
         duration_ms: u64,
     },
+    #[serde(rename = "delegation_started")]
+    DelegationStarted {
+        delegation_id: String,
+        #[allow(dead_code)]
+        agent_count: usize,
+        agents: Vec<AgentInfo>,
+    },
+    #[serde(rename = "agent_progress")]
+    AgentProgress {
+        #[allow(dead_code)]
+        delegation_id: String,
+        agent_id: String,
+        tool_uses: u32,
+        tokens_used: u64,
+        current_activity: String,
+    },
+    #[serde(rename = "agent_completed")]
+    AgentCompleted {
+        #[allow(dead_code)]
+        delegation_id: String,
+        agent_id: String,
+        status: String,
+        duration_ms: u64,
+        tool_uses: u32,
+        tokens_used: u64,
+    },
+    #[serde(rename = "delegation_completed")]
+    DelegationCompleted {
+        #[allow(dead_code)]
+        delegation_id: String,
+        #[allow(dead_code)]
+        total_duration_ms: u64,
+        #[allow(dead_code)]
+        total_tokens: u64,
+    },
     #[serde(rename = "done")]
     Done,
     #[serde(rename = "error")]
     Error { error: String },
+}
+
+/// Agent info received in delegation_started messages.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AgentInfo {
+    pub id: String,
+    pub description: String,
 }
 
 /// All events the TUI main loop processes.

@@ -44,6 +44,8 @@ pub struct TaskResult {
     pub duration_ms: u64,
     pub error: Option<String>,
     pub session_id: String,
+    #[serde(default)]
+    pub tool_uses: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +126,7 @@ mod tests {
             duration_ms: 500,
             error: Some("timeout".into()),
             session_id: "s1".into(),
+            tool_uses: 0,
         };
         let json = serde_json::to_string(&result).unwrap();
         let back: TaskResult = serde_json::from_str(&json).unwrap();
@@ -147,6 +150,7 @@ mod tests {
             duration_ms: 500,
             error: None,
             session_id: "s1".into(),
+            tool_uses: 3,
         };
         let r2 = TaskResult {
             task_id: "t2".into(),
@@ -161,6 +165,7 @@ mod tests {
             duration_ms: 700,
             error: None,
             session_id: "s2".into(),
+            tool_uses: 5,
         };
         let total = r1.usage.clone() + r2.usage.clone();
         let result = DelegationResult {

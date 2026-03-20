@@ -1,12 +1,20 @@
 use std::sync::Arc;
 
+use tokio::sync::broadcast;
+use tracing::warn;
+
+use crate::ai::adapter::{ToolCallEvent, ToolCallPhase};
 use crate::ai::agent::{TokenUsage, ZeniiAgent};
 use crate::ai::delegation::task::{DelegationTask, TaskResult, TaskStatus};
+use crate::event_bus::EventBus;
 
 pub struct SubAgent {
     task: DelegationTask,
     agent: Arc<ZeniiAgent>,
     session_id: String,
+    delegation_id: String,
+    event_bus: Arc<dyn EventBus>,
+    tool_rx: broadcast::Receiver<ToolCallEvent>,
 }
 
 impl SubAgent {
@@ -16,6 +24,7 @@ impl SubAgent {
         task: DelegationTask,
         state: &crate::gateway::state::AppState,
         surface: &str,
+        delegation_id: String,
     ) -> crate::Result<Self> {
         let desc_preview = &task.description[..task.description.len().min(80)];
         let session = state
@@ -42,24 +51,84 @@ impl SubAgent {
             )
         };
 
+        // Create per-agent broadcast channel for tool events
+        let (tool_tx, tool_rx) = broadcast::channel::<ToolCallEvent>(128);
+
         let agent =
-            crate::ai::resolve_agent_with_tools(None, state, None, None, Some(tools), surface)
+            crate::ai::resolve_agent_with_tools(None, state, Some(tool_tx), None, Some(tools), surface)
                 .await?;
 
         Ok(Self {
             task,
             agent,
             session_id: session.id,
+            delegation_id,
+            event_bus: state.event_bus.clone(),
+            tool_rx,
         })
     }
 
-    /// Execute the sub-agent's task with timeout.
+    /// Execute the sub-agent's task with timeout and tool monitoring.
     /// Always returns a TaskResult (never errors at the outer level).
     pub async fn execute(self) -> TaskResult {
         let start = std::time::Instant::now();
         let timeout = std::time::Duration::from_secs(self.task.timeout_secs);
 
-        match tokio::time::timeout(timeout, self.agent.prompt(&self.task.description)).await {
+        // Shared tool counter for the monitoring task
+        let tool_uses = Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let tool_uses_clone = tool_uses.clone();
+
+        // Spawn concurrent tool monitoring task
+        let delegation_id = self.delegation_id.clone();
+        let agent_id = self.task.id.clone();
+        let event_bus = self.event_bus.clone();
+        let mut monitor_rx = self.tool_rx;
+
+        let monitor_handle = tokio::spawn(async move {
+            let mut last_emit = tokio::time::Instant::now();
+            let throttle = std::time::Duration::from_secs(1);
+
+            loop {
+                match monitor_rx.recv().await {
+                    Ok(evt) => {
+                        match &evt.phase {
+                            ToolCallPhase::Started { .. } => {
+                                let current = tool_uses_clone.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                                // Throttle progress events to max 1/sec
+                                if last_emit.elapsed() >= throttle {
+                                    let _ = event_bus.publish(
+                                        crate::event_bus::AppEvent::SubAgentProgress {
+                                            delegation_id: delegation_id.clone(),
+                                            agent_id: agent_id.clone(),
+                                            tool_uses: current,
+                                            tokens_used: 0, // Not available per-tool
+                                            current_activity: format!("{}: started", evt.tool_name),
+                                        },
+                                    );
+                                    last_emit = tokio::time::Instant::now();
+                                }
+                            }
+                            ToolCallPhase::Completed { .. } | ToolCallPhase::Cached { .. } => {
+                                // Already counted on Started
+                            }
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        warn!("Sub-agent tool monitor lagged by {n} messages");
+                    }
+                }
+            }
+        });
+
+        let result = tokio::time::timeout(timeout, self.agent.prompt(&self.task.description)).await;
+
+        // Stop the monitor
+        monitor_handle.abort();
+
+        let final_tool_uses = tool_uses.load(std::sync::atomic::Ordering::Relaxed);
+
+        match result {
             Ok(Ok(response)) => TaskResult {
                 task_id: self.task.id,
                 status: TaskStatus::Completed,
@@ -68,6 +137,7 @@ impl SubAgent {
                 duration_ms: start.elapsed().as_millis() as u64,
                 error: None,
                 session_id: self.session_id,
+                tool_uses: final_tool_uses,
             },
             Ok(Err(e)) => TaskResult {
                 task_id: self.task.id,
@@ -77,6 +147,7 @@ impl SubAgent {
                 duration_ms: start.elapsed().as_millis() as u64,
                 error: Some(e.to_string()),
                 session_id: self.session_id,
+                tool_uses: final_tool_uses,
             },
             Err(_) => TaskResult {
                 task_id: self.task.id,
@@ -86,6 +157,7 @@ impl SubAgent {
                 duration_ms: start.elapsed().as_millis() as u64,
                 error: Some("task timed out".into()),
                 session_id: self.session_id,
+                tool_uses: final_tool_uses,
             },
         }
     }
@@ -136,7 +208,7 @@ mod tests {
             depends_on: vec![],
         };
 
-        let sub = SubAgent::new(task, &state, "desktop").await.unwrap();
+        let sub = SubAgent::new(task, &state, "desktop", "d-test".into()).await.unwrap();
         assert!(!sub.session_id().is_empty());
 
         let session = state
@@ -174,7 +246,7 @@ mod tests {
             depends_on: vec![],
         };
 
-        let sub = SubAgent::new(task, &state, "desktop").await;
+        let sub = SubAgent::new(task, &state, "desktop", "d-test".into()).await;
         assert!(sub.is_ok(), "SubAgent with tool allowlist should succeed");
     }
 
@@ -193,7 +265,7 @@ mod tests {
             depends_on: vec![],
         };
 
-        let sub = SubAgent::new(task, &state, "desktop").await;
+        let sub = SubAgent::new(task, &state, "desktop", "d-test".into()).await;
         assert!(sub.is_ok(), "SubAgent with no allowlist should succeed");
     }
 

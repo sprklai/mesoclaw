@@ -30,9 +30,11 @@
 		type PromptInputMessage
 	} from '$lib/components/ai-elements/prompt-input';
 	import { Copy, RefreshCw } from '@lucide/svelte';
+	import AgentTree from '$lib/components/AgentTree.svelte';
 	import { messagesStore } from '$lib/stores/messages.svelte';
 	import { sessionsStore } from '$lib/stores/sessions.svelte';
 	import { providersStore } from '$lib/stores/providers.svelte';
+	import { delegationStore } from '$lib/stores/delegation.svelte';
 	import { createChatStream } from '$lib/api/websocket';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
@@ -119,8 +121,21 @@
 				onToolResult(callId, _toolName, output, success, durationMs) {
 					messagesStore.completeToolCall(callId, output, success, durationMs);
 				},
+				onDelegationStarted(delegationId, agents) {
+					delegationStore.startDelegation(delegationId, agents);
+				},
+				onAgentProgress(delegationId, agentId, toolUses, tokensUsed, activity) {
+					delegationStore.updateAgent(agentId, toolUses, tokensUsed, activity);
+				},
+				onAgentCompleted(delegationId, agentId, status, durationMs, toolUses, tokensUsed) {
+					delegationStore.completeAgent(agentId, status, durationMs, toolUses, tokensUsed);
+				},
+				onDelegationCompleted() {
+					delegationStore.completeDelegation();
+				},
 				onDone() {
 					activeWs = null;
+					delegationStore.clear();
 					messagesStore.finishStream(capturedSessionId);
 					if (isFirstMessage) {
 						sessionsStore.generateTitle(capturedSessionId, capturedModel);
@@ -128,6 +143,7 @@
 				},
 				onError(error) {
 					activeWs = null;
+					delegationStore.clear();
 					const friendlyError =
 						error.toLowerCase().includes('no agent configured') ||
 						error.toLowerCase().includes('no provider')
@@ -211,6 +227,10 @@
 							{/if}
 						</Message>
 					{/each}
+
+					{#if delegationStore.active && delegationStore.delegation}
+						<AgentTree delegation={delegationStore.delegation} />
+					{/if}
 
 					{#if messagesStore.streaming}
 						<Message from="assistant">

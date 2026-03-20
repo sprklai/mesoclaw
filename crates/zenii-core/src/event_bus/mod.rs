@@ -3,6 +3,13 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
+/// Agent info included in delegation lifecycle events.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DelegationAgentInfo {
+    pub id: String,
+    pub description: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AppEvent {
     ConfigUpdated,
@@ -47,18 +54,40 @@ pub enum AppEvent {
         status: String,
         error: Option<String>,
     },
+    DelegationStarted {
+        delegation_id: String,
+        agents: Vec<DelegationAgentInfo>,
+    },
     SubAgentSpawned {
+        delegation_id: String,
         agent_id: String,
         task: String,
     },
+    SubAgentProgress {
+        delegation_id: String,
+        agent_id: String,
+        tool_uses: u32,
+        tokens_used: u64,
+        current_activity: String,
+    },
     SubAgentCompleted {
+        delegation_id: String,
         agent_id: String,
         status: String,
         duration_ms: u64,
+        tool_uses: u32,
+        tokens_used: u64,
     },
     SubAgentFailed {
+        delegation_id: String,
         agent_id: String,
         error: String,
+        tool_uses: u32,
+    },
+    DelegationCompleted {
+        delegation_id: String,
+        total_duration_ms: u64,
+        total_tokens: u64,
     },
     WorkflowStarted {
         workflow_id: String,
@@ -335,14 +364,15 @@ mod tests {
     #[test]
     fn sub_agent_spawned_event_serde() {
         let event = AppEvent::SubAgentSpawned {
+            delegation_id: "d1".into(),
             agent_id: "t1".into(),
             task: "research topic".into(),
         };
         let json = serde_json::to_string(&event).unwrap();
         let back: AppEvent = serde_json::from_str(&json).unwrap();
         assert!(
-            matches!(back, AppEvent::SubAgentSpawned { agent_id, task }
-                if agent_id == "t1" && task == "research topic")
+            matches!(back, AppEvent::SubAgentSpawned { delegation_id, agent_id, task }
+                if delegation_id == "d1" && agent_id == "t1" && task == "research topic")
         );
     }
 
@@ -350,15 +380,19 @@ mod tests {
     #[test]
     fn sub_agent_completed_event_serde() {
         let event = AppEvent::SubAgentCompleted {
+            delegation_id: "d1".into(),
             agent_id: "t1".into(),
             status: "completed".into(),
             duration_ms: 1500,
+            tool_uses: 5,
+            tokens_used: 12300,
         };
         let json = serde_json::to_string(&event).unwrap();
         let back: AppEvent = serde_json::from_str(&json).unwrap();
         assert!(
-            matches!(back, AppEvent::SubAgentCompleted { agent_id, status, duration_ms }
-                if agent_id == "t1" && status == "completed" && duration_ms == 1500)
+            matches!(back, AppEvent::SubAgentCompleted { delegation_id, agent_id, status, duration_ms, tool_uses, tokens_used }
+                if delegation_id == "d1" && agent_id == "t1" && status == "completed"
+                && duration_ms == 1500 && tool_uses == 5 && tokens_used == 12300)
         );
     }
 
@@ -366,15 +400,77 @@ mod tests {
     #[test]
     fn sub_agent_failed_event_serde() {
         let event = AppEvent::SubAgentFailed {
+            delegation_id: "d1".into(),
             agent_id: "t2".into(),
             error: "task timed out".into(),
+            tool_uses: 3,
         };
         let json = serde_json::to_string(&event).unwrap();
         let back: AppEvent = serde_json::from_str(&json).unwrap();
         assert!(
-            matches!(back, AppEvent::SubAgentFailed { agent_id, error }
-                if agent_id == "t2" && error == "task timed out")
+            matches!(back, AppEvent::SubAgentFailed { delegation_id, agent_id, error, tool_uses }
+                if delegation_id == "d1" && agent_id == "t2" && error == "task timed out" && tool_uses == 3)
         );
+    }
+
+    // D.1 — DelegationStarted event serde round-trip
+    #[test]
+    fn delegation_started_event_serde() {
+        let event = AppEvent::DelegationStarted {
+            delegation_id: "d1".into(),
+            agents: vec![
+                DelegationAgentInfo { id: "t1".into(), description: "Research web".into() },
+                DelegationAgentInfo { id: "t2".into(), description: "Analyze code".into() },
+            ],
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(back, AppEvent::DelegationStarted { delegation_id, agents }
+            if delegation_id == "d1" && agents.len() == 2));
+    }
+
+    // D.2 — SubAgentProgress event serde round-trip
+    #[test]
+    fn sub_agent_progress_event_serde() {
+        let event = AppEvent::SubAgentProgress {
+            delegation_id: "d1".into(),
+            agent_id: "t1".into(),
+            tool_uses: 5,
+            tokens_used: 12300,
+            current_activity: "WebSearch: rust frameworks".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(back, AppEvent::SubAgentProgress { delegation_id, agent_id, tool_uses, tokens_used, current_activity }
+            if delegation_id == "d1" && agent_id == "t1" && tool_uses == 5
+            && tokens_used == 12300 && current_activity == "WebSearch: rust frameworks"));
+    }
+
+    // D.3 — DelegationCompleted event serde round-trip
+    #[test]
+    fn delegation_completed_event_serde() {
+        let event = AppEvent::DelegationCompleted {
+            delegation_id: "d1".into(),
+            total_duration_ms: 5000,
+            total_tokens: 45000,
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(back, AppEvent::DelegationCompleted { delegation_id, total_duration_ms, total_tokens }
+            if delegation_id == "d1" && total_duration_ms == 5000 && total_tokens == 45000));
+    }
+
+    // D.4 — DelegationAgentInfo serde round-trip
+    #[test]
+    fn delegation_agent_info_serde() {
+        let info = DelegationAgentInfo {
+            id: "t1".into(),
+            description: "Research web frameworks".into(),
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let back: DelegationAgentInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.id, "t1");
+        assert_eq!(back.description, "Research web frameworks");
     }
 
     #[tokio::test]

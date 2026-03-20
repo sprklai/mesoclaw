@@ -16,6 +16,12 @@ pub struct Theme {
     pub help_overlay: Style,
     pub connection_ok: Style,
     pub connection_err: Style,
+    pub agent_header: Style,
+    pub agent_running: Style,
+    pub agent_complete: Style,
+    pub agent_failed: Style,
+    pub agent_activity: Style,
+    pub agent_connector: Style,
 }
 
 impl Default for Theme {
@@ -38,6 +44,14 @@ impl Default for Theme {
             help_overlay: Style::default().bg(Color::Black).fg(Color::White),
             connection_ok: Style::default().fg(Color::Green),
             connection_err: Style::default().fg(Color::Red),
+            agent_header: Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+            agent_running: Style::default().fg(Color::Yellow),
+            agent_complete: Style::default().fg(Color::Green),
+            agent_failed: Style::default().fg(Color::Red),
+            agent_activity: Style::default().fg(Color::DarkGray),
+            agent_connector: Style::default().fg(Color::DarkGray),
         }
     }
 }

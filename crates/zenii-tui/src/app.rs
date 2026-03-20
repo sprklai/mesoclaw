@@ -251,6 +251,34 @@ pub struct PluginListItem {
     pub skills_count: usize,
 }
 
+/// Display status for a single sub-agent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AgentDisplayStatus {
+    Pending,
+    Running,
+    Completed { duration_ms: u64 },
+    Failed { error: String },
+}
+
+/// Per-agent display state.
+#[derive(Debug, Clone)]
+pub struct AgentState {
+    pub id: String,
+    pub description: String,
+    pub tool_uses: u32,
+    pub tokens_used: u64,
+    pub current_activity: String,
+    pub status: AgentDisplayStatus,
+}
+
+/// Active delegation display state.
+#[derive(Debug, Clone)]
+pub struct DelegationState {
+    pub delegation_id: String,
+    pub agents: Vec<AgentState>,
+    pub start_time: std::time::Instant,
+}
+
 /// Top-level application state.
 pub struct App {
     pub mode: AppMode,
@@ -295,6 +323,7 @@ pub struct App {
     pub plugin_install_local: bool,
     pub plugin_error: Option<String>,
     pub plugin_loading: bool,
+    pub delegation: Option<DelegationState>,
 }
 
 impl App {
@@ -342,6 +371,7 @@ impl App {
             plugin_install_local: false,
             plugin_error: None,
             plugin_loading: false,
+            delegation: None,
         }
     }
 
@@ -477,6 +507,58 @@ impl App {
         }
         self.chat_status = ChatStatus::Idle;
         self.scroll_offset = usize::MAX;
+    }
+
+    pub fn start_delegation(&mut self, delegation_id: String, agents: Vec<(String, String)>) {
+        self.delegation = Some(DelegationState {
+            delegation_id,
+            agents: agents
+                .into_iter()
+                .map(|(id, desc)| AgentState {
+                    id,
+                    description: desc,
+                    tool_uses: 0,
+                    tokens_used: 0,
+                    current_activity: String::new(),
+                    status: AgentDisplayStatus::Pending,
+                })
+                .collect(),
+            start_time: std::time::Instant::now(),
+        });
+    }
+
+    pub fn update_agent(&mut self, agent_id: &str, tool_uses: u32, tokens: u64, activity: &str) {
+        if let Some(ref mut d) = self.delegation
+            && let Some(agent) = d.agents.iter_mut().find(|a| a.id == agent_id)
+        {
+            agent.tool_uses = tool_uses;
+            agent.tokens_used = tokens;
+            agent.current_activity = activity.to_string();
+            agent.status = AgentDisplayStatus::Running;
+        }
+    }
+
+    pub fn complete_agent(
+        &mut self,
+        agent_id: &str,
+        status: &str,
+        duration_ms: u64,
+        tool_uses: u32,
+        tokens: u64,
+    ) {
+        if let Some(ref mut d) = self.delegation
+            && let Some(agent) = d.agents.iter_mut().find(|a| a.id == agent_id)
+        {
+            agent.tool_uses = tool_uses;
+            agent.tokens_used = tokens;
+            agent.status = if status == "failed" {
+                AgentDisplayStatus::Failed {
+                    error: "task failed".into(),
+                }
+            } else {
+                AgentDisplayStatus::Completed { duration_ms }
+            };
+        }
     }
 
     /// Clamp scroll offset to valid range given total rendered lines.

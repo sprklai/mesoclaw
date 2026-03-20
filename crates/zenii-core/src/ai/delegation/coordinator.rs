@@ -6,6 +6,7 @@ use tracing::{info, warn};
 use crate::ai::agent::TokenUsage;
 use crate::ai::delegation::task::{DelegationResult, DelegationTask, TaskResult, TaskStatus};
 use crate::ai::delegation::DelegationConfig;
+use crate::event_bus::DelegationAgentInfo;
 use crate::{Result, ZeniiError};
 
 pub struct Coordinator {
@@ -147,6 +148,20 @@ impl Coordinator {
             "Starting delegation"
         );
 
+        // Emit DelegationStarted with all agent info
+        let _ = state.event_bus.publish(
+            crate::event_bus::AppEvent::DelegationStarted {
+                delegation_id: delegation_id.clone(),
+                agents: tasks
+                    .iter()
+                    .map(|t| DelegationAgentInfo {
+                        id: t.id.clone(),
+                        description: t.description.clone(),
+                    })
+                    .collect(),
+            },
+        );
+
         // Execute tasks in dependency waves
         let mut completed: HashMap<String, TaskResult> = HashMap::new();
         let mut remaining: Vec<DelegationTask> = tasks;
@@ -174,6 +189,7 @@ impl Coordinator {
                             duration_ms: 0,
                             error: Some("unresolved dependencies".into()),
                             session_id: String::new(),
+                            tool_uses: 0,
                         },
                     );
                 }
@@ -187,12 +203,13 @@ impl Coordinator {
                 let task_id = task.id.clone();
                 let _ = state.event_bus.publish(
                     crate::event_bus::AppEvent::SubAgentSpawned {
+                        delegation_id: delegation_id.clone(),
                         agent_id: task_id.clone(),
                         task: task.description.clone(),
                     },
                 );
 
-                match SubAgent::new(task, state, surface).await {
+                match SubAgent::new(task, state, surface, delegation_id.clone()).await {
                     Ok(sub) => {
                         let abort_handle = join_set.spawn(sub.execute());
                         all_handles.push(abort_handle);
@@ -209,6 +226,7 @@ impl Coordinator {
                                 duration_ms: 0,
                                 error: Some(e.to_string()),
                                 session_id: String::new(),
+                                tool_uses: 0,
                             },
                         );
                     }
@@ -223,14 +241,19 @@ impl Coordinator {
                     Ok(task_result) => {
                         let event = if task_result.status == TaskStatus::Completed {
                             crate::event_bus::AppEvent::SubAgentCompleted {
+                                delegation_id: delegation_id.clone(),
                                 agent_id: task_result.task_id.clone(),
                                 status: "completed".into(),
                                 duration_ms: task_result.duration_ms,
+                                tool_uses: task_result.tool_uses,
+                                tokens_used: task_result.usage.total_tokens,
                             }
                         } else {
                             crate::event_bus::AppEvent::SubAgentFailed {
+                                delegation_id: delegation_id.clone(),
                                 agent_id: task_result.task_id.clone(),
                                 error: task_result.error.clone().unwrap_or_default(),
+                                tool_uses: task_result.tool_uses,
                             }
                         };
                         let _ = state.event_bus.publish(event);
@@ -250,9 +273,19 @@ impl Coordinator {
             total_usage += r.usage.clone();
         }
 
+        let total_duration_ms = start.elapsed().as_millis() as u64;
+
+        // Emit DelegationCompleted
+        let _ = state.event_bus.publish(
+            crate::event_bus::AppEvent::DelegationCompleted {
+                delegation_id: delegation_id.clone(),
+                total_duration_ms,
+                total_tokens: total_usage.total_tokens,
+            },
+        );
+
         let results: Vec<TaskResult> = completed.into_values().collect();
         let aggregated = self.aggregate(prompt, &results, &agent).await?;
-        let total_duration_ms = start.elapsed().as_millis() as u64;
 
         Ok(DelegationResult {
             id: delegation_id,

@@ -6,8 +6,9 @@ use ratatui::widgets::{
     Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
 };
 
-use crate::app::{App, AppMode, ChatStatus};
+use crate::app::{AgentDisplayStatus, App, AppMode, ChatStatus, DelegationState};
 use crate::markdown;
+use crate::theme::Theme;
 
 pub fn render_chat(frame: &mut Frame, area: Rect, app: &App) {
     let is_active = matches!(app.mode, AppMode::Chat | AppMode::Input);
@@ -84,6 +85,12 @@ pub fn render_chat(frame: &mut Frame, area: Rect, app: &App) {
         lines.push(Line::from("")); // spacing between messages
     }
 
+    // Agent delegation tree (above streaming buffer)
+    if let Some(ref delegation) = app.delegation {
+        lines.extend(render_delegation_tree(delegation, &app.theme));
+        lines.push(Line::from("")); // spacing
+    }
+
     // Streaming buffer
     if !app.streaming_buffer.is_empty() {
         lines.push(Line::from(Span::styled(
@@ -136,4 +143,83 @@ pub fn render_chat(frame: &mut Frame, area: Rect, app: &App) {
             &mut scrollbar_state,
         );
     }
+}
+
+fn format_tokens(tokens: u64) -> String {
+    if tokens >= 1_000_000 {
+        format!("{:.1}M tokens", tokens as f64 / 1_000_000.0)
+    } else if tokens >= 1_000 {
+        format!("{:.1}k tokens", tokens as f64 / 1_000.0)
+    } else {
+        format!("{tokens} tokens")
+    }
+}
+
+fn render_delegation_tree<'a>(delegation: &DelegationState, theme: &Theme) -> Vec<Line<'a>> {
+    let mut lines = Vec::new();
+    let elapsed = delegation.start_time.elapsed().as_secs();
+    let agent_count = delegation.agents.len();
+
+    // Header line: ● Running N agents... (Xs)
+    lines.push(Line::from(Span::styled(
+        format!("\u{25CF} Running {agent_count} agents... ({elapsed}s)"),
+        theme.agent_header,
+    )));
+
+    for (i, agent) in delegation.agents.iter().enumerate() {
+        let is_last = i == agent_count - 1;
+        let connector = if is_last { "\u{2514}\u{2500} " } else { "\u{251C}\u{2500} " };
+        let sub_connector = if is_last { "   " } else { "\u{2502}  " };
+
+        // Build the agent summary line
+        let (status_icon, status_style, status_suffix) = match &agent.status {
+            AgentDisplayStatus::Pending => ("", theme.agent_activity, String::new()),
+            AgentDisplayStatus::Running => ("", theme.agent_running, String::new()),
+            AgentDisplayStatus::Completed { duration_ms } => {
+                let secs = *duration_ms as f64 / 1000.0;
+                ("\u{2713} ", theme.agent_complete, format!("completed ({secs:.1}s) \u{00B7} "))
+            }
+            AgentDisplayStatus::Failed { .. } => {
+                ("\u{2717} ", theme.agent_failed, "failed \u{00B7} ".to_string())
+            }
+        };
+
+        let stats = format!(
+            "{} tool uses \u{00B7} {}",
+            agent.tool_uses,
+            format_tokens(agent.tokens_used),
+        );
+
+        lines.push(Line::from(vec![
+            Span::styled(connector.to_string(), theme.agent_connector),
+            Span::styled(
+                format!("{}{}", agent.description, if status_suffix.is_empty() && stats.is_empty() { "" } else { " \u{00B7} " }),
+                status_style,
+            ),
+            Span::styled(format!("{status_icon}{status_suffix}"), status_style),
+            Span::styled(stats, theme.agent_activity),
+        ]));
+
+        // Activity sub-line
+        let activity_text = if agent.current_activity.is_empty() {
+            match &agent.status {
+                AgentDisplayStatus::Pending => "Pending...".to_string(),
+                AgentDisplayStatus::Completed { .. } | AgentDisplayStatus::Failed { .. } => {
+                    String::new()
+                }
+                AgentDisplayStatus::Running => String::new(),
+            }
+        } else {
+            agent.current_activity.clone()
+        };
+
+        if !activity_text.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled(format!("{sub_connector}\u{2514} "), theme.agent_connector),
+                Span::styled(activity_text, theme.agent_activity),
+            ]));
+        }
+    }
+
+    lines
 }

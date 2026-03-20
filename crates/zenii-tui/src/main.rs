@@ -458,7 +458,41 @@ fn handle_ws_message(app: &mut App, msg: WsInbound) {
                 evt.duration_ms = Some(duration_ms);
             }
         }
+        WsInbound::DelegationStarted {
+            delegation_id,
+            agents,
+            ..
+        } => {
+            app.start_delegation(
+                delegation_id,
+                agents.into_iter().map(|a| (a.id, a.description)).collect(),
+            );
+            app.chat_status = ChatStatus::Streaming;
+        }
+        WsInbound::AgentProgress {
+            agent_id,
+            tool_uses,
+            tokens_used,
+            current_activity,
+            ..
+        } => {
+            app.update_agent(&agent_id, tool_uses, tokens_used, &current_activity);
+        }
+        WsInbound::AgentCompleted {
+            agent_id,
+            status,
+            duration_ms,
+            tool_uses,
+            tokens_used,
+            ..
+        } => {
+            app.complete_agent(&agent_id, &status, duration_ms, tool_uses, tokens_used);
+        }
+        WsInbound::DelegationCompleted { .. } => {
+            // Keep tree visible until text+done arrives
+        }
         WsInbound::Done => {
+            app.delegation = None;
             app.flush_streaming_buffer();
         }
         WsInbound::Error { error } => {
