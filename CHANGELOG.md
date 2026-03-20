@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.33] - 2026-03-20
+
+### Added
+- Delegation mode for CLI chat with workflows enabled by default
+- Real-time workflow execution visibility via WebSocket streaming
+- WorkflowTool exposing workflow system to AI agent with context plugin
+- Update/modify capabilities for workflows and scheduler
+- Edit and re-execute for user messages in chat UI
+
+### Fixed
+- Windows boot detection using IPC with diagnostic logging
+- macOS release timeout increased from 30m to 45m
+
+### Changed
+- Reduced vertical padding across UI components
+
+### Docs
+- Delegation system flow sequence diagram
+
 ## [0.0.32] - 2026-03-20
 
 ### Added
