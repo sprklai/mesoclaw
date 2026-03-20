@@ -1,6 +1,7 @@
 pub mod adapter;
 pub mod agent;
 pub mod context;
+pub mod delegation;
 pub mod prompt;
 pub mod provider_registry;
 pub mod providers;

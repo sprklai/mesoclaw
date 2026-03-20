@@ -231,6 +231,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .merge(channel_routes())
         // Scheduler (Phase 8)
         .merge(scheduler_routes())
+        // Workflows (Feature 5)
+        .merge(workflow_routes())
+        // Agent Delegation
+        .route("/agents/active", get(handlers::delegation::list_active_agents))
+        .route("/agents/{id}/cancel", post(handlers::delegation::cancel_agent))
         // WebSocket
         .route("/ws/chat", get(handlers::ws::ws_chat))
         .route("/ws/notifications", get(handlers::ws::ws_notifications))
@@ -333,6 +338,40 @@ fn api_docs_routes() -> Router<Arc<AppState>> {
         super::openapi::openapi_routes()
     }
     #[cfg(not(feature = "api-docs"))]
+    {
+        Router::new()
+    }
+}
+
+/// Build workflow routes, conditionally compiled.
+fn workflow_routes() -> Router<Arc<AppState>> {
+    #[cfg(feature = "workflows")]
+    {
+        Router::new()
+            .route(
+                "/workflows",
+                get(handlers::workflows::list_workflows)
+                    .post(handlers::workflows::create_workflow),
+            )
+            .route(
+                "/workflows/{id}",
+                get(handlers::workflows::get_workflow)
+                    .delete(handlers::workflows::delete_workflow),
+            )
+            .route(
+                "/workflows/{id}/run",
+                post(handlers::workflows::run_workflow),
+            )
+            .route(
+                "/workflows/{id}/history",
+                get(handlers::workflows::workflow_history),
+            )
+            .route(
+                "/workflows/{id}/runs/{run_id}",
+                get(handlers::workflows::get_run_details),
+            )
+    }
+    #[cfg(not(feature = "workflows"))]
     {
         Router::new()
     }

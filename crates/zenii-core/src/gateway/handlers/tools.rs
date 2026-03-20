@@ -143,6 +143,11 @@ mod tests {
             #[cfg(feature = "scheduler")]
             scheduler: base_state.scheduler.clone(),
             notification_router: None,
+            coordinator: base_state.coordinator.clone(),
+            #[cfg(feature = "workflows")]
+            workflow_registry: None,
+            #[cfg(feature = "workflows")]
+            workflow_executor: None,
             usage_logger: base_state.usage_logger.clone(),
             embedding_model_available: base_state.embedding_model_available.clone(),
         });

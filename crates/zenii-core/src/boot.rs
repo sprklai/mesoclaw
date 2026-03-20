@@ -80,6 +80,11 @@ pub struct Services {
     #[cfg(feature = "scheduler")]
     pub scheduler: Option<Arc<TokioScheduler>>,
     pub notification_router: Option<Arc<crate::notification::router::NotificationRouter>>,
+    pub coordinator: Arc<crate::ai::delegation::Coordinator>,
+    #[cfg(feature = "workflows")]
+    pub workflow_registry: Option<Arc<crate::workflows::WorkflowRegistry>>,
+    #[cfg(feature = "workflows")]
+    pub workflow_executor: Option<Arc<crate::workflows::executor::WorkflowExecutor>>,
     pub usage_logger: Arc<crate::logging::UsageLogger>,
     /// Whether the local embedding model is downloaded and ready.
     pub embedding_model_available: Arc<AtomicBool>,
@@ -753,13 +758,50 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         }
     }
 
+    // 17. Coordinator (delegation)
+    let coordinator = Arc::new(crate::ai::delegation::Coordinator::new(
+        crate::ai::delegation::DelegationConfig::from_app_config(&config),
+    ));
+    info!("Delegation coordinator initialized");
+
+    // 18. Workflow engine (feature-gated)
+    #[cfg(feature = "workflows")]
+    let workflow_registry_init = {
+        let wf_dir = config
+            .workflow_dir
+            .as_ref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| data_dir.join("workflows"));
+        match crate::workflows::WorkflowRegistry::new(wf_dir) {
+            Ok(r) => {
+                info!(
+                    "Workflow registry initialized ({} workflows)",
+                    r.list().len()
+                );
+                Some(Arc::new(r))
+            }
+            Err(e) => {
+                tracing::warn!("Workflow registry init failed: {e}");
+                None
+            }
+        }
+    };
+    #[cfg(feature = "workflows")]
+    let workflow_executor_init =
+        Some(Arc::new(crate::workflows::executor::WorkflowExecutor::new(
+            pool.clone(),
+            config.workflow_max_steps,
+            config.workflow_step_timeout_secs,
+            config.workflow_step_max_retries,
+        )));
+
     info!("All services initialized");
 
     Ok(Services {
         config,
         config_swap,
         config_path: crate::config::default_config_path(),
-        db: pool,
+        db: pool.clone(),
         event_bus,
         memory,
         credentials,
@@ -795,6 +837,11 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         #[cfg(feature = "scheduler")]
         scheduler,
         notification_router,
+        coordinator,
+        #[cfg(feature = "workflows")]
+        workflow_registry: workflow_registry_init,
+        #[cfg(feature = "workflows")]
+        workflow_executor: workflow_executor_init,
         usage_logger,
         embedding_model_available,
     })
@@ -845,6 +892,11 @@ impl From<Services> for AppState {
             #[cfg(feature = "scheduler")]
             scheduler: s.scheduler,
             notification_router: s.notification_router,
+            coordinator: s.coordinator,
+            #[cfg(feature = "workflows")]
+            workflow_registry: s.workflow_registry,
+            #[cfg(feature = "workflows")]
+            workflow_executor: s.workflow_executor,
             usage_logger: s.usage_logger,
             embedding_model_available: s.embedding_model_available,
         }

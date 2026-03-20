@@ -74,6 +74,10 @@ fastembed = { workspace = true, optional = true }
 # Phase 8: Scheduler (optional)
 cron = { version = "0.15", optional = true }
 
+# Feature 5: Workflow Engine (optional)
+petgraph = { workspace = true, optional = true }
+minijinja = { workspace = true, optional = true }
+
 # API Documentation (optional)
 utoipa = { workspace = true, optional = true }
 utoipa-scalar = { workspace = true, optional = true }
@@ -92,6 +96,7 @@ channels-slack = ["channels"]
 channels-discord = ["channels", "dep:serenity"]
 local-embeddings = ["dep:fastembed"]
 scheduler = ["dep:cron"]
+workflows = ["dep:petgraph", "dep:minijinja"]
 keyring = ["dep:keyring"]
 api-docs = ["gateway", "dep:utoipa", "dep:utoipa-scalar"]
 vendored-openssl = ["dep:openssl"]

@@ -95,6 +95,9 @@ pub enum ZeniiError {
     #[error("plugin not found: {0}")]
     PluginNotFound(String),
 
+    #[error("workflow error: {0}")]
+    Workflow(String),
+
     #[error("model capability error: {0}")]
     ModelCapability(String),
 

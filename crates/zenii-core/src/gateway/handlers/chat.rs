@@ -17,6 +17,8 @@ pub struct ChatRequest {
     pub prompt: String,
     pub session_id: Option<String>,
     pub model: Option<String>,
+    #[serde(default)]
+    pub delegation: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]

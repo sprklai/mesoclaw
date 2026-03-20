@@ -292,6 +292,37 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    if version < 11 {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS workflow_runs (
+                id TEXT PRIMARY KEY,
+                workflow_id TEXT NOT NULL,
+                workflow_name TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'running',
+                started_at TEXT NOT NULL DEFAULT (datetime('now')),
+                completed_at TEXT,
+                error TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow
+                ON workflow_runs(workflow_id);
+
+            CREATE TABLE IF NOT EXISTS workflow_step_results (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL REFERENCES workflow_runs(id) ON DELETE CASCADE,
+                step_name TEXT NOT NULL,
+                output TEXT,
+                success INTEGER NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                error TEXT,
+                executed_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_step_results_run
+                ON workflow_step_results(run_id);
+
+            PRAGMA user_version = 11;",
+        )?;
+    }
+
     Ok(())
 }
 
@@ -341,7 +372,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 10);
+        assert_eq!(version, 11);
     }
 
     #[test]
@@ -525,7 +556,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 10);
+        assert_eq!(version, 11);
     }
 
     // IN.9 — Migration v9 adds channel_key column and unique index

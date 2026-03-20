@@ -51,6 +51,8 @@ pub enum JobPayload {
     Notify { message: String },
     /// Send a message via a named channel.
     SendViaChannel { channel: String, message: String },
+    /// Execute a workflow by ID.
+    Workflow { workflow_id: String },
 }
 
 /// A registered job in the scheduler.

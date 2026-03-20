@@ -58,6 +58,9 @@ impl IntoResponse for ZeniiError {
             }
             ZeniiError::Plugin(_) => (StatusCode::INTERNAL_SERVER_ERROR, "ZENII_PLUGIN_ERROR"),
             ZeniiError::PluginNotFound(_) => (StatusCode::NOT_FOUND, "ZENII_PLUGIN_NOT_FOUND"),
+            ZeniiError::Workflow(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "ZENII_WORKFLOW_ERROR")
+            }
             ZeniiError::ModelCapability(_) => (StatusCode::BAD_REQUEST, "ZENII_MODEL_CAPABILITY"),
             ZeniiError::Other(_) => (StatusCode::INTERNAL_SERVER_ERROR, "ZENII_INTERNAL_ERROR"),
         };

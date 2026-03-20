@@ -47,6 +47,34 @@ pub enum AppEvent {
         status: String,
         error: Option<String>,
     },
+    SubAgentSpawned {
+        agent_id: String,
+        task: String,
+    },
+    SubAgentCompleted {
+        agent_id: String,
+        status: String,
+        duration_ms: u64,
+    },
+    SubAgentFailed {
+        agent_id: String,
+        error: String,
+    },
+    WorkflowStarted {
+        workflow_id: String,
+        run_id: String,
+    },
+    WorkflowCompleted {
+        workflow_id: String,
+        run_id: String,
+        status: String,
+    },
+    WorkflowStepCompleted {
+        workflow_id: String,
+        run_id: String,
+        step_name: String,
+        success: bool,
+    },
     Shutdown,
 }
 
@@ -300,6 +328,52 @@ mod tests {
         let back: AppEvent = serde_json::from_str(&json).unwrap();
         assert!(
             matches!(back, AppEvent::ChannelReconnecting { channel, attempt } if channel == "slack" && attempt == 5)
+        );
+    }
+
+    // 7.25 — SubAgentSpawned event serde round-trip
+    #[test]
+    fn sub_agent_spawned_event_serde() {
+        let event = AppEvent::SubAgentSpawned {
+            agent_id: "t1".into(),
+            task: "research topic".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(
+            matches!(back, AppEvent::SubAgentSpawned { agent_id, task }
+                if agent_id == "t1" && task == "research topic")
+        );
+    }
+
+    // 7.26 — SubAgentCompleted event serde round-trip
+    #[test]
+    fn sub_agent_completed_event_serde() {
+        let event = AppEvent::SubAgentCompleted {
+            agent_id: "t1".into(),
+            status: "completed".into(),
+            duration_ms: 1500,
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(
+            matches!(back, AppEvent::SubAgentCompleted { agent_id, status, duration_ms }
+                if agent_id == "t1" && status == "completed" && duration_ms == 1500)
+        );
+    }
+
+    // 7.27 — SubAgentFailed event serde round-trip
+    #[test]
+    fn sub_agent_failed_event_serde() {
+        let event = AppEvent::SubAgentFailed {
+            agent_id: "t2".into(),
+            error: "task timed out".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(
+            matches!(back, AppEvent::SubAgentFailed { agent_id, error }
+                if agent_id == "t2" && error == "task timed out")
         );
     }
 

@@ -187,6 +187,19 @@ pub struct AppConfig {
     pub log_dir: String,
     pub log_keep_days: u32,
 
+    // Feature 5: Workflow Engine
+    pub workflow_dir: Option<String>,
+    pub workflow_max_concurrent: usize,
+    pub workflow_max_steps: usize,
+    pub workflow_step_timeout_secs: u64,
+    pub workflow_step_max_retries: u32,
+
+    // Feature 7: Agent Delegation
+    pub delegation_max_sub_agents: usize,
+    pub delegation_per_agent_token_budget: usize,
+    pub delegation_per_agent_timeout_secs: u64,
+    pub delegation_decomposition_model: Option<String>,
+
     // Phase 8: Self-Evolution
     pub self_evolution_enabled: bool,
     pub learning_archive_threshold: f64,
@@ -367,6 +380,19 @@ impl Default for AppConfig {
             usage_tracking_enabled: true,
             log_dir: String::new(),
             log_keep_days: 30,
+
+            // Workflow Engine
+            workflow_dir: None,
+            workflow_max_concurrent: 5,
+            workflow_max_steps: 50,
+            workflow_step_timeout_secs: 300,
+            workflow_step_max_retries: 3,
+
+            // Agent Delegation
+            delegation_max_sub_agents: 4,
+            delegation_per_agent_token_budget: 4000,
+            delegation_per_agent_timeout_secs: 120,
+            delegation_decomposition_model: None,
 
             // Self-Evolution
             self_evolution_enabled: true,
@@ -829,6 +855,34 @@ mod tests {
     fn default_log_dir_empty() {
         let config = AppConfig::default();
         assert!(config.log_dir.is_empty());
+    }
+
+    // 7.28 — delegation config defaults and TOML deser
+    #[test]
+    fn delegation_config_defaults() {
+        let config = AppConfig::default();
+        assert_eq!(config.delegation_max_sub_agents, 4);
+        assert_eq!(config.delegation_per_agent_token_budget, 4000);
+        assert_eq!(config.delegation_per_agent_timeout_secs, 120);
+        assert!(config.delegation_decomposition_model.is_none());
+    }
+
+    #[test]
+    fn delegation_config_from_toml() {
+        let toml_str = r#"
+            delegation_max_sub_agents = 8
+            delegation_per_agent_token_budget = 8000
+            delegation_per_agent_timeout_secs = 300
+            delegation_decomposition_model = "openai:gpt-4o"
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.delegation_max_sub_agents, 8);
+        assert_eq!(config.delegation_per_agent_token_budget, 8000);
+        assert_eq!(config.delegation_per_agent_timeout_secs, 300);
+        assert_eq!(
+            config.delegation_decomposition_model.as_deref(),
+            Some("openai:gpt-4o")
+        );
     }
 
     // AUDIT — default agent_timeout_secs is 300

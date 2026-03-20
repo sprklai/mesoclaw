@@ -23,6 +23,8 @@ pub mod channels;
 pub mod gateway;
 #[cfg(feature = "scheduler")]
 pub mod scheduler;
+#[cfg(feature = "workflows")]
+pub mod workflows;
 
 pub use error::ZeniiError;
 

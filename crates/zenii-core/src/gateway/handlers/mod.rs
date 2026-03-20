@@ -4,6 +4,9 @@ pub mod channels_test;
 pub mod chat;
 pub mod config;
 pub mod credentials;
+pub mod delegation;
+#[cfg(feature = "workflows")]
+pub mod workflows;
 pub mod embeddings;
 pub mod health;
 pub mod identity;
@@ -141,6 +144,13 @@ pub(crate) mod tests {
                 Some(sched)
             },
             notification_router: None,
+            coordinator: Arc::new(crate::ai::delegation::Coordinator::new(
+                crate::ai::delegation::DelegationConfig::default(),
+            )),
+            #[cfg(feature = "workflows")]
+            workflow_registry: None,
+            #[cfg(feature = "workflows")]
+            workflow_executor: None,
             usage_logger: Arc::new(crate::logging::UsageLogger::new(
                 &crate::config::AppConfig::default(),
                 "test",

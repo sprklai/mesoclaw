@@ -80,6 +80,11 @@ pub struct AppState {
     #[cfg(feature = "scheduler")]
     pub scheduler: Option<Arc<TokioScheduler>>,
     pub notification_router: Option<Arc<crate::notification::router::NotificationRouter>>,
+    pub coordinator: Arc<crate::ai::delegation::Coordinator>,
+    #[cfg(feature = "workflows")]
+    pub workflow_registry: Option<Arc<crate::workflows::WorkflowRegistry>>,
+    #[cfg(feature = "workflows")]
+    pub workflow_executor: Option<Arc<crate::workflows::executor::WorkflowExecutor>>,
     pub usage_logger: Arc<UsageLogger>,
     /// Whether the local embedding model is downloaded and ready.
     pub embedding_model_available: Arc<AtomicBool>,

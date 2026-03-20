@@ -30,6 +30,9 @@ pub async fn execute(
         JobPayload::SendViaChannel { channel, message } => {
             execute_send_via_channel(job, channel, message, app_state).await
         }
+        JobPayload::Workflow { workflow_id } => {
+            execute_workflow(job, workflow_id, app_state).await
+        }
     };
 
     // Publish completion event
@@ -230,6 +233,79 @@ async fn execute_send_via_channel(
         let _ = (app_state, channel, message);
         warn!(
             "Scheduler job '{}': SendViaChannel skipped — channels feature not enabled",
+            job.name
+        );
+        JobStatus::Skipped
+    }
+}
+
+/// Execute a Workflow payload.
+#[cfg(feature = "gateway")]
+async fn execute_workflow(
+    job: &ScheduledJob,
+    workflow_id: &str,
+    app_state: Option<&Arc<AppState>>,
+) -> JobStatus {
+    #[cfg(feature = "workflows")]
+    {
+        let Some(state) = app_state else {
+            warn!(
+                "Scheduler job '{}': Workflow skipped — no AppState wired",
+                job.name
+            );
+            return JobStatus::Skipped;
+        };
+
+        let Some(ref registry) = state.workflow_registry else {
+            warn!(
+                "Scheduler job '{}': Workflow skipped — workflow feature not initialized",
+                job.name
+            );
+            return JobStatus::Skipped;
+        };
+
+        let Some(workflow) = registry.get(workflow_id) else {
+            warn!(
+                "Scheduler job '{}': Workflow '{}' not found",
+                job.name, workflow_id
+            );
+            return JobStatus::Failed;
+        };
+
+        let Some(ref executor) = state.workflow_executor else {
+            warn!(
+                "Scheduler job '{}': Workflow executor not initialized",
+                job.name
+            );
+            return JobStatus::Skipped;
+        };
+
+        match executor.execute(&workflow, &state.tools, state.event_bus.as_ref()).await {
+            Ok(run) => {
+                info!(
+                    "Scheduler job '{}': Workflow '{}' completed (run {})",
+                    job.name, workflow_id, run.id
+                );
+                if run.status == crate::workflows::WorkflowRunStatus::Completed {
+                    JobStatus::Success
+                } else {
+                    JobStatus::Failed
+                }
+            }
+            Err(e) => {
+                warn!(
+                    "Scheduler job '{}': Workflow '{}' failed: {e}",
+                    job.name, workflow_id
+                );
+                JobStatus::Failed
+            }
+        }
+    }
+    #[cfg(not(feature = "workflows"))]
+    {
+        let _ = (app_state, workflow_id);
+        warn!(
+            "Scheduler job '{}': Workflow skipped — workflows feature not enabled",
             job.name
         );
         JobStatus::Skipped
