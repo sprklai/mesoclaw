@@ -41,6 +41,7 @@ slug: /architecture
 - [Tool Permission System](#tool-permission-system-phase-19)
 - [Model Capability Validation](#model-capability-validation)
 - [Agent Delegation](#agent-delegation)
+  - [Delegation System Flow](#delegation-system-flow)
 - [Workflow Engine](#workflow-engine)
 - [Concurrency Rules](#concurrency-rules)
 - [Lessons Learned from v1](#lessons-learned-from-v1)
@@ -1878,6 +1879,71 @@ The `ChatRequest` struct has an optional `delegation: Option<bool>` field. When 
 
 - `GET /agents/active` -- list active delegation run IDs
 - `POST /agents/{id}/cancel` -- cancel a delegation run by ID
+
+### Delegation System Flow
+
+End-to-end sequence from client WebSocket request through decomposition, parallel execution, and aggregated response. Everything runs on the daemon -- clients are thin renderers of streamed events.
+
+```mermaid
+sequenceDiagram
+    participant Client as Client - CLI/Desktop/TUI
+    participant WS as WS Handler - ws.rs
+    participant Coord as Coordinator
+    participant LLM as LLM Model
+    participant SA1 as SubAgent t1
+    participant SA2 as SubAgent t2
+    participant EB as Event Bus
+
+    Client->>WS: prompt + delegation=true
+    WS->>EB: subscribe to events
+    WS->>Coord: delegate - spawned in tokio::spawn
+
+    Note over Coord: Decomposition Phase
+    Coord->>LLM: "Break this into sub-tasks"
+    LLM-->>Coord: JSON tasks - t1, t2
+
+    Coord->>EB: DelegationStarted
+    EB-->>WS: forward
+    WS-->>Client: delegation_started
+
+    Note over Coord: Execution Phase - Wave 1
+    Coord->>SA1: spawn with isolated session
+    Coord->>SA2: spawn with isolated session
+
+    SA1->>LLM: agent.prompt - task description
+    SA2->>LLM: agent.prompt - task description
+
+    SA1->>EB: SubAgentProgress
+    EB-->>WS: forward
+    WS-->>Client: agent_progress
+
+    SA2-->>Coord: TaskResult
+    Coord->>EB: SubAgentCompleted
+    EB-->>WS: forward
+    WS-->>Client: agent_completed
+
+    SA1-->>Coord: TaskResult
+    Coord->>EB: SubAgentCompleted
+    EB-->>WS: forward
+    WS-->>Client: agent_completed
+
+    Note over Coord: Aggregation Phase
+    Coord->>LLM: "Synthesize results"
+    LLM-->>Coord: aggregated response
+
+    Coord->>EB: DelegationCompleted
+    EB-->>WS: forward
+    WS-->>Client: delegation_completed
+
+    Coord-->>WS: DelegationResult via oneshot
+    WS-->>Client: text + done
+```
+
+**Key points:**
+
+- **LLM does the decomposition** -- the Coordinator sends a meta-prompt to the configured model asking it to break the task into sub-tasks. The LLM decides how many agents, what each does, and what tools each needs.
+- **WebSocket protocol** defines 4 message types: `delegation_started`, `agent_progress`, `agent_completed`, `delegation_completed` -- enabling real-time visualization in all clients.
+- **Oneshot channel** delivers the final `DelegationResult` back to the WS handler for the aggregated text response.
 
 ---
 
