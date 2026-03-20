@@ -1,6 +1,8 @@
-# Cross-Model Code Audit: Codex Audits, Claude Validates & Fixes
+# Cross-Model Code Audit: Codex Audits, Claude Judges & Fixes
 
-This command runs a dual-agent audit: Codex CLI reviews code with fresh eyes, Claude validates each finding against actual code and CLAUDE.md conventions, then applies approved fixes with verification.
+This command runs a dual-agent audit: Codex CLI reviews code with fresh eyes, then Claude independently reads the actual code, judges each finding's validity, designs its own fixes where warranted, and applies only what passes rigorous verification.
+
+**Codex proposes, Claude disposes.** Claude is the architect — it reads every referenced file, forms its own opinion, and never applies Codex's suggested fixes verbatim. A wrong fix is worse than no fix.
 
 **It runs automatically with NO user prompts unless findings need user decisions.**
 
@@ -177,34 +179,58 @@ Print: "Clean audit — Codex found no issues." STOP.
 If `--dry-run` flag was set:
 Print all parsed findings in a formatted table and STOP. Do not validate or fix anything.
 
-### Step 4: Validate each finding (Claude's job)
+### Step 4: Validate each finding (Claude's job — the critical gate)
+
+Claude is the architect here, not a rubber stamp. Codex has context poverty — it sees code fragments without understanding project conventions, architectural decisions, or cross-module interactions. Treat every Codex finding as a **hypothesis to verify**, not a fact to act on.
+
+**Default stance: skeptical.** Most Codex findings will be either false positives or technically correct but wrong for this project. Only promote a finding to "Apply" when you have HIGH confidence it's both real AND the right fix.
 
 For EACH finding from Codex, do the following:
 
-#### 4a. Read the actual code
+#### 4a. Read the actual code (mandatory — no shortcuts)
 
-Use the Read tool to read the file(s) referenced in the finding. Read enough context (30-50 lines around the referenced location) to understand the code.
+Use the Read tool to read the file(s) referenced in the finding. Read **at least 50-80 lines** around the referenced location — enough to understand the full function/method, its callers, and its error handling context. If the finding involves cross-module interaction, read the other module too.
 
-#### 4b. Determine if the issue is real
+**Do NOT skip this step.** Do NOT rely on Codex's description of what the code does. Read it yourself.
 
-Ask yourself:
-1. Does the code actually have this problem? (Codex may have hallucinated or misread)
-2. Is this already handled elsewhere that Codex couldn't see?
-3. Does this conflict with a CLAUDE.md convention? (Codex doesn't know our conventions)
-4. Is this a matter of preference vs. an actual bug?
+#### 4b. Independent assessment (form your own opinion BEFORE comparing to Codex)
 
-#### 4c. Classify the finding
+Before evaluating Codex's specific claim, form your own understanding of the code:
+1. What does this code do? What's its purpose in the larger system?
+2. What invariants does it maintain? What assumptions does it rely on?
+3. Is there anything you'd flag independently, looking at this code fresh?
 
-Assign one of four dispositions:
+Then evaluate Codex's claim against your independent reading:
+
+#### 4c. Rigorous truthfulness check
+
+Run through ALL of these checks — a finding must pass every one to be considered real:
+
+1. **Existence check**: Does the code Codex references actually exist at that location? (Codex frequently hallucinates file paths, line numbers, and function names)
+2. **Accuracy check**: Does the code actually do what Codex claims? Read it literally — is Codex misreading the logic, conflating two code paths, or missing context?
+3. **Context check**: Is this already handled elsewhere that Codex couldn't see? (e.g., validation at API boundary, error handling in caller, config-driven behavior)
+4. **Convention check**: Does this conflict with a CLAUDE.md convention or an intentional project decision? (e.g., Codex might flag `spawn_blocking` as unnecessary, not knowing our SQLite rule)
+5. **Severity check**: Even if real, does this actually matter? Is it in a hot path? Is it reachable by users? Could it cause data loss or security issues, or is it cosmetic?
+6. **Fix quality check**: Is Codex's suggested fix actually correct? Would it introduce new problems? Does it align with project patterns? (Often the finding is real but the suggested fix is wrong or over-engineered)
+
+#### 4d. Design your own fix (never copy Codex's fix blindly)
+
+If a finding passes the truthfulness check:
+- **Design your own fix** based on your understanding of the codebase and CLAUDE.md conventions
+- Codex's suggested fix is a hint, not a prescription — it often suggests patterns that violate project conventions or are overly complex
+- The fix must be minimal, follow existing patterns in the codebase, and not introduce new abstractions or dependencies
+- If the right fix is non-obvious or touches multiple modules, classify as "Defer" or "User Decision" instead of guessing
+
+#### 4e. Classify the finding
 
 | Disposition | Criteria | Action |
 |-------------|----------|--------|
-| **Apply** | Issue is real, fix is clear, low risk, aligns with CLAUDE.md | Will be fixed |
-| **Skip** | False positive, already handled, convention conflict, or Codex misunderstanding | Won't fix, explain why |
-| **Defer** | Issue is real but fix is complex, risky, or needs design discussion | Track for later |
-| **User Decision** | Issue is real but fix has trade-offs the user should weigh | Ask user |
+| **Apply** | Issue is real (passed ALL checks in 4c), fix is clear AND minimal, low risk, aligns with CLAUDE.md. Claude has designed a specific fix and is confident it won't break anything. | Will be fixed with Claude's fix (not Codex's) |
+| **Skip** | Failed any check in 4c. Be specific about which check failed and why. | Won't fix — explain what Codex got wrong |
+| **Defer** | Passed truthfulness checks but: fix touches >2 files, requires architectural discussion, has non-obvious side effects, or Claude isn't confident in the right fix | Track for later — explain what needs to be decided first |
+| **User Decision** | Issue is real but there are legitimate trade-offs (performance vs. readability, strictness vs. ergonomics, etc.) that depend on user priorities | Present options with Claude's recommendation |
 
-Record your reasoning for each classification. Be specific — "false positive" is not enough; explain what Codex got wrong.
+**Bias toward Skip and Defer over Apply.** A wrong fix is worse than no fix. When in doubt, defer.
 
 ### Step 5: Present structured report
 
@@ -229,31 +255,36 @@ Print the report in this format:
 For each:
 > **[CATEGORY] Title** (severity) — file:line
 > Codex says: {description}
-> Claude validates: {why this is a real issue}
-> Fix: {what will be done}
+> Claude's independent read: {what Claude found reading the actual code — confirm or nuance the issue}
+> Checks passed: {which of the 6 checks in 4c this passed and key evidence}
+> Claude's fix (not Codex's): {specific fix Claude designed, explaining how it differs from Codex's suggestion if at all}
 
 ### Findings Skipped
 
 For each:
 > **[CATEGORY] Title** — file:line
 > Codex says: {description}
-> Skipped because: {specific reason — convention conflict, false positive, already handled}
+> Check failed: {which specific check (existence/accuracy/context/convention/severity/fix-quality) failed}
+> Evidence: {what Claude actually found in the code that contradicts Codex's claim}
 
 ### Findings Deferred
 
 For each:
 > **[CATEGORY] Title** (severity) — file:line
 > Codex says: {description}
-> Deferred because: {why it needs more thought}
-> Suggested tracking: {TODO comment, issue, or plan}
+> Claude confirms: {what's real about the finding}
+> Deferred because: {why Claude can't confidently fix this now — multi-file impact, needs design discussion, uncertain side effects}
+> Suggested next step: {specific action — TODO comment, plan file, or conversation topic}
 
 ### Findings Needing User Decision
 
 For each:
 > **[CATEGORY] Title** (severity) — file:line
 > Codex says: {description}
-> Trade-offs: {option A vs option B with pros/cons}
-> Recommendation: {what Claude would do and why}
+> Claude's analysis: {what Claude found reading the code independently}
+> Option A: {description, pros, cons}
+> Option B: {description, pros, cons}
+> Claude recommends: {which option and why, but deferring to user}
 ```
 
 ### Step 6: Handle user decisions
@@ -268,15 +299,19 @@ If `--fix` flag was set:
 
 If there are NO "Apply" or approved "User Decision" findings, print "No fixes to apply." and skip to Step 9.
 
-### Step 7: Apply fixes
+### Step 7: Apply fixes (Claude's fixes, not Codex's)
+
+**CRITICAL**: Apply the fix Claude designed in Step 4d, NOT the fix Codex suggested. Codex's suggestions often violate project conventions, introduce unnecessary abstractions, or miss cross-module implications. Claude's fix was designed with full codebase context.
 
 For each approved fix:
 
-1. Edit the code following CLAUDE.md conventions (use Edit tool, minimal changes)
-2. After every 3 fixes, run `cargo check --workspace` to catch breakage early
-3. If a fix breaks compilation:
+1. **Re-read the target code** before editing — the code may have changed from earlier fixes in this batch
+2. Edit using the Edit tool, following CLAUDE.md conventions. Keep changes minimal — if a fix starts growing beyond ~10 lines, reconsider whether it should be "Defer" instead
+3. After every 3 fixes, run `cargo check --workspace` to catch breakage early
+4. If a fix breaks compilation:
    - Immediately revert that specific edit
-   - Note it in the report as "Reverted — broke compilation"
+   - Note it in the report as "Reverted — broke compilation: {error}"
+   - Reconsider: was the fix actually correct? Log the lesson.
    - Continue with remaining fixes
 
 For frontend fixes (Svelte/TypeScript files):
