@@ -6,6 +6,7 @@ on:
     paths:
       - "docs-site/**"
       - "docs/**"
+      - ".github/workflows/deploy-docs.yml"
   workflow_dispatch:
 
 jobs:
