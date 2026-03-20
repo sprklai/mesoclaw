@@ -23,7 +23,9 @@ pub async fn execute(
 ) -> JobStatus {
     let result = match &job.payload {
         JobPayload::Notify { message } => execute_notify(job, message, event_bus),
-        JobPayload::AgentTurn { prompt } => execute_agent_turn(job, prompt, app_state).await,
+        JobPayload::AgentTurn { prompt } => {
+            execute_agent_turn(job, prompt, app_state, event_bus).await
+        }
         JobPayload::Heartbeat => execute_heartbeat(job, event_bus, app_state).await,
         JobPayload::SendViaChannel { channel, message } => {
             execute_send_via_channel(job, channel, message, app_state).await
@@ -59,11 +61,13 @@ fn execute_notify(job: &ScheduledJob, message: &str, event_bus: &Arc<dyn EventBu
 }
 
 /// Execute an AgentTurn payload: resolve agent, run chat with full context.
+/// Publishes the agent's response as a SchedulerNotification so the user sees it.
 #[cfg(feature = "gateway")]
 async fn execute_agent_turn(
     job: &ScheduledJob,
     prompt: &str,
     app_state: Option<&Arc<AppState>>,
+    event_bus: &Arc<dyn EventBus>,
 ) -> JobStatus {
     let Some(state) = app_state else {
         warn!(
@@ -136,6 +140,14 @@ async fn execute_agent_turn(
                 job.name,
                 response.len()
             );
+
+            // Publish the agent's response so the user can see it via WS/toast
+            let _ = event_bus.publish(AppEvent::SchedulerNotification {
+                job_id: job.id.clone(),
+                job_name: job.name.clone(),
+                message: response,
+            });
+
             JobStatus::Success
         }
         Err(e) => {

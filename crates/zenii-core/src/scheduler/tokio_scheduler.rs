@@ -162,8 +162,23 @@ impl TokioScheduler {
                 active_hours,
                 delete_after_run: delete_after_run != 0,
             };
-            self.jobs.insert(id, job);
+            self.jobs.insert(id.clone(), job);
             count += 1;
+
+            // Recompute stale next_run times (job was due while we were offline)
+            let now = Utc::now();
+            let grace = chrono::Duration::seconds((self.tick_interval_secs * 2) as i64);
+            if let Some(mut entry) = self.jobs.get_mut(&id) {
+                let needs_recompute = match entry.next_run {
+                    None => true,
+                    Some(t) => t < (now - grace),
+                };
+                if needs_recompute
+                    && let Ok(next) = Self::compute_next_run(&entry.schedule)
+                {
+                    entry.next_run = Some(next);
+                }
+            }
         }
         info!("Scheduler loaded {count} job(s) from DB");
         Ok(count)
@@ -269,11 +284,17 @@ impl TokioScheduler {
 
     /// Get backoff delay using configured levels.
     pub fn get_backoff(&self, error_count: u32) -> u64 {
-        if self.error_backoff_secs.is_empty() {
+        Self::compute_backoff(&self.error_backoff_secs, error_count)
+    }
+
+    /// Compute backoff delay from a backoff schedule slice.
+    /// Falls back to the module-level `backoff_secs()` if the slice is empty.
+    fn compute_backoff(backoff_schedule: &[u64], error_count: u32) -> u64 {
+        if backoff_schedule.is_empty() {
             return backoff_secs(error_count);
         }
-        let idx = (error_count as usize).min(self.error_backoff_secs.len() - 1);
-        self.error_backoff_secs[idx]
+        let idx = (error_count as usize).min(backoff_schedule.len() - 1);
+        backoff_schedule[idx]
     }
 
     /// Record an execution in the history ring buffer.
@@ -315,6 +336,7 @@ impl Scheduler for TokioScheduler {
         let tick_secs = self.tick_interval_secs;
         let stuck_threshold = self.stuck_threshold_secs;
         let max_history = self.max_history_per_job;
+        let error_backoff = self.error_backoff_secs.clone();
         #[cfg(feature = "gateway")]
         let app_state_cell = self.app_state.clone();
 
@@ -336,7 +358,7 @@ impl Scheduler for TokioScheduler {
                             .collect();
 
                         for job in due {
-                            // Active hours gate
+                            // Active hours gate (cheap, synchronous — check before spawning)
                             if !TokioScheduler::is_in_active_hours(&job.active_hours) {
                                 // Reschedule
                                 if let Some(mut entry) = jobs.get_mut(&job.id)
@@ -347,9 +369,18 @@ impl Scheduler for TokioScheduler {
                                 continue;
                             }
 
-                            let started_at = Utc::now();
+                            // Set next_run = None as in-flight guard to prevent re-pickup
+                            let scheduled_time = {
+                                if let Some(mut entry) = jobs.get_mut(&job.id) {
+                                    let prev = entry.next_run;
+                                    entry.next_run = None;
+                                    prev
+                                } else {
+                                    continue;
+                                }
+                            };
 
-                            // Emit event
+                            // Emit pre-execution event (cheap)
                             let event = match &job.payload {
                                 JobPayload::Heartbeat => AppEvent::HeartbeatTick {
                                     job_id: job.id.clone(),
@@ -361,96 +392,121 @@ impl Scheduler for TokioScheduler {
                             };
                             let _ = bus.publish(event);
 
-                            // Execute with stuck detection timeout
-                            let timeout = Duration::from_secs(stuck_threshold);
-                            let bus_ref = bus.clone();
-                            let job_ref = job.clone();
+                            // Clone shared state for the spawned task
+                            let jobs = jobs.clone();
+                            let history = history.clone();
+                            let bus = bus.clone();
+                            let db = db.clone();
+                            let error_backoff = error_backoff.clone();
                             #[cfg(feature = "gateway")]
                             let app_state_ref = app_state_cell.clone();
-                            let status = tokio::time::timeout(timeout, async move {
+
+                            // Spawn each job in its own task for parallel execution
+                            tokio::spawn(async move {
+                                let started_at = Utc::now();
+
+                                // Execute with stuck detection timeout
+                                let timeout = Duration::from_secs(stuck_threshold);
+                                let bus_ref = bus.clone();
+                                let job_ref = job.clone();
                                 #[cfg(feature = "gateway")]
-                                {
-                                    super::payload_executor::execute(
-                                        &job_ref,
-                                        &bus_ref,
-                                        app_state_ref.get(),
-                                    )
-                                    .await
-                                }
-                                #[cfg(not(feature = "gateway"))]
-                                {
-                                    match &job_ref.payload {
-                                        JobPayload::Notify { message } => {
-                                            info!("Scheduler notify: {message}");
-                                            let _ = bus_ref.publish(AppEvent::SchedulerNotification {
-                                                job_id: job_ref.id.clone(),
-                                                job_name: job_ref.name.clone(),
-                                                message: message.clone(),
-                                            });
-                                            JobStatus::Success
-                                        }
-                                        _ => JobStatus::Success,
+                                let app_state_exec = app_state_ref.clone();
+                                let status = tokio::time::timeout(timeout, async move {
+                                    #[cfg(feature = "gateway")]
+                                    {
+                                        super::payload_executor::execute(
+                                            &job_ref,
+                                            &bus_ref,
+                                            app_state_exec.get(),
+                                        )
+                                        .await
                                     }
-                                }
-                            })
-                            .await;
-
-                            let completed_at = Utc::now();
-                            let (job_status, error_msg) = match status {
-                                Ok(s) => (s, None),
-                                Err(_) => (
-                                    JobStatus::Stuck,
-                                    Some(format!(
-                                        "Job '{}' stuck after {stuck_threshold}s",
-                                        job.name
-                                    )),
-                                ),
-                            };
-
-                            // Record history
-                            let exec = JobExecution {
-                                id: Uuid::new_v4().to_string(),
-                                job_id: job.id.clone(),
-                                status: job_status.clone(),
-                                started_at,
-                                completed_at: Some(completed_at),
-                                error: error_msg,
-                            };
-                            let exec_job_id = exec.job_id.clone();
-                            {
-                                let mut entry = history
-                                    .entry(exec_job_id)
-                                    .or_default();
-                                entry.push_front(exec);
-                                entry.truncate(max_history);
-                            }
-
-                            // Reschedule / one-shot / error tracking
-                            if job.delete_after_run && job_status == JobStatus::Success {
-                                jobs.remove(&job.id);
-                                let _ = TokioScheduler::delete_job_from_db(&db, &job.id).await;
-                            } else {
-                                // Clone data out of DashMap guard to avoid holding it across .await
-                                let snapshot = {
-                                    if let Some(mut entry) = jobs.get_mut(&job.id) {
-                                        if job_status == JobStatus::Success {
-                                            entry.error_count = 0;
-                                        } else {
-                                            entry.error_count += 1;
+                                    #[cfg(not(feature = "gateway"))]
+                                    {
+                                        match &job_ref.payload {
+                                            JobPayload::Notify { message } => {
+                                                info!("Scheduler notify: {message}");
+                                                let _ = bus_ref.publish(AppEvent::SchedulerNotification {
+                                                    job_id: job_ref.id.clone(),
+                                                    job_name: job_ref.name.clone(),
+                                                    message: message.clone(),
+                                                });
+                                                JobStatus::Success
+                                            }
+                                            _ => JobStatus::Success,
                                         }
-                                        if let Ok(next) = TokioScheduler::compute_next_run(&entry.schedule) {
-                                            entry.next_run = Some(next);
-                                        }
-                                        Some(entry.clone())
-                                    } else {
-                                        None
                                     }
+                                })
+                                .await;
+
+                                let completed_at = Utc::now();
+                                let (job_status, error_msg) = match status {
+                                    Ok(s) => (s, None),
+                                    Err(_) => (
+                                        JobStatus::Stuck,
+                                        Some(format!(
+                                            "Job '{}' stuck after {stuck_threshold}s",
+                                            job.name
+                                        )),
+                                    ),
                                 };
-                                // Guard is dropped — safe to .await now
-                                if let Some(snapshot) = snapshot {
-                                    let _ = TokioScheduler::persist_job(&db, &snapshot).await;
+
+                                // Record history
+                                let exec = JobExecution {
+                                    id: Uuid::new_v4().to_string(),
+                                    job_id: job.id.clone(),
+                                    status: job_status.clone(),
+                                    started_at,
+                                    completed_at: Some(completed_at),
+                                    error: error_msg,
+                                };
+                                {
+                                    let mut entry = history
+                                        .entry(job.id.clone())
+                                        .or_default();
+                                    entry.push_front(exec);
+                                    entry.truncate(max_history);
                                 }
-                            }
+
+                                // Reschedule / one-shot / error tracking
+                                if job.delete_after_run && job_status == JobStatus::Success {
+                                    jobs.remove(&job.id);
+                                    let _ = TokioScheduler::delete_job_from_db(&db, &job.id).await;
+                                } else {
+                                    // Clone data out of DashMap guard to avoid holding it across .await
+                                    let snapshot = {
+                                        if let Some(mut entry) = jobs.get_mut(&job.id) {
+                                            if job_status == JobStatus::Success {
+                                                entry.error_count = 0;
+                                                // Fix interval drift: compute from previous scheduled time, not now
+                                                if let Some(prev_time) = scheduled_time {
+                                                    if let Schedule::Interval { secs } = &entry.schedule {
+                                                        let next = prev_time + chrono::Duration::seconds(*secs as i64);
+                                                        // Clamp to at least now to avoid firing immediately
+                                                        entry.next_run = Some(next.max(Utc::now()));
+                                                    } else if let Ok(next) = TokioScheduler::compute_next_run(&entry.schedule) {
+                                                        entry.next_run = Some(next);
+                                                    }
+                                                } else if let Ok(next) = TokioScheduler::compute_next_run(&entry.schedule) {
+                                                    entry.next_run = Some(next);
+                                                }
+                                            } else {
+                                                entry.error_count += 1;
+                                                // Apply error backoff instead of normal schedule
+                                                let backoff_delay = TokioScheduler::compute_backoff(&error_backoff, entry.error_count);
+                                                entry.next_run = Some(Utc::now() + chrono::Duration::seconds(backoff_delay as i64));
+                                            }
+                                            Some(entry.clone())
+                                        } else {
+                                            None
+                                        }
+                                    };
+                                    // Guard is dropped — safe to .await now
+                                    if let Some(snapshot) = snapshot {
+                                        let _ = TokioScheduler::persist_job(&db, &snapshot).await;
+                                    }
+                                }
+                            });
                         }
                     }
                     Ok(()) = stop_rx.changed() => {

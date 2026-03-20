@@ -145,6 +145,13 @@ class NotificationStore {
             if (hasTarget("scheduler_notification", "desktop") && isTauri) {
               showNotification(data.job_name, data.message ?? "");
             }
+          } else if (data.event_type === "heartbeat_alert") {
+            if (hasTarget("scheduler_job_completed", "toast")) {
+              toast.info(data.message ?? "Heartbeat");
+            }
+            if (hasTarget("scheduler_job_completed", "desktop") && isTauri) {
+              showNotification("Heartbeat", data.message ?? "");
+            }
           } else if (data.event_type === "scheduler_job_completed") {
             if (hasTarget("scheduler_job_completed", "toast")) {
               if (data.status === "success") {

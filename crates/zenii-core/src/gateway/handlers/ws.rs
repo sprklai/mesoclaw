@@ -156,6 +156,21 @@ async fn handle_notifications(mut socket: WebSocket, state: Arc<AppState>) {
                             break;
                         }
                     }
+                    Ok(crate::event_bus::AppEvent::HeartbeatAlert { message }) => {
+                        let outbound = WsOutbound::Notification {
+                            event_type: "heartbeat_alert".into(),
+                            job_id: String::new(),
+                            job_name: "heartbeat".into(),
+                            message: Some(message),
+                            status: None,
+                            error: None,
+                        };
+                        if let Ok(json) = serde_json::to_string(&outbound)
+                            && socket.send(Message::Text(json.into())).await.is_err()
+                        {
+                            break;
+                        }
+                    }
                     Ok(crate::event_bus::AppEvent::Shutdown) => {
                         break;
                     }
