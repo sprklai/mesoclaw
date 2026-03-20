@@ -23,9 +23,38 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Cache bun dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('web/bun.lockb') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install and build
+        working-directory: web
+        run: |
+          bun install
+          bun run build
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-build
+          path: web/build/
+
   build-linux:
     name: Build Linux
     runs-on: ubuntu-22.04
+    needs: [build-frontend]
     if: >-
       github.event_name == 'push' ||
       contains(github.event.inputs.platforms, 'linux')
@@ -46,19 +75,15 @@ jobs:
             lld \
             rpm
 
-      - uses: oven-sh/setup-bun@v2
-
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: swatinem/rust-cache@v2
 
-      - name: Install frontend dependencies
-        working-directory: web
-        run: bun install
-
-      - name: Build frontend
-        working-directory: web
-        run: bun run build
+      - name: Download frontend build
+        uses: actions/download-artifact@v8
+        with:
+          name: frontend-build
+          path: web/build/
 
       - name: Build desktop (deb, rpm, appimage)
         uses: tauri-apps/tauri-action@v0
@@ -99,6 +124,7 @@ jobs:
   build-windows:
     name: Build Windows
     runs-on: windows-latest
+    needs: [build-frontend]
     if: >-
       github.event_name == 'push' ||
       contains(github.event.inputs.platforms, 'windows')
@@ -106,19 +132,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: oven-sh/setup-bun@v2
-
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: swatinem/rust-cache@v2
 
-      - name: Install frontend dependencies
-        working-directory: web
-        run: bun install
-
-      - name: Build frontend
-        working-directory: web
-        run: bun run build
+      - name: Download frontend build
+        uses: actions/download-artifact@v8
+        with:
+          name: frontend-build
+          path: web/build/
 
       - name: Build desktop (msi, nsis)
         uses: tauri-apps/tauri-action@v0
@@ -151,6 +173,7 @@ jobs:
   build-macos:
     name: Build macOS
     runs-on: macos-latest
+    needs: [build-frontend]
     if: >-
       github.event_name == 'push' ||
       contains(github.event.inputs.platforms, 'macos')
@@ -158,21 +181,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: oven-sh/setup-bun@v2
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - uses: swatinem/rust-cache@v2
 
-      - name: Install frontend dependencies
-        working-directory: web
-        run: bun install
-
-      - name: Build frontend
-        working-directory: web
-        run: bun run build
+      - name: Download frontend build
+        uses: actions/download-artifact@v8
+        with:
+          name: frontend-build
+          path: web/build/
 
       - name: Import Apple certificate
         env:
@@ -294,8 +313,10 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: Install cross-compilation tools
-        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
 
       - name: Build CLI, daemon, and TUI
         run: cross build --profile ci-release -p zenii-cli -p zenii-daemon -p zenii-tui --no-default-features --features channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard${{ matrix.extra-features }} --target ${{ matrix.target }}
