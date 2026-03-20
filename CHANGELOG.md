@@ -20,6 +20,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto-refresh workflow list in frontend when workflow completes
 - `get_text()` method on ZeniiClient for plain text API responses
 
+### Fixed
+- Chat: first-message race condition — `goto()` now awaited, route effect guards against clearing during active stream
+- Chat: session ID closure capture — `activeStreamSessionId` prevents stale callbacks from corrupting wrong session
+- Chat: synthetic message IDs — `finishStream()` reconciles with server instead of fabricating untracked messages
+- Chat: manual stop no longer creates phantom assistant messages (new `cancelStream()` method)
+- Desktop: graceful shutdown — sends gateway `shutdown_tx` and waits for WAL checkpoint before exit
+- Boot: readiness-gated store init — `sessionsStore.load()` and `notificationStore.connect()` now wait for AuthGate readiness
+- WebSocket: unknown message types no longer silently dropped (added `default` case + `onWarning` callback)
+- Stores: scheduler, workflows, channels, inbox now surface errors via `error` field instead of swallowing as empty lists
+- Workflows: cancel rollback — restores running state on API failure instead of silent `.catch(() => {})`
+- Inbox: message deduplication on WebSocket reconnect (2-second window check)
+- Notifications: `retryConnection()` method resets reconnect budget; layout shows "Reconnect" banner
+- Channels: config update rollback on API failure (snapshot/restore pattern)
+
+### Changed
+- Settings page: lazy-loaded tab components (162 kB → 33 kB initial chunk, 80% reduction)
+- Shiki themes: wrapped in arrow functions for lazy loading
+
 ### Docs
 - Updated route/tool/provider counts across all documentation surfaces (114 routes, 14 tools, 6 providers)
 - CLI reference: workflow command section with 8 subcommands and recipe

@@ -9,9 +9,16 @@
 
 	$effect(() => {
 		if (sessionId) {
-			messagesStore.clear();
+			// P0.1: Skip clearing if we're actively streaming this same session
+			// (e.g., after first-message goto navigates here)
+			const isStreamingThisSession =
+				messagesStore.streaming && messagesStore.activeStreamSessionId === sessionId;
+
+			if (!isStreamingThisSession) {
+				messagesStore.clear();
+				messagesStore.load(sessionId);
+			}
 			sessionsStore.get(sessionId);
-			messagesStore.load(sessionId);
 		}
 	});
 </script>

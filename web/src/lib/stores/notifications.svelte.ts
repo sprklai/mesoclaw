@@ -255,6 +255,15 @@ class NotificationStore {
     this.currentUrl = null;
   }
 
+  /** Reset reconnect state and attempt to reconnect after permanent disconnection. */
+  retryConnection() {
+    if (!this.currentUrl) return;
+    this.reconnectAttempt = 0;
+    this.disconnectedPermanently = false;
+    this.shouldReconnect = true;
+    this.openSocket(this.currentUrl);
+  }
+
   clear() {
     this.notifications = [];
   }

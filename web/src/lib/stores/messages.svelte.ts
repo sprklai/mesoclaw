@@ -39,6 +39,7 @@ function createMessagesStore() {
   let streamContent = $state("");
   let error = $state("");
   let activeToolCalls = $state<ActiveToolCall[]>([]);
+  let activeStreamSessionId = $state<string | null>(null);
 
   return {
     get messages() {
@@ -58,6 +59,9 @@ function createMessagesStore() {
     },
     get activeToolCalls() {
       return activeToolCalls;
+    },
+    get activeStreamSessionId() {
+      return activeStreamSessionId;
     },
 
     async load(sessionId: string) {
@@ -85,11 +89,12 @@ function createMessagesStore() {
       return msg;
     },
 
-    startStream() {
+    startStream(sessionId: string) {
       streaming = true;
       streamContent = "";
       error = "";
       activeToolCalls = [];
+      activeStreamSessionId = sessionId;
     },
 
     setError(msg: string) {
@@ -133,35 +138,32 @@ function createMessagesStore() {
       );
     },
 
-    finishStream(sessionId: string) {
-      if (streamContent || activeToolCalls.length > 0) {
-        const toolCalls: ToolCallRecord[] = activeToolCalls.map((tc) => ({
-          id: tc.callId,
-          message_id: "",
-          session_id: sessionId,
-          tool_name: tc.toolName,
-          args: tc.args,
-          output: tc.output,
-          success: tc.success,
-          duration_ms: tc.durationMs,
-          created_at: new Date().toISOString(),
-        }));
+    async finishStream(sessionId: string) {
+      // Keep streamed content visible while we reconcile with server
+      streaming = false;
+      activeStreamSessionId = null;
 
-        messages = [
-          ...messages,
-          {
-            id: crypto.randomUUID(),
-            session_id: sessionId,
-            role: "assistant",
-            content: streamContent,
-            created_at: Date.now(),
-            tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-          },
-        ];
+      // Reconcile with server-persisted messages (server is source of truth)
+      try {
+        const serverMessages = await apiGet<Message[]>(
+          `/sessions/${encodeURIComponent(sessionId)}/messages`,
+        );
+        messages = serverMessages;
+      } catch (e) {
+        // If server load fails, keep what we have — stream content is already
+        // visible in the messages list as the last assistant message
+        console.error("finishStream: failed to reconcile with server:", e);
       }
+
+      streamContent = "";
+      activeToolCalls = [];
+    },
+
+    cancelStream() {
       streaming = false;
       streamContent = "";
       activeToolCalls = [];
+      activeStreamSessionId = null;
     },
 
     async deleteFrom(sessionId: string, messageId: string) {
@@ -180,6 +182,7 @@ function createMessagesStore() {
       streamContent = "";
       error = "";
       activeToolCalls = [];
+      activeStreamSessionId = null;
     },
   };
 }

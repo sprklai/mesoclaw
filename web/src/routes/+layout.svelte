@@ -2,6 +2,7 @@
 	import '../app.css';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Separator } from '$lib/components/ui/separator';
+	import { Button } from '$lib/components/ui/button';
 	import AuthGate from '$lib/components/AuthGate.svelte';
 	import SessionList from '$lib/components/SessionList.svelte';
 	import { Toaster } from 'svelte-sonner';
@@ -13,6 +14,7 @@
 	import Workflow from '@lucide/svelte/icons/workflow';
 	import BookOpen from '@lucide/svelte/icons/book-open';
 	import FileText from '@lucide/svelte/icons/file-text';
+	import WifiOff from '@lucide/svelte/icons/wifi-off';
 	import { inboxStore } from '$lib/stores/inbox.svelte';
 	import '$lib/stores/theme.svelte';
 	import { goto } from '$app/navigation';
@@ -21,7 +23,7 @@
 	import { notificationStore } from '$lib/stores/notifications.svelte';
 	import { getBaseUrl, getToken } from '$lib/api/client';
 	import { getAppVersion, openInBrowser } from '$lib/tauri';
-	import { onMount, onDestroy } from 'svelte';
+	import { onDestroy } from 'svelte';
 
 	let { children } = $props();
 	let appVersion = $state<string | null>(null);
@@ -32,7 +34,8 @@
 		}
 	}
 
-	onMount(async () => {
+	/** Called by AuthGate once the gateway is authenticated and ready. */
+	function handleGatewayReady() {
 		sessionsStore.load();
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 
@@ -44,8 +47,10 @@
 			: `${wsBase}/ws/notifications`;
 		notificationStore.connect(wsUrl);
 
-		appVersion = await getAppVersion();
-	});
+		getAppVersion().then((v) => {
+			appVersion = v;
+		});
+	}
 
 	onDestroy(() => {
 		document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -67,7 +72,7 @@
 </script>
 
 <Toaster richColors />
-<AuthGate>
+<AuthGate onReady={handleGatewayReady}>
 	<Sidebar.Provider>
 		<Sidebar.Root>
 			<Sidebar.Header class="sticky top-0 z-10 bg-sidebar-accent/50 border-b border-sidebar-border">
@@ -137,6 +142,20 @@
 		</Sidebar.Root>
 
 		<main class="flex-1 overflow-hidden">
+			{#if notificationStore.disconnectedPermanently}
+				<div class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+					<WifiOff class="h-4 w-4 shrink-0" />
+					<span>Real-time notifications disconnected.</span>
+					<Button
+						variant="outline"
+						size="sm"
+						class="ml-auto h-7 border-destructive/30 text-destructive hover:bg-destructive/10"
+						onclick={() => notificationStore.retryConnection()}
+					>
+						Reconnect
+					</Button>
+				</div>
+			{/if}
 			<div class="flex h-full items-start">
 				<Sidebar.Trigger class="m-2 shrink-0" />
 				<div class="flex-1 h-full overflow-auto p-2 sm:p-4 md:p-6">

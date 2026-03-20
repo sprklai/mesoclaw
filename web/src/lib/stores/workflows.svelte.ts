@@ -53,6 +53,7 @@ export interface WorkflowRunProgress {
 function createWorkflowsStore() {
   let workflows = $state<Workflow[]>([]);
   let loading = $state(false);
+  let error = $state<string | null>(null);
   let runningWorkflows = $state<Map<string, WorkflowRunProgress>>(new Map());
   const timeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -62,6 +63,9 @@ function createWorkflowsStore() {
     },
     get loading() {
       return loading;
+    },
+    get error() {
+      return error;
     },
 
     isRunning(workflowId: string): boolean {
@@ -124,28 +128,57 @@ function createWorkflowsStore() {
     },
 
     async cancel(workflowId: string) {
+      // Save running state before optimistic removal
+      const savedProgress = runningWorkflows.get(workflowId);
+      const savedTimeout = timeouts.get(workflowId);
+
       // Optimistic remove
       const next = new Map(runningWorkflows);
       next.delete(workflowId);
       runningWorkflows = next;
 
-      const timeout = timeouts.get(workflowId);
-      if (timeout) {
-        clearTimeout(timeout);
+      if (savedTimeout) {
+        clearTimeout(savedTimeout);
         timeouts.delete(workflowId);
       }
 
-      await apiPost(
-        `/workflows/${encodeURIComponent(workflowId)}/cancel`,
-        {},
-      ).catch(() => {});
+      try {
+        await apiPost(
+          `/workflows/${encodeURIComponent(workflowId)}/cancel`,
+          {},
+        );
+      } catch (e: unknown) {
+        // Restore running state on failure
+        if (savedProgress) {
+          const restored = new Map(runningWorkflows);
+          restored.set(workflowId, savedProgress);
+          runningWorkflows = restored;
+
+          if (savedTimeout) {
+            timeouts.set(
+              workflowId,
+              setTimeout(
+                () => {
+                  this.setCompleted(workflowId, savedProgress.runId, "timeout");
+                },
+                5 * 60 * 1000,
+              ),
+            );
+          }
+        }
+        error = e instanceof Error ? e.message : "Failed to cancel workflow";
+      }
     },
 
     async load() {
       loading = true;
+      error = null;
       try {
         workflows = await apiGet<Workflow[]>("/workflows").catch(
-          () => [] as Workflow[],
+          (e: unknown) => {
+            error = e instanceof Error ? e.message : "Failed to load workflows";
+            return [] as Workflow[];
+          },
         );
       } finally {
         loading = false;

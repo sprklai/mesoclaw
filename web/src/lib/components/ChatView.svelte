@@ -111,12 +111,12 @@
 		if (!currentSessionId) {
 			const session = await sessionsStore.create(prompt.slice(0, 50));
 			currentSessionId = session.id;
-			goto(`/chat/${currentSessionId}`, { replaceState: true });
+			await goto(`/chat/${currentSessionId}`, { replaceState: true });
 		}
 
 		await messagesStore.send(currentSessionId, 'user', prompt);
 
-		messagesStore.startStream();
+		messagesStore.startStream(currentSessionId);
 
 		const capturedSessionId = currentSessionId;
 		const capturedModel = providersStore.selectedModel || undefined;
@@ -155,7 +155,10 @@
 					activeWs = null;
 					delegationStore.clear();
 					approvalsStore.clear();
-					messagesStore.finishStream(capturedSessionId);
+					// P0.2: Only finish if this stream still owns the session
+					if (messagesStore.activeStreamSessionId === capturedSessionId) {
+						messagesStore.finishStream(capturedSessionId);
+					}
 					if (isFirstMessage) {
 						sessionsStore.generateTitle(capturedSessionId, capturedModel);
 					}
@@ -170,7 +173,10 @@
 							? '__NO_PROVIDER__'
 							: error;
 					messagesStore.setError(friendlyError);
-					messagesStore.finishStream(capturedSessionId);
+					// P0.2: Only finish if this stream still owns the session
+					if (messagesStore.activeStreamSessionId === capturedSessionId) {
+						messagesStore.finishStream(capturedSessionId);
+					}
 					console.error('Chat error:', error);
 				}
 			},
@@ -190,9 +196,10 @@
 			activeWs.close();
 			activeWs = null;
 		}
+		delegationStore.clear();
+		approvalsStore.clear();
 		if (messagesStore.streaming) {
-			const sid = sessionId ?? '';
-			messagesStore.finishStream(sid);
+			messagesStore.cancelStream();
 		}
 	}
 </script>

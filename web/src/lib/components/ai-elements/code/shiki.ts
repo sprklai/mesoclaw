@@ -30,9 +30,9 @@ export const shikiThemes = {
 /** A preloaded highlighter instance. */
 export const highlighter = createHighlighterCore({
   themes: [
-    import("@shikijs/themes/github-light-default"),
-    import("@shikijs/themes/github-dark-default"),
-    import("@shikijs/themes/vesper"),
+    () => import("@shikijs/themes/github-light-default"),
+    () => import("@shikijs/themes/github-dark-default"),
+    () => import("@shikijs/themes/vesper"),
   ],
   langs: Object.entries(bundledLanguages).map(([_, lang]) => lang),
   engine: createJavaScriptRegexEngine(),

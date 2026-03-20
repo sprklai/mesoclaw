@@ -93,6 +93,7 @@ function credKey(channelId: string, field: string): string {
 function createChannelsStore() {
   let channels = $state<ChannelWithStatus[]>([]);
   let loading = $state(false);
+  let error = $state<string | null>(null);
   let channelConfig = $state<ChannelConfig>({
     telegram_dm_policy: "allowlist",
     telegram_polling_timeout_secs: 30,
@@ -112,16 +113,21 @@ function createChannelsStore() {
     get channelConfig() {
       return channelConfig;
     },
+    get error() {
+      return error;
+    },
 
     async load() {
       loading = true;
+      error = null;
       try {
         // Fetch configured credential keys
         let allKeys = new Set<string>();
         try {
           const keys = await apiGet<string[]>("/credentials");
           allKeys = new Set(keys.filter((k) => k.startsWith("channel:")));
-        } catch {
+        } catch (e: unknown) {
+          error = e instanceof Error ? e.message : "Failed to load credentials";
           allKeys = new Set();
         }
 
@@ -134,7 +140,7 @@ function createChannelsStore() {
             liveStatuses[s.name] = s.status;
           }
         } catch {
-          // Channels feature may not be enabled
+          // Channels feature may not be enabled — not an error
         }
 
         // Fetch config for channel settings
@@ -154,8 +160,11 @@ function createChannelsStore() {
             discord_allowed_channel_ids:
               (config.discord_allowed_channel_ids as number[]) ?? [],
           };
-        } catch {
-          // Use defaults
+        } catch (e: unknown) {
+          if (!error) {
+            error =
+              e instanceof Error ? e.message : "Failed to load channel config";
+          }
         }
 
         // Build channel list with per-channel credential status
@@ -254,8 +263,19 @@ function createChannelsStore() {
     },
 
     async updateConfig(fields: Partial<ChannelConfig>) {
-      await apiPut("/config", fields);
+      // Snapshot before optimistic update
+      const snapshot = { ...channelConfig };
+      // Optimistic update
       Object.assign(channelConfig, fields);
+      try {
+        await apiPut("/config", fields);
+      } catch (e: unknown) {
+        // Restore from snapshot on failure
+        channelConfig = snapshot;
+        error =
+          e instanceof Error ? e.message : "Failed to update channel config";
+        throw e;
+      }
     },
   };
 }

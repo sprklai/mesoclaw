@@ -16,9 +16,10 @@
 	import { onDestroy } from 'svelte';
 	import OnboardingWizard from '$lib/components/OnboardingWizard.svelte';
 
-	let { children } = $props();
+	let { children, onReady }: { children: any; onReady?: () => void } = $props();
 
 	let authenticated = $state(false);
+	let readyFired = false;
 	let showSetup = $state(false);
 	let detectedTimezone = $state('');
 	let missingFields = $state<string[]>([]);
@@ -248,6 +249,14 @@
 			// Non-fatal: if endpoint unavailable, skip onboarding
 		}
 	}
+
+	// Fire onReady callback once when authenticated and not in setup wizard
+	$effect(() => {
+		if (authenticated && !showSetup && !readyFired) {
+			readyFired = true;
+			onReady?.();
+		}
+	});
 
 	onDestroy(() => {
 		clearPollTimeout();

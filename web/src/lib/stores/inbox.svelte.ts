@@ -48,6 +48,7 @@ class InboxStore {
   channelFilter = $state<string | null>(null);
   loading = $state(false);
   loadingMessages = $state(false);
+  error = $state<string | null>(null);
   lastReadTimestamps = $state<Record<string, number>>(getLastReadTimestamps());
 
   get totalUnread(): number {
@@ -64,6 +65,7 @@ class InboxStore {
 
   async load() {
     this.loading = true;
+    this.error = null;
     try {
       const params = new URLSearchParams();
       if (this.channelFilter) {
@@ -74,7 +76,9 @@ class InboxStore {
       this.conversations = await apiGet<ChannelConversation[]>(
         `/channels/sessions?${query}`,
       );
-    } catch {
+    } catch (e: unknown) {
+      this.error =
+        e instanceof Error ? e.message : "Failed to load conversations";
       this.conversations = [];
     } finally {
       this.loading = false;
@@ -131,16 +135,31 @@ class InboxStore {
 
     // If viewing this conversation, append the message preview
     if (this.selectedId === event.session_id) {
-      this.messages = [
-        ...this.messages,
-        {
-          id: `rt-${Date.now()}`,
-          session_id: event.session_id,
-          role: event.role,
-          content: event.content_preview,
-          created_at: new Date().toISOString(),
-        },
-      ];
+      // Deduplicate: check if a message with same session_id + sender + similar
+      // timestamp (within 2s window) already exists — prevents duplicates on
+      // WebSocket reconnect
+      const now = Date.now();
+      const isDuplicate = this.messages.some((m) => {
+        if (m.session_id !== event.session_id) return false;
+        if (m.role !== event.role) return false;
+        const msgTime = new Date(m.created_at).getTime();
+        return (
+          Math.abs(now - msgTime) < 2000 && m.content === event.content_preview
+        );
+      });
+
+      if (!isDuplicate) {
+        this.messages = [
+          ...this.messages,
+          {
+            id: `rt-${Date.now()}`,
+            session_id: event.session_id,
+            role: event.role,
+            content: event.content_preview,
+            created_at: new Date().toISOString(),
+          },
+        ];
+      }
       this.markAsRead(event.session_id);
     }
   }

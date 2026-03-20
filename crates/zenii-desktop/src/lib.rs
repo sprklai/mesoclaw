@@ -1,7 +1,10 @@
 pub mod commands;
 pub mod tray;
 
+use std::sync::Arc;
+
 use tauri::Manager;
+use tracing::info;
 
 #[allow(clippy::expect_used)]
 pub fn run() {
@@ -47,7 +50,27 @@ pub fn run() {
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                window.app_handle().exit(0);
+                let app_handle = window.app_handle();
+
+                // Attempt graceful gateway shutdown before exiting
+                if let Some(state) =
+                    app_handle.try_state::<Arc<tokio::sync::Mutex<commands::GatewayState>>>()
+                {
+                    // Use try_lock to avoid blocking the UI thread indefinitely.
+                    // The inner lock is a tokio::sync::Mutex, but we can try_lock
+                    // synchronously here since we're in a sync callback.
+                    if let Ok(mut guard) = state.try_lock()
+                        && let Some(tx) = guard.shutdown_tx.take()
+                    {
+                        info!("Sending gateway shutdown signal");
+                        let _ = tx.send(());
+                    }
+
+                    // Brief wait for WAL checkpoint and cleanup
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+
+                app_handle.exit(0);
             }
         })
         .run(tauri::generate_context!())

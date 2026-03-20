@@ -10,20 +10,36 @@
 	import Bell from '@lucide/svelte/icons/bell';
 	import Shield from '@lucide/svelte/icons/shield';
 	import Info from '@lucide/svelte/icons/info';
-	import GeneralSettings from '$lib/components/settings/GeneralSettings.svelte';
-	import PermissionsSettings from '$lib/components/settings/PermissionsSettings.svelte';
-	import ConfigurationsSettings from '$lib/components/settings/ConfigurationsSettings.svelte';
-	import ProvidersSettings from '$lib/components/settings/ProvidersSettings.svelte';
-	import PersonaSettings from '$lib/components/settings/PersonaSettings.svelte';
-	import ChannelsSettings from '$lib/components/settings/ChannelsSettings.svelte';
-	import ServicesSettings from '$lib/components/settings/ServicesSettings.svelte';
-	import EmbeddingsSettings from '$lib/components/settings/EmbeddingsSettings.svelte';
-	import NotificationsSettings from '$lib/components/settings/NotificationsSettings.svelte';
-	import PluginsSettings from '$lib/components/settings/PluginsSettings.svelte';
+	import type { Component } from 'svelte';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { getAppVersion } from '$lib/tauri';
 	import { onMount } from 'svelte';
+
+	const tabLoaders: Record<string, () => Promise<{ default: Component }>> = {
+		general: () => import('$lib/components/settings/GeneralSettings.svelte'),
+		providers: () => import('$lib/components/settings/ProvidersSettings.svelte'),
+		persona: () => import('$lib/components/settings/PersonaSettings.svelte'),
+		channels: () => import('$lib/components/settings/ChannelsSettings.svelte'),
+		permissions: () => import('$lib/components/settings/PermissionsSettings.svelte'),
+		notifications: () => import('$lib/components/settings/NotificationsSettings.svelte'),
+		services: () => import('$lib/components/settings/ServicesSettings.svelte'),
+		embeddings: () => import('$lib/components/settings/EmbeddingsSettings.svelte'),
+		configurations: () => import('$lib/components/settings/ConfigurationsSettings.svelte'),
+		plugins: () => import('$lib/components/settings/PluginsSettings.svelte'),
+	};
+
+	const componentCache = new Map<string, Component>();
+
+	async function loadTab(tabId: string): Promise<Component> {
+		const cached = componentCache.get(tabId);
+		if (cached) return cached;
+		const loader = tabLoaders[tabId];
+		if (!loader) throw new Error(`Unknown tab: ${tabId}`);
+		const mod = await loader();
+		componentCache.set(tabId, mod.default);
+		return mod.default;
+	}
 
 	const tabs = [
 		{ id: 'general', label: 'General', icon: SettingsIcon },
@@ -41,6 +57,7 @@
 	let activeTab = $state('general');
 	let appVersion = $state<string | null>(null);
 	let aboutOpen = $state(false);
+	let activeComponent = $derived(loadTab(activeTab));
 
 	function getHashTab(): string {
 		const hash = window.location.hash.slice(1);
@@ -116,27 +133,15 @@
 	<div class="flex-1 min-w-0 space-y-4">
 		<h1 class="text-2xl font-bold">{tabs.find((t) => t.id === activeTab)?.label ?? 'Settings'}</h1>
 
-		{#if activeTab === 'general'}
-			<GeneralSettings />
-		{:else if activeTab === 'providers'}
-			<ProvidersSettings />
-		{:else if activeTab === 'persona'}
-			<PersonaSettings />
-		{:else if activeTab === 'channels'}
-			<ChannelsSettings />
-		{:else if activeTab === 'permissions'}
-			<PermissionsSettings />
-		{:else if activeTab === 'notifications'}
-			<NotificationsSettings />
-		{:else if activeTab === 'services'}
-			<ServicesSettings />
-		{:else if activeTab === 'embeddings'}
-			<EmbeddingsSettings />
-		{:else if activeTab === 'configurations'}
-			<ConfigurationsSettings />
-		{:else if activeTab === 'plugins'}
-			<PluginsSettings />
-		{/if}
+		{#await activeComponent}
+			<div class="flex items-center justify-center py-12">
+				<div class="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent"></div>
+			</div>
+		{:then TabComponent}
+			<TabComponent />
+		{:catch error}
+			<p class="text-destructive text-sm">Failed to load settings tab: {error.message}</p>
+		{/await}
 	</div>
 </div>
 

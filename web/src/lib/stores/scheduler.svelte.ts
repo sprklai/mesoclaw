@@ -37,6 +37,7 @@ export interface SchedulerStatus {
 function createSchedulerStore() {
   let jobs = $state<ScheduledJob[]>([]);
   let loading = $state(false);
+  let error = $state<string | null>(null);
   let status = $state<SchedulerStatus>({ running: false, job_count: 0 });
 
   return {
@@ -46,20 +47,29 @@ function createSchedulerStore() {
     get loading() {
       return loading;
     },
+    get error() {
+      return error;
+    },
     get status() {
       return status;
     },
 
     async load() {
       loading = true;
+      error = null;
       try {
         const [jobList, schedulerStatus] = await Promise.all([
-          apiGet<ScheduledJob[]>("/scheduler/jobs").catch(
-            () => [] as ScheduledJob[],
-          ),
-          apiGet<SchedulerStatus>("/scheduler/status").catch(
-            () => ({ running: false, job_count: 0 }) as SchedulerStatus,
-          ),
+          apiGet<ScheduledJob[]>("/scheduler/jobs").catch((e: unknown) => {
+            error = e instanceof Error ? e.message : "Failed to load jobs";
+            return [] as ScheduledJob[];
+          }),
+          apiGet<SchedulerStatus>("/scheduler/status").catch((e: unknown) => {
+            error =
+              e instanceof Error
+                ? e.message
+                : "Failed to load scheduler status";
+            return { running: false, job_count: 0 } as SchedulerStatus;
+          }),
         ]);
         jobs = jobList;
         status = schedulerStatus;

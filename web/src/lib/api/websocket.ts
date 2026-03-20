@@ -81,6 +81,11 @@ export interface WsApprovalResolvedMessage {
   auto: boolean;
 }
 
+export interface WsWarningMessage {
+  type: "warning";
+  message: string;
+}
+
 export type WsMessage =
   | WsTextMessage
   | WsDoneMessage
@@ -92,7 +97,8 @@ export type WsMessage =
   | WsAgentCompletedMessage
   | WsDelegationCompletedMessage
   | WsApprovalRequestMessage
-  | WsApprovalResolvedMessage;
+  | WsApprovalResolvedMessage
+  | WsWarningMessage;
 
 export interface ChatStreamCallbacks {
   onToken: (content: string) => void;
@@ -138,6 +144,7 @@ export interface ChatStreamCallbacks {
     timeoutSecs: number,
   ) => void;
   onApprovalResolved?: (approvalId: string, decision: string) => void;
+  onWarning?: (message: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
 }
@@ -231,6 +238,9 @@ export function createChatStream(
         case "approval_resolved":
           callbacks.onApprovalResolved?.(msg.approval_id, msg.decision);
           break;
+        case "warning":
+          callbacks.onWarning?.(msg.message);
+          break;
         case "done":
           callbacks.onDone();
           intentionalClose = true;
@@ -240,6 +250,12 @@ export function createChatStream(
           callbacks.onError(msg.error);
           intentionalClose = true;
           ws.close();
+          break;
+        default:
+          console.warn(
+            `[WS] Unknown message type: ${(msg as { type: string }).type}`,
+            msg,
+          );
           break;
       }
     } catch {

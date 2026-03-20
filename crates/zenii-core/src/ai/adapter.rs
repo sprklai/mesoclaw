@@ -352,111 +352,110 @@ impl ToolDyn for RigToolAdapter {
 
             // Approval gate: check if this tool needs user approval
             if let Some(ref broker) = self.approval_broker
-                && let Some(reason) = self.tool.needs_approval(&args_value) {
-                    let args_summary = args_value
-                        .get("command")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or(&args)
-                        .to_string();
-                    let risk_level = format!("{:?}", self.tool.risk_level()).to_lowercase();
+                && let Some(reason) = self.tool.needs_approval(&args_value)
+            {
+                let args_summary = args_value
+                    .get("command")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&args)
+                    .to_string();
+                let risk_level = format!("{:?}", self.tool.risk_level()).to_lowercase();
 
-                    // Check pre-approved (session cache or DB rule)
-                    let pre = broker
-                        .pre_check(&tool_name, &args_summary, &self.surface)
-                        .await;
+                // Check pre-approved (session cache or DB rule)
+                let pre = broker
+                    .pre_check(&tool_name, &args_summary, &self.surface)
+                    .await;
 
-                    match pre {
-                        Some(crate::security::approval::ApprovalDecision::Deny) => {
-                            return Err(ToolError::ToolCallError(Box::new(std::io::Error::other(
-                                format!("Tool '{tool_name}' denied by saved rule"),
-                            ))));
+                match pre {
+                    Some(crate::security::approval::ApprovalDecision::Deny) => {
+                        return Err(ToolError::ToolCallError(Box::new(std::io::Error::other(
+                            format!("Tool '{tool_name}' denied by saved rule"),
+                        ))));
+                    }
+                    Some(_) => {
+                        // Pre-approved, continue to execution
+                    }
+                    None => {
+                        // Need to prompt user
+                        let approval_id = uuid::Uuid::new_v4().to_string();
+
+                        // Emit approval requested event via tool events
+                        if let Some(ref tx) = self.event_tx {
+                            let _ = tx.send(ToolCallEvent {
+                                call_id: call_id.clone(),
+                                tool_name: tool_name.clone(),
+                                phase: ToolCallPhase::ApprovalRequested {
+                                    approval_id: approval_id.clone(),
+                                    reason: reason.clone(),
+                                    risk_level: risk_level.clone(),
+                                    timeout_secs: self.approval_timeout_secs,
+                                },
+                            });
                         }
-                        Some(_) => {
-                            // Pre-approved, continue to execution
+
+                        // Also publish to event bus for notifications WS
+                        if let Some(ref bus) = self.event_bus {
+                            let _ = bus.publish(crate::event_bus::AppEvent::ApprovalRequested {
+                                approval_id: approval_id.clone(),
+                                call_id: call_id.clone(),
+                                tool_name: tool_name.clone(),
+                                args_summary: args_summary.clone(),
+                                risk_level: risk_level.clone(),
+                                reason: reason.clone(),
+                                timeout_secs: self.approval_timeout_secs,
+                            });
                         }
-                        None => {
-                            // Need to prompt user
-                            let approval_id = uuid::Uuid::new_v4().to_string();
 
-                            // Emit approval requested event via tool events
-                            if let Some(ref tx) = self.event_tx {
-                                let _ = tx.send(ToolCallEvent {
-                                    call_id: call_id.clone(),
-                                    tool_name: tool_name.clone(),
-                                    phase: ToolCallPhase::ApprovalRequested {
-                                        approval_id: approval_id.clone(),
-                                        reason: reason.clone(),
-                                        risk_level: risk_level.clone(),
-                                        timeout_secs: self.approval_timeout_secs,
-                                    },
-                                });
+                        // Wait for decision with timeout
+                        let rx = broker.register(&approval_id);
+                        let timeout = std::time::Duration::from_secs(self.approval_timeout_secs);
+                        let decision = tokio::select! {
+                            result = rx => {
+                                result.unwrap_or(crate::security::approval::ApprovalDecision::Deny)
                             }
-
-                            // Also publish to event bus for notifications WS
-                            if let Some(ref bus) = self.event_bus {
-                                let _ =
-                                    bus.publish(crate::event_bus::AppEvent::ApprovalRequested {
-                                        approval_id: approval_id.clone(),
-                                        call_id: call_id.clone(),
-                                        tool_name: tool_name.clone(),
-                                        args_summary: args_summary.clone(),
-                                        risk_level: risk_level.clone(),
-                                        reason: reason.clone(),
-                                        timeout_secs: self.approval_timeout_secs,
-                                    });
+                            _ = tokio::time::sleep(timeout) => {
+                                crate::security::approval::ApprovalDecision::Deny
                             }
+                        };
 
-                            // Wait for decision with timeout
-                            let rx = broker.register(&approval_id);
-                            let timeout =
-                                std::time::Duration::from_secs(self.approval_timeout_secs);
-                            let decision = tokio::select! {
-                                result = rx => {
-                                    result.unwrap_or(crate::security::approval::ApprovalDecision::Deny)
-                                }
-                                _ = tokio::time::sleep(timeout) => {
-                                    crate::security::approval::ApprovalDecision::Deny
-                                }
-                            };
+                        // Emit resolution event
+                        if let Some(ref tx) = self.event_tx {
+                            let _ = tx.send(ToolCallEvent {
+                                call_id: call_id.clone(),
+                                tool_name: tool_name.clone(),
+                                phase: ToolCallPhase::ApprovalResolved {
+                                    approval_id: approval_id.clone(),
+                                    decision: decision.as_str().to_string(),
+                                },
+                            });
+                        }
 
-                            // Emit resolution event
-                            if let Some(ref tx) = self.event_tx {
-                                let _ = tx.send(ToolCallEvent {
-                                    call_id: call_id.clone(),
-                                    tool_name: tool_name.clone(),
-                                    phase: ToolCallPhase::ApprovalResolved {
-                                        approval_id: approval_id.clone(),
-                                        decision: decision.as_str().to_string(),
-                                    },
-                                });
+                        match decision {
+                            crate::security::approval::ApprovalDecision::Approve => {
+                                broker.cache_session(&tool_name, decision);
                             }
-
-                            match decision {
-                                crate::security::approval::ApprovalDecision::Approve => {
-                                    broker.cache_session(&tool_name, decision);
-                                }
-                                crate::security::approval::ApprovalDecision::ApproveAlways => {
-                                    broker.cache_session(&tool_name, decision);
-                                    let _ = broker
-                                        .save_rule(
-                                            &tool_name,
-                                            Some(&args_summary),
-                                            decision,
-                                            &self.surface,
-                                        )
-                                        .await;
-                                }
-                                crate::security::approval::ApprovalDecision::Deny => {
-                                    return Err(ToolError::ToolCallError(Box::new(
-                                        std::io::Error::other(format!(
-                                            "Tool '{tool_name}' denied by user"
-                                        )),
-                                    )));
-                                }
+                            crate::security::approval::ApprovalDecision::ApproveAlways => {
+                                broker.cache_session(&tool_name, decision);
+                                let _ = broker
+                                    .save_rule(
+                                        &tool_name,
+                                        Some(&args_summary),
+                                        decision,
+                                        &self.surface,
+                                    )
+                                    .await;
+                            }
+                            crate::security::approval::ApprovalDecision::Deny => {
+                                return Err(ToolError::ToolCallError(Box::new(
+                                    std::io::Error::other(format!(
+                                        "Tool '{tool_name}' denied by user"
+                                    )),
+                                )));
                             }
                         }
                     }
                 }
+            }
 
             // Emit Started event (cache miss)
             if let Some(ref tx) = self.event_tx {
