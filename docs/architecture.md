@@ -41,6 +41,8 @@ slug: /architecture
 - [Onboarding Flow](#onboarding-flow)
 - [Tool Permission System](#tool-permission-system-phase-19)
 - [Model Capability Validation](#model-capability-validation)
+- [Agent Delegation](#agent-delegation)
+- [Workflow Engine](#workflow-engine)
 - [Concurrency Rules](#concurrency-rules)
 - [Lessons Learned from v1](#lessons-learned-from-v1)
 
@@ -70,6 +72,8 @@ graph TD
             Skills["Skills<br>SkillRegistry"]
             UserL["User Profile<br>UserLearner"]
             Channels["Channels"]
+            Deleg["Delegation<br>Coordinator"]
+            Workflows["Workflows<br>WorkflowRegistry"]
         end
 
         subgraph Support["Support Layer"]
@@ -107,7 +111,7 @@ graph TB
     end
 
     subgraph GW["Gateway :18981"]
-        REST["REST<br>75 base + 17 feature-gated"]
+        REST["REST<br>77 base + 24 feature-gated"]
         WS["WebSocket<br>/ws/chat"]
     end
 
@@ -158,6 +162,8 @@ graph TD
     core --> websearch["websearch<br>#40;web search providers#41;"]
     core -.-> teloxide["teloxide<br>#40;Telegram, feature-gated#41;"]
     core -.-> serenity["serenity<br>#40;Discord, feature-gated#41;"]
+    core -.-> petgraph["petgraph<br>#40;workflow DAG, feature-gated#41;"]
+    core -.-> minijinja["minijinja<br>#40;workflow templates, feature-gated#41;"]
 
     cli --> reqwest["reqwest<br>#40;HTTP client#41;"]
     cli --> tungstenite["tokio-tungstenite<br>#40;WS client#41;"]
@@ -189,8 +195,10 @@ zenii/
 │   │   │   ├── credential/ # CredentialStore trait + KeyringStore + FileCredentialStore + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
 │   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 16 tools (14 base + 2 feature-gated)
-│   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter, context engine
-│   │   │   ├── gateway/    # axum HTTP+WS gateway (75 base + 17 feature-gated routes, auth middleware, error mapping, ZENII_VALIDATION)
+│   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter, context engine, delegation
+│   │   │   │   └── delegation/ # Coordinator, SubAgent, DelegationTask, dependency-wave execution
+│   │   │   ├── workflows/  # WorkflowRegistry, WorkflowExecutor, StepRuntime, templates (feature-gated)
+│   │   │   ├── gateway/    # axum HTTP+WS gateway (77 base + 24 feature-gated routes, auth middleware, error mapping, ZENII_VALIDATION)
 │   │   │   ├── identity/   # SoulLoader + PromptComposer + defaults (SOUL/IDENTITY/USER.md)
 │   │   │   ├── skills/     # SkillRegistry + bundled/user skills (markdown + YAML frontmatter)
 │   │   │   ├── user/       # UserLearner + SQLite observations + privacy controls
@@ -281,6 +289,7 @@ graph TD
     Daemon --> ChDC["--features channels-discord"]
     Daemon --> Scheduler["--features scheduler"]
     Daemon --> Dashboard["--features web-dashboard"]
+    Daemon --> Wkflows["--features workflows"]
 
     Default --> CoreGW["zenii-core<br>#40;gateway + ai + keyring#41;"]
     CoreGW --> Axum[axum + tower-http]
@@ -294,6 +303,9 @@ graph TD
     Scheduler --> CoreSC[zenii-core/scheduler]
     Dashboard --> CoreWD[zenii-core/web-dashboard]
     CoreWD --> CoreGW
+    Wkflows --> CoreWF[zenii-core/workflows]
+    CoreWF --> Petgraph[petgraph]
+    CoreWF --> Minijinja[minijinja]
 ```
 
 ## Trait-Driven Architecture
@@ -516,6 +528,7 @@ graph TB
 | `channels-telegram` | `channels` | TelegramChannel + teloxide dependency |
 | `channels-slack` | `channels` | SlackChannel (uses existing reqwest/tungstenite) |
 | `channels-discord` | `channels` | DiscordChannel + serenity dependency |
+| `workflows` | (none) | WorkflowRegistry + WorkflowExecutor + petgraph + minijinja + 7 gateway routes |
 
 ## Identity / Soul System
 
@@ -782,7 +795,7 @@ graph TB
 
 ## Gateway Routes
 
-All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Routes are grouped by subsystem (79 base + 17 feature-gated = 96 total).
+All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Routes are grouped by subsystem (81 base + 24 feature-gated = 105 total).
 
 ### Health (1 route, no auth)
 
@@ -976,6 +989,25 @@ All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Rou
 | POST | `/plugins/{name}/update` | Update plugin to latest version |
 | GET | `/plugins/{name}/config` | Get plugin configuration |
 | PUT | `/plugins/{name}/config` | Update plugin configuration |
+
+### Agent Delegation (2 routes)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/agents/active` | List active delegation runs |
+| POST | `/agents/{id}/cancel` | Cancel a delegation run |
+
+### Workflows (7 routes, feature-gated)
+
+| Method | Path | Feature | Description |
+|---|---|---|---|
+| POST | `/workflows` | `workflows` | Create workflow from TOML |
+| GET | `/workflows` | `workflows` | List all workflows |
+| GET | `/workflows/{id}` | `workflows` | Get workflow definition |
+| DELETE | `/workflows/{id}` | `workflows` | Delete workflow |
+| POST | `/workflows/{id}/run` | `workflows` | Execute workflow |
+| GET | `/workflows/{id}/history` | `workflows` | Get run history |
+| GET | `/workflows/{id}/runs/{run_id}` | `workflows` | Get run details with step results |
 
 ### WebSocket Endpoints (2 routes)
 
@@ -1838,6 +1870,217 @@ flowchart TD
 - **API**: `POST /providers/{id}/models` accepts `supports_tools` flag
 
 **Key file**: `ai/agent.rs` (capability check in `get_or_build_agent()`)
+
+---
+
+## Agent Delegation
+
+The delegation system allows the main agent to decompose complex tasks into independent sub-tasks, execute them in parallel via isolated sub-agents, and aggregate the results into a unified response.
+
+```mermaid
+flowchart TD
+    Chat([Chat request<br>delegation: true]) --> Decompose["Coordinator::decompose<br>LLM decomposes task into sub-tasks"]
+    Decompose --> Validate["validate_tasks<br>check max_sub_agents + tool allowlists"]
+    Validate --> Waves["Dependency wave execution"]
+
+    Waves --> Wave1["Wave 1: independent tasks"]
+    Wave1 --> Sub1["SubAgent t1<br>isolated session + filtered tools"]
+    Wave1 --> Sub2["SubAgent t2<br>isolated session + filtered tools"]
+    Sub1 --> JoinSet["JoinSet::join_next"]
+    Sub2 --> JoinSet
+
+    JoinSet --> Wave2{"More waves?"}
+    Wave2 -->|"dependent tasks ready"| WaveN["Wave N: depends_on resolved"]
+    WaveN --> JoinSet
+    Wave2 -->|"all done"| Agg["Coordinator::aggregate<br>LLM synthesizes results"]
+    Agg --> Result["DelegationResult<br>aggregated_response + per-task results + total usage"]
+
+    subgraph Events["Event Bus"]
+        Spawn["SubAgentSpawned"]
+        Complete["SubAgentCompleted"]
+        Failed["SubAgentFailed"]
+    end
+
+    Sub1 -.-> Spawn
+    JoinSet -.-> Complete
+    JoinSet -.-> Failed
+
+    style Chat fill:#2196F3,color:#fff
+    style Waves fill:#4CAF50,color:#fff
+    style Events fill:#FF9800,color:#fff
+```
+
+### Key Components
+
+| Component | File | Description |
+|---|---|---|
+| `DelegationConfig` | `ai/delegation/mod.rs` | Config: max sub-agents, token budget, timeout, decomposition model |
+| `DelegationTask` | `ai/delegation/task.rs` | Task definition with id, description, tool_allowlist, depends_on |
+| `TaskResult` | `ai/delegation/task.rs` | Per-task outcome: status, output, usage, duration, session_id |
+| `DelegationResult` | `ai/delegation/task.rs` | Aggregated result: all task results + synthesized response + total usage |
+| `TaskStatus` | `ai/delegation/task.rs` | Enum: Pending, Running, Completed, Failed, Cancelled, TimedOut |
+| `SubAgent` | `ai/delegation/sub_agent.rs` | Isolated agent with own session, filtered tools, timeout enforcement |
+| `Coordinator` | `ai/delegation/coordinator.rs` | Orchestrator: decompose, validate, execute waves, cancel, aggregate |
+
+### Execution Model
+
+- **Dependency waves**: Tasks are partitioned into waves based on `depends_on` fields. Each wave runs in parallel via `JoinSet`. Wave N+1 starts only after wave N completes.
+- **Isolated sessions**: Each sub-agent gets a dedicated session with `source: "delegation"` for traceability.
+- **Tool filtering**: Sub-agents can be restricted to a tool allowlist, or inherit the surface's full permission set.
+- **Timeout**: Per-agent timeout via `tokio::time::timeout`, configurable via `delegation_per_agent_timeout_secs`.
+- **Cancellation**: `Coordinator::cancel(id)` aborts all sub-agent `JoinHandle`s for a delegation run. `cancel_all()` aborts everything.
+
+### Config Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `delegation_max_sub_agents` | usize | 4 | Maximum sub-tasks per delegation |
+| `delegation_per_agent_token_budget` | usize | 4000 | Token budget per sub-agent |
+| `delegation_per_agent_timeout_secs` | u64 | 120 | Timeout per sub-agent in seconds |
+| `delegation_decomposition_model` | Option | None | Model override for decomposition LLM call |
+
+### Gateway Integration
+
+The `ChatRequest` struct has an optional `delegation: Option<bool>` field. When `true`, the chat handler delegates to `Coordinator::delegate()` instead of the standard agent flow. Two management routes are always available:
+
+- `GET /agents/active` -- list active delegation run IDs
+- `POST /agents/{id}/cancel` -- cancel a delegation run by ID
+
+---
+
+## Workflow Engine
+
+The workflow engine provides multi-step automation pipelines defined in TOML, with DAG-based execution ordering, template resolution between steps, retry/timeout policies, and DB-persisted run history. Feature-gated behind `workflows`.
+
+```mermaid
+flowchart TD
+    subgraph Definition["Workflow Definition - TOML files"]
+        TOML["workflow.toml<br>id, name, steps, schedule"]
+        Steps["WorkflowStep<br>name, type, depends_on, retry, failure_policy"]
+        Types["StepType variants<br>Tool, Llm, Condition, Parallel, Delay"]
+    end
+
+    subgraph Registry["WorkflowRegistry - DashMap"]
+        Load["load_all from directory"]
+        CRUD["save / get / list / delete"]
+        Persist["TOML files on disk"]
+    end
+
+    subgraph Execution["WorkflowExecutor"]
+        DAG["build_dag#40;petgraph#41;<br>validate acyclic + dependencies"]
+        Topo["toposort → execution order"]
+        StepExec["execute_step<br>timeout + retry loop"]
+        Templates["minijinja templates<br>resolve step output references"]
+        DB["Persist run + step results<br>workflow_runs + workflow_step_results"]
+    end
+
+    subgraph Runtime["StepRuntime - dispatch_step"]
+        ToolStep["Tool: execute via ToolRegistry"]
+        LlmStep["Llm: resolve template in prompt"]
+        CondStep["Condition: evaluate expression"]
+        ParStep["Parallel: meta-step"]
+        DelayStep["Delay: tokio::sleep"]
+    end
+
+    subgraph EventsSG["Event Bus"]
+        WfStarted["WorkflowStarted"]
+        WfStepDone["WorkflowStepCompleted"]
+        WfDone["WorkflowCompleted"]
+    end
+
+    TOML --> Load
+    Load --> CRUD
+    CRUD --> DAG
+    DAG --> Topo
+    Topo --> StepExec
+    StepExec --> Templates
+    Templates --> ToolStep & LlmStep & CondStep & ParStep & DelayStep
+    StepExec --> DB
+
+    StepExec -.-> WfStarted
+    StepExec -.-> WfStepDone
+    StepExec -.-> WfDone
+
+    style Definition fill:#2196F3,color:#fff
+    style Registry fill:#4CAF50,color:#fff
+    style Execution fill:#FF9800,color:#fff
+    style Runtime fill:#9E9E9E,color:#fff
+    style EventsSG fill:#FF9800,color:#fff
+```
+
+### Key Components
+
+| Component | File | Description |
+|---|---|---|
+| `Workflow` | `workflows/definition.rs` | Workflow definition: id, name, steps, optional schedule |
+| `WorkflowStep` | `workflows/definition.rs` | Step with name, type, depends_on, retry config, failure policy, timeout |
+| `StepType` | `workflows/definition.rs` | Enum: Tool, Llm, Condition, Parallel, Delay |
+| `FailurePolicy` | `workflows/definition.rs` | Enum: Stop, Continue, Fallback with step reference |
+| `RetryConfig` | `workflows/definition.rs` | max_retries + retry_delay_ms |
+| `StepOutput` | `workflows/definition.rs` | Per-step result: output string, success, duration, error |
+| `WorkflowRun` | `workflows/definition.rs` | Run record: status, step results, timestamps |
+| `WorkflowRunStatus` | `workflows/definition.rs` | Enum: Running, Completed, Failed, Cancelled |
+| `WorkflowRegistry` | `workflows/mod.rs` | DashMap-backed CRUD + TOML persistence to disk |
+| `WorkflowExecutor` | `workflows/executor.rs` | DAG builder, topological execution, DB persistence, retry/timeout |
+| `dispatch_step` | `workflows/runtime.rs` | Step type dispatcher with template resolution |
+| `resolve` | `workflows/templates.rs` | Minijinja template engine for inter-step data flow |
+
+### Step Types
+
+| Type | Description | Template Support |
+|---|---|---|
+| `Tool` | Execute a registered tool with JSON args | Args are template-resolved |
+| `Llm` | Send prompt to LLM | Prompt is template-resolved |
+| `Condition` | Evaluate expression, branch to if_true/if_false | Expression is template-resolved |
+| `Parallel` | Meta-step referencing parallel sub-steps | N/A |
+| `Delay` | Sleep for N seconds | N/A |
+
+### Template Resolution
+
+Inter-step data flow uses minijinja templates. Completed step outputs are available via `{{ steps.step_name.output }}`, `{{ steps.step_name.success }}`, and `{{ steps.step_name.error }}`.
+
+Example workflow TOML:
+```toml
+id = "daily-report"
+name = "Daily Report"
+description = "Fetch news and summarize"
+
+[[steps]]
+name = "fetch"
+type = "tool"
+tool = "web_search"
+[steps.args]
+query = "latest tech news"
+
+[[steps]]
+name = "summarize"
+type = "llm"
+prompt = "Summarize: {{ steps.fetch.output }}"
+depends_on = ["fetch"]
+```
+
+### Failure Policies
+
+| Policy | Behavior |
+|---|---|
+| `Stop` (default) | Workflow fails immediately on step failure |
+| `Continue` | Skip failed step, continue to next |
+| `Fallback { step }` | Execute named fallback step on failure |
+
+### Config Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `workflow_dir` | Option | None | Workflow TOML directory (default: `data_dir/workflows`) |
+| `workflow_max_concurrent` | usize | 5 | Max concurrent workflow runs |
+| `workflow_max_steps` | usize | 50 | Max steps per workflow |
+| `workflow_step_timeout_secs` | u64 | 300 | Default step timeout in seconds |
+| `workflow_step_max_retries` | u32 | 3 | Default step retry count |
+
+### DB Schema
+
+- `workflow_runs` -- run history: id, workflow_id, workflow_name, status, started_at, completed_at, error
+- `workflow_step_results` -- per-step results: id, run_id, step_name, output, success, duration_ms, error, executed_at
 
 ---
 

@@ -122,3 +122,121 @@ pub async fn get_run_details(
         .map(Json)
         .ok_or_else(|| ZeniiError::NotFound(format!("run '{run_id}' not found")))
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use tower::ServiceExt;
+
+    // 5.42 — create workflow returns error when registry not initialized
+    #[tokio::test]
+    async fn create_workflow_no_registry() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"toml_content":"id = \"test\"\nname = \"Test\"\ndescription = \"t\"\n\n[[steps]]\nname = \"s1\"\ntype = \"delay\"\nseconds = 1"}"#,
+            ))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 5.43 — list workflows returns error when registry not initialized
+    #[tokio::test]
+    async fn list_workflows_no_registry() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .uri("/workflows")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 5.44 — get workflow returns error when registry not initialized
+    #[tokio::test]
+    async fn get_workflow_no_registry() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .uri("/workflows/nonexistent")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 5.45 — delete workflow returns error when registry not initialized
+    #[tokio::test]
+    async fn delete_workflow_no_registry() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .method("DELETE")
+            .uri("/workflows/test")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 5.46 — run workflow returns error when executor not initialized
+    #[tokio::test]
+    async fn run_workflow_no_executor() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows/test/run")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 5.47 — workflow history returns error when executor not initialized
+    #[tokio::test]
+    async fn workflow_history_no_executor() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .uri("/workflows/test/history")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 5.48 — get run details returns error when executor not initialized
+    #[tokio::test]
+    async fn get_run_details_no_executor() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .uri("/workflows/test/runs/run1")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}

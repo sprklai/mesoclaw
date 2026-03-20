@@ -597,6 +597,57 @@ mod tests {
             .unwrap();
     }
 
+    // 5.54 — migration v11 creates workflow_runs table
+    #[test]
+    fn migration_creates_workflow_runs() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test.db");
+        let conn = Connection::open(&path).unwrap();
+        run_migrations(&conn).unwrap();
+
+        // Insert a row into workflow_runs
+        conn.execute(
+            "INSERT INTO workflow_runs (id, workflow_id, workflow_name, status) VALUES ('r1', 'wf1', 'Test Workflow', 'running')",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM workflow_runs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    // 5.55 — migration v11 creates workflow_step_results table
+    #[test]
+    fn migration_creates_step_results() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("test.db");
+        let conn = Connection::open(&path).unwrap();
+        run_migrations(&conn).unwrap();
+
+        // Insert parent run first
+        conn.execute(
+            "INSERT INTO workflow_runs (id, workflow_id, workflow_name, status) VALUES ('r1', 'wf1', 'Test', 'running')",
+            [],
+        )
+        .unwrap();
+
+        // Insert a step result
+        conn.execute(
+            "INSERT INTO workflow_step_results (id, run_id, step_name, success, duration_ms) VALUES ('s1', 'r1', 'step1', 1, 500)",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM workflow_step_results", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
     #[tokio::test]
     async fn with_db_does_not_block_runtime() {
         let dir = TempDir::new().unwrap();

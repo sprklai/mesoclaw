@@ -127,7 +127,7 @@ Or use the desktop app, CLI, or TUI — they all talk to the same backend.
 |-----------|-------------------|
 | **AI tools are islands — ChatGPT, Telegram, scripts, cron all have separate memory and context** | **One shared brain: every interface, channel, and script shares the same memory, tools, and intelligence via `localhost:18981`** |
 | Context resets every AI session | Semantic memory persists across sessions and survives restarts |
-| AI can't do things, only talk | 16 built-in tools: web search, file ops, shell, scheduling |
+| AI can't do things, only talk | 16 built-in tools: web search, file ops, shell, scheduling. Workflow pipelines and parallel delegation for complex tasks |
 | Locked into one AI provider | 18 providers, switch with one config change |
 | AI tools are cloud-only | 100% local, zero telemetry, encrypted credential storage |
 | "Works on my machine" for AI | Same binary on macOS, Linux, Windows — desktop, CLI, or daemon |
@@ -150,7 +150,7 @@ Get notified on Discord. **Nothing is siloed. Everything converges.**
 
 ## What Zenii is NOT
 
-- Not a chatbot wrapper — it's a full API backend with 96 routes
+- Not a chatbot wrapper — it's a full API backend with 105 routes
 - Not Electron — native Tauri 2, under 20 MB
 - Not a framework you learn — it's infrastructure you call via `curl`
 - Not cloud-dependent — runs fully offline with Ollama
@@ -216,7 +216,7 @@ curl -X POST localhost:18981/chat \
 | **Language** | **Rust** | TypeScript | TypeScript + Python | Rust | Go | Python | Python/TS | TypeScript |
 | **Binary** | **<20 MB (w/ GUI)** | ~100 MB+ | Docker container (~500 MB+) | ~3.4 MB | <10 MB RAM | N/A (Python) | N/A (Docker) | N/A (npm) |
 | **Desktop GUI** | **Native (Tauri 2)** | -- | -- | -- | Web console | -- | Browser | -- |
-| **API Routes** | **96 REST+WS** | Chat endpoint | Inherits OpenClaw | Daemon endpoint | Webhook gateway | -- | -- | -- |
+| **API Routes** | **105 REST+WS** | Chat endpoint | Inherits OpenClaw | Daemon endpoint | Webhook gateway | -- | -- | -- |
 | **Plugins** | **Any language** | JS only | Inherits OpenClaw (JS) | Rust only | Tool-based | -- | -- | -- |
 | **Memory** | **FTS5 + vectors** | File-based | Inherits OpenClaw (file) | Basic | Workspace logs | -- | Doc search | -- |
 | **Self-Evolution** | **Human-approved** | Autonomous | Inherits OpenClaw (sandboxed) | -- | Agent-generated | -- | -- | -- |
@@ -224,7 +224,7 @@ curl -X POST localhost:18981/chat \
 | **Offline** | **Ollama** | Ollama | NVIDIA Nemotron primary | Ollama | DuckDuckGo | LiteLLM | Optional | No |
 | **License** | **MIT** | Open source | Apache 2.0 | Open source | MIT | AGPL-3.0 | AGPL-3.0 | Apache 2.0 |
 
-**No other project has ALL of these simultaneously**: native desktop GUI, 96-route REST/WS API where any language, any tool, any channel connects to the same shared intelligence, plugins in any language, semantic vector memory, self-evolution with human approval, under 20 MB binary, cross-system coherence where memory stored from any interface is instantly available everywhere, and MIT licensed. NemoClaw brings the strongest kernel-level sandboxing (Landlock + seccomp + netns) but requires Linux + Docker (~500 MB+) — Zenii delivers built-in 6-layer security natively on macOS, Windows, and Linux in under 20 MB.
+**No other project has ALL of these simultaneously**: native desktop GUI, 105-route REST/WS API where any language, any tool, any channel connects to the same shared intelligence, plugins in any language, semantic vector memory, self-evolution with human approval, under 20 MB binary, cross-system coherence where memory stored from any interface is instantly available everywhere, and MIT licensed. NemoClaw brings the strongest kernel-level sandboxing (Landlock + seccomp + netns) but requires Linux + Docker (~500 MB+) — Zenii delivers built-in 6-layer security natively on macOS, Windows, and Linux in under 20 MB.
 
 ---
 
@@ -245,7 +245,7 @@ Your AI gets smarter. You stay in control. No surprises.
 
 - **Self-evolving agent** — proposes skill changes based on your patterns, learns only with your approval
 - **Plugin system** — write plugins in Python, Go, JS, or any language. A plugin is any program that speaks JSON-RPC 2.0 over stdio (~15 lines of Python)
-- **96 API routes** — full REST + WebSocket gateway. Interactive docs at `localhost:18981/api-docs`
+- **105 API routes** — full REST + WebSocket gateway. Interactive docs at `localhost:18981/api-docs`
 - **18 AI providers** via rig-core (OpenAI, Anthropic, Google, Ollama, and more)
 - **16 built-in tools** — websearch, sysinfo, shell, file ops, memory, config, scheduling, channels
 - **Semantic memory** — SQLite FTS5 + vector embeddings, persists across sessions and restarts
@@ -254,6 +254,8 @@ Your AI gets smarter. You stay in control. No surprises.
 - **Unified diagnostic logging** — all binaries write daily-rotated logs to OS-appropriate directories with auto-cleanup
 - **Token usage tracking** — date-rotated JSONL logs for cost visibility
 - **Messaging channels** — Telegram, Slack, Discord (feature-gated)
+- **Workflow engine** — TOML-defined multi-step automation pipelines with DAG execution, inter-step templates, retry/timeout, DB-persisted history (feature-gated)
+- **Agent delegation** — parallel sub-agents for complex tasks with dependency waves, tool filtering, cancellation
 - **Cron scheduler** — automated recurring AI tasks
 - **6-layer security** — OS keyring with encrypted file fallback, autonomy levels, FS sandbox, injection detection (9 blocked commands + pipe patterns), rate limits, audit trail, agent timeout + abort on disconnect
 - **Cross-platform** — Linux, macOS, Windows, ARM (Raspberry Pi)
@@ -264,6 +266,8 @@ Your AI gets smarter. You stay in control. No surprises.
 <summary><strong>Full feature details</strong> (click to expand)</summary>
 
 - **Tool calling** with 16 built-in tools (14 base + 2 feature-gated) via DashMap-backed ToolRegistry: websearch, sysinfo, shell, file read/write/list/search, patch, process, learn, skill_proposal, memory, config, agent_self + feature-gated channel_send, scheduler
+- **Workflow engine** -- TOML-defined multi-step automation pipelines with 5 step types (Tool, LLM, Condition, Parallel, Delay), petgraph DAG execution, minijinja inter-step templates, retry/timeout policies, failure policies (Stop/Continue/Fallback), DB-persisted run history. Feature-gated behind `workflows`
+- **Agent delegation** -- Coordinator decomposes complex tasks into parallel sub-agents via LLM, executes in dependency waves with JoinSet, aggregates results. Each sub-agent gets an isolated session with tool allowlist filtering and per-agent timeout. Cancellation via `POST /agents/{id}/cancel`
 - **Plugin system** -- external process plugins via JSON-RPC 2.0 protocol, installable from git or local paths, with automatic tool and skill registration. Managed via CLI, Web/Desktop UI, and TUI. See [zenii-plugins](https://github.com/sprklai/zenii-plugins) for official community plugins
 - **Autonomous reasoning** -- ReasoningEngine with tool-aware ContinuationStrategy and per-request tool call deduplication cache
 - **Context-driven auto-discovery** -- keyword-based domain detection (Channels/Scheduler/Skills/Tools) filters context injection and agent rules to only relevant domains per query
@@ -483,12 +487,14 @@ graph TD
     Daemon[zenii-daemon] --> Default[default]
     Daemon --> Ch["--features channels"]
     Daemon --> Sc["--features scheduler"]
+    Daemon --> Wf["--features workflows"]
     Daemon --> Wd["--features web-dashboard"]
 
     Default --> GW["zenii-core/gateway"]
     GW --> Axum[axum + tower-http]
     Ch --> ChCore[zenii-core/channels]
     Sc --> ScCore[zenii-core/scheduler]
+    Wf --> WfCore[zenii-core/workflows]
     Wd --> WdCore[zenii-core/web-dashboard]
     WdCore --> GW
 ```
@@ -509,7 +515,7 @@ zenii/
 ├── docs/
 │   ├── architecture.md     # Detailed architecture diagrams
 │   ├── processes.md        # Process flow diagrams
-│   ├── api-reference.md    # All 96 REST/WS routes
+│   ├── api-reference.md    # All 105 REST/WS routes
 │   ├── configuration.md    # All 70+ config fields
 │   ├── cli-reference.md    # CLI command reference
 │   ├── deployment.md       # Deployment guide
@@ -667,6 +673,7 @@ cargo build -p zenii-daemon --features channels-telegram  # + Telegram (teloxide
 cargo build -p zenii-daemon --features channels-slack     # + Slack
 cargo build -p zenii-daemon --features channels-discord   # + Discord (serenity)
 cargo build -p zenii-daemon --features scheduler     # + cron jobs
+cargo build -p zenii-daemon --features workflows     # + workflow engine (DAG pipelines)
 cargo build -p zenii-daemon --features api-docs      # + Scalar UI + OpenAPI spec at /api-docs
 cargo build -p zenii-daemon --features web-dashboard # + embedded web UI
 cargo build -p zenii-daemon --all-features           # Everything

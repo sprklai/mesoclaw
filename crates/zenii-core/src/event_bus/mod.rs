@@ -383,4 +383,35 @@ mod tests {
         let result = bus.publish(AppEvent::ConfigUpdated);
         assert!(result.is_ok());
     }
+
+    // 5.52 — WorkflowStarted event serde round-trip
+    #[test]
+    fn workflow_started_event_serde() {
+        let event = AppEvent::WorkflowStarted {
+            workflow_id: "wf1".into(),
+            run_id: "run1".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(
+            matches!(back, AppEvent::WorkflowStarted { workflow_id, run_id }
+                if workflow_id == "wf1" && run_id == "run1")
+        );
+    }
+
+    // 5.53 — WorkflowCompleted event serde round-trip
+    #[test]
+    fn workflow_completed_event_serde() {
+        let event = AppEvent::WorkflowCompleted {
+            workflow_id: "wf1".into(),
+            run_id: "run1".into(),
+            status: "success".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(
+            matches!(back, AppEvent::WorkflowCompleted { workflow_id, run_id, status }
+                if workflow_id == "wf1" && run_id == "run1" && status == "success")
+        );
+    }
 }

@@ -10,6 +10,7 @@
 	import Database from '@lucide/svelte/icons/database';
 	import Settings from '@lucide/svelte/icons/settings';
 	import Calendar from '@lucide/svelte/icons/calendar';
+	import Workflow from '@lucide/svelte/icons/workflow';
 	import BookOpen from '@lucide/svelte/icons/book-open';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import { inboxStore } from '$lib/stores/inbox.svelte';
@@ -55,7 +56,8 @@
 		{ href: '/', icon: Home, label: 'Home' },
 		{ href: '/channels', icon: MessageSquare, label: 'Channels' },
 		{ href: '/memory', icon: Database, label: 'Memory' },
-		{ href: '/schedule', icon: Calendar, label: 'Schedule' }
+		{ href: '/schedule', icon: Calendar, label: 'Schedule' },
+		{ href: '/workflows', icon: Workflow, label: 'Workflows' }
 	];
 
 	function handleApiDocs() {

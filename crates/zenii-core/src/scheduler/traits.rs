@@ -210,6 +210,30 @@ mod tests {
         assert_eq!(h, back);
     }
 
+    // 5.56 — JobPayload::Workflow variant serde round-trip
+    #[test]
+    fn job_payload_workflow_variant() {
+        let p = JobPayload::Workflow {
+            workflow_id: "wf1".into(),
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: JobPayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(p, back);
+    }
+
+    // 5.57 — JobPayload::Workflow JSON serde round-trip preserves fields
+    #[test]
+    fn job_payload_workflow_serde() {
+        let p = JobPayload::Workflow {
+            workflow_id: "my-workflow-123".into(),
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        assert!(json.contains("workflow"));
+        assert!(json.contains("my-workflow-123"));
+        let back: JobPayload = serde_json::from_str(&json).unwrap();
+        assert!(matches!(back, JobPayload::Workflow { workflow_id } if workflow_id == "my-workflow-123"));
+    }
+
     // 16.8 — SessionTarget variants
     #[test]
     fn session_target_variants() {

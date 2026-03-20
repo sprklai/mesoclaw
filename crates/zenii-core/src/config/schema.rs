@@ -922,4 +922,33 @@ mod tests {
         assert_eq!(config.event_bus_capacity, 512);
         assert_eq!(config.session_max_age_days, 30);
     }
+
+    // 5.50 — workflow config defaults
+    #[test]
+    fn workflow_config_defaults() {
+        let config = AppConfig::default();
+        assert!(config.workflow_dir.is_none());
+        assert_eq!(config.workflow_max_concurrent, 5);
+        assert_eq!(config.workflow_max_steps, 50);
+        assert_eq!(config.workflow_step_timeout_secs, 300);
+        assert_eq!(config.workflow_step_max_retries, 3);
+    }
+
+    // 5.51 — workflow config from TOML
+    #[test]
+    fn workflow_config_from_toml() {
+        let toml_str = r#"
+            workflow_dir = "/tmp/workflows"
+            workflow_max_concurrent = 10
+            workflow_max_steps = 100
+            workflow_step_timeout_secs = 600
+            workflow_step_max_retries = 5
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.workflow_dir.as_deref(), Some("/tmp/workflows"));
+        assert_eq!(config.workflow_max_concurrent, 10);
+        assert_eq!(config.workflow_max_steps, 100);
+        assert_eq!(config.workflow_step_timeout_secs, 600);
+        assert_eq!(config.workflow_step_max_retries, 5);
+    }
 }

@@ -32,6 +32,8 @@ slug: /processes
 - [Onboarding / First-Run Setup Flow](#onboarding--first-run-setup-flow)
 - [Auto-Discovery Flow](#auto-discovery-flow)
 - [Agent Self-Learning Flow](#agent-self-learning-flow)
+- [Agent Delegation Flow](#agent-delegation-flow)
+- [Workflow Execution Flow](#workflow-execution-flow)
 
 ---
 
@@ -49,15 +51,22 @@ sequenceDiagram
 
     U->>G: Send message (REST/WS)
 
-    Note over G,CE: Context-aware preamble (PromptStrategy system)
-    G->>SM: get_context_info(session_id)
-    SM-->>G: message_count, last_message_at, summary
-    G->>CE: prompt_strategy.assemble(&AssemblyRequest)
-    Note over CE: CompactStrategy or LegacyStrategy + plugins
-    CE-->>G: Context preamble string
+    alt delegation: true
+        G->>AI: Coordinator::delegate(prompt, state, surface)
+        Note over AI: See Agent Delegation Flow
+        AI-->>G: DelegationResult (aggregated response)
+        G-->>U: Aggregated response
+    else Standard chat
+        Note over G,CE: Context-aware preamble (PromptStrategy system)
+        G->>SM: get_context_info(session_id)
+        SM-->>G: message_count, last_message_at, summary
+        G->>CE: prompt_strategy.assemble(&AssemblyRequest)
+        Note over CE: CompactStrategy or LegacyStrategy + plugins
+        CE-->>G: Context preamble string
 
-    G->>AI: resolve_agent(model, preamble)
-    AI->>LLM: Send prompt with context preamble
+        G->>AI: resolve_agent(model, preamble)
+        AI->>LLM: Send prompt with context preamble
+    end
 
     loop Tool calling loop
         LLM-->>AI: Response (may contain tool calls)
@@ -974,3 +983,124 @@ sequenceDiagram
 **Control**: Gated by `self_evolution_enabled` config flag (runtime toggle via `Arc<AtomicBool>`)
 
 **Key files**: `tools/agent_self_tool.rs`, `ai/context.rs` (`load_agent_rules()`)
+
+## Agent Delegation Flow
+
+When a chat request includes `delegation: true`, the Coordinator decomposes the task into independent sub-tasks, spawns isolated sub-agents in dependency waves, and aggregates the results into a unified response.
+
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant GW as Gateway
+    participant Coord as Coordinator
+    participant LLM as Decomposition LLM
+    participant SA1 as SubAgent t1
+    participant SA2 as SubAgent t2
+    participant EB as EventBus
+
+    User->>GW: POST /chat { prompt, delegation: true }
+    GW->>Coord: delegate(prompt, state, surface)
+
+    Note over Coord,LLM: Task decomposition
+    Coord->>LLM: "Break into N sub-tasks..."
+    LLM-->>Coord: JSON array of DelegationTasks
+
+    Coord->>Coord: validate_tasks (count, tool names)
+
+    Note over Coord,SA2: Wave 1 -- independent tasks
+    Coord->>EB: SubAgentSpawned { t1 }
+    Coord->>SA1: SubAgent::new (isolated session, filtered tools)
+    Coord->>EB: SubAgentSpawned { t2 }
+    Coord->>SA2: SubAgent::new (isolated session, filtered tools)
+
+    par Parallel execution
+        SA1->>SA1: execute with timeout
+        SA2->>SA2: execute with timeout
+    end
+
+    SA1-->>Coord: TaskResult (completed/failed/timed_out)
+    Coord->>EB: SubAgentCompleted/Failed { t1 }
+    SA2-->>Coord: TaskResult
+    Coord->>EB: SubAgentCompleted/Failed { t2 }
+
+    Note over Coord: Wave 2+ if depends_on resolved
+
+    Note over Coord,LLM: Aggregation
+    Coord->>LLM: "Synthesize these results..."
+    LLM-->>Coord: Unified response
+
+    Coord-->>GW: DelegationResult
+    GW-->>User: aggregated_response + task_results + usage
+```
+
+### Cancellation
+
+Active delegation runs can be cancelled via `POST /agents/{id}/cancel`, which aborts all sub-agent `JoinHandle`s. `GET /agents/active` lists active run IDs.
+
+**Key files**: `ai/delegation/coordinator.rs`, `ai/delegation/sub_agent.rs`, `ai/delegation/task.rs`, `gateway/handlers/delegation.rs`
+
+## Workflow Execution Flow
+
+Workflows are TOML-defined multi-step pipelines executed in topological order with retry/timeout policies and inter-step template resolution. Feature-gated behind `workflows`.
+
+```mermaid
+sequenceDiagram
+    participant User as User / Scheduler
+    participant GW as Gateway
+    participant WR as WorkflowRegistry
+    participant WE as WorkflowExecutor
+    participant DAG as petgraph DAG
+    participant RT as StepRuntime
+    participant TM as minijinja Templates
+    participant Tools as ToolRegistry
+    participant DB as SQLite
+    participant EB as EventBus
+
+    User->>GW: POST /workflows/{id}/run
+    GW->>WR: get(id)
+    WR-->>GW: Workflow definition
+
+    GW->>WE: execute(workflow, tools, event_bus)
+    WE->>DAG: build_dag(steps)
+    DAG-->>WE: Validated acyclic graph
+    WE->>DAG: toposort
+    DAG-->>WE: Execution order
+
+    WE->>DB: INSERT workflow_runs (status: running)
+    WE->>EB: WorkflowStarted
+
+    loop Each step in topological order
+        WE->>TM: resolve(args/prompt, step_outputs)
+        TM-->>WE: Template-resolved values
+
+        WE->>RT: dispatch_step(step_type, step_outputs, tools)
+        alt Tool step
+            RT->>Tools: execute(tool_name, resolved_args)
+            Tools-->>RT: ToolResult
+        else Delay step
+            RT->>RT: tokio::sleep(seconds)
+        else Condition step
+            RT->>RT: Evaluate expression
+        end
+        RT-->>WE: Step output
+
+        WE->>DB: INSERT workflow_step_results
+        WE->>EB: WorkflowStepCompleted
+
+        alt Step failed
+            Note over WE: Apply FailurePolicy (Stop/Continue/Fallback)
+        end
+    end
+
+    WE->>DB: UPDATE workflow_runs (status, completed_at)
+    WE->>EB: WorkflowCompleted
+    WE-->>GW: WorkflowRun (status, step_results)
+    GW-->>User: 202 Accepted + run details
+```
+
+### Run History
+
+- `GET /workflows/{id}/history` -- list past runs for a workflow
+- `GET /workflows/{id}/runs/{run_id}` -- get run details with per-step results
+
+**Key files**: `workflows/executor.rs`, `workflows/runtime.rs`, `workflows/templates.rs`, `workflows/definition.rs`, `workflows/mod.rs`, `gateway/handlers/workflows.rs`

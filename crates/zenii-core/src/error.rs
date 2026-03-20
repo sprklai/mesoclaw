@@ -135,4 +135,11 @@ mod tests {
         let err: ZeniiError = sqlite_err.into();
         assert!(matches!(err, ZeniiError::Sqlite(_)));
     }
+
+    // 5.49 — ZeniiError::Workflow variant
+    #[test]
+    fn workflow_error_variant() {
+        let err = ZeniiError::Workflow("step failed".into());
+        assert_eq!(err.to_string(), "workflow error: step failed");
+    }
 }
