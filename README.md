@@ -55,7 +55,7 @@
 
 <!-- Row 4: Quality & i18n -->
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-1272%20Rust%20%2B%20JS-success?style=flat-square" alt="1272 Rust + JS Tests" />
+  <img src="https://img.shields.io/badge/tests-1306%20Rust%20%2B%20JS-success?style=flat-square" alt="1306 Rust + JS Tests" />
   <img src="https://img.shields.io/badge/i18n-EN-blue?style=flat-square" alt="English" />
 </p>
 
@@ -255,7 +255,7 @@ Your AI gets smarter. You stay in control. No surprises.
 - **Token usage tracking** — date-rotated JSONL logs for cost visibility
 - **Messaging channels** — Telegram, Slack, Discord (feature-gated)
 - **Cron scheduler** — automated recurring AI tasks
-- **6-layer security** — OS keyring with encrypted file fallback, autonomy levels, FS sandbox, injection detection, rate limits, audit trail
+- **6-layer security** — OS keyring with encrypted file fallback, autonomy levels, FS sandbox, injection detection (9 blocked commands + pipe patterns), rate limits, audit trail, agent timeout + abort on disconnect
 - **Cross-platform** — Linux, macOS, Windows, ARM (Raspberry Pi)
 
 <!-- Detailed feature descriptions below for SEO / deep readers -->

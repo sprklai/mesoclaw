@@ -109,7 +109,7 @@ function createMessagesStore() {
           args,
           state: "input-available" as ToolUIPartState,
         },
-      ];
+      ].slice(-50); // Keep last 50 tool calls to prevent memory leak
     },
 
     completeToolCall(

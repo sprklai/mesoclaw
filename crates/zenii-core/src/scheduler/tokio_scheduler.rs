@@ -584,6 +584,16 @@ impl Scheduler for TokioScheduler {
             job.delete_after_run = true;
         }
 
+        // Validate active hours: start == end would block all hours
+        if let Some(ref hours) = job.active_hours
+            && hours.start_hour == hours.end_hour
+        {
+            return Err(ZeniiError::Validation(format!(
+                "active_hours start_hour ({}) cannot equal end_hour — job would never fire",
+                hours.start_hour
+            )));
+        }
+
         // Validate cron expression if applicable
         if let Schedule::Cron { ref expr } = job.schedule {
             let full_expr = if expr.split_whitespace().count() == 5 {
@@ -1102,5 +1112,35 @@ mod tests {
         assert!(TokioScheduler::hour_in_window(12, 9, 17));
         assert!(!TokioScheduler::hour_in_window(17, 9, 17));
         assert!(!TokioScheduler::hour_in_window(8, 9, 17));
+    }
+
+    // AUDIT-L2.1 — add_job rejects active_hours with start == end
+    #[tokio::test]
+    async fn add_job_rejects_equal_active_hours() {
+        let (_dir, sched) = test_scheduler();
+        let mut job = test_job("bad_hours");
+        job.active_hours = Some(super::super::traits::ActiveHours {
+            start_hour: 9,
+            end_hour: 9,
+        });
+        let result = sched.add_job(job).await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ZeniiError::Validation(msg) if msg.contains("cannot equal")
+        ));
+    }
+
+    // AUDIT-L2.2 — add_job accepts valid active_hours
+    #[tokio::test]
+    async fn add_job_accepts_valid_active_hours() {
+        let (_dir, sched) = test_scheduler();
+        let mut job = test_job("good_hours");
+        job.active_hours = Some(super::super::traits::ActiveHours {
+            start_hour: 9,
+            end_hour: 17,
+        });
+        let result = sched.add_job(job).await;
+        assert!(result.is_ok());
     }
 }

@@ -6,6 +6,7 @@ use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tracing::{debug, info, warn};
+use tokio::task::JoinHandle;
 
 use crate::ai::adapter::{ToolCallEvent, ToolCallPhase};
 use crate::ai::prompt::AssemblyRequest;
@@ -64,6 +65,8 @@ pub(crate) enum WsOutbound {
     ChannelReconnecting { channel: String, attempt: u32 },
     #[serde(rename = "done")]
     Done,
+    #[serde(rename = "warning")]
+    Warning { warning: String },
     #[serde(rename = "error")]
     Error { error: String },
 }
@@ -333,17 +336,39 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
         let reasoning_engine = state.reasoning_engine.clone();
         let (result_tx, mut result_rx) = tokio::sync::oneshot::channel();
         let chat_start = std::time::Instant::now();
-        tokio::spawn(async move {
-            let result = reasoning_engine.chat(&agent, &prompt, history).await;
+        let agent_timeout_secs = state.config.load().agent_timeout_secs;
+        let agent_handle: JoinHandle<()> = tokio::spawn(async move {
+            let timeout_result = tokio::time::timeout(
+                std::time::Duration::from_secs(agent_timeout_secs),
+                reasoning_engine.chat(&agent, &prompt, history),
+            )
+            .await;
+            let result = match timeout_result {
+                Ok(r) => r,
+                Err(_) => Err(crate::ZeniiError::Agent(
+                    "agent execution timed out".to_string(),
+                )),
+            };
             let _ = result_tx.send(result);
         });
 
         // Collect tool events for DB persistence
         let mut tool_events = Vec::new();
 
-        // Concurrently forward tool events and wait for agent result
+        // Concurrently forward tool events, wait for agent result, and detect client disconnect
         loop {
             tokio::select! {
+                // H1: Detect client disconnect during agent execution
+                ws_msg = socket.recv() => {
+                    match ws_msg {
+                        Some(Ok(Message::Close(_))) | None => {
+                            info!("WS: client disconnected during agent execution, aborting agent task");
+                            agent_handle.abort();
+                            break;
+                        }
+                        _ => {} // Ignore other messages during execution
+                    }
+                }
                 event = tool_rx.recv() => {
                     match event {
                         Ok(evt) => {
@@ -376,6 +401,9 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
                         }
                         Err(broadcast::error::RecvError::Lagged(n)) => {
                             warn!("tool event receiver lagged by {n} messages");
+                            send_outbound(&mut socket, &WsOutbound::Warning {
+                                warning: format!("{n} tool events were dropped due to high volume"),
+                            }).await;
                         }
                     }
                 }
@@ -434,25 +462,39 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
                                 let _ = logger.log(&record).await;
                             });
 
-                            // Store assistant response and tool calls
+                            // Store assistant response and tool calls (retry once on failure)
                             if let Some(ref sid) = request.session_id {
                                 info!(
                                     "WS: storing assistant response for session={sid}, len={}",
                                     response.len()
                                 );
-                                let msg = state
+                                let mut msg = state
                                     .session_manager
                                     .append_message(sid, "assistant", &response)
                                     .await;
+
+                                // Retry once after 100ms on failure
+                                if msg.is_err() {
+                                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                                    msg = state
+                                        .session_manager
+                                        .append_message(sid, "assistant", &response)
+                                        .await;
+                                }
 
                                 match &msg {
                                     Ok(m) => info!(
                                         "WS: assistant message stored OK: id={}, session={}",
                                         m.id, m.session_id
                                     ),
-                                    Err(e) => warn!(
-                                        "WS: FAILED to store assistant message for session={sid}: {e}"
-                                    ),
+                                    Err(e) => {
+                                        warn!(
+                                            "WS: FAILED to store assistant message for session={sid}: {e}"
+                                        );
+                                        send_outbound(&mut socket, &WsOutbound::Warning {
+                                            warning: "message could not be saved to history".into(),
+                                        }).await;
+                                    }
                                 }
 
                                 if let Ok(msg) = msg && !tool_events.is_empty() {
@@ -724,6 +766,28 @@ mod tests {
         let json = serde_json::to_value(&msg).unwrap();
         assert_eq!(json["type"], "error");
         assert_eq!(json["error"], "oops");
+    }
+
+    // AUDIT-C4 — WsOutbound::Warning serializes with warning field
+    #[test]
+    fn ws_outbound_warning_serializes() {
+        let msg = WsOutbound::Warning {
+            warning: "message could not be saved".into(),
+        };
+        let json = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["type"], "warning");
+        assert_eq!(json["warning"], "message could not be saved");
+    }
+
+    // AUDIT-H2 — WsOutbound::Warning for lagged events serializes correctly
+    #[test]
+    fn ws_outbound_warning_lagged_serializes() {
+        let msg = WsOutbound::Warning {
+            warning: "5 tool events were dropped due to high volume".into(),
+        };
+        let json = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["type"], "warning");
+        assert!(json["warning"].as_str().unwrap().contains("dropped"));
     }
 
     // TV.16 — WS upgrade still succeeds

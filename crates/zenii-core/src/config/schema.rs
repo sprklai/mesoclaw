@@ -129,6 +129,15 @@ pub struct AppConfig {
     pub agent_max_continuations: u32,
     pub agent_reasoning_guidance: Option<String>,
 
+    // Audit: Agent execution safety
+    pub agent_timeout_secs: u64,
+
+    // Audit: Event bus capacity
+    pub event_bus_capacity: usize,
+
+    // Audit: Session cleanup
+    pub session_max_age_days: u32,
+
     // Phase 8: Inbox
     pub inbox_page_size: usize,
     pub inbox_sessions_page_size: usize,
@@ -309,6 +318,15 @@ impl Default for AppConfig {
             // Autonomous Reasoning
             agent_max_continuations: 1,
             agent_reasoning_guidance: None,
+
+            // Agent execution safety
+            agent_timeout_secs: 300,
+
+            // Event bus capacity
+            event_bus_capacity: 256,
+
+            // Session cleanup
+            session_max_age_days: 90,
 
             // Inbox
             inbox_page_size: 50,
@@ -811,5 +829,40 @@ mod tests {
     fn default_log_dir_empty() {
         let config = AppConfig::default();
         assert!(config.log_dir.is_empty());
+    }
+
+    // AUDIT — default agent_timeout_secs is 300
+    #[test]
+    fn audit_default_agent_timeout() {
+        let config = AppConfig::default();
+        assert_eq!(config.agent_timeout_secs, 300);
+    }
+
+    // AUDIT — default event_bus_capacity is 256
+    #[test]
+    fn audit_default_event_bus_capacity() {
+        let config = AppConfig::default();
+        assert_eq!(config.event_bus_capacity, 256);
+    }
+
+    // AUDIT — default session_max_age_days is 90
+    #[test]
+    fn audit_default_session_max_age_days() {
+        let config = AppConfig::default();
+        assert_eq!(config.session_max_age_days, 90);
+    }
+
+    // AUDIT — new config fields from TOML
+    #[test]
+    fn audit_config_from_toml() {
+        let toml_str = r#"
+            agent_timeout_secs = 600
+            event_bus_capacity = 512
+            session_max_age_days = 30
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.agent_timeout_secs, 600);
+        assert_eq!(config.event_bus_capacity, 512);
+        assert_eq!(config.session_max_age_days, 30);
     }
 }

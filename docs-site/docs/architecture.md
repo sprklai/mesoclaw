@@ -187,7 +187,7 @@ zenii/
 │   │   │   ├── boot.rs     # init_services() -> Services -> AppState, single boot entry point
 │   │   │   ├── config/     # TOML config (schema + load/save + OS paths)
 │   │   │   ├── db/         # rusqlite pool + WAL + migrations + spawn_blocking
-│   │   │   ├── event_bus/  # EventBus trait + TokioBroadcastBus (12 events)
+│   │   │   ├── event_bus/  # EventBus trait + TokioBroadcastBus (13 events)
 │   │   │   ├── memory/     # Memory trait + SqliteMemoryStore (FTS5 + vectors) + InMemoryStore
 │   │   │   ├── credential/ # CredentialStore trait + KeyringStore + FileCredentialStore + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log

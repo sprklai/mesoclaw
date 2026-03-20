@@ -6,6 +6,7 @@ import { isTauri, showNotification } from "$lib/tauri";
 export interface NotificationRouting {
   scheduler_notification: string[];
   scheduler_job_completed: string[];
+  heartbeat_alert: string[];
   channel_message: string[];
 }
 
@@ -24,6 +25,7 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 const DEFAULT_ROUTING: NotificationRouting = {
   scheduler_notification: ["toast", "desktop"],
   scheduler_job_completed: ["toast", "desktop"],
+  heartbeat_alert: ["toast", "desktop"],
   channel_message: ["toast", "desktop"],
 };
 
@@ -146,10 +148,10 @@ class NotificationStore {
               showNotification(data.job_name, data.message ?? "");
             }
           } else if (data.event_type === "heartbeat_alert") {
-            if (hasTarget("scheduler_job_completed", "toast")) {
+            if (hasTarget("heartbeat_alert", "toast")) {
               toast.info(data.message ?? "Heartbeat");
             }
-            if (hasTarget("scheduler_job_completed", "desktop") && isTauri) {
+            if (hasTarget("heartbeat_alert", "desktop") && isTauri) {
               showNotification("Heartbeat", data.message ?? "");
             }
           } else if (data.event_type === "scheduler_job_completed") {

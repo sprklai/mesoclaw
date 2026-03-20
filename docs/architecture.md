@@ -33,6 +33,7 @@ slug: /architecture
 - [Autonomous Reasoning Engine](#autonomous-reasoning-engine-phase-811)
 - [Semantic Memory and Embeddings](#semantic-memory-and-embeddings-phase-811)
 - [Phase 18 Hardening](#phase-18-hardening)
+- [Workflow Audit Hardening](#workflow-audit-hardening)
 - [Plugin Architecture](#plugin-architecture-phase-9)
 - [Context-Driven Auto-Discovery](#context-driven-auto-discovery)
 - [AgentSelfTool](#agentselftool)
@@ -183,7 +184,7 @@ zenii/
 │   │   │   ├── boot.rs     # init_services() -> Services -> AppState, single boot entry point
 │   │   │   ├── config/     # TOML config (schema + load/save + OS paths)
 │   │   │   ├── db/         # rusqlite pool + WAL + migrations + spawn_blocking
-│   │   │   ├── event_bus/  # EventBus trait + TokioBroadcastBus (12 events)
+│   │   │   ├── event_bus/  # EventBus trait + TokioBroadcastBus (13 events)
 │   │   │   ├── memory/     # Memory trait + SqliteMemoryStore (FTS5 + vectors) + InMemoryStore
 │   │   │   ├── credential/ # CredentialStore trait + KeyringStore + FileCredentialStore + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
@@ -1345,6 +1346,75 @@ Phase 18 addressed 51 issues from two code audits across 8 parallel work streams
 - **Channel reliability** -- UTF-8 safe message splitting, Slack echo loop prevention
 - **Frontend** -- svelte-check warnings reduced from 19 to 0
 - **CI/CD** -- all-features testing added to CI pipeline
+
+## Workflow Audit Hardening
+
+A whole-app workflow audit addressing security, agent safety, session lifecycle, event bus hygiene, and frontend resilience. 16 new tests added (1,306 total).
+
+### Security Hardening
+
+9 additional commands added to `BLOCKED_COMMANDS` in `security/policy.rs`: `eval`, `exec`, `nc`, `ncat`, `socat`, `docker`, `systemctl`, `xdg-open`, `open`. Pipe-to-shell patterns (e.g., `curl | sh`) were already caught by `|` in `INJECTION_PATTERNS`.
+
+### Agent Execution Safety
+
+```mermaid
+flowchart TD
+    WS([WS chat message]) --> Spawn["tokio::spawn agent task<br>store JoinHandle"]
+    Spawn --> Select["tokio::select!"]
+
+    Select -->|agent completes| Done["Send response tokens"]
+    Select -->|timeout| Abort["abort JoinHandle<br>send ZeniiError::Agent"]
+    Select -->|client disconnects| Abort2["abort JoinHandle<br>log warning, clean up"]
+
+    Done --> Persist["Persist to DB<br>retry once after 100ms on failure<br>send WsOutbound::Warning on final failure"]
+
+    subgraph ToolEvents["Tool Event Handling"]
+        ToolRx["tool_rx channel"] --> Lag{"lagged?"}
+        Lag -->|yes| Warn["Send WsOutbound::Warning<br>with dropped event count"]
+        Lag -->|no| Forward["Forward tool event to client"]
+    end
+
+    style Select fill:#FF9800,color:#fff
+    style Abort fill:#F44336,color:#fff
+    style Abort2 fill:#F44336,color:#fff
+    style Warn fill:#FF9800,color:#fff
+```
+
+Key changes in `gateway/handlers/ws.rs`:
+- **Agent timeout**: `tokio::time::timeout()` with configurable `agent_timeout_secs` (default 300s)
+- **Client disconnect abort**: `JoinHandle` stored, `tokio::select!` detects WS close and aborts the agent task
+- **Tool event lag handling**: when `tool_rx` lags, sends `WsOutbound::Warning` with count of dropped events
+- **DB persistence retry**: one retry after 100ms on failure, `WsOutbound::Warning` sent to client on final failure
+
+### Session Lifecycle
+
+`SessionManager::cleanup_old_sessions()` added in `ai/session.rs`. Deletes sessions older than `session_max_age_days` (default 90). Runs automatically on boot during `init_services()`.
+
+### Event Bus Cleanup
+
+- 10 never-published `AppEvent` variants removed from `event_bus/mod.rs`: `SessionCreated`, `SessionDeleted`, `MessageReceived`, `StreamChunk`, `StreamDone`, `ToolExecutionStarted`, `ToolExecutionCompleted`, `ProviderChanged`, `MemoryStored`, `GatewayStarted`
+- Event bus capacity now reads from `config.event_bus_capacity` (default 256) instead of being hardcoded
+
+### Notification Routing
+
+`heartbeat_alert` field added to `NotificationRouting` (backend `routing.rs` + frontend `notifications.svelte.ts`). Frontend now uses `hasTarget("heartbeat_alert", ...)` instead of piggybacking on `scheduler_job_completed`.
+
+### Frontend Resilience
+
+- `activeToolCalls` array capped at 50 entries in `messages.svelte.ts`
+- Session store retry replaced with exponential backoff (3 attempts: 1s, 2s, 4s) in `sessions.svelte.ts`
+
+### Scheduler Validation
+
+`add_job()` validates `start_hour != end_hour` in active hours configuration (`tokio_scheduler.rs`).
+
+### New Config Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `agent_timeout_secs` | u64 | 300 | Maximum seconds for agent execution before timeout |
+| `event_bus_capacity` | usize | 256 | Capacity of the tokio broadcast event bus |
+| `session_max_age_days` | u32 | 90 | Days before old sessions are cleaned up on boot |
 
 ## Plugin Architecture (Phase 9)
 

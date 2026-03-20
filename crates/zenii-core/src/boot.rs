@@ -108,8 +108,8 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
     db::with_db(&pool, db::run_migrations).await?;
     info!("Database initialized at {}", db_path.display());
 
-    // 2. Event bus
-    let event_bus = Arc::new(TokioBroadcastBus::new(256));
+    // 2. Event bus (M8: configurable capacity)
+    let event_bus = Arc::new(TokioBroadcastBus::new(config.event_bus_capacity));
 
     // 3. Memory — always use SqliteMemoryStore (persistent)
     let memory_db_path = config
@@ -737,6 +737,19 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
     tokio::task::spawn_blocking(move || crate::logging::cleanup_old_tracing_files(&log_dir, keep_days))
         .await
         .ok();
+
+    // H3: Cleanup old sessions on boot
+    #[cfg(feature = "ai")]
+    {
+        let max_age = config.session_max_age_days;
+        if max_age > 0 {
+            match session_manager.cleanup_old_sessions(max_age).await {
+                Ok(0) => {}
+                Ok(n) => info!("Cleaned up {n} sessions older than {max_age} days"),
+                Err(e) => tracing::warn!("Session cleanup failed: {e}"),
+            }
+        }
+    }
 
     info!("All services initialized");
 

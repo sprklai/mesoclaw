@@ -38,21 +38,24 @@ function createSessionsStore() {
     async load() {
       loading = true;
       error = null;
-      try {
-        sessions = await apiGet<SessionSummary[]>("/sessions");
-      } catch {
-        // Retry once after 1s — safety net for transient gateway startup timing
-        await new Promise((r) => setTimeout(r, 1000));
+      const maxAttempts = 3;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
           sessions = await apiGet<SessionSummary[]>("/sessions");
+          error = null;
+          break;
         } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          error = `Failed to load sessions. Is the daemon running? (${msg})`;
-          console.error("sessionsStore.load failed after retry:", e);
+          if (attempt < maxAttempts - 1) {
+            // Exponential backoff: 1s, 2s, 4s
+            await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+          } else {
+            const msg = e instanceof Error ? e.message : String(e);
+            error = `Failed to load sessions. Is the daemon running? (${msg})`;
+            console.error("sessionsStore.load failed after retries:", e);
+          }
         }
-      } finally {
-        loading = false;
       }
+      loading = false;
     },
 
     async get(id: string) {

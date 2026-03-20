@@ -351,6 +351,38 @@ impl SessionManager {
         .await
     }
 
+    /// Delete sessions older than `max_age_days` and their associated messages/tool_calls.
+    pub async fn cleanup_old_sessions(&self, max_age_days: u32) -> Result<usize> {
+        let cutoff = chrono::Utc::now() - chrono::Duration::days(i64::from(max_age_days));
+        let cutoff_str = cutoff.to_rfc3339();
+
+        db::with_db(&self.db, move |conn| {
+            // Delete tool_calls for old messages
+            conn.execute(
+                "DELETE FROM tool_calls WHERE message_id IN (
+                    SELECT m.id FROM messages m
+                    JOIN sessions s ON m.session_id = s.id
+                    WHERE s.updated_at < ?1
+                )",
+                rusqlite::params![cutoff_str],
+            )?;
+            // Delete messages for old sessions
+            conn.execute(
+                "DELETE FROM messages WHERE session_id IN (
+                    SELECT id FROM sessions WHERE updated_at < ?1
+                )",
+                rusqlite::params![cutoff_str],
+            )?;
+            // Delete old sessions
+            let deleted = conn.execute(
+                "DELETE FROM sessions WHERE updated_at < ?1",
+                rusqlite::params![cutoff_str],
+            )?;
+            Ok(deleted)
+        })
+        .await
+    }
+
     pub async fn update_session(&self, id: &str, title: &str) -> Result<Session> {
         let id = id.to_string();
         let title = title.to_string();
@@ -1226,5 +1258,37 @@ mod tests {
             .create_session_with_channel_key("TG 1 dup", "telegram", "telegram:1")
             .await;
         assert!(result.is_err());
+    }
+
+    // AUDIT-H3.1 — cleanup_old_sessions with large max_age deletes nothing
+    #[tokio::test]
+    async fn cleanup_old_sessions_keeps_recent() {
+        let (_dir, mgr) = setup().await;
+        mgr.create_session("Recent 1").await.unwrap();
+        mgr.create_session("Recent 2").await.unwrap();
+        let deleted = mgr.cleanup_old_sessions(9999).await.unwrap();
+        assert_eq!(deleted, 0);
+        assert_eq!(mgr.list_sessions().await.unwrap().len(), 2);
+    }
+
+    // AUDIT-H3.2 — cleanup_old_sessions with 0 days deletes all
+    #[tokio::test]
+    async fn cleanup_old_sessions_deletes_all() {
+        let (_dir, mgr) = setup().await;
+        let s = mgr.create_session("Old session").await.unwrap();
+        mgr.append_message(&s.id, "user", "hello").await.unwrap();
+        let deleted = mgr.cleanup_old_sessions(0).await.unwrap();
+        assert_eq!(deleted, 1);
+        assert!(mgr.list_sessions().await.unwrap().is_empty());
+        // Messages should be cascade deleted too
+        assert!(mgr.get_messages(&s.id).await.unwrap().is_empty());
+    }
+
+    // AUDIT-H3.3 — cleanup_old_sessions on empty DB returns 0
+    #[tokio::test]
+    async fn cleanup_old_sessions_empty_db() {
+        let (_dir, mgr) = setup().await;
+        let deleted = mgr.cleanup_old_sessions(30).await.unwrap();
+        assert_eq!(deleted, 0);
     }
 }

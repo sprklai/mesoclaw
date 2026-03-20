@@ -8,6 +8,7 @@ use super::target::NotificationTarget;
 pub struct NotificationRouting {
     pub scheduler_notification: Vec<NotificationTarget>,
     pub scheduler_job_completed: Vec<NotificationTarget>,
+    pub heartbeat_alert: Vec<NotificationTarget>,
     pub channel_message: Vec<NotificationTarget>,
 }
 
@@ -16,6 +17,7 @@ impl Default for NotificationRouting {
         Self {
             scheduler_notification: vec![NotificationTarget::Toast, NotificationTarget::Desktop],
             scheduler_job_completed: vec![NotificationTarget::Toast, NotificationTarget::Desktop],
+            heartbeat_alert: vec![NotificationTarget::Toast, NotificationTarget::Desktop],
             channel_message: vec![NotificationTarget::Toast, NotificationTarget::Desktop],
         }
     }
@@ -30,6 +32,7 @@ impl NotificationRouting {
         match event_type {
             "scheduler_notification" => &self.scheduler_notification,
             "scheduler_job_completed" => &self.scheduler_job_completed,
+            "heartbeat_alert" => &self.heartbeat_alert,
             "channel_message" => &self.channel_message,
             _ => EMPTY_TARGETS,
         }
@@ -118,6 +121,40 @@ mod tests {
         assert!(!routing.has_target("unknown_event", &NotificationTarget::Toast));
     }
 
+    // AUDIT-C5.1 — heartbeat_alert has default targets
+    #[test]
+    fn heartbeat_alert_default_targets() {
+        let routing = NotificationRouting::default();
+        let targets = routing.targets_for("heartbeat_alert");
+        assert_eq!(targets.len(), 2);
+        assert!(targets.contains(&NotificationTarget::Toast));
+        assert!(targets.contains(&NotificationTarget::Desktop));
+    }
+
+    // AUDIT-C5.2 — heartbeat_alert has_target works correctly
+    #[test]
+    fn heartbeat_alert_has_target() {
+        let routing = NotificationRouting::default();
+        assert!(routing.has_target("heartbeat_alert", &NotificationTarget::Toast));
+        assert!(routing.has_target("heartbeat_alert", &NotificationTarget::Desktop));
+        assert!(!routing.has_target("heartbeat_alert", &NotificationTarget::Telegram));
+    }
+
+    // AUDIT-C5.3 — heartbeat_alert TOML deserialization
+    #[test]
+    fn heartbeat_alert_toml_deser() {
+        let toml_str = r#"
+            scheduler_notification = ["toast"]
+            scheduler_job_completed = ["desktop"]
+            heartbeat_alert = ["toast", "telegram"]
+            channel_message = ["toast"]
+        "#;
+        let routing: NotificationRouting = toml::from_str(toml_str).unwrap();
+        assert_eq!(routing.heartbeat_alert.len(), 2);
+        assert!(routing.heartbeat_alert.contains(&NotificationTarget::Toast));
+        assert!(routing.heartbeat_alert.contains(&NotificationTarget::Telegram));
+    }
+
     // 8.12.11 — TOML deserialization with channel targets
     #[test]
     fn toml_deser_with_channels() {
@@ -148,6 +185,7 @@ mod tests {
         let routing = NotificationRouting {
             scheduler_notification: vec![NotificationTarget::Toast, NotificationTarget::Telegram],
             scheduler_job_completed: vec![NotificationTarget::Desktop],
+            heartbeat_alert: vec![NotificationTarget::Toast, NotificationTarget::Desktop],
             channel_message: vec![
                 NotificationTarget::Toast,
                 NotificationTarget::Desktop,

@@ -104,6 +104,14 @@ impl RateLimiter {
 /// Commands that are always denied regardless of autonomy level.
 const BLOCKED_COMMANDS: &[&str] = &[
     "rm", "sudo", "chmod", "chown", "kill", "pkill", "shutdown", "reboot", "dd", "mkfs", "fdisk",
+    // Arbitrary code execution
+    "eval", "exec",
+    // Network backdoors
+    "nc", "ncat", "socat",
+    // Container / service control (can run arbitrary images or restart services)
+    "docker", "systemctl",
+    // Desktop openers (can launch arbitrary URLs/protocols)
+    "xdg-open", "open",
     // Windows equivalents
     "format", "runas",
 ];
@@ -1299,5 +1307,36 @@ mod tests {
         let config = AppConfig::default();
         let policy = SecurityPolicy::from_config(&config);
         assert_eq!(policy.autonomy_level, AutonomyLevel::Full);
+    }
+
+    // --- Audit C1: expanded blocked commands ---
+
+    // AUDIT-C1.1 — newly blocked commands are denied
+    #[test]
+    fn audit_c1_new_blocked_commands_denied() {
+        let policy = full_policy();
+        // These commands were added in the audit to prevent arbitrary code/network access
+        let blocked = ["nc -l 4444", "ncat --listen 8080", "socat TCP4:1234",
+                        "docker run alpine", "systemctl restart nginx",
+                        "xdg-open https://example.com", "open /Applications/Terminal.app"];
+        for cmd in &blocked {
+            assert!(
+                matches!(policy.validate_command(cmd), ValidationResult::Denied(_)),
+                "expected '{cmd}' to be Denied"
+            );
+        }
+    }
+
+    // AUDIT-C1.2 — new blocked commands are classified as High risk
+    #[test]
+    fn audit_c1_new_blocked_high_risk() {
+        let policy = supervised_policy();
+        for cmd in &["nc", "ncat", "socat", "docker", "systemctl", "xdg-open", "open"] {
+            assert_eq!(
+                policy.classify_command_risk(cmd),
+                RiskLevel::High,
+                "{cmd} should be High risk"
+            );
+        }
     }
 }

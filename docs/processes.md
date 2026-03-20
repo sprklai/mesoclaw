@@ -95,6 +95,7 @@ sequenceDiagram
     App->>App: Load identity (SoulLoader from data_dir/identity/)
     App->>App: Load skills (SkillRegistry from data_dir/skills/)
     App->>App: Init user learner (UserLearner from DB pool)
+    App->>App: Cleanup old sessions (session_max_age_days, default 90)
     App->>App: Init ContextEngine + store_all_summaries()
     opt channels feature enabled
         App->>App: Init ChannelRegistry (DashMap)
@@ -183,9 +184,30 @@ sequenceDiagram
 
     C->>S: WS Connect /ws/chat?token=xxx
     C->>S: { "prompt": "hello", "session_id": "optional-uuid" }
-    Note over S: Validate JSON, check agent, call ZeniiAgent.prompt
-    S-->>C: { "type": "text", "content": "Hi there!" }
-    S-->>C: { "type": "done" }
+    Note over S: Validate JSON, check agent, spawn agent task with JoinHandle
+    Note over S: tokio::select! on agent / timeout / client disconnect
+
+    alt Agent completes within timeout
+        S-->>C: { "type": "text", "content": "Hi there!" }
+        S-->>C: { "type": "done" }
+        Note over S: Persist to DB (retry once on failure)
+    else Agent exceeds agent_timeout_secs
+        Note over S: Abort JoinHandle
+        S-->>C: { "type": "error", "error": "agent timeout" }
+    else Client disconnects during execution
+        Note over S: Abort JoinHandle, log warning
+    end
+
+    Note over C,S: Tool event lag
+    alt tool_rx channel lags
+        S-->>C: { "type": "warning", "message": "N tool events dropped" }
+    end
+
+    Note over C,S: DB persistence failure
+    alt DB write fails after retry
+        S-->>C: { "type": "warning", "message": "failed to persist messages" }
+    end
+
     Note over C,S: Error cases
     C->>S: invalid-json
     S-->>C: { "type": "error", "error": "invalid JSON: ..." }

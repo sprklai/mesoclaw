@@ -75,6 +75,7 @@ All fields use `serde(default)`, so any field can be omitted to use its default 
 | `gateway_auth_token` | Option\<String\> | `null` | Bearer token for API authentication. If unset, auth is disabled |
 | `gateway_cors_origins` | Vec\<String\> | `["http://localhost:18971"]` | Allowed CORS origins. `["*"]` enables permissive CORS |
 | `ws_max_connections` | usize | `32` | Maximum concurrent WebSocket connections |
+| `event_bus_capacity` | usize | `256` | Capacity of the tokio broadcast event bus channel |
 
 ```toml
 gateway_host = "127.0.0.1"
@@ -82,6 +83,7 @@ gateway_port = 18981
 gateway_auth_token = "my-secret-token"
 gateway_cors_origins = ["http://localhost:18971"]
 ws_max_connections = 32
+event_bus_capacity = 256
 ```
 
 ### Database
@@ -91,11 +93,13 @@ ws_max_connections = 32
 | `data_dir` | Option\<String\> | Platform default (see above) | Root directory for all data files |
 | `db_path` | Option\<String\> | `{data_dir}/zenii.db` | Path to main SQLite database (app + FTS5) |
 | `memory_db_path` | Option\<String\> | `{data_dir}/memory_vec.db` | Path to vector memory SQLite database (sqlite-vec) |
+| `session_max_age_days` | u32 | `90` | Days before old sessions are automatically cleaned up on boot |
 
 ```toml
 data_dir = "/home/user/.zenii"
 db_path = "/home/user/.zenii/zenii.db"
 memory_db_path = "/home/user/.zenii/memory_vec.db"
+session_max_age_days = 90
 ```
 
 ### Memory
@@ -145,6 +149,7 @@ security_audit_log_capacity = 1000
 | `provider_api_key_env` | Option\<String\> | `null` | Environment variable name for the API key |
 | `agent_max_turns` | usize | `4` | Maximum agent turns (tool call loops) per request |
 | `agent_max_tokens` | usize | `4096` | Maximum tokens for agent responses |
+| `agent_timeout_secs` | u64 | `300` | Maximum seconds for agent execution before timeout. WebSocket chat aborts the agent task and returns an error on timeout |
 | `agent_system_prompt` | Option\<String\> | `null` | Additional system prompt appended to identity (never replaces it) |
 
 ```toml
@@ -155,6 +160,7 @@ provider_model_id = "gpt-4o"
 provider_api_key_env = "OPENAI_API_KEY"
 agent_max_turns = 4
 agent_max_tokens = 4096
+agent_timeout_secs = 300
 agent_system_prompt = "Always respond concisely."
 ```
 
@@ -517,6 +523,7 @@ gateway_port = 18981
 gateway_auth_token = "my-secret-token"
 gateway_cors_origins = ["http://localhost:18971"]
 ws_max_connections = 32
+event_bus_capacity = 256
 
 # Logging
 log_level = "info"
@@ -525,12 +532,14 @@ log_level = "info"
 
 # Database
 # data_dir = "~/.local/share/zenii"  # uses platform default if unset
+session_max_age_days = 90
 
 # AI Agent
 provider_name = "openai"
 provider_model_id = "gpt-4o"
 agent_max_turns = 4
 agent_max_tokens = 4096
+agent_timeout_secs = 300
 
 # Identity
 identity_name = "Zenii"

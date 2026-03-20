@@ -5,41 +5,7 @@ use tokio::sync::broadcast;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AppEvent {
-    SessionCreated {
-        session_id: String,
-    },
-    SessionDeleted {
-        session_id: String,
-    },
-    MessageReceived {
-        session_id: String,
-        role: String,
-    },
-    StreamChunk {
-        session_id: String,
-        content: String,
-    },
-    StreamDone {
-        session_id: String,
-    },
-    ToolExecutionStarted {
-        tool_name: String,
-    },
-    ToolExecutionCompleted {
-        tool_name: String,
-        success: bool,
-    },
-    ProviderChanged {
-        provider: String,
-        model: String,
-    },
-    MemoryStored {
-        key: String,
-    },
     ConfigUpdated,
-    GatewayStarted {
-        port: u16,
-    },
     ChannelConnected {
         channel: String,
     },
