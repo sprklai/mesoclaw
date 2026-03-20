@@ -10172,6 +10172,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "dialoguer",
+ "directories",
  "futures",
  "iana-time-zone",
  "openssl",
@@ -10181,6 +10182,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite 0.28.0",
  "tracing",
+ "tracing-appender",
  "tracing-subscriber",
 ]
 
@@ -10275,6 +10277,7 @@ version = "0.0.30"
 dependencies = [
  "clap",
  "crossterm",
+ "directories",
  "futures",
  "iana-time-zone",
  "ratatui",
@@ -10286,6 +10289,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite 0.28.0",
  "tracing",
+ "tracing-appender",
  "tracing-subscriber",
  "unicode-width",
 ]

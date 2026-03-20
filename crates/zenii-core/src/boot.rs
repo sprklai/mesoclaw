@@ -725,12 +725,18 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         plugin_registry.list().len()
     );
 
-    // Usage logger
+    // Usage logger + tracing log cleanup
     let usage_logger = Arc::new(crate::logging::UsageLogger::new(&config, "daemon"));
     if usage_logger.is_enabled() {
         let _ = usage_logger.cleanup_old_files().await;
         info!("Usage logger initialized");
     }
+    // Clean up old tracing log files alongside usage logs
+    let log_dir = crate::logging::resolve_log_dir(&config);
+    let keep_days = config.log_keep_days;
+    tokio::task::spawn_blocking(move || crate::logging::cleanup_old_tracing_files(&log_dir, keep_days))
+        .await
+        .ok();
 
     info!("All services initialized");
 

@@ -138,6 +138,44 @@ pub fn resolve_log_dir(config: &AppConfig) -> PathBuf {
     }
 }
 
+/// Delete tracing log files older than `keep_days`.
+///
+/// Matches files like `daemon.log.2026-03-15` (tracing-appender daily format).
+pub fn cleanup_old_tracing_files(log_dir: &Path, keep_days: u32) {
+    let cutoff = Utc::now() - chrono::Duration::days(i64::from(keep_days));
+    let cutoff_str = cutoff.format("%Y-%m-%d").to_string();
+
+    let entries = match std::fs::read_dir(log_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            warn!("Failed to read log dir for tracing cleanup: {e}");
+            return;
+        }
+    };
+
+    let mut removed = 0u32;
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+
+        // Match *.log.YYYY-MM-DD (tracing-appender daily rotation format)
+        if let Some(pos) = name_str.find(".log.") {
+            let date_part = &name_str[pos + 5..];
+            if date_part.len() == 10 && date_part < cutoff_str.as_str() {
+                if let Err(e) = std::fs::remove_file(entry.path()) {
+                    warn!("Failed to remove old tracing log {}: {e}", name_str);
+                } else {
+                    removed += 1;
+                }
+            }
+        }
+    }
+
+    if removed > 0 {
+        info!("Cleaned up {removed} old tracing log files");
+    }
+}
+
 fn cleanup_old_usage_files(log_dir: &Path, keep_days: u32) {
     let cutoff = Utc::now() - chrono::Duration::days(i64::from(keep_days));
     let cutoff_str = cutoff.format("%Y-%m-%d").to_string();
@@ -205,10 +243,14 @@ pub fn init_tracing(config: &AppConfig, binary_name: &str, quiet: bool) -> crate
             .with_ansi(false)
             .with_target(true);
 
-        tracing_subscriber::registry()
+        if tracing_subscriber::registry()
             .with(env_filter)
             .with(file_layer)
-            .init();
+            .try_init()
+            .is_err()
+        {
+            // A global subscriber was already set (e.g. by Tauri devtools) — not an error.
+        }
     } else {
         let env_filter =
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
@@ -218,11 +260,15 @@ pub fn init_tracing(config: &AppConfig, binary_name: &str, quiet: bool) -> crate
             .with_target(true);
         let console_layer = fmt::layer().with_writer(std::io::stderr).with_target(true);
 
-        tracing_subscriber::registry()
+        if tracing_subscriber::registry()
             .with(env_filter)
             .with(console_layer)
             .with(file_layer)
-            .init();
+            .try_init()
+            .is_err()
+        {
+            // A global subscriber was already set — not an error.
+        }
     }
 
     Ok(())

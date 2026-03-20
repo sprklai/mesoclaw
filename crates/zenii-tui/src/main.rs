@@ -44,24 +44,28 @@ struct Args {
     token: Option<String>,
 }
 
+fn init_file_tracing() {
+    let log_dir = directories::ProjectDirs::from("com", "sprklai", "zenii")
+        .map(|d| d.data_dir().join("logs"))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let _ = std::fs::create_dir_all(&log_dir);
+    let file_appender = tracing_appender::rolling::daily(&log_dir, "tui.log");
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("zenii_tui=debug,info"));
+    tracing_subscriber::fmt()
+        .with_writer(file_appender)
+        .with_ansi(false)
+        .with_target(true)
+        .with_env_filter(env_filter)
+        .init();
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    // Set up tracing to file (not terminal, since we own the terminal)
-    tracing_subscriber::fmt()
-        .with_writer(|| {
-            std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/tmp/zenii-tui.log")
-                .unwrap_or_else(|_| {
-                    #[allow(clippy::expect_used)]
-                    std::fs::File::create("/dev/null").expect("open /dev/null")
-                })
-        })
-        .with_env_filter("zenii_tui=debug")
-        .init();
+    // Set up tracing to OS-appropriate log dir (not terminal, since we own the terminal)
+    init_file_tracing();
 
     // Set panic hook to restore terminal
     let original_hook = std::panic::take_hook();

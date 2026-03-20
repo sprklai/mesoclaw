@@ -49,15 +49,6 @@ pub fn resolve_data_dir() -> std::path::PathBuf {
 /// This is called from the Tauri `.setup()` hook when no external URL is configured.
 #[allow(clippy::unwrap_used)]
 pub fn boot_gateway(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing so gateway logs are visible in the terminal.
-    // Use try_init() because Tauri devtools may have already set a global subscriber.
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "zenii_core=info,warn".parse().unwrap()),
-        )
-        .try_init();
-
     let mode = resolve_gateway_mode().map_err(|e| e.to_string())?;
 
     if mode.external_url.is_some() {
@@ -72,6 +63,10 @@ pub fn boot_gateway(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
     // Load config
     let config_path = zenii_core::config::default_config_path();
     let config = zenii_core::config::load_or_create_config(&config_path)?;
+
+    // Initialize file-based tracing using the shared init_tracing().
+    // Use quiet=false so desktop also logs to stderr (visible in terminal when run via `cargo tauri dev`).
+    let _ = zenii_core::logging::init_tracing(&config, "desktop", false);
 
     let host = config.gateway_host.clone();
     let port = config.gateway_port;

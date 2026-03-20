@@ -369,9 +369,25 @@ enum ProviderAction {
     },
 }
 
+fn init_file_tracing() {
+    let log_dir = directories::ProjectDirs::from("com", "sprklai", "zenii")
+        .map(|d| d.data_dir().join("logs"))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let _ = std::fs::create_dir_all(&log_dir);
+    let file_appender = tracing_appender::rolling::daily(&log_dir, "cli.log");
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    tracing_subscriber::fmt()
+        .with_writer(file_appender)
+        .with_ansi(false)
+        .with_target(true)
+        .with_env_filter(env_filter)
+        .init();
+}
+
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    init_file_tracing();
 
     let cli = Cli::parse();
     let client = ZeniiClient::new(&cli.host, cli.port, cli.token);

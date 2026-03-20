@@ -27,6 +27,8 @@ serde_json = { workspace = true }
 dialoguer = "0.12"
 iana-time-zone = { workspace = true }
 clap_complete = "4"
+tracing-appender = { workspace = true }
+directories = { workspace = true }
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 
 [features]
