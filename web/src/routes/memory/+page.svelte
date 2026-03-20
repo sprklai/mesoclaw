@@ -61,7 +61,7 @@
 	}
 </script>
 
-<div class="max-w-3xl mx-auto space-y-6">
+<div class="max-w-3xl mx-auto space-y-4">
 	<div class="flex items-center justify-between">
 		<h1 class="text-2xl font-bold">Memory</h1>
 		<Button size="sm" onclick={() => (addOpen = true)} class="gap-1">
@@ -155,9 +155,9 @@
 
 		{#if memoryStore.entries.length === 0 && memoryStore.observations.length === 0}
 			{#if query}
-				<p class="text-center text-muted-foreground py-8">No memories found for "{query}"</p>
+				<p class="text-center text-muted-foreground py-6">No memories found for "{query}"</p>
 			{:else}
-				<p class="text-center text-muted-foreground py-8">No memories yet. Add one or chat with the agent to build memory.</p>
+				<p class="text-center text-muted-foreground py-6">No memories yet. Add one or chat with the agent to build memory.</p>
 			{/if}
 		{/if}
 	{/if}

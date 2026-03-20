@@ -11,7 +11,7 @@
 	}
 </script>
 
-<div class="max-w-2xl mx-auto space-y-6">
+<div class="max-w-2xl mx-auto space-y-4">
 	<div class="text-center space-y-2">
 		<h1 class="text-3xl font-bold">Zenii</h1>
 		<p class="text-muted-foreground">Your AI assistant</p>

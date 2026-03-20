@@ -111,7 +111,7 @@
 	}
 </script>
 
-<div class="max-w-3xl mx-auto space-y-6">
+<div class="max-w-3xl mx-auto space-y-4">
 	<div class="flex items-center justify-between">
 		<h1 class="text-2xl font-bold">Workflows</h1>
 		<Button size="sm" onclick={() => { showForm = !showForm; if (showForm) resetForm(); }}>
@@ -155,7 +155,7 @@
 		<p class="text-sm text-muted-foreground">Loading...</p>
 	{:else if workflowsStore.workflows.length === 0 && !showForm}
 		<Card.Root>
-			<Card.Content class="flex flex-col items-center justify-center py-12 text-center">
+			<Card.Content class="flex flex-col items-center justify-center py-8 text-center">
 				<WorkflowIcon class="h-12 w-12 text-muted-foreground mb-4" />
 				<h2 class="text-lg font-medium">No workflows</h2>
 				<p class="text-muted-foreground mt-1">

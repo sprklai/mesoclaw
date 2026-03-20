@@ -66,7 +66,7 @@
 	});
 </script>
 
-<div class="flex flex-col md:flex-row gap-6 max-w-4xl mx-auto">
+<div class="flex flex-col md:flex-row gap-4 max-w-4xl mx-auto">
 	<!-- Desktop sidebar -->
 	<nav class="hidden md:flex flex-col w-48 shrink-0 space-y-1">
 		{#each tabs as tab (tab.id)}
@@ -113,7 +113,7 @@
 	</div>
 
 	<!-- Content area -->
-	<div class="flex-1 min-w-0 space-y-6">
+	<div class="flex-1 min-w-0 space-y-4">
 		<h1 class="text-2xl font-bold">{tabs.find((t) => t.id === activeTab)?.label ?? 'Settings'}</h1>
 
 		{#if activeTab === 'general'}
