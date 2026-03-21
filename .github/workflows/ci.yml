@@ -32,14 +32,17 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
 
+      - name: Check
+        run: cargo check --workspace
+
       - name: Test (default features)
         run: cargo test --workspace
 
       - name: Test (all features)
         run: cargo test --workspace --all-features
 
-  frontend:
-    name: Frontend
+  check-frontend:
+    name: Check Frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -54,12 +57,11 @@ jobs:
           restore-keys: |
             bun-${{ runner.os }}-
 
-      - name: Install, build, check, and test
+      - name: Install, build, and test
         working-directory: web
         run: |
           bun install
           bun run build
-          bun run check
           bun run test
 
   lint-backend:
@@ -86,11 +88,36 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
 
+      - name: Clippy (default features)
+        run: cargo clippy --workspace -- -D warnings
+
       - name: Clippy (all features)
         run: cargo clippy --workspace --all-features -- -D warnings
 
       - name: Rustfmt
         run: cargo fmt --check
+
+  lint-frontend:
+    name: Lint Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Cache bun dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('web/bun.lockb') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Check
+        working-directory: web
+        run: |
+          bun install
+          bun run check
 
   check-embedded:
     name: Check Embedded (aarch64-musl)
@@ -124,9 +151,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-audit
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
 
       - name: Run audit
         run: cargo audit
