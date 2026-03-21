@@ -188,6 +188,7 @@ impl Coordinator {
                             error: Some("unresolved dependencies".into()),
                             session_id: String::new(),
                             tool_uses: 0,
+                            description: task.description.clone(),
                         },
                     );
                 }
@@ -225,6 +226,7 @@ impl Coordinator {
                                 error: Some(e.to_string()),
                                 session_id: String::new(),
                                 tool_uses: 0,
+                                description: String::new(),
                             },
                         );
                     }

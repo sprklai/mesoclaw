@@ -8,6 +8,7 @@ export interface Message {
   content: string;
   created_at: number;
   tool_calls?: ToolCallRecord[];
+  delegation?: DelegationRecord;
 }
 
 export interface ToolCallRecord {
@@ -20,6 +21,23 @@ export interface ToolCallRecord {
   success?: boolean;
   duration_ms?: number;
   created_at: string;
+}
+
+export interface DelegationAgentRecord {
+  id: string;
+  description: string;
+  status: string;
+  tool_uses: number;
+  tokens_used: number;
+  duration_ms: number;
+  error?: string;
+}
+
+export interface DelegationRecord {
+  delegation_id: string;
+  total_duration_ms: number;
+  total_tokens: number;
+  agents: DelegationAgentRecord[];
 }
 
 export interface ActiveToolCall {

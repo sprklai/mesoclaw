@@ -7,7 +7,7 @@ use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
-use crate::ai::session::ToolCallRecord;
+use crate::ai::session::{DelegationRecord, ToolCallRecord};
 use crate::gateway::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -27,6 +27,8 @@ pub struct MessageWithToolCalls {
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCallRecord>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delegation: Option<DelegationRecord>,
 }
 
 #[cfg_attr(feature = "api-docs", utoipa::path(
@@ -54,6 +56,12 @@ pub async fn get_messages(
             None
         };
 
+        let delegation = if msg.role == "assistant" {
+            state.session_manager.get_delegation(&msg.id).await?
+        } else {
+            None
+        };
+
         result.push(MessageWithToolCalls {
             id: msg.id,
             session_id: msg.session_id,
@@ -61,6 +69,7 @@ pub async fn get_messages(
             content: msg.content,
             created_at: msg.created_at,
             tool_calls,
+            delegation,
         });
     }
 

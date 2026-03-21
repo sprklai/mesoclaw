@@ -834,7 +834,7 @@ async fn handle_delegation(
             result = &mut result_rx => {
                 match result {
                     Ok(Ok(delegation_result)) => {
-                        let response = delegation_result.aggregated_response;
+                        let response = delegation_result.aggregated_response.clone();
                         send_outbound(socket, &WsOutbound::Text {
                             content: response.clone(),
                         })
@@ -862,6 +862,17 @@ async fn handle_delegation(
                                     warning: "message could not be saved to history".into(),
                                 })
                                 .await;
+                            }
+
+                            // Store delegation details linked to the assistant message
+                            if let Ok(ref msg) = msg {
+                                if let Err(e) = state
+                                    .session_manager
+                                    .store_delegation(&msg.id, sid, &delegation_result)
+                                    .await
+                                {
+                                    warn!("WS: FAILED to store delegation details for session={sid}: {e}");
+                                }
                             }
                         }
 

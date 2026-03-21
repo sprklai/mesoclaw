@@ -156,6 +156,7 @@ impl SubAgent {
                     error: None,
                     session_id: self.session_id,
                     tool_uses: final_tool_uses,
+                    description: self.task.description.clone(),
                 }
             }
             Ok(Err(e)) => TaskResult {
@@ -167,6 +168,7 @@ impl SubAgent {
                 error: Some(e.to_string()),
                 session_id: self.session_id,
                 tool_uses: final_tool_uses,
+                description: self.task.description.clone(),
             },
             Err(_) => TaskResult {
                 task_id: self.task.id,
@@ -177,6 +179,7 @@ impl SubAgent {
                 error: Some("task timed out".into()),
                 session_id: self.session_id,
                 tool_uses: final_tool_uses,
+                description: self.task.description.clone(),
             },
         }
     }

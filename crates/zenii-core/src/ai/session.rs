@@ -59,6 +59,25 @@ pub struct ToolCallRecord {
     pub created_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DelegationRecord {
+    pub delegation_id: String,
+    pub total_duration_ms: u64,
+    pub total_tokens: u64,
+    pub agents: Vec<DelegationAgentRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DelegationAgentRecord {
+    pub id: String,
+    pub description: String,
+    pub status: String,
+    pub tool_uses: u32,
+    pub tokens_used: u64,
+    pub duration_ms: u64,
+    pub error: Option<String>,
+}
+
 pub struct SessionManager {
     db: DbPool,
 }
@@ -611,6 +630,128 @@ impl SessionManager {
                 .collect::<std::result::Result<Vec<_>, _>>()?;
 
             Ok(rows)
+        })
+        .await
+    }
+
+    /// Store delegation task results linked to an assistant message.
+    pub async fn store_delegation(
+        &self,
+        message_id: &str,
+        session_id: &str,
+        result: &crate::ai::delegation::task::DelegationResult,
+    ) -> Result<()> {
+        let db = self.db.clone();
+        let message_id = message_id.to_string();
+        let session_id = session_id.to_string();
+        let delegation_id = result.id.clone();
+        let total_duration_ms = result.total_duration_ms as i64;
+        let total_tokens = result.total_usage.total_tokens as i64;
+
+        // Collect task data before moving into spawn_blocking
+        let tasks: Vec<_> = result
+            .task_results
+            .iter()
+            .map(|t| {
+                (
+                    uuid::Uuid::new_v4().to_string(),
+                    t.task_id.clone(),
+                    t.description.clone(),
+                    format!("{:?}", t.status),
+                    t.tool_uses as i64,
+                    t.usage.total_tokens as i64,
+                    t.duration_ms as i64,
+                    t.error.clone(),
+                )
+            })
+            .collect();
+
+        db::with_db(&db, move |conn| {
+            for (id, agent_id, description, status, tool_uses, tokens_used, duration_ms, error) in
+                &tasks
+            {
+                conn.execute(
+                    "INSERT INTO delegation_tasks (id, message_id, session_id, delegation_id, agent_id, description, status, tool_uses, tokens_used, duration_ms, error, total_duration_ms, total_tokens)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                    rusqlite::params![
+                        id,
+                        message_id,
+                        session_id,
+                        delegation_id,
+                        agent_id,
+                        description,
+                        status,
+                        tool_uses,
+                        tokens_used,
+                        duration_ms,
+                        error,
+                        total_duration_ms,
+                        total_tokens
+                    ],
+                )?;
+            }
+            Ok(())
+        })
+        .await
+    }
+
+    /// Retrieve delegation record for a given message.
+    pub async fn get_delegation(
+        &self,
+        message_id: &str,
+    ) -> Result<Option<DelegationRecord>> {
+        let db = self.db.clone();
+        let message_id = message_id.to_string();
+
+        db::with_db(&db, move |conn| {
+            let mut stmt = conn.prepare(
+                "SELECT delegation_id, agent_id, description, status, tool_uses, tokens_used, duration_ms, error, total_duration_ms, total_tokens
+                 FROM delegation_tasks WHERE message_id = ?1 ORDER BY created_at ASC",
+            )?;
+            let rows: Vec<_> = stmt
+                .query_map(rusqlite::params![message_id], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, i64>(4)?,
+                        row.get::<_, i64>(5)?,
+                        row.get::<_, i64>(6)?,
+                        row.get::<_, Option<String>>(7)?,
+                        row.get::<_, i64>(8)?,
+                        row.get::<_, i64>(9)?,
+                    ))
+                })?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+
+            if rows.is_empty() {
+                return Ok(None);
+            }
+
+            let delegation_id = rows[0].0.clone();
+            let total_duration_ms = rows[0].8 as u64;
+            let total_tokens = rows[0].9 as u64;
+
+            let agents = rows
+                .into_iter()
+                .map(|r| DelegationAgentRecord {
+                    id: r.1,
+                    description: r.2,
+                    status: r.3,
+                    tool_uses: r.4 as u32,
+                    tokens_used: r.5 as u64,
+                    duration_ms: r.6 as u64,
+                    error: r.7,
+                })
+                .collect();
+
+            Ok(Some(DelegationRecord {
+                delegation_id,
+                total_duration_ms,
+                total_tokens,
+                agents,
+            }))
         })
         .await
     }
@@ -1463,5 +1604,149 @@ mod tests {
         let remaining = mgr.get_messages(&session.id).await.unwrap();
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].content, "Do something");
+    }
+
+    // DEL.1 — store_delegation and retrieve
+    #[tokio::test]
+    async fn store_delegation_and_retrieve() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr.create_session("Chat").await.unwrap();
+        let msg = mgr
+            .append_message(&session.id, "assistant", "delegation result")
+            .await
+            .unwrap();
+
+        let delegation_result = crate::ai::delegation::task::DelegationResult {
+            id: "del-1".into(),
+            task_results: vec![
+                crate::ai::delegation::task::TaskResult {
+                    task_id: "agent-1".into(),
+                    status: crate::ai::delegation::task::TaskStatus::Completed,
+                    output: "result 1".into(),
+                    usage: crate::ai::agent::TokenUsage {
+                        input_tokens: 100,
+                        output_tokens: 50,
+                        total_tokens: 150,
+                        cached_input_tokens: 0,
+                    },
+                    duration_ms: 1000,
+                    error: None,
+                    session_id: session.id.clone(),
+                    tool_uses: 3,
+                    description: "Research topic A".into(),
+                },
+                crate::ai::delegation::task::TaskResult {
+                    task_id: "agent-2".into(),
+                    status: crate::ai::delegation::task::TaskStatus::Completed,
+                    output: "result 2".into(),
+                    usage: crate::ai::agent::TokenUsage {
+                        input_tokens: 200,
+                        output_tokens: 100,
+                        total_tokens: 300,
+                        cached_input_tokens: 0,
+                    },
+                    duration_ms: 2000,
+                    error: None,
+                    session_id: session.id.clone(),
+                    tool_uses: 5,
+                    description: "Research topic B".into(),
+                },
+            ],
+            aggregated_response: "combined".into(),
+            total_usage: crate::ai::agent::TokenUsage {
+                input_tokens: 300,
+                output_tokens: 150,
+                total_tokens: 450,
+                cached_input_tokens: 0,
+            },
+            total_duration_ms: 2500,
+        };
+
+        mgr.store_delegation(&msg.id, &session.id, &delegation_result)
+            .await
+            .unwrap();
+
+        let record = mgr.get_delegation(&msg.id).await.unwrap();
+        assert!(record.is_some());
+        let record = record.unwrap();
+        assert_eq!(record.delegation_id, "del-1");
+        assert_eq!(record.total_duration_ms, 2500);
+        assert_eq!(record.total_tokens, 450);
+        assert_eq!(record.agents.len(), 2);
+        assert_eq!(record.agents[0].id, "agent-1");
+        assert_eq!(record.agents[0].description, "Research topic A");
+        assert_eq!(record.agents[0].tool_uses, 3);
+        assert_eq!(record.agents[1].id, "agent-2");
+        assert_eq!(record.agents[1].description, "Research topic B");
+    }
+
+    // DEL.2 — get_delegation returns None for message without delegation
+    #[tokio::test]
+    async fn get_delegation_empty() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr.create_session("Chat").await.unwrap();
+        let msg = mgr
+            .append_message(&session.id, "assistant", "no delegation")
+            .await
+            .unwrap();
+
+        let record = mgr.get_delegation(&msg.id).await.unwrap();
+        assert!(record.is_none());
+    }
+
+    // DEL.3 — store_delegation preserves error field
+    #[tokio::test]
+    async fn store_delegation_preserves_error() {
+        let (_dir, mgr) = setup().await;
+        let session = mgr.create_session("Chat").await.unwrap();
+        let msg = mgr
+            .append_message(&session.id, "assistant", "partial failure")
+            .await
+            .unwrap();
+
+        let delegation_result = crate::ai::delegation::task::DelegationResult {
+            id: "del-2".into(),
+            task_results: vec![
+                crate::ai::delegation::task::TaskResult {
+                    task_id: "agent-ok".into(),
+                    status: crate::ai::delegation::task::TaskStatus::Completed,
+                    output: "done".into(),
+                    usage: crate::ai::agent::TokenUsage::default(),
+                    duration_ms: 500,
+                    error: None,
+                    session_id: session.id.clone(),
+                    tool_uses: 1,
+                    description: "Successful task".into(),
+                },
+                crate::ai::delegation::task::TaskResult {
+                    task_id: "agent-fail".into(),
+                    status: crate::ai::delegation::task::TaskStatus::Failed,
+                    output: String::new(),
+                    usage: crate::ai::agent::TokenUsage::default(),
+                    duration_ms: 200,
+                    error: Some("connection refused".into()),
+                    session_id: session.id.clone(),
+                    tool_uses: 0,
+                    description: "Failed task".into(),
+                },
+            ],
+            aggregated_response: "partial".into(),
+            total_usage: crate::ai::agent::TokenUsage::default(),
+            total_duration_ms: 700,
+        };
+
+        mgr.store_delegation(&msg.id, &session.id, &delegation_result)
+            .await
+            .unwrap();
+
+        let record = mgr.get_delegation(&msg.id).await.unwrap().unwrap();
+        assert_eq!(record.agents.len(), 2);
+        assert_eq!(record.agents[0].status, "Completed");
+        assert!(record.agents[0].error.is_none());
+        assert_eq!(record.agents[1].status, "Failed");
+        assert_eq!(
+            record.agents[1].error.as_deref(),
+            Some("connection refused")
+        );
     }
 }
