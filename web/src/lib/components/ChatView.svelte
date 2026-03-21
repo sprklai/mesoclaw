@@ -111,12 +111,15 @@
 		if (!currentSessionId) {
 			const session = await sessionsStore.create(prompt.slice(0, 50));
 			currentSessionId = session.id;
+			// P0.3: Send + claim stream BEFORE navigation so the
+			// [id]/+page.svelte $effect sees streaming=true and skips clear()+load()
+			await messagesStore.send(currentSessionId, 'user', prompt);
+			messagesStore.startStream(currentSessionId);
 			await goto(`/chat/${currentSessionId}`, { replaceState: true });
+		} else {
+			await messagesStore.send(currentSessionId, 'user', prompt);
+			messagesStore.startStream(currentSessionId);
 		}
-
-		await messagesStore.send(currentSessionId, 'user', prompt);
-
-		messagesStore.startStream(currentSessionId);
 
 		const capturedSessionId = currentSessionId;
 		const capturedModel = providersStore.selectedModel || undefined;

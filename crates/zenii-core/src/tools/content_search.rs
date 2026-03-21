@@ -152,10 +152,10 @@ impl Tool for ContentSearchTool {
                 }
 
                 // Skip files larger than max size
-                if let Ok(meta) = path.metadata() {
-                    if meta.len() > max_file_size as u64 {
-                        continue;
-                    }
+                if let Ok(meta) = path.metadata()
+                    && meta.len() > max_file_size as u64
+                {
+                    continue;
                 }
 
                 // Read and search file
@@ -174,14 +174,17 @@ impl Tool for ContentSearchTool {
                         let start = line_idx.saturating_sub(context_lines);
                         let end = (line_idx + context_lines + 1).min(lines.len());
 
-                        for ctx_idx in start..end {
-                            let prefix = if ctx_idx == line_idx { ">" } else { " " };
+                        for (ctx_idx, line_content) in
+                            lines[start..end].iter().enumerate()
+                        {
+                            let abs_idx = start + ctx_idx;
+                            let prefix = if abs_idx == line_idx { ">" } else { " " };
                             match_block.push_str(&format!(
                                 "{}{}:{}: {}\n",
                                 prefix,
                                 path.display(),
-                                ctx_idx + 1,
-                                lines[ctx_idx]
+                                abs_idx + 1,
+                                line_content
                             ));
                         }
                         matches.push(match_block);

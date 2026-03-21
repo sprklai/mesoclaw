@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::Result;
 use crate::ai::prompt::AssemblyRequest;
 use crate::ai::resolve_agent;
+use crate::event_bus::AppEvent;
 use crate::gateway::state::AppState;
 use crate::logging::UsageRecord;
 
@@ -40,23 +41,37 @@ pub async fn chat(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatRequest>,
 ) -> Result<impl IntoResponse> {
+    // Auto-create session when none provided (so CLI messages persist)
+    let session_id = match req.session_id.clone() {
+        Some(sid) => sid,
+        None => {
+            let title: String = req.prompt.chars().take(50).collect();
+            let session = state
+                .session_manager
+                .create_session_with_source(&title, "api")
+                .await?;
+            let _ = state.event_bus.publish(AppEvent::SessionCreated {
+                session_id: session.id.clone(),
+                title: session.title.clone(),
+                source: session.source.clone(),
+            });
+            session.id
+        }
+    };
+
     // Build context parts via ContextBuilder
     let (history, _memories, _user_obs) = state
         .context_builder
-        .build_parts(req.session_id.as_deref(), &req.prompt)
+        .build_parts(Some(&session_id), &req.prompt)
         .await?;
 
     // Get conversation summary for resumed sessions
-    let summary = if let Some(ref sid) = req.session_id {
-        state
-            .session_manager
-            .get_context_info(sid)
-            .await
-            .ok()
-            .and_then(|(_, _, s)| s)
-    } else {
-        None
-    };
+    let summary = state
+        .session_manager
+        .get_context_info(&session_id)
+        .await
+        .ok()
+        .and_then(|(_, _, s)| s);
 
     // Assemble preamble via PromptStrategy
     let config = state.config.load_full();
@@ -64,7 +79,7 @@ pub async fn chat(
     let assembly_request = AssemblyRequest {
         boot_context: state.boot_context.clone(),
         model_display: model_display.into(),
-        session_id: req.session_id.clone(),
+        session_id: Some(session_id.clone()),
         user_message: Some(req.prompt.clone()),
         conversation_summary: summary,
         channel_hint: None,
@@ -83,15 +98,20 @@ pub async fn chat(
     )
     .await?;
 
-    // If session_id provided, store the user message
-    if let Some(ref sid) = req.session_id {
-        let _ = state
-            .session_manager
-            .append_message(sid, "user", &req.prompt)
-            .await
-            .inspect_err(|e| {
-                tracing::warn!("Failed to persist user message for session {sid}: {e}");
-            });
+    // Store the user message
+    if let Ok(msg) = state
+        .session_manager
+        .append_message(&session_id, "user", &req.prompt)
+        .await
+        .inspect_err(|e| {
+            tracing::warn!("Failed to persist user message for session {session_id}: {e}");
+        })
+    {
+        let _ = state.event_bus.publish(AppEvent::MessageAdded {
+            session_id: session_id.clone(),
+            message_id: msg.id,
+            role: "user".into(),
+        });
     }
 
     // Use reasoning engine for multi-turn continuity with autonomous reasoning
@@ -106,7 +126,7 @@ pub async fn chat(
     // Log usage
     let record = UsageRecord {
         timestamp: chrono::Utc::now().to_rfc3339(),
-        session_id: req.session_id.clone(),
+        session_id: Some(session_id.clone()),
         model_id: model_display.to_string(),
         provider_id: model_display
             .split(':')
@@ -129,27 +149,30 @@ pub async fn chat(
     });
 
     // Auto-extract facts from the conversation
-    if let Some(ref sid) = req.session_id {
-        let _ = state
-            .context_builder
-            .extract_facts(&req.prompt, &response, Some(sid))
-            .await;
-    }
+    let _ = state
+        .context_builder
+        .extract_facts(&req.prompt, &response, Some(&session_id))
+        .await;
 
-    // If session_id provided, store the assistant response
-    if let Some(ref sid) = req.session_id {
-        let _ = state
-            .session_manager
-            .append_message(sid, "assistant", &response)
-            .await
-            .inspect_err(|e| {
-                tracing::warn!("Failed to persist assistant message for session {sid}: {e}");
-            });
+    // Store the assistant response
+    if let Ok(msg) = state
+        .session_manager
+        .append_message(&session_id, "assistant", &response)
+        .await
+        .inspect_err(|e| {
+            tracing::warn!("Failed to persist assistant message for session {session_id}: {e}");
+        })
+    {
+        let _ = state.event_bus.publish(AppEvent::MessageAdded {
+            session_id: session_id.clone(),
+            message_id: msg.id,
+            role: "assistant".into(),
+        });
     }
 
     Ok(Json(ChatResponse {
         response,
-        session_id: req.session_id,
+        session_id: Some(session_id),
     }))
 }
 

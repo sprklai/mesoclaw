@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 use crate::ai::session::{DelegationRecord, ToolCallRecord};
+use crate::event_bus::AppEvent;
 use crate::gateway::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -96,6 +97,11 @@ pub async fn send_message(
         .session_manager
         .append_message(&session_id, &req.role, &req.content)
         .await?;
+    let _ = state.event_bus.publish(AppEvent::MessageAdded {
+        session_id: session_id.clone(),
+        message_id: message.id.clone(),
+        role: req.role,
+    });
     Ok((StatusCode::CREATED, Json(message)))
 }
 

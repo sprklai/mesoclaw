@@ -1,7 +1,6 @@
-/// Shared path resolution for all file tools.
-///
-/// Resolves user-provided path strings to absolute OS paths.
-/// Handles tilde expansion, environment variables, and named directories.
+// Shared path resolution for all file tools.
+// Resolves user-provided path strings to absolute OS paths.
+// Handles tilde expansion, environment variables, and named directories.
 
 /// Get the home directory path, trying multiple sources.
 pub fn home_dir() -> Option<String> {
@@ -115,9 +114,11 @@ fn expand_env_vars(input: &str) -> String {
                 result.push('%');
                 i += 1;
             }
+        } else if let Some(ch) = input[i..].chars().next() {
+            result.push(ch);
+            i += ch.len_utf8();
         } else {
-            result.push(input[i..].chars().next().unwrap());
-            i += input[i..].chars().next().unwrap().len_utf8();
+            break;
         }
     }
 

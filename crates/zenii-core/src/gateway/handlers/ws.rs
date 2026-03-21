@@ -135,6 +135,20 @@ pub(crate) enum WsOutbound {
         decision: String,
         auto: bool,
     },
+    #[serde(rename = "session_created")]
+    SessionCreated {
+        session_id: String,
+        title: String,
+        source: String,
+    },
+    #[serde(rename = "session_deleted")]
+    SessionDeleted { session_id: String },
+    #[serde(rename = "message_added")]
+    MessageAdded {
+        session_id: String,
+        message_id: String,
+        role: String,
+    },
     #[serde(rename = "done")]
     Done,
     #[serde(rename = "warning")]
@@ -295,6 +309,30 @@ async fn handle_notifications(mut socket: WebSocket, state: Arc<AppState>) {
                     }
                     Ok(crate::event_bus::AppEvent::WorkflowCompleted { workflow_id, run_id, status }) => {
                         let outbound = WsOutbound::WorkflowCompleted { workflow_id, run_id, status };
+                        if let Ok(json) = serde_json::to_string(&outbound)
+                            && socket.send(Message::Text(json.into())).await.is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(crate::event_bus::AppEvent::SessionCreated { session_id, title, source }) => {
+                        let outbound = WsOutbound::SessionCreated { session_id, title, source };
+                        if let Ok(json) = serde_json::to_string(&outbound)
+                            && socket.send(Message::Text(json.into())).await.is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(crate::event_bus::AppEvent::SessionDeleted { session_id }) => {
+                        let outbound = WsOutbound::SessionDeleted { session_id };
+                        if let Ok(json) = serde_json::to_string(&outbound)
+                            && socket.send(Message::Text(json.into())).await.is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Ok(crate::event_bus::AppEvent::MessageAdded { session_id, message_id, role }) => {
+                        let outbound = WsOutbound::MessageAdded { session_id, message_id, role };
                         if let Ok(json) = serde_json::to_string(&outbound)
                             && socket.send(Message::Text(json.into())).await.is_err()
                         {

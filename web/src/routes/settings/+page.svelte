@@ -11,10 +11,11 @@
 	import Shield from '@lucide/svelte/icons/shield';
 	import Info from '@lucide/svelte/icons/info';
 	import Download from '@lucide/svelte/icons/download';
+	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import type { Component } from 'svelte';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Dialog from '$lib/components/ui/dialog';
-	import { getAppVersion, checkForUpdate, installUpdate, onUpdateAvailable } from '$lib/tauri';
+	import { getAppVersion, checkForUpdate, installUpdate, onUpdateAvailable, openInBrowser } from '$lib/tauri';
 	import type { UpdateInfo } from '$lib/tauri';
 	import { onMount } from 'svelte';
 
@@ -291,6 +292,25 @@
 					<p class="text-sm">You're up to date!</p>
 				</div>
 			{/if}
+
+			<Separator />
+			<div class="space-y-1.5">
+				<p class="text-xs text-muted-foreground">Or check manually:</p>
+				<div class="flex gap-3">
+					<button
+						class="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+						onclick={() => openInBrowser('https://github.com/sprklai/zenii/releases/')}
+					>
+						GitHub Releases <ExternalLink class="h-3 w-3" />
+					</button>
+					<button
+						class="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+						onclick={() => openInBrowser('https://zenii.sprklai.com/#download')}
+					>
+						Download Page <ExternalLink class="h-3 w-3" />
+					</button>
+				</div>
+			</div>
 		</Dialog.Description>
 	</Dialog.Content>
 </Dialog.Root>

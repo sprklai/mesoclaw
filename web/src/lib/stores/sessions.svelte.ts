@@ -116,6 +116,35 @@ function createSessionsStore() {
     setActive(session: Session | null) {
       active = session;
     },
+
+    /** Prepend a session from a push notification (guards against duplicates). */
+    prependFromEvent(data: { id: string; title: string; source?: string }) {
+      if (sessions.some((s) => s.id === data.id)) return;
+      sessions = [
+        {
+          id: data.id,
+          title: data.title,
+          created_at: Date.now(),
+          source: data.source,
+        },
+        ...sessions,
+      ];
+    },
+
+    /** Remove a session from a push notification. */
+    removeFromEvent(sessionId: string) {
+      sessions = sessions.filter((s) => s.id !== sessionId);
+      if (active?.id === sessionId) active = null;
+    },
+
+    /** Move a session to the top of the list (most recent activity). */
+    bumpSession(sessionId: string) {
+      const idx = sessions.findIndex((s) => s.id === sessionId);
+      if (idx > 0) {
+        const [session] = sessions.splice(idx, 1);
+        sessions = [session, ...sessions];
+      }
+    },
   };
 }
 

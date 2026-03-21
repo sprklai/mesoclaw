@@ -1,6 +1,7 @@
 import { toast } from "svelte-sonner";
 import { inboxStore } from "./inbox.svelte";
 import { configStore } from "./config.svelte";
+import { sessionsStore } from "./sessions.svelte";
 import { isTauri, showNotification } from "$lib/tauri";
 import { workflowsStore } from "./workflows.svelte";
 
@@ -218,6 +219,16 @@ class NotificationStore {
             data.status === "completed" ? "completed successfully" : "failed";
           showNotification(`Workflow "${data.workflow_id}"`, detail);
         }
+      } else if (data.type === "session_created") {
+        sessionsStore.prependFromEvent({
+          id: data.session_id,
+          title: data.title,
+          source: data.source,
+        });
+      } else if (data.type === "session_deleted") {
+        sessionsStore.removeFromEvent(data.session_id);
+      } else if (data.type === "message_added") {
+        sessionsStore.bumpSession(data.session_id);
       } else if (data.type === "notification") {
         const notification: SchedulerNotification = {
           eventType: data.event_type,

@@ -9,6 +9,7 @@ use tracing::warn;
 
 use crate::Result;
 use crate::ai::resolve_agent;
+use crate::event_bus::AppEvent;
 use crate::gateway::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -36,6 +37,11 @@ pub async fn create_session(
     Json(req): Json<CreateSessionRequest>,
 ) -> Result<impl IntoResponse> {
     let session = state.session_manager.create_session(&req.title).await?;
+    let _ = state.event_bus.publish(AppEvent::SessionCreated {
+        session_id: session.id.clone(),
+        title: session.title.clone(),
+        source: session.source.clone(),
+    });
     Ok((StatusCode::CREATED, Json(session)))
 }
 
@@ -98,6 +104,9 @@ pub async fn delete_session(
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse> {
     state.session_manager.delete_session(&id).await?;
+    let _ = state.event_bus.publish(AppEvent::SessionDeleted {
+        session_id: id,
+    });
     Ok(StatusCode::NO_CONTENT)
 }
 

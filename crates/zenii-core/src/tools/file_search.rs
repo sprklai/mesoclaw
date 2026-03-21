@@ -228,6 +228,7 @@ mod tests {
     // FS.1 — Tilde directory resolves
     #[tokio::test]
     async fn search_with_tilde_directory() {
+        // Just verify it doesn't error — tilde resolves to home
         let result = tool()
             .execute(serde_json::json!({
                 "pattern": "nonexistent_file_xyz",
@@ -241,12 +242,14 @@ mod tests {
     // FS.2 — Named directory resolves
     #[tokio::test]
     async fn search_with_named_directory() {
+        // Desktop may or may not exist, but shouldn't error
         let result = tool()
             .execute(serde_json::json!({
                 "pattern": "nonexistent_file_xyz",
                 "directory": "Desktop"
             }))
             .await;
+        // May fail if Desktop dir doesn't exist, that's fine
         assert!(result.is_ok());
     }
 

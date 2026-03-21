@@ -123,6 +123,19 @@ pub enum AppEvent {
         reason: String,
         timeout_secs: u64,
     },
+    SessionCreated {
+        session_id: String,
+        title: String,
+        source: String,
+    },
+    SessionDeleted {
+        session_id: String,
+    },
+    MessageAdded {
+        session_id: String,
+        message_id: String,
+        role: String,
+    },
     Shutdown,
 }
 
@@ -503,6 +516,67 @@ mod tests {
         let back: DelegationAgentInfo = serde_json::from_str(&json).unwrap();
         assert_eq!(back.id, "t1");
         assert_eq!(back.description, "Research web frameworks");
+    }
+
+    #[tokio::test]
+    async fn session_created_event_broadcast() {
+        let bus = TokioBroadcastBus::new(16);
+        let mut rx = bus.subscribe();
+
+        bus.publish(AppEvent::SessionCreated {
+            session_id: "sess-1".into(),
+            title: "Test Chat".into(),
+            source: "api".into(),
+        })
+        .unwrap();
+
+        let event = rx.recv().await.unwrap();
+        assert!(
+            matches!(event, AppEvent::SessionCreated { session_id, title, source }
+                if session_id == "sess-1" && title == "Test Chat" && source == "api")
+        );
+    }
+
+    #[test]
+    fn session_created_event_serde() {
+        let event = AppEvent::SessionCreated {
+            session_id: "sess-1".into(),
+            title: "Test Chat".into(),
+            source: "api".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(
+            matches!(back, AppEvent::SessionCreated { session_id, title, source }
+                if session_id == "sess-1" && title == "Test Chat" && source == "api")
+        );
+    }
+
+    #[test]
+    fn session_deleted_event_serde() {
+        let event = AppEvent::SessionDeleted {
+            session_id: "sess-2".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(
+            matches!(back, AppEvent::SessionDeleted { session_id } if session_id == "sess-2")
+        );
+    }
+
+    #[test]
+    fn message_added_event_serde() {
+        let event = AppEvent::MessageAdded {
+            session_id: "sess-1".into(),
+            message_id: "msg-1".into(),
+            role: "user".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: AppEvent = serde_json::from_str(&json).unwrap();
+        assert!(
+            matches!(back, AppEvent::MessageAdded { session_id, message_id, role }
+                if session_id == "sess-1" && message_id == "msg-1" && role == "user")
+        );
     }
 
     #[tokio::test]
