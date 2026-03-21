@@ -136,6 +136,49 @@ Categories: SECURITY, PERFORMANCE, LOGIC, ERROR-HANDLING, CONCURRENCY, RACE-COND
 If you find no issues, output exactly: NO_ISSUES_FOUND
 ```
 
+### Step 1.5: Parallel execution strategy
+
+Codex CLI supports **parallel agent execution through subagents**. When enabled, the main Codex agent can spawn child agents that review different parts of the codebase concurrently, producing faster and more thorough audits on large scopes.
+
+#### How it works
+- **Prompt-driven**: Codex spawns subagents when the prompt explicitly instructs it to (e.g., "spawn one agent per crate")
+- **`--enable subagents`** flag: Activates the experimental subagents feature on the Codex command
+- **`agents.max_threads`** config (default 6): Caps concurrent agent threads. Can be overridden with `-c agents.max_threads=N`
+- **`agents.max_depth`** config (default 1): Controls nesting depth (1 = direct children only, no deeper recursion)
+- Each subagent runs independently with its own context and tool access, then reports findings back to the parent agent
+- Token consumption scales with subagent count — each agent does its own model + tool work
+
+#### When to use subagents
+| Scope | Parallel? | Strategy |
+|-------|-----------|----------|
+| `uncommitted` | No | Diff is usually small enough for a single pass |
+| `branch:NAME` | No | Diff-scoped, single pass sufficient |
+| `commit:SHA` | No | Diff-scoped, single pass sufficient |
+| `files:` (≤3 files) | No | Too few files to benefit from parallelism |
+| `files:` (>3 files) | **Yes** | One subagent per file for concurrent review |
+| `full` | **Yes** | One subagent per workspace crate/directory |
+
+#### Parallel prompt injection
+
+For scopes that use subagents, append this to FULL_PROMPT before execution:
+
+**For `full` scope:**
+```
+PARALLEL EXECUTION: Spawn one subagent per workspace module to review concurrently:
+- Subagent 1: crates/zenii-core/ (shared library — largest module, focus here)
+- Subagent 2: crates/zenii-desktop/ + crates/zenii-mobile/ (Tauri shells)
+- Subagent 3: crates/zenii-cli/ + crates/zenii-tui/ + crates/zenii-daemon/ (thin binary crates)
+- Subagent 4: web/ (SvelteKit frontend)
+Each subagent must use the same OUTPUT FORMAT defined above. Merge all findings into a single report.
+```
+
+**For `files:` scope (>3 files):**
+```
+PARALLEL EXECUTION: Spawn one subagent per file to review concurrently:
+{list each file as "- Subagent N: path/to/file"}
+Each subagent must use the same OUTPUT FORMAT defined above. Merge all findings into a single report.
+```
+
 ### Step 2: Execute Codex
 
 Based on SCOPE, run one of these commands (15-minute timeout). Capture ALL output.
@@ -155,14 +198,19 @@ timeout 900 codex review --base NAME "FULL_PROMPT" 2>&1
 timeout 900 codex review --commit SHA "FULL_PROMPT" 2>&1
 ```
 
-**files:p1,p2,...:**
+**files:p1,p2,... (≤3 files):**
 ```bash
 timeout 900 codex exec "Review these files: p1, p2, ... FULL_PROMPT" --sandbox read-only --ephemeral 2>&1
 ```
 
-**full:**
+**files:p1,p2,... (>3 files — parallel):**
 ```bash
-timeout 900 codex exec "Full codebase audit of this Rust+Svelte project. FULL_PROMPT" --sandbox read-only --ephemeral 2>&1
+timeout 900 codex exec "Review these files: p1, p2, ... FULL_PROMPT" --enable subagents --sandbox read-only --ephemeral 2>&1
+```
+
+**full (parallel):**
+```bash
+timeout 900 codex exec "Full codebase audit of this Rust+Svelte project. FULL_PROMPT" --enable subagents --sandbox read-only --ephemeral 2>&1
 ```
 
 If the command times out, continue with whatever partial output was captured and print a warning: "Codex timed out after 15 minutes. Working with partial output."
@@ -186,7 +234,45 @@ Claude is the architect here, not a rubber stamp. Codex has context poverty — 
 
 **Default stance: skeptical.** Most Codex findings will be either false positives or technically correct but wrong for this project. Only promote a finding to "Apply" when you have HIGH confidence it's both real AND the right fix.
 
-For EACH finding from Codex, do the following:
+#### Parallel validation with Claude Agent tool
+
+When Codex produces **4+ findings**, use the Agent tool to validate findings concurrently instead of sequentially. This dramatically speeds up Step 4.
+
+**Strategy**: Group findings by file/module, then spawn one Agent per group. Each agent independently reads the code, runs all 6 truthfulness checks, designs fixes, and classifies findings.
+
+**How to parallelize:**
+1. Group findings by their primary file or module (e.g., all `zenii-core/src/gateway/` findings together)
+2. Spawn up to **4 parallel agents** (one per group) using the Agent tool with `subagent_type="general-purpose"`
+3. Each agent's prompt must include:
+   - The CLAUDE.md conventions (from Step 1a)
+   - The specific findings assigned to that agent
+   - The full validation checklist (Steps 4a-4e below)
+   - Instruction to output structured JSON with: `{finding_title, disposition, evidence, fix_description}`
+4. Collect all agent results and merge into the unified report
+
+**When NOT to parallelize:**
+- Fewer than 4 findings (overhead exceeds benefit)
+- Findings that reference each other or share cross-module context (validate sequentially to preserve coherence)
+- `--dry-run` mode (no validation needed)
+
+**Prompt template for each validation agent:**
+```
+You are validating Codex audit findings for a Rust+Svelte project. Read the actual code for each finding, form your own independent opinion, run all 6 truthfulness checks, and classify each finding.
+
+PROJECT CONVENTIONS: {paste Step 1a context}
+
+FINDINGS TO VALIDATE:
+{paste the grouped findings}
+
+For each finding, output:
+1. Your independent code reading (what you found)
+2. Which truthfulness checks passed/failed and evidence
+3. Disposition: Apply | Skip | Defer | User Decision
+4. If Apply: your designed fix (NOT Codex's suggestion)
+5. If Skip: which check failed and why
+```
+
+For EACH finding (whether validated by agent or directly), apply the following checks:
 
 #### 4a. Read the actual code (mandatory — no shortcuts)
 
@@ -318,6 +404,26 @@ If there are NO "Apply" or approved "User Decision" findings, print "No fixes to
 
 **CRITICAL**: Apply the fix Claude designed in Step 4d, NOT the fix Codex suggested. Codex's suggestions often violate project conventions, introduce unnecessary abstractions, or miss cross-module implications. Claude's fix was designed with full codebase context.
 
+#### Parallel fix application with Claude Agent tool
+
+When there are **3+ approved fixes touching different files**, use Agent tool to apply them concurrently:
+
+1. **Group fixes by file** — fixes to the same file must be sequential (they can conflict)
+2. **Spawn one Agent per independent file group** (up to 4 parallel agents) using `subagent_type="general-purpose"`
+3. Each agent's prompt must include:
+   - The specific fix(es) to apply with exact code changes
+   - CLAUDE.md conventions to follow
+   - Instruction to re-read the target file before editing
+   - Instruction to run `cargo check --workspace` after applying its batch
+4. After all agents complete, run the full verification suite (Step 8)
+
+**When NOT to parallelize fixes:**
+- Fixes that depend on each other (e.g., fix B references code changed by fix A)
+- All fixes are in the same file
+- Fewer than 3 fixes (just apply sequentially)
+
+#### Sequential application (default for small batches or dependent fixes)
+
 For each approved fix:
 
 1. **Re-read the target code** before editing — the code may have changed from earlier fixes in this batch
@@ -405,4 +511,6 @@ These are the highest-signal items — they reveal blind spots in both models.}
 | Fix breaks tests | Revert that fix, note in report, continue |
 | Frontend-only changes | Skip Rust verification |
 | Rust-only changes | Skip bun verification |
+| Codex subagent fails/times out | Continue with findings from other subagents + warning about incomplete coverage |
+| Claude validation agent fails | Fall back to sequential validation for that agent's findings |
 | Zero findings | "Clean audit" message, STOP |
