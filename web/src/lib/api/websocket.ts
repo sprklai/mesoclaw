@@ -1,5 +1,5 @@
-import { isTauri, isWindows } from "$lib/tauri";
-import { getBaseUrl, getToken } from "./client";
+import { isTauri } from "$lib/tauri";
+import { getBaseUrl, getToken, withTimeout } from "./client";
 
 export interface WsTextMessage {
   type: "text";
@@ -340,7 +340,11 @@ async function createChatStreamTauri(
     `[WS/Tauri] Connecting to ${url.replace(/token=[^&]+/, "token=***")}`,
   );
 
-  const ws = await TauriWebSocket.connect(url);
+  const ws = await withTimeout(
+    TauriWebSocket.connect(url),
+    10000,
+    "WS chat connect",
+  );
   let intentionalClose = false;
   let open = true;
 
@@ -398,7 +402,7 @@ export async function createChatStream(
   model?: string,
   delegation?: boolean,
 ): Promise<ChatConnection> {
-  if (isTauri && isWindows) {
+  if (isTauri) {
     return createChatStreamTauri(
       prompt,
       sessionId,

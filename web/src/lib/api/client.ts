@@ -1,20 +1,43 @@
-import { isTauri, isWindows } from "$lib/tauri";
+import { isTauri } from "$lib/tauri";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:18981";
 const TOKEN_KEY = "zenii_token";
 const BASE_URL_KEY = "zenii_base_url";
 
+/** Race a promise against a timeout. Rejects with an Error if the deadline is exceeded. */
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label?: string,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `Request timed out after ${ms}ms${label ? `: ${label}` : ""}`,
+          ),
+        ),
+      ms,
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() =>
+    clearTimeout(timeoutId),
+  );
+}
+
 /**
- * Resolved fetch: Tauri plugin on desktop (bypasses WebView2 mixed-content),
- * browser native otherwise.
+ * Resolved fetch: Tauri plugin on desktop (bypasses WebView CORS/mixed-content
+ * restrictions on both Windows WebView2 and macOS WKWebView), browser native otherwise.
  */
 async function resolvedFetch(
   input: string | URL | Request,
   init?: RequestInit,
 ): Promise<Response> {
-  if (isTauri && isWindows) {
+  if (isTauri) {
     const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
-    return tauriFetch(input, init);
+    return withTimeout(tauriFetch(input, init), 15000, String(input));
   }
   return fetch(input, init);
 }

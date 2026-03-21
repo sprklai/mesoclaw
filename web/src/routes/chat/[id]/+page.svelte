@@ -4,15 +4,18 @@
 	import { sessionsStore } from '$lib/stores/sessions.svelte';
 	import { page } from '$app/state';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { untrack } from 'svelte';
 
 	let sessionId = $derived(page.params.id!);
 
 	$effect(() => {
 		if (sessionId) {
 			// P0.1: Skip clearing if we're actively streaming this same session
-			// (e.g., after first-message goto navigates here)
-			const isStreamingThisSession =
-				messagesStore.streaming && messagesStore.activeStreamSessionId === sessionId;
+			// (e.g., after first-message goto navigates here).
+			// Use untrack so streaming state changes don't re-trigger this effect.
+			const isStreamingThisSession = untrack(() =>
+				messagesStore.streaming && messagesStore.activeStreamSessionId === sessionId
+			);
 
 			if (!isStreamingThisSession) {
 				messagesStore.clear();

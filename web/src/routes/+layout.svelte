@@ -14,6 +14,7 @@
 	import Workflow from '@lucide/svelte/icons/workflow';
 	import BookOpen from '@lucide/svelte/icons/book-open';
 	import FileText from '@lucide/svelte/icons/file-text';
+	import Star from '@lucide/svelte/icons/star';
 	import WifiOff from '@lucide/svelte/icons/wifi-off';
 	import { inboxStore } from '$lib/stores/inbox.svelte';
 	import '$lib/stores/theme.svelte';
@@ -117,16 +118,22 @@
 			<Sidebar.Footer class="sticky bottom-0 z-10 bg-sidebar-accent/50 border-t border-sidebar-border">
 				<Sidebar.Menu>
 					<Sidebar.MenuItem>
-						<Sidebar.MenuButton onclick={() => openInBrowser('https://docs.zenii.sprklai.com/installation-and-usage')}>
-							<FileText class="h-4 w-4" />
-							<span>Documentation</span>
+						<Sidebar.MenuButton onclick={() => openInBrowser('https://github.com/sprklai/zenii')}>
+							<Star class="h-4 w-4" />
+							<span>Star on GitHub</span>
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 					<Sidebar.MenuItem>
-						<Sidebar.MenuButton onclick={handleApiDocs}>
-							<BookOpen class="h-4 w-4" />
-							<span>API Docs</span>
-						</Sidebar.MenuButton>
+						<div class="flex items-center gap-0 rounded-md border border-sidebar-border overflow-hidden">
+							<Sidebar.MenuButton onclick={() => openInBrowser('https://docs.zenii.sprklai.com/installation-and-usage')} class="flex-1 !rounded-none border-r border-sidebar-border">
+								<FileText class="h-4 w-4" />
+								<span>Docs</span>
+							</Sidebar.MenuButton>
+							<Sidebar.MenuButton onclick={handleApiDocs} class="flex-1 !rounded-none">
+								<BookOpen class="h-4 w-4" />
+								<span>API Docs</span>
+							</Sidebar.MenuButton>
+						</div>
 					</Sidebar.MenuItem>
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton

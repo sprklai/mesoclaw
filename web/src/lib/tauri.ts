@@ -10,10 +10,6 @@ export const isTauri: boolean =
     "__TAURI_INTERNALS__" in window ||
     "__TAURI__" in window);
 
-/** True when running on Windows (where WebView2 blocks mixed-content HTTP). */
-export const isWindows: boolean =
-  typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
-
 /** Show and focus the main window. */
 export async function showWindow(): Promise<void> {
   if (!isTauri) return;

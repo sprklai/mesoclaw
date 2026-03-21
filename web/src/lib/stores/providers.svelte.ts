@@ -92,6 +92,9 @@ function createProvidersStore() {
         if (selectedModel && !models.some((m) => m.value === selectedModel)) {
           this.selectedModel = "";
         }
+      } catch (e) {
+        console.error("[ProvidersStore] Failed to load providers:", e);
+        providers = [];
       } finally {
         loading = false;
       }

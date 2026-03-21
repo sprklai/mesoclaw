@@ -39,7 +39,7 @@
 	import { ToolApproval } from '$lib/components/ai-elements/tool-approval';
 	import { createChatStream, sendApprovalResponse, type ChatConnection } from '$lib/api/websocket';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 
 	let { sessionId = undefined }: { sessionId?: string } = $props();
 
@@ -52,6 +52,16 @@
 		await providersStore.load();
 		await providersStore.loadDefault();
 		providersLoaded = true;
+	});
+
+	onDestroy(() => {
+		if (activeWs) {
+			activeWs.close();
+			activeWs = null;
+		}
+		if (messagesStore.streaming) {
+			messagesStore.cancelStream();
+		}
 	});
 
 	const hasUsableModel = $derived(providersStore.hasUsableModel);

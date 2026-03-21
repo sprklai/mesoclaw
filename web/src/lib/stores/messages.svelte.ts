@@ -58,6 +58,7 @@ function createMessagesStore() {
   let error = $state("");
   let activeToolCalls = $state<ActiveToolCall[]>([]);
   let activeStreamSessionId = $state<string | null>(null);
+  let loadVersion = 0;
 
   return {
     get messages() {
@@ -83,18 +84,24 @@ function createMessagesStore() {
     },
 
     async load(sessionId: string) {
+      const version = ++loadVersion;
       loading = true;
       error = "";
       try {
-        messages = await apiGet<Message[]>(
+        const result = await apiGet<Message[]>(
           `/sessions/${encodeURIComponent(sessionId)}/messages`,
         );
+        if (version !== loadVersion) return; // Stale load from previous navigation
+        messages = result;
       } catch (e) {
+        if (version !== loadVersion) return;
         const msg = e instanceof Error ? e.message : String(e);
         error = `Failed to load messages. Is the daemon running? (${msg})`;
         console.error("messagesStore.load failed:", e);
       } finally {
-        loading = false;
+        if (version === loadVersion) {
+          loading = false;
+        }
       }
     },
 

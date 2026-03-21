@@ -4,6 +4,7 @@ import { configStore } from "./config.svelte";
 import { sessionsStore } from "./sessions.svelte";
 import { isTauri, showNotification } from "$lib/tauri";
 import { workflowsStore } from "./workflows.svelte";
+import { withTimeout } from "$lib/api/client";
 
 export interface NotificationRouting {
   scheduler_notification: string[];
@@ -113,7 +114,11 @@ class NotificationStore {
     try {
       const { default: TauriWebSocket } =
         await import("@tauri-apps/plugin-websocket");
-      const tauriWs = await TauriWebSocket.connect(wsUrl);
+      const tauriWs = await withTimeout(
+        TauriWebSocket.connect(wsUrl),
+        10000,
+        "WS notification connect",
+      );
       this.tauriWs = tauriWs;
       this.connected = true;
       this.reconnectAttempt = 0;

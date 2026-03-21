@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Use Tauri HTTP/WebSocket plugins on all desktop platforms (macOS, Linux, Windows) — fixes provider loading and chat on macOS/Linux where WKWebView/webkit2gtk CORS blocks `tauri://` to `http://127.0.0.1` requests
+- Add 15s timeout to Tauri HTTP plugin fetch — prevents app hang on macOS when plugin is slow to init
+- Add 10s timeout to Tauri WebSocket plugin connect for chat and notification streams
+- Fix `$effect` re-trigger in chat page — streaming state changes no longer cause message flicker after response completes
+- Fix stale message load race condition — rapid session switching no longer shows wrong session's messages
+- Fix orphaned WebSocket on chat navigation — ChatView now cleans up stream on unmount
+
 ## [0.0.42] - 2026-03-21
 
 ### Fixed
