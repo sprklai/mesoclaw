@@ -13,10 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DB migration v13: `delegation_tasks` table for storing per-agent delegation metadata
 - `DelegationRecord` and `DelegationAgentRecord` types in backend API and frontend stores
 - `description` field added to `TaskResult` for delegation agent descriptions
+- Per-tool permission enforcement: AskOnce/AskAlways tools now trigger the approval gate during agent execution
+- `executable_tools()` method on `PermissionResolver` — includes all non-Denied tools so AskOnce/AskAlways tools reach the approval gate
+- `from_tools_full()` on `RigToolAdapter` — unified constructor wiring permissions, cache, approval, and events
 
 ### Fixed
 - Delegation responses now persist to the database, fixing blank screen after delegation completion
 - `MessageWithToolCalls` API response now includes delegation data alongside tool calls
+- Chat: streamed assistant responses no longer flash blank during server reconciliation — streaming UI stays visible until server data is confirmed
 
 ## [0.0.37] - 2026-03-20
 

@@ -157,8 +157,6 @@ function createMessagesStore() {
     },
 
     async finishStream(sessionId: string) {
-      // Keep streamed content visible while we reconcile with server
-      streaming = false;
       activeStreamSessionId = null;
 
       // Reconcile with server-persisted messages (server is source of truth)
@@ -166,14 +164,51 @@ function createMessagesStore() {
         const serverMessages = await apiGet<Message[]>(
           `/sessions/${encodeURIComponent(sessionId)}/messages`,
         );
-        messages = serverMessages;
+
+        // Only replace if server has the new assistant response
+        const lastServer = serverMessages[serverMessages.length - 1];
+        const hasNewResponse =
+          lastServer?.role === "assistant" && lastServer.content;
+
+        if (hasNewResponse) {
+          messages = serverMessages;
+          streamContent = "";
+        } else if (streamContent) {
+          // Server doesn't have the response yet — keep streamed content as synthetic message
+          messages = [
+            ...serverMessages,
+            {
+              id: `temp-${Date.now()}`,
+              session_id: sessionId,
+              role: "assistant",
+              content: streamContent,
+              created_at: Date.now(),
+            } as Message,
+          ];
+          streamContent = "";
+        } else {
+          messages = serverMessages;
+        }
       } catch (e) {
-        // If server load fails, keep what we have — stream content is already
-        // visible in the messages list as the last assistant message
+        // If server load fails, preserve streamed content as a message
         console.error("finishStream: failed to reconcile with server:", e);
+        if (streamContent) {
+          messages = [
+            ...messages,
+            {
+              id: `temp-${Date.now()}`,
+              session_id: sessionId,
+              role: "assistant",
+              content: streamContent,
+              created_at: Date.now(),
+            } as Message,
+          ];
+          streamContent = "";
+        }
       }
 
-      streamContent = "";
+      // Set streaming=false AFTER reconciliation so streaming UI stays visible until data is ready
+      streaming = false;
       activeToolCalls = [];
     },
 

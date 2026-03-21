@@ -219,6 +219,8 @@ impl ZeniiAgent {
     /// Build a new ZeniiAgent from provider details with tool event broadcasting.
     ///
     /// If `preamble_override` is provided, it replaces the default system prompt.
+    /// When `approval_broker` and `event_bus` are provided, tools with AskOnce/AskAlways
+    /// permission will trigger the interactive approval gate.
     #[allow(clippy::too_many_arguments)]
     pub async fn from_provider_with_events(
         provider_id: &str,
@@ -231,19 +233,23 @@ impl ZeniiAgent {
         tool_event_tx: broadcast::Sender<ToolCallEvent>,
         preamble_override: Option<&str>,
         dedup_cache: Option<Arc<ToolCallCache>>,
+        approval_broker: Option<Arc<crate::security::approval::ApprovalBroker>>,
+        event_bus: Option<Arc<dyn crate::event_bus::EventBus>>,
+        surface: &str,
     ) -> Result<Self> {
         let api_key =
             providers::resolve_api_key_for_provider(provider_id, requires_api_key, credentials)
                 .await?;
-        let rig_tools = if let Some(ref cache) = dedup_cache {
-            RigToolAdapter::from_tools_with_events_and_cache(
-                tools,
-                tool_event_tx,
-                Arc::clone(cache),
-            )
-        } else {
-            RigToolAdapter::from_tools_with_events(tools, tool_event_tx)
-        };
+        let rig_tools = RigToolAdapter::from_tools_full(
+            tools,
+            tool_event_tx,
+            dedup_cache.clone(),
+            approval_broker,
+            event_bus,
+            surface,
+            config.approval_timeout_secs,
+            &config.tool_permissions,
+        );
 
         let preamble = preamble_override.unwrap_or_else(|| {
             config
@@ -411,17 +417,17 @@ pub async fn resolve_agent_with_tools(
             )));
         }
 
+        let config = state.config.load();
+
         let tools = tool_override.unwrap_or_else(|| {
-            let cfg = state.config.load();
-            crate::security::permissions::PermissionResolver::allowed_tools(
-                &cfg.tool_permissions,
+            crate::security::permissions::PermissionResolver::executable_tools(
+                &config.tool_permissions,
                 surface,
                 &state.tools,
             )
         });
 
         // Create per-request dedup cache if enabled
-        let config = state.config.load();
         let dedup_cache = if config.tool_dedup_enabled {
             Some(Arc::new(ToolCallCache::with_limits(
                 config.tool_call_limits.clone(),
@@ -442,6 +448,9 @@ pub async fn resolve_agent_with_tools(
                 tx,
                 preamble_override,
                 dedup_cache,
+                state.approval_broker.clone(),
+                Some(state.event_bus.clone()),
+                surface,
             )
             .await?
         } else {

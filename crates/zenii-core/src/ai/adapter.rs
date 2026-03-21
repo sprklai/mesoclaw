@@ -182,6 +182,7 @@ pub struct RigToolAdapter {
     event_bus: Option<Arc<dyn crate::event_bus::EventBus>>,
     surface: String,
     approval_timeout_secs: u64,
+    permission_state: crate::security::permissions::PermissionState,
 }
 
 impl RigToolAdapter {
@@ -194,6 +195,7 @@ impl RigToolAdapter {
             event_bus: None,
             surface: "desktop".into(),
             approval_timeout_secs: 120,
+            permission_state: crate::security::permissions::PermissionState::Allowed,
         }
     }
 
@@ -207,6 +209,7 @@ impl RigToolAdapter {
             event_bus: None,
             surface: "desktop".into(),
             approval_timeout_secs: 120,
+            permission_state: crate::security::permissions::PermissionState::Allowed,
         }
     }
 
@@ -222,6 +225,12 @@ impl RigToolAdapter {
         self.event_bus = Some(event_bus);
         self.surface = surface.to_string();
         self.approval_timeout_secs = timeout_secs;
+        self
+    }
+
+    /// Set the permission state for this adapter (builder pattern).
+    pub fn with_permission(mut self, state: crate::security::permissions::PermissionState) -> Self {
+        self.permission_state = state;
         self
     }
 
@@ -276,6 +285,47 @@ impl RigToolAdapter {
             .map(|t| {
                 Box::new(Self::new(Arc::clone(t)).with_cache(Arc::clone(&cache)))
                     as Box<dyn ToolDyn>
+            })
+            .collect()
+    }
+
+    /// Convert tools with full configuration: events, cache, approval, and per-tool permissions.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_tools_full(
+        tools: &[Arc<dyn Tool>],
+        tx: broadcast::Sender<ToolCallEvent>,
+        cache: Option<Arc<ToolCallCache>>,
+        broker: Option<Arc<crate::security::approval::ApprovalBroker>>,
+        event_bus: Option<Arc<dyn crate::event_bus::EventBus>>,
+        surface: &str,
+        timeout_secs: u64,
+        permissions: &crate::security::permissions::ToolPermissions,
+    ) -> Vec<Box<dyn ToolDyn>> {
+        tools
+            .iter()
+            .map(|t| {
+                let perm = crate::security::permissions::PermissionResolver::resolve(
+                    permissions,
+                    t.name(),
+                    t.risk_level(),
+                    surface,
+                );
+                let mut adapter =
+                    Self::new_with_events(Arc::clone(t), tx.clone()).with_permission(perm);
+                if let Some(ref cache) = cache {
+                    adapter = adapter.with_cache(Arc::clone(cache));
+                }
+                if let Some(ref broker) = broker
+                    && let Some(ref bus) = event_bus
+                {
+                    adapter = adapter.with_approval(
+                        Arc::clone(broker),
+                        Arc::clone(bus),
+                        surface,
+                        timeout_secs,
+                    );
+                }
+                Box::new(adapter) as Box<dyn ToolDyn>
             })
             .collect()
     }
@@ -350,9 +400,21 @@ impl ToolDyn for RigToolAdapter {
                 }
             }
 
-            // Approval gate: check if this tool needs user approval
+            // Approval gate: check if this tool needs user approval.
+            // Two paths trigger approval:
+            //   1. PermissionState is AskOnce or AskAlways (set via Settings > Permissions)
+            //   2. Tool's own needs_approval() returns Some (e.g. ShellTool checks SecurityPolicy)
+            let approval_reason = match self.permission_state {
+                crate::security::permissions::PermissionState::AskOnce
+                | crate::security::permissions::PermissionState::AskAlways => Some(format!(
+                    "Tool '{}' requires approval ({:?})",
+                    tool_name, self.permission_state
+                )),
+                _ => self.tool.needs_approval(&args_value),
+            };
+
             if let Some(ref broker) = self.approval_broker
-                && let Some(reason) = self.tool.needs_approval(&args_value)
+                && let Some(reason) = approval_reason
             {
                 let args_summary = args_value
                     .get("command")
@@ -361,10 +423,20 @@ impl ToolDyn for RigToolAdapter {
                     .to_string();
                 let risk_level = format!("{:?}", self.tool.risk_level()).to_lowercase();
 
-                // Check pre-approved (session cache or DB rule)
-                let pre = broker
-                    .pre_check(&tool_name, &args_summary, &self.surface)
-                    .await;
+                // For AskAlways, skip pre-check (always prompt user).
+                // For AskOnce, pre-check session cache / DB rules as normal.
+                let skip_pre_check = matches!(
+                    self.permission_state,
+                    crate::security::permissions::PermissionState::AskAlways
+                );
+
+                let pre = if skip_pre_check {
+                    None
+                } else {
+                    broker
+                        .pre_check(&tool_name, &args_summary, &self.surface)
+                        .await
+                };
 
                 match pre {
                     Some(crate::security::approval::ApprovalDecision::Deny) => {

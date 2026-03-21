@@ -865,14 +865,13 @@ async fn handle_delegation(
                             }
 
                             // Store delegation details linked to the assistant message
-                            if let Ok(ref msg) = msg {
-                                if let Err(e) = state
+                            if let Ok(ref msg) = msg
+                                && let Err(e) = state
                                     .session_manager
                                     .store_delegation(&msg.id, sid, &delegation_result)
                                     .await
-                                {
-                                    warn!("WS: FAILED to store delegation details for session={sid}: {e}");
-                                }
+                            {
+                                warn!("WS: FAILED to store delegation details for session={sid}: {e}");
                             }
                         }
 

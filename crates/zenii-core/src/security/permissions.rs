@@ -115,6 +115,26 @@ impl PermissionResolver {
             .collect()
     }
 
+    /// Get all executable tools on a surface (Allowed + AskOnce + AskAlways).
+    /// Excludes only Denied tools. AskOnce/AskAlways tools are included so the
+    /// agent can attempt to use them and trigger the approval gate.
+    pub fn executable_tools(
+        config: &ToolPermissions,
+        surface: &str,
+        registry: &ToolRegistry,
+    ) -> Vec<Arc<dyn Tool>> {
+        registry
+            .to_vec()
+            .into_iter()
+            .filter(|tool| {
+                !matches!(
+                    Self::resolve(config, tool.name(), tool.risk_level(), surface),
+                    PermissionState::Denied
+                )
+            })
+            .collect()
+    }
+
     /// Get permission summary for all tools on a surface (for UI/API).
     pub fn list_permissions(
         config: &ToolPermissions,
