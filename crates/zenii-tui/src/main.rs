@@ -239,9 +239,12 @@ async fn run_app(
                                             "provider_type": provider_id,
                                             "provider_model_id": model_id,
                                         });
-                                        let _ = client
+                                        if let Err(e) = client
                                             .put::<_, serde_json::Value>("/config", &config_body)
-                                            .await;
+                                            .await
+                                        {
+                                            warn!("Failed to sync default model to config: {e}");
+                                        }
                                         app.current_model = format!("{provider_id}:{model_id}");
                                         app.onboard_step = app::OnboardStep::Channels;
                                         app.onboard_error = None;
@@ -695,7 +698,10 @@ async fn send_message(
     };
 
     // Store user message via REST
-    let _ = client.send_user_message(&session_id, &content).await;
+    if let Err(e) = client.send_user_message(&session_id, &content).await {
+        app.chat_status = ChatStatus::Error(format!("Failed to store message: {e}"));
+        return;
+    }
 
     // Add to local display
     app.messages.push(ChatMessage {

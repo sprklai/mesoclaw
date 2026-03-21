@@ -297,6 +297,12 @@ impl ApprovalBroker {
         .await
     }
 
+    /// Cancel a pending approval request, removing it from the pending map.
+    /// Use this when an approval times out to avoid leaking entries.
+    pub fn cancel(&self, approval_id: &str) {
+        self.pending.remove(approval_id);
+    }
+
     /// Number of pending approval requests (for testing/diagnostics).
     pub fn pending_count(&self) -> usize {
         self.pending.len()

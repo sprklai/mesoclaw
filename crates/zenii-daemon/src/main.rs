@@ -63,7 +63,24 @@ async fn main() {
 
     // Graceful shutdown on SIGTERM/SIGINT
     let shutdown = async {
-        tokio::signal::ctrl_c().await.ok();
+        #[cfg(unix)]
+        {
+            let Ok(mut sigterm) =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            else {
+                error!("Failed to register SIGTERM handler, falling back to SIGINT only");
+                tokio::signal::ctrl_c().await.ok();
+                return;
+            };
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {},
+                _ = sigterm.recv() => {},
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            tokio::signal::ctrl_c().await.ok();
+        }
         info!("Shutdown signal received, draining connections...");
     };
 

@@ -260,6 +260,10 @@ class NotificationStore {
   /** Reset reconnect state and attempt to reconnect after permanent disconnection. */
   retryConnection() {
     if (!this.currentUrl) return;
+    if (this.reconnectTimeoutId !== undefined) {
+      clearTimeout(this.reconnectTimeoutId);
+      this.reconnectTimeoutId = undefined;
+    }
     this.reconnectAttempt = 0;
     this.disconnectedPermanently = false;
     this.shouldReconnect = true;

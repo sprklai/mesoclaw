@@ -486,6 +486,7 @@ impl ToolDyn for RigToolAdapter {
                                 result.unwrap_or(crate::security::approval::ApprovalDecision::Deny)
                             }
                             _ = tokio::time::sleep(timeout) => {
+                                broker.cancel(&approval_id);
                                 crate::security::approval::ApprovalDecision::Deny
                             }
                         };

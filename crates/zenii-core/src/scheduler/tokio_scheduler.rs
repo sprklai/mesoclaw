@@ -48,6 +48,7 @@ pub struct TokioScheduler {
     max_history_per_job: usize,
     error_backoff_secs: Vec<u64>,
     running: AtomicBool,
+    loop_handle: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
     #[cfg(feature = "gateway")]
     app_state: Arc<tokio::sync::OnceCell<Arc<AppState>>>,
 }
@@ -67,6 +68,7 @@ impl TokioScheduler {
             max_history_per_job: config.scheduler_max_history_per_job,
             error_backoff_secs: config.scheduler_error_backoff_secs.clone(),
             running: AtomicBool::new(false),
+            loop_handle: Arc::new(tokio::sync::Mutex::new(None)),
             #[cfg(feature = "gateway")]
             app_state: Arc::new(tokio::sync::OnceCell::new()),
         })
@@ -409,7 +411,8 @@ impl Scheduler for TokioScheduler {
 
         let _ = bus.publish(AppEvent::SchedulerStarted);
 
-        tokio::spawn(async move {
+        let loop_handle = self.loop_handle.clone();
+        let handle = tokio::spawn(async move {
             let mut ticker = tokio::time::interval(Duration::from_secs(tick_secs));
             loop {
                 tokio::select! {
@@ -585,11 +588,23 @@ impl Scheduler for TokioScheduler {
                 }
             }
         });
+
+        // Store the JoinHandle so stop() can await it
+        *loop_handle.lock().await = Some(handle);
     }
 
     async fn stop(&self) {
         let _ = self.stop_tx.send(true);
+
+        // Await the spawned loop to ensure it has exited
+        if let Some(handle) = self.loop_handle.lock().await.take() {
+            let _ = handle.await;
+        }
+
         self.running.store(false, Ordering::SeqCst);
+
+        // Reset the watch channel so a subsequent start() gets a clean receiver
+        let _ = self.stop_tx.send(false);
     }
 
     async fn add_job(&self, mut job: ScheduledJob) -> Result<JobId> {

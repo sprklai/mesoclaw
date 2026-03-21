@@ -1,8 +1,13 @@
+use std::sync::Arc;
+
 use tauri::{
     Manager,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+use tracing::info;
+
+use crate::commands;
 
 /// Menu item IDs for the system tray.
 pub const MENU_SHOW: &str = "show";
@@ -35,7 +40,24 @@ pub fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>
                     let _ = w.set_focus();
                 }
             }
-            MENU_QUIT => app.exit(0),
+            MENU_QUIT => {
+                // Graceful gateway shutdown before exit (mirrors on_window_event logic)
+                if let Some(state) =
+                    app.try_state::<Arc<tokio::sync::Mutex<commands::GatewayState>>>()
+                {
+                    if let Ok(mut guard) = state.try_lock()
+                        && let Some(tx) = guard.shutdown_tx.take()
+                    {
+                        info!("Sending gateway shutdown signal from tray quit");
+                        let _ = tx.send(());
+                    }
+
+                    // Brief wait for WAL checkpoint and cleanup
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+
+                app.exit(0);
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

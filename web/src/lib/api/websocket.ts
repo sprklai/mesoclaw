@@ -84,7 +84,7 @@ export interface WsApprovalResolvedMessage {
 
 export interface WsWarningMessage {
   type: "warning";
-  message: string;
+  warning: string;
 }
 
 export type WsMessage =
@@ -244,7 +244,7 @@ export function createChatStream(
           callbacks.onApprovalResolved?.(msg.approval_id, msg.decision);
           break;
         case "warning":
-          callbacks.onWarning?.(msg.message);
+          callbacks.onWarning?.(msg.warning);
           break;
         case "done":
           callbacks.onDone();

@@ -152,6 +152,9 @@
 				onApprovalResolved(approvalId) {
 					approvalsStore.resolve(approvalId);
 				},
+				onWarning(warning: string) {
+					console.warn('[Chat] Server warning:', warning);
+				},
 				onDone() {
 					activeWs = null;
 					delegationStore.clear();
