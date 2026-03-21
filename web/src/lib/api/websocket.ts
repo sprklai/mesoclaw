@@ -1,3 +1,4 @@
+import { isTauri } from "$lib/tauri";
 import { getBaseUrl, getToken } from "./client";
 
 export interface WsTextMessage {
@@ -151,117 +152,143 @@ export interface ChatStreamCallbacks {
   onError: (error: string) => void;
 }
 
-export function createChatStream(
+/** Minimal interface for an active chat connection (browser WS or Tauri WS). */
+export interface ChatConnection {
+  send(data: string): void;
+  close(): void;
+  readonly isOpen: boolean;
+}
+
+/** Dispatch a parsed WsMessage to the appropriate callback. Returns true if the connection should close. */
+function dispatchMessage(
+  msg: WsMessage,
+  callbacks: ChatStreamCallbacks,
+): boolean {
+  switch (msg.type) {
+    case "text":
+      callbacks.onToken(msg.content);
+      return false;
+    case "tool_call":
+      callbacks.onToolCall?.(msg.call_id, msg.tool_name, msg.args);
+      return false;
+    case "tool_result":
+      callbacks.onToolResult?.(
+        msg.call_id,
+        msg.tool_name,
+        msg.output,
+        msg.success,
+        msg.duration_ms,
+      );
+      return false;
+    case "delegation_started":
+      callbacks.onDelegationStarted?.(msg.delegation_id, msg.agents);
+      return false;
+    case "agent_progress":
+      callbacks.onAgentProgress?.(
+        msg.delegation_id,
+        msg.agent_id,
+        msg.tool_uses,
+        msg.tokens_used,
+        msg.current_activity,
+      );
+      return false;
+    case "agent_completed":
+      callbacks.onAgentCompleted?.(
+        msg.delegation_id,
+        msg.agent_id,
+        msg.status,
+        msg.duration_ms,
+        msg.tool_uses,
+        msg.tokens_used,
+        msg.error,
+      );
+      return false;
+    case "delegation_completed":
+      callbacks.onDelegationCompleted?.(
+        msg.delegation_id,
+        msg.total_duration_ms,
+        msg.total_tokens,
+      );
+      return false;
+    case "approval_request":
+      callbacks.onApprovalRequest?.(
+        msg.approval_id,
+        msg.call_id,
+        msg.tool_name,
+        msg.args_summary,
+        msg.risk_level,
+        msg.reason,
+        msg.timeout_secs,
+      );
+      return false;
+    case "approval_resolved":
+      callbacks.onApprovalResolved?.(msg.approval_id, msg.decision);
+      return false;
+    case "warning":
+      callbacks.onWarning?.(msg.warning);
+      return false;
+    case "done":
+      callbacks.onDone();
+      return true;
+    case "error":
+      callbacks.onError(msg.error);
+      return true;
+    default:
+      console.warn(
+        `[WS] Unknown message type: ${(msg as { type: string }).type}`,
+        msg,
+      );
+      return false;
+  }
+}
+
+function buildChatUrl(): string {
+  const baseUrl = getBaseUrl().replace(/^http/, "ws");
+  const token = getToken();
+  return token
+    ? `${baseUrl}/ws/chat?token=${encodeURIComponent(token)}`
+    : `${baseUrl}/ws/chat`;
+}
+
+function buildPromptPayload(
+  prompt: string,
+  sessionId: string | undefined,
+  model?: string,
+  delegation?: boolean,
+): string {
+  return JSON.stringify({
+    prompt,
+    session_id: sessionId,
+    model: model || undefined,
+    delegation: delegation || undefined,
+  });
+}
+
+/** Browser WebSocket path. */
+function createChatStreamBrowser(
   prompt: string,
   sessionId: string | undefined,
   callbacks: ChatStreamCallbacks,
   model?: string,
   delegation?: boolean,
-): WebSocket {
-  const baseUrl = getBaseUrl().replace(/^http/, "ws");
-  const token = getToken();
-  const url = token
-    ? `${baseUrl}/ws/chat?token=${encodeURIComponent(token)}`
-    : `${baseUrl}/ws/chat`;
-
+): ChatConnection {
+  const url = buildChatUrl();
   console.log(`[WS] Connecting to ${url.replace(/token=[^&]+/, "token=***")}`);
   const ws = new WebSocket(url);
   let intentionalClose = false;
 
   ws.onopen = () => {
     console.log(`[WS] Connected, sending prompt`);
-    ws.send(
-      JSON.stringify({
-        prompt,
-        session_id: sessionId,
-        model: model || undefined,
-        delegation: delegation || undefined,
-      }),
-    );
+    ws.send(buildPromptPayload(prompt, sessionId, model, delegation));
   };
 
   ws.onmessage = (event) => {
     try {
       const msg: WsMessage = JSON.parse(event.data);
-      switch (msg.type) {
-        case "text":
-          callbacks.onToken(msg.content);
-          break;
-        case "tool_call":
-          callbacks.onToolCall?.(msg.call_id, msg.tool_name, msg.args);
-          break;
-        case "tool_result":
-          callbacks.onToolResult?.(
-            msg.call_id,
-            msg.tool_name,
-            msg.output,
-            msg.success,
-            msg.duration_ms,
-          );
-          break;
-        case "delegation_started":
-          callbacks.onDelegationStarted?.(msg.delegation_id, msg.agents);
-          break;
-        case "agent_progress":
-          callbacks.onAgentProgress?.(
-            msg.delegation_id,
-            msg.agent_id,
-            msg.tool_uses,
-            msg.tokens_used,
-            msg.current_activity,
-          );
-          break;
-        case "agent_completed":
-          callbacks.onAgentCompleted?.(
-            msg.delegation_id,
-            msg.agent_id,
-            msg.status,
-            msg.duration_ms,
-            msg.tool_uses,
-            msg.tokens_used,
-            msg.error,
-          );
-          break;
-        case "delegation_completed":
-          callbacks.onDelegationCompleted?.(
-            msg.delegation_id,
-            msg.total_duration_ms,
-            msg.total_tokens,
-          );
-          break;
-        case "approval_request":
-          callbacks.onApprovalRequest?.(
-            msg.approval_id,
-            msg.call_id,
-            msg.tool_name,
-            msg.args_summary,
-            msg.risk_level,
-            msg.reason,
-            msg.timeout_secs,
-          );
-          break;
-        case "approval_resolved":
-          callbacks.onApprovalResolved?.(msg.approval_id, msg.decision);
-          break;
-        case "warning":
-          callbacks.onWarning?.(msg.warning);
-          break;
-        case "done":
-          callbacks.onDone();
-          intentionalClose = true;
-          ws.close();
-          break;
-        case "error":
-          callbacks.onError(msg.error);
-          intentionalClose = true;
-          ws.close();
-          break;
-        default:
-          console.warn(
-            `[WS] Unknown message type: ${(msg as { type: string }).type}`,
-            msg,
-          );
-          break;
+      const shouldClose = dispatchMessage(msg, callbacks);
+      if (shouldClose) {
+        intentionalClose = true;
+        ws.close();
       }
     } catch {
       callbacks.onError("Failed to parse WebSocket message");
@@ -286,17 +313,117 @@ export function createChatStream(
     }
   };
 
-  return ws;
+  return {
+    send: (data: string) => ws.send(data),
+    close: () => {
+      intentionalClose = true;
+      ws.close();
+    },
+    get isOpen() {
+      return ws.readyState === WebSocket.OPEN;
+    },
+  };
 }
 
-/** Send an approval response through an active WS connection. */
+/** Tauri WebSocket plugin path — bypasses WebView2 mixed-content blocking. */
+async function createChatStreamTauri(
+  prompt: string,
+  sessionId: string | undefined,
+  callbacks: ChatStreamCallbacks,
+  model?: string,
+  delegation?: boolean,
+): Promise<ChatConnection> {
+  const { default: TauriWebSocket } =
+    await import("@tauri-apps/plugin-websocket");
+  const url = buildChatUrl();
+  console.log(
+    `[WS/Tauri] Connecting to ${url.replace(/token=[^&]+/, "token=***")}`,
+  );
+
+  const ws = await TauriWebSocket.connect(url);
+  let intentionalClose = false;
+  let open = true;
+
+  ws.addListener((msg) => {
+    if (msg.type === "Text" && typeof msg.data === "string") {
+      try {
+        const parsed: WsMessage = JSON.parse(msg.data);
+        const shouldClose = dispatchMessage(parsed, callbacks);
+        if (shouldClose) {
+          intentionalClose = true;
+          open = false;
+          ws.disconnect();
+        }
+      } catch {
+        callbacks.onError("Failed to parse WebSocket message");
+        intentionalClose = true;
+        open = false;
+        ws.disconnect();
+      }
+    } else if (msg.type === "Close") {
+      open = false;
+      if (!intentionalClose) {
+        callbacks.onError("Connection closed unexpectedly");
+      }
+    }
+  });
+
+  // Connection is already open after connect() resolves — send prompt immediately
+  console.log(`[WS/Tauri] Connected, sending prompt`);
+  await ws.send(buildPromptPayload(prompt, sessionId, model, delegation));
+
+  return {
+    send: (data: string) => {
+      ws.send(data);
+    },
+    close: () => {
+      intentionalClose = true;
+      open = false;
+      ws.disconnect();
+    },
+    get isOpen() {
+      return open;
+    },
+  };
+}
+
+/**
+ * Create a chat stream connection. Uses Tauri WebSocket plugin on desktop
+ * (bypasses WebView2 mixed-content) or browser WebSocket otherwise.
+ */
+export async function createChatStream(
+  prompt: string,
+  sessionId: string | undefined,
+  callbacks: ChatStreamCallbacks,
+  model?: string,
+  delegation?: boolean,
+): Promise<ChatConnection> {
+  if (isTauri) {
+    return createChatStreamTauri(
+      prompt,
+      sessionId,
+      callbacks,
+      model,
+      delegation,
+    );
+  }
+  return createChatStreamBrowser(
+    prompt,
+    sessionId,
+    callbacks,
+    model,
+    delegation,
+  );
+}
+
+/** Send an approval response through an active chat connection. */
 export function sendApprovalResponse(
-  ws: WebSocket,
+  conn: ChatConnection,
   approvalId: string,
   decision: "approve" | "approve_always" | "deny",
 ): void {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(
+  if (conn.isOpen) {
+    conn.send(
       JSON.stringify({
         type: "approval_response",
         approval_id: approvalId,

@@ -1,6 +1,23 @@
+import { isTauri } from "$lib/tauri";
+
 const DEFAULT_BASE_URL = "http://127.0.0.1:18981";
 const TOKEN_KEY = "zenii_token";
 const BASE_URL_KEY = "zenii_base_url";
+
+/**
+ * Resolved fetch: Tauri plugin on desktop (bypasses WebView2 mixed-content),
+ * browser native otherwise.
+ */
+async function resolvedFetch(
+  input: string | URL | Request,
+  init?: RequestInit,
+): Promise<Response> {
+  if (isTauri) {
+    const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
+    return tauriFetch(input, init);
+  }
+  return fetch(input, init);
+}
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -46,7 +63,7 @@ export function clearBaseUrl(): void {
 export async function healthCheckNoAuth(): Promise<boolean> {
   const baseUrl = getBaseUrl();
   try {
-    const response = await fetch(`${baseUrl}/health`);
+    const response = await resolvedFetch(`${baseUrl}/health`);
     if (!response.ok) {
       console.warn(
         `[API] healthCheckNoAuth: ${baseUrl}/health returned ${response.status}`,
@@ -97,7 +114,7 @@ export async function api<T>(
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await resolvedFetch(url, {
       ...options,
       headers,
     });

@@ -112,7 +112,9 @@ export async function onUpdateAvailable(
 ): Promise<(() => void) | null> {
   if (!isTauri) return null;
   const { listen } = await import("@tauri-apps/api/event");
-  return listen<UpdateInfo>("update-available", (event) => callback(event.payload));
+  return listen<UpdateInfo>("update-available", (event) =>
+    callback(event.payload),
+  );
 }
 
 /** Download and install an update, then relaunch the app. */

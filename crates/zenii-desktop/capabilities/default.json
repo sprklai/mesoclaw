@@ -9,6 +9,14 @@
     "window-state:default",
     "notification:default",
     "updater:default",
-    "process:default"
+    "process:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "http://127.0.0.1:*" },
+        { "url": "http://localhost:*" }
+      ]
+    },
+    "websocket:default"
   ]
 }

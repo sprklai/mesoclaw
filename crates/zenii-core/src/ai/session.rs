@@ -201,7 +201,7 @@ impl SessionManager {
                     "SELECT s.id, s.title, s.created_at, s.updated_at, COUNT(m.id), s.source, s.channel_key
                      FROM sessions s
                      LEFT JOIN messages m ON m.session_id = s.id
-                     WHERE s.source != 'web' AND s.source = ?1
+                     WHERE s.source IN ('telegram', 'slack', 'discord') AND s.source = ?1
                      GROUP BY s.id
                      ORDER BY s.updated_at DESC
                      LIMIT ?2 OFFSET ?3".to_string(),
@@ -215,7 +215,7 @@ impl SessionManager {
                     "SELECT s.id, s.title, s.created_at, s.updated_at, COUNT(m.id), s.source, s.channel_key
                      FROM sessions s
                      LEFT JOIN messages m ON m.session_id = s.id
-                     WHERE s.source != 'web'
+                     WHERE s.source IN ('telegram', 'slack', 'discord')
                      GROUP BY s.id
                      ORDER BY s.updated_at DESC
                      LIMIT ?1 OFFSET ?2".to_string(),

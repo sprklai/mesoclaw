@@ -37,14 +37,14 @@
 	import { notificationStore } from '$lib/stores/notifications.svelte';
 	import { approvalsStore } from '$lib/stores/approvals.svelte';
 	import { ToolApproval } from '$lib/components/ai-elements/tool-approval';
-	import { createChatStream, sendApprovalResponse } from '$lib/api/websocket';
+	import { createChatStream, sendApprovalResponse, type ChatConnection } from '$lib/api/websocket';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
 	let { sessionId = undefined }: { sessionId?: string } = $props();
 
 	let providersLoaded = $state(false);
-	let activeWs = $state<WebSocket | null>(null);
+	let activeWs = $state<ChatConnection | null>(null);
 	let editText = $state("");
 	let delegationEnabled = $state(false);
 
@@ -121,7 +121,7 @@
 		const capturedSessionId = currentSessionId;
 		const capturedModel = providersStore.selectedModel || undefined;
 		const capturedDelegation = delegationEnabled || undefined;
-		activeWs = createChatStream(
+		activeWs = await createChatStream(
 			prompt,
 			currentSessionId,
 			{
