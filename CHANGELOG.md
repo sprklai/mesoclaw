@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.42] - 2026-03-21
+
+### Fixed
+- Add `app` bundle to macOS CI for auto-updater support — `latest.json` was missing `darwin-aarch64` and `darwin-x86_64` entries because only DMG (non-updater-compatible) bundles were built
+- Handle missing Desktop directory in case-insensitive path test
+
 ## [0.0.41] - 2026-03-21
 
 ### Fixed
