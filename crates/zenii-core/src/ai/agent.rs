@@ -452,8 +452,16 @@ pub async fn resolve_agent_with_tools(
                 tx,
                 preamble_override,
                 dedup_cache,
-                if skip_approval { None } else { state.approval_broker.clone() },
-                if skip_approval { None } else { Some(state.event_bus.clone()) },
+                if skip_approval {
+                    None
+                } else {
+                    state.approval_broker.clone()
+                },
+                if skip_approval {
+                    None
+                } else {
+                    Some(state.event_bus.clone())
+                },
                 surface,
             )
             .await?

@@ -19,6 +19,9 @@ on:
         type: boolean
         default: true
 
+permissions:
+  contents: write
+
 env:
   CARGO_INCREMENTAL: 0
 
@@ -397,8 +400,6 @@ jobs:
       needs.build-linux.result == 'success' &&
       (startsWith(github.ref, 'refs/tags/app-v') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true'))
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v6
 
