@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.40] - 2026-03-21
+
+### Fixed
+- Resolved 22 audit findings across agent, delegation, workflow, and scheduler systems
+- Fixed delegation race condition and invalid tool names in decomposition
+- Updated docs for content_search tool and fixed std::sync::Mutex in async path
+
+### Added
+- Cross-client session sync via event bus and WebSocket push
+
 ## [0.0.39] - 2026-03-21
 
 ### Fixed
