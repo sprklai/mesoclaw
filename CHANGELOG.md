@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.41] - 2026-03-21
+
+### Fixed
+- Restrict Tauri HTTP/WebSocket plugin routing to Windows only — fixes macOS provider detection and Linux chat connections broken by the WebView2 mixed-content bypass
+
+### Style
+- Fix rustfmt formatting across 10 files
+
 ## [0.0.40] - 2026-03-21
 
 ### Fixed
