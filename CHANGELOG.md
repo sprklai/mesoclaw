@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `$effect` re-trigger in chat page — streaming state changes no longer cause message flicker after response completes
 - Fix stale message load race condition — rapid session switching no longer shows wrong session's messages
 - Fix orphaned WebSocket on chat navigation — ChatView now cleans up stream on unmount
+- Fix duplicate session on "New Chat" — suppress self-originated `session_created` push events that race with local creation
+- Fix `bumpSession` Svelte 5 reactivity — use array reassignment instead of in-place `splice()` mutation
 
 ## [0.0.42] - 2026-03-21
 

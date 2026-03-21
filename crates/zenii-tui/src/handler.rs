@@ -18,13 +18,13 @@ pub fn handle_key_event(app: &mut App, key: KeyEvent) {
         _ => {}
     }
 
-    // Cancel delete confirmation on any key except 'y'
+    // Handle delete confirmation: only 'y' confirms, anything else cancels
     if app.confirm_delete {
-        if key.code == KeyCode::Char('y') {
-            // Delete confirmed — handled by caller checking confirm_delete
-            // The actual delete is performed in the main loop
-        }
         app.confirm_delete = false;
+        if key.code != KeyCode::Char('y') {
+            // Cancel delete — clear notification so caller won't trigger delete
+            app.notification_text = None;
+        }
         return;
     }
 

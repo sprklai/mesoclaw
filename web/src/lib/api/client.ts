@@ -191,6 +191,22 @@ export async function apiDelete<T>(path: string): Promise<T> {
   return api<T>(path, { method: "DELETE" });
 }
 
+/** GET request returning plain text (uses Tauri HTTP plugin on desktop). */
+export async function apiGetText(path: string): Promise<string> {
+  const token = getToken();
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}${path}`;
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const response = await resolvedFetch(url, { headers });
+  if (!response.ok) {
+    throw new MesoApiError(response.status, "ZENII_UNKNOWN", response.statusText);
+  }
+  return response.text();
+}
+
 export async function healthCheck(): Promise<boolean> {
   try {
     const data = await apiGet<{ status: string }>("/health");

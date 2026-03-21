@@ -23,10 +23,7 @@ async fn main() {
     let config_path = args.config.unwrap_or_else(default_config_path);
 
     let config = match load_or_create_config(&config_path) {
-        Ok(c) => {
-            eprintln!("Config loaded from {}", config_path.display());
-            c
-        }
+        Ok(c) => c,
         Err(e) => {
             eprintln!("Failed to load config from {}: {e}", config_path.display());
             std::process::exit(1);
@@ -38,6 +35,7 @@ async fn main() {
         std::process::exit(1);
     }
 
+    info!("Config loaded from {}", config_path.display());
     info!(identity = %config.identity_name, "Starting Zenii daemon");
 
     let host = config.gateway_host.clone();

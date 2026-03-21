@@ -20,6 +20,8 @@ function createSessionsStore() {
   let active = $state<Session | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
+  /** IDs of sessions being created locally — used to suppress duplicate push events. */
+  const pendingLocalIds = new Set<string>();
 
   return {
     get sessions() {
@@ -70,6 +72,7 @@ function createSessionsStore() {
 
     async create(title: string) {
       const session = await apiPost<Session>("/sessions", { title });
+      pendingLocalIds.add(session.id);
       sessions = [
         {
           id: session.id,
@@ -79,6 +82,8 @@ function createSessionsStore() {
         ...sessions,
       ];
       active = session;
+      // Allow push event dedup window to pass, then clear
+      setTimeout(() => pendingLocalIds.delete(session.id), 2000);
       return session;
     },
 
@@ -119,6 +124,7 @@ function createSessionsStore() {
 
     /** Prepend a session from a push notification (guards against duplicates). */
     prependFromEvent(data: { id: string; title: string; source?: string }) {
+      if (pendingLocalIds.has(data.id)) return;
       if (sessions.some((s) => s.id === data.id)) return;
       sessions = [
         {
@@ -141,8 +147,8 @@ function createSessionsStore() {
     bumpSession(sessionId: string) {
       const idx = sessions.findIndex((s) => s.id === sessionId);
       if (idx > 0) {
-        const [session] = sessions.splice(idx, 1);
-        sessions = [session, ...sessions];
+        const session = sessions[idx];
+        sessions = [session, ...sessions.filter((s) => s.id !== sessionId)];
       }
     },
   };
