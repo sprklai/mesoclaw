@@ -359,6 +359,7 @@ pub async fn resolve_agent(
         preamble_override,
         None,
         surface,
+        false,
     )
     .await
 }
@@ -366,6 +367,8 @@ pub async fn resolve_agent(
 /// Like `resolve_agent`, but accepts an optional tool override for channel tool policy filtering.
 /// When `tool_override` is `Some`, those tools are used instead of the full registry.
 /// When `tool_override` is `None`, tools are filtered by `ToolPermissions` for the given `surface`.
+/// When `skip_approval` is `true`, the approval broker is omitted so tools execute without
+/// interactive approval prompts (used by delegation sub-agents).
 pub async fn resolve_agent_with_tools(
     requested_model: Option<&str>,
     state: &AppState,
@@ -373,6 +376,7 @@ pub async fn resolve_agent_with_tools(
     preamble_override: Option<&str>,
     tool_override: Option<Vec<Arc<dyn crate::tools::traits::Tool>>>,
     surface: &str,
+    skip_approval: bool,
 ) -> Result<Arc<ZeniiAgent>> {
     // Try requested model first, then last_used, then default model
     let model_spec = if let Some(spec) = requested_model {
@@ -448,8 +452,8 @@ pub async fn resolve_agent_with_tools(
                 tx,
                 preamble_override,
                 dedup_cache,
-                state.approval_broker.clone(),
-                Some(state.event_bus.clone()),
+                if skip_approval { None } else { state.approval_broker.clone() },
+                if skip_approval { None } else { Some(state.event_bus.clone()) },
                 surface,
             )
             .await?

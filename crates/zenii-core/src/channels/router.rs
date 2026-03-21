@@ -264,6 +264,7 @@ impl ChannelRouter {
             Some(&system_context),
             tool_override,
             &channel_name,
+            false,
         )
         .await
         {

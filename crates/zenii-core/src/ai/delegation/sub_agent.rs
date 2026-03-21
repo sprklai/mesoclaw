@@ -41,7 +41,7 @@ impl SubAgent {
                 .collect()
         } else {
             let cfg = state.config.load();
-            crate::security::permissions::PermissionResolver::allowed_tools(
+            crate::security::permissions::PermissionResolver::executable_tools(
                 &cfg.tool_permissions,
                 surface,
                 &state.tools,
@@ -58,6 +58,7 @@ impl SubAgent {
             None,
             Some(tools),
             surface,
+            true, // skip approval — sub-agents execute autonomously
         )
         .await?;
 
