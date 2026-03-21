@@ -19,18 +19,18 @@
 
 	function statusIcon(status: string): string {
 		switch (status) {
-			case 'completed': return '\u2713';
-			case 'failed': return '\u2717';
-			case 'timed_out': return '\u23F1';
+			case 'Completed': return '\u2713';
+			case 'Failed': return '\u2717';
+			case 'TimedOut': return '\u23F1';
 			default: return '\u25CF';
 		}
 	}
 
 	function statusColor(status: string): string {
 		switch (status) {
-			case 'completed': return 'text-green-500';
-			case 'failed': return 'text-red-500';
-			case 'timed_out': return 'text-red-500';
+			case 'Completed': return 'text-green-500';
+			case 'Failed': return 'text-red-500';
+			case 'TimedOut': return 'text-red-500';
 			default: return 'text-muted-foreground';
 		}
 	}

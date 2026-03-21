@@ -29,6 +29,7 @@
 	} from '$lib/components/ai-elements/prompt-input';
 	import { Copy, Pencil, RefreshCw } from '@lucide/svelte';
 	import AgentTree from '$lib/components/AgentTree.svelte';
+	import DelegationSummary from '$lib/components/DelegationSummary.svelte';
 	import { messagesStore } from '$lib/stores/messages.svelte';
 	import { sessionsStore } from '$lib/stores/sessions.svelte';
 	import { providersStore } from '$lib/stores/providers.svelte';
@@ -249,6 +250,9 @@
 												</ToolContent>
 											</Tool>
 										{/each}
+									{/if}
+									{#if msg.delegation}
+										<DelegationSummary delegation={msg.delegation} />
 									{/if}
 									<MessageResponse content={msg.content} />
 								</MessageContent>

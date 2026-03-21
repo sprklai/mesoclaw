@@ -60,6 +60,7 @@ pub struct ToolCallRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct DelegationRecord {
     pub delegation_id: String,
     pub total_duration_ms: u64,
@@ -68,6 +69,7 @@ pub struct DelegationRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "api-docs", derive(utoipa::ToSchema))]
 pub struct DelegationAgentRecord {
     pub id: String,
     pub description: String,
