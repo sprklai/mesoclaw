@@ -288,15 +288,29 @@ For each:
 > Claude recommends: {which option and why, but deferring to user}
 ```
 
-### Step 6: Handle user decisions
+### Step 6: User approval gate
+
+**All findings require user approval before any code is modified.** Present the full report and wait for the user to review it.
+
+#### 6a. Handle "User Decision" findings first
 
 If there are any "User Decision" findings:
 - Ask the user for their disposition on each one (apply, skip, or defer)
 - Wait for their response before proceeding
 
-If `--fix` flag was set:
-- Auto-apply all "Apply" findings without asking
-- Still ask for "User Decision" items
+#### 6b. Ask permission to apply fixes
+
+After "User Decision" items are resolved, present the final list of all findings marked "Apply" (both from Step 4 and any approved "User Decision" items). Ask the user:
+
+```
+Ready to apply N fixes. Proceed? (yes / pick specific ones / no)
+```
+
+- **yes**: Apply all "Apply" findings
+- **pick**: Let the user specify which findings to apply by number/title
+- **no**: Skip all fixes, jump to Step 9
+
+**The `--fix` flag skips this gate** — auto-apply all "Apply" findings without asking. Still ask for "User Decision" items.
 
 If there are NO "Apply" or approved "User Decision" findings, print "No fixes to apply." and skip to Step 9.
 
