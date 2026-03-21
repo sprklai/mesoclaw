@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.35] - 2026-03-20
+
 ### Fixed
 - CLI: `workflow cancel` now uses correct route `/workflows/{id}/runs/{run_id}/cancel` (was 404ing against non-existent `/workflows/{id}/cancel`)
 - CLI: `workflow run` now prints `run_id` so users can reference it for cancel
