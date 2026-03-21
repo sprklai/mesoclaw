@@ -294,10 +294,10 @@ jobs:
         include:
           - target: aarch64-unknown-linux-gnu
             label: arm64
-            extra-features: ""
+            extra-features: ",vendored-openssl"
           - target: armv7-unknown-linux-gnueabihf
             label: armv7
-            extra-features: ""
+            extra-features: ",vendored-openssl"
           # TODO: musl needs vendored OpenSSL — re-enable after fixing cross-compilation
           # - target: x86_64-unknown-linux-musl
           #   label: musl

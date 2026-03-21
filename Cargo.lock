@@ -10314,6 +10314,7 @@ dependencies = [
  "directories",
  "futures",
  "iana-time-zone",
+ "openssl",
  "ratatui",
  "reqwest 0.13.2",
  "serde",
