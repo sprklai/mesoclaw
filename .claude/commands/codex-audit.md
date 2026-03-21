@@ -16,10 +16,19 @@ Parse the arguments string for these options:
 
 | Arg | Values | Default | Description |
 |-----|--------|---------|-------------|
-| SCOPE | `uncommitted`, `branch:NAME`, `commit:SHA`, `files:p1,p2`, `full` | `uncommitted` | What code to review |
+| SCOPE | `uncommitted`, `branch:NAME`, `commit:SHA`, `files:p1,p2`, `dir:PATH`, `crate:NAME`, `full` | `uncommitted` | What code to review |
 | --focus | `security`, `performance`, `logic`, `error-handling`, `concurrency`, `race-conditions`, `api`, `frontend`, `architecture`, `all` | `all` | Narrow the audit focus |
 | --fix | flag | off | Auto-apply "Apply" findings without asking |
 | --dry-run | flag | off | Show Codex findings only, no validation or fixes |
+
+**Scope details:**
+- `uncommitted` — audit only uncommitted changes (git diff)
+- `branch:NAME` — audit diff between current branch and NAME
+- `commit:SHA` — audit a specific commit's changes
+- `files:p1,p2` — audit specific files (comma-separated paths)
+- `dir:PATH` — audit all source files under a directory (e.g., `dir:crates/zenii-core/src/gateway`)
+- `crate:NAME` — shorthand for auditing a workspace crate (e.g., `crate:zenii-core` → `crates/zenii-core/`)
+- `full` — audit entire codebase
 
 If `$ARGUMENTS` is empty, use defaults: scope=`uncommitted`, focus=`all`, no flags.
 

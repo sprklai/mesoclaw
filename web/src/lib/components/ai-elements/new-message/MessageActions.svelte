@@ -11,6 +11,6 @@
 	let { class: className, children, ...restProps }: Props = $props();
 </script>
 
-<div class={cn("flex items-center gap-1", className)} {...restProps}>
+<div class={cn("flex items-center gap-1 group-[.is-user]:ml-auto", className)} {...restProps}>
 	{@render children?.()}
 </div>
