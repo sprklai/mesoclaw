@@ -174,11 +174,13 @@ pub async fn cancel_workflow_run(
                 .persist_run_end(&run_id, "cancelled", None, &completed_at)
                 .await;
         }
-        let _ = state.event_bus.publish(crate::event_bus::AppEvent::WorkflowCompleted {
-            workflow_id: workflow_id.clone(),
-            run_id: run_id.clone(),
-            status: "cancelled".into(),
-        });
+        let _ = state
+            .event_bus
+            .publish(crate::event_bus::AppEvent::WorkflowCompleted {
+                workflow_id: workflow_id.clone(),
+                run_id: run_id.clone(),
+                status: "cancelled".into(),
+            });
 
         Ok(StatusCode::NO_CONTENT)
     } else {

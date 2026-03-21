@@ -92,7 +92,8 @@ impl WorkflowExecutor {
         event_bus: &dyn crate::event_bus::EventBus,
     ) -> Result<WorkflowRun> {
         let run_id = uuid::Uuid::new_v4().to_string();
-        self.execute_with_id(run_id, workflow, tools, event_bus).await
+        self.execute_with_id(run_id, workflow, tools, event_bus)
+            .await
     }
 
     /// Execute a workflow with a pre-generated run_id (for external tracking).
@@ -215,12 +216,14 @@ impl WorkflowExecutor {
                                 },
                             };
                             // B.3: Emit event and persist result for fallback step
-                            let _ = event_bus.publish(crate::event_bus::AppEvent::WorkflowStepCompleted {
-                                workflow_id: workflow.id.clone(),
-                                run_id: run_id.clone(),
-                                step_name: fallback_name.clone(),
-                                success: fb_output.success,
-                            });
+                            let _ = event_bus.publish(
+                                crate::event_bus::AppEvent::WorkflowStepCompleted {
+                                    workflow_id: workflow.id.clone(),
+                                    run_id: run_id.clone(),
+                                    step_name: fallback_name.clone(),
+                                    success: fb_output.success,
+                                },
+                            );
                             if let Err(e) = self.persist_step_result(&run_id, &fb_output).await {
                                 tracing::warn!(
                                     run_id = %run_id,
