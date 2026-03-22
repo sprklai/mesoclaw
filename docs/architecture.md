@@ -1697,7 +1697,7 @@ sequenceDiagram
 
 ### CLI (Interactive Flow)
 
-The `zenii setup` command runs an interactive onboarding:
+The `zenii onboard` command runs an interactive onboarding:
 
 1. Fetch providers from `GET /providers/with-key-status`
 2. User selects provider via `dialoguer::Select`

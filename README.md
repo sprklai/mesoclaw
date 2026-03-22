@@ -100,7 +100,7 @@
 | **Linux** | `.deb` `.rpm` `.AppImage` | `zenii-linux` `zenii-daemon-linux` `zenii-tui-linux` |
 | **macOS** | `.dmg` | `zenii-macos-arm64` `zenii-daemon-macos-arm64` `zenii-tui-macos-arm64` |
 | **Windows** | `.msi` `.exe` (NSIS) | `zenii.exe` `zenii-daemon.exe` `zenii-tui.exe` |
-| **ARM** | -- | `zenii-arm64` `zenii-daemon-arm64` `zenii-tui-arm64` |
+| **ARM** | -- | `zenii-arm64` `zenii-daemon-arm64` |
 
 Or install via script (Linux/macOS):
 
@@ -275,7 +275,7 @@ Your AI gets smarter. You stay in control. No surprises.
 - **Model capability validation** -- `supports_tools` pre-check prevents tool-calling errors with incompatible models
 - **Context-aware agent** -- 3-tier adaptive context injection (Full/Minimal/Summary) with hash-based cache invalidation
 - **Efficient prompt system** -- plugin-based prompt strategy with CompactStrategy (~65% token reduction), 6 built-in plugins, and token budget trimming
-- **Onboarding wizard** -- multi-step first-run setup across Desktop (2-step wizard), CLI (`zenii setup` interactive flow), and TUI (4-step overlay modal) collecting AI provider selection, API key, default model, and user profile (name, location, timezone)
+- **Onboarding wizard** -- multi-step first-run setup across Desktop (2-step wizard), CLI (`zenii onboard` interactive flow), and TUI (4-step overlay modal) collecting AI provider selection, API key, default model, and user profile (name, location, timezone)
 - **LLM-based auto fact extraction** -- automatically extracts structured facts (preferences, knowledge, context, workflow) from conversations via a configurable LLM, persisted to user observations for progressive learning
 - **User location awareness** -- timezone and location injected into agent context for location-sensitive queries (weather, events, news)
 - **OpenAPI interactive docs** -- Scalar UI at `/api-docs` + OpenAPI 3.1 JSON spec (feature-gated `api-docs`, built with utoipa)
@@ -735,7 +735,7 @@ max_tool_retries = 3
 ## CLI Commands
 
 ```bash
-zenii setup                        # First-run onboarding wizard (provider, API key, model, channels, profile)
+zenii onboard                        # First-run onboarding wizard (provider, API key, model, channels, profile)
 zenii daemon start|stop|status     # Manage the daemon process
 zenii chat [--session ID] [--model M]  # Interactive WS streaming chat
 zenii run "prompt" [--session] [--model]  # Single prompt, print response

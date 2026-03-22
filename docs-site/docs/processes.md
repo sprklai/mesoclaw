@@ -847,7 +847,7 @@ sequenceDiagram
 ### Interface Variants
 
 - **Desktop**: 3-step `OnboardingWizard` component (provider setup via embedded `ProvidersSettings`, optional channels via `ChannelsSettings`, then profile fields). Next button is in the card header for visibility on long pages.
-- **CLI**: `zenii setup` command -- interactive flow using `dialoguer` (Select, Confirm, Password, Input prompts). Channels step uses Confirm prompt (default: skip).
+- **CLI**: `zenii onboard` command -- interactive flow using `dialoguer` (Select, Confirm, Password, Input prompts). Channels step uses Confirm prompt (default: skip).
 - **TUI**: 5-step overlay modal (ProviderSelect, ApiKey, ModelSelect, Channels, Profile) with j/k navigation. Channels step has Tab to switch between Telegram/Slack/Discord and s to skip.
 
 **Config fields**: `user_name: Option<String>`, `user_timezone: Option<String>` (IANA format), `user_location: Option<String>` (human-readable)

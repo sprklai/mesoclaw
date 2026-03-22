@@ -108,12 +108,16 @@ The **daemon** is the core — it runs the gateway server. Desktop embeds the da
 **Pre-built binary:**
 
 ```bash
-# Download the latest release
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-x86_64-unknown-linux-gnu.tar.gz
-tar xzf zenii-x86_64-unknown-linux-gnu.tar.gz
+# Download the latest release (bare binaries — no tarball)
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-linux
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-linux
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-tui-linux
 
 # Install
-sudo mv zenii-daemon zenii zenii-tui /usr/local/bin/
+chmod +x zenii-linux zenii-daemon-linux zenii-tui-linux
+sudo mv zenii-linux /usr/local/bin/zenii
+sudo mv zenii-daemon-linux /usr/local/bin/zenii-daemon
+sudo mv zenii-tui-linux /usr/local/bin/zenii-tui
 ```
 
 **From source:**
@@ -134,23 +138,26 @@ sudo cp target/release/zenii-daemon target/release/zenii target/release/zenii-tu
 **Desktop app (Debian/Ubuntu):**
 
 ```bash
-# Download .deb package
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-desktop_amd64.deb
-sudo dpkg -i zenii-desktop_amd64.deb
+# Download .deb package (replace VERSION with the actual release version, e.g. 0.0.44)
+# Browse available versions at: https://github.com/sprklai/zenii/releases
+curl -LO "https://github.com/sprklai/zenii/releases/latest/download/Zenii_VERSION_amd64.deb"
+sudo dpkg -i Zenii_*_amd64.deb
 
 # Or AppImage (no install needed)
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-desktop_amd64.AppImage
-chmod +x zenii-desktop_amd64.AppImage
-./zenii-desktop_amd64.AppImage
+curl -LO "https://github.com/sprklai/zenii/releases/latest/download/Zenii_VERSION_amd64.AppImage"
+chmod +x Zenii_*_amd64.AppImage
+./Zenii_*_amd64.AppImage
 ```
 
 ### Linux (ARM64 / Raspberry Pi)
 
 ```bash
-# Pre-built binary
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-aarch64-unknown-linux-gnu.tar.gz
-tar xzf zenii-aarch64-unknown-linux-gnu.tar.gz
-sudo mv zenii-daemon zenii /usr/local/bin/
+# Pre-built binary (bare binaries — no tarball)
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-arm64
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-arm64
+chmod +x zenii-arm64 zenii-daemon-arm64
+sudo mv zenii-arm64 /usr/local/bin/zenii
+sudo mv zenii-daemon-arm64 /usr/local/bin/zenii-daemon
 ```
 
 **From source on the board:**
@@ -173,10 +180,12 @@ cargo build --release -p zenii-daemon -p zenii-cli
 ### Linux (ARMv7 / Older Boards)
 
 ```bash
-# Pre-built binary
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-armv7-unknown-linux-gnueabihf.tar.gz
-tar xzf zenii-armv7-unknown-linux-gnueabihf.tar.gz
-sudo mv zenii-daemon zenii /usr/local/bin/
+# Pre-built binary (bare binaries — no tarball)
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-armv7
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-armv7
+chmod +x zenii-armv7 zenii-daemon-armv7
+sudo mv zenii-armv7 /usr/local/bin/zenii
+sudo mv zenii-daemon-armv7 /usr/local/bin/zenii-daemon
 
 # Cross-compile from host
 ./scripts/build.sh --target linux-armv7 --release
@@ -187,23 +196,34 @@ sudo mv zenii-daemon zenii /usr/local/bin/
 **Pre-built binary:**
 
 ```bash
-# Apple Silicon (M1/M2/M3/M4/M5)
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-aarch64-apple-darwin.tar.gz
-tar xzf zenii-aarch64-apple-darwin.tar.gz
-sudo mv zenii-daemon zenii zenii-tui /usr/local/bin/
+# Apple Silicon (M1/M2/M3/M4/M5) — bare binaries, no tarball
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-macos-arm64
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-macos-arm64
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-tui-macos-arm64
+chmod +x zenii-macos-arm64 zenii-daemon-macos-arm64 zenii-tui-macos-arm64
+sudo mv zenii-macos-arm64 /usr/local/bin/zenii
+sudo mv zenii-daemon-macos-arm64 /usr/local/bin/zenii-daemon
+sudo mv zenii-tui-macos-arm64 /usr/local/bin/zenii-tui
 
 # Intel
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-x86_64-apple-darwin.tar.gz
-tar xzf zenii-x86_64-apple-darwin.tar.gz
-sudo mv zenii-daemon zenii zenii-tui /usr/local/bin/
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-macos-x86_64
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-macos-x86_64
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-tui-macos-x86_64
+chmod +x zenii-macos-x86_64 zenii-daemon-macos-x86_64 zenii-tui-macos-x86_64
+sudo mv zenii-macos-x86_64 /usr/local/bin/zenii
+sudo mv zenii-daemon-macos-x86_64 /usr/local/bin/zenii-daemon
+sudo mv zenii-tui-macos-x86_64 /usr/local/bin/zenii-tui
 ```
 
 **Desktop app:**
 
 ```bash
-# Download .dmg
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/Zenii.dmg
-open Zenii.dmg
+# Download .dmg (replace VERSION with the actual release version, e.g. 0.0.44)
+# Apple Silicon:
+curl -LO "https://github.com/sprklai/zenii/releases/latest/download/Zenii_VERSION_aarch64.dmg"
+# Intel:
+# curl -LO "https://github.com/sprklai/zenii/releases/latest/download/Zenii_VERSION_amd64.dmg"
+open Zenii_*.dmg
 # Drag to Applications
 ```
 
@@ -223,9 +243,10 @@ cargo build --release -p zenii-daemon -p zenii-cli -p zenii-tui
 **Pre-built binary:**
 
 ```powershell
-# Download from GitHub Releases
-Invoke-WebRequest -Uri "https://github.com/sprklai/zenii/releases/latest/download/zenii-x86_64-pc-windows-msvc.zip" -OutFile zenii.zip
-Expand-Archive zenii.zip -DestinationPath C:\zenii
+# Download CLI and daemon binaries from GitHub Releases
+Invoke-WebRequest -Uri "https://github.com/sprklai/zenii/releases/latest/download/zenii.exe" -OutFile C:\zenii\zenii.exe
+Invoke-WebRequest -Uri "https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon.exe" -OutFile C:\zenii\zenii-daemon.exe
+Invoke-WebRequest -Uri "https://github.com/sprklai/zenii/releases/latest/download/zenii-tui.exe" -OutFile C:\zenii\zenii-tui.exe
 $env:Path += ";C:\zenii"
 ```
 
@@ -388,7 +409,7 @@ zenii schedule status
 
 # Plugins
 zenii plugin list
-zenii plugin install github.com/user/weather-plugin
+zenii plugin install https://github.com/user/weather-plugin
 zenii plugin remove weather
 
 # Channels
@@ -1012,10 +1033,12 @@ Zenii runs well on ARM-based Linux boards as a headless daemon.
 Recommended setup — 4GB+ RAM, 64-bit Raspberry Pi OS.
 
 ```bash
-# Install pre-built ARM64 binary
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-aarch64-unknown-linux-gnu.tar.gz
-tar xzf zenii-aarch64-unknown-linux-gnu.tar.gz
-sudo mv zenii-daemon zenii /usr/local/bin/
+# Install pre-built ARM64 binaries
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-arm64
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-arm64
+chmod +x zenii-arm64 zenii-daemon-arm64
+sudo mv zenii-arm64 /usr/local/bin/zenii
+sudo mv zenii-daemon-arm64 /usr/local/bin/zenii-daemon
 
 # Create config
 mkdir -p ~/.config/zenii
@@ -1039,9 +1062,11 @@ Limited RAM (512MB-1GB). Use minimal features.
 
 ```bash
 # ARMv7 binary
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-armv7-unknown-linux-gnueabihf.tar.gz
-tar xzf zenii-armv7-unknown-linux-gnueabihf.tar.gz
-sudo mv zenii-daemon /usr/local/bin/
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-armv7
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-armv7
+chmod +x zenii-armv7 zenii-daemon-armv7
+sudo mv zenii-armv7 /usr/local/bin/zenii
+sudo mv zenii-daemon-armv7 /usr/local/bin/zenii-daemon
 
 # Build from source without optional features (smaller binary)
 cargo build --release -p zenii-daemon --no-default-features
@@ -1052,9 +1077,11 @@ cargo build --release -p zenii-daemon --no-default-features
 Jetson Nano/Xavier/Orin run Ubuntu ARM64. Use the standard ARM64 binary:
 
 ```bash
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-aarch64-unknown-linux-gnu.tar.gz
-tar xzf zenii-aarch64-unknown-linux-gnu.tar.gz
-sudo mv zenii-daemon zenii /usr/local/bin/
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-arm64
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-arm64
+chmod +x zenii-arm64 zenii-daemon-arm64
+sudo mv zenii-arm64 /usr/local/bin/zenii
+sudo mv zenii-daemon-arm64 /usr/local/bin/zenii-daemon
 ```
 
 If you want to use local embeddings (fastembed), build with the `local-embeddings` feature:
@@ -1225,9 +1252,11 @@ Zenii runs on any Linux VM, container service, or VPS. The daemon is a single st
 ssh -i your-key.pem ec2-user@<instance-ip>
 
 # 3. Install Zenii
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-x86_64-unknown-linux-gnu.tar.gz
-tar xzf zenii-x86_64-unknown-linux-gnu.tar.gz
-sudo mv zenii-daemon zenii /usr/local/bin/
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-linux
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-linux
+chmod +x zenii-linux zenii-daemon-linux
+sudo mv zenii-linux /usr/local/bin/zenii
+sudo mv zenii-daemon-linux /usr/local/bin/zenii-daemon
 
 # 4. Configure
 mkdir -p ~/.config/zenii
@@ -1277,7 +1306,11 @@ curl http://localhost:18981/health
 ```bash
 # Use a t4g.micro/small instance (ARM64 Graviton, ~20% cheaper)
 # Download the ARM64 binary instead:
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-aarch64-unknown-linux-gnu.tar.gz
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-arm64
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-arm64
+chmod +x zenii-arm64 zenii-daemon-arm64
+sudo mv zenii-arm64 /usr/local/bin/zenii
+sudo mv zenii-daemon-arm64 /usr/local/bin/zenii-daemon
 ```
 
 ### AWS (ECS Fargate)
@@ -1484,13 +1517,18 @@ Excellent value — ARM64 CAX servers start at ~$4/mo.
 ssh root@<server-ip>
 
 # For ARM64 (CAX):
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-aarch64-unknown-linux-gnu.tar.gz
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-arm64
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-arm64
+chmod +x zenii-arm64 zenii-daemon-arm64
+mv zenii-arm64 /usr/local/bin/zenii
+mv zenii-daemon-arm64 /usr/local/bin/zenii-daemon
 
 # For x86 (CX):
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-x86_64-unknown-linux-gnu.tar.gz
-
-tar xzf zenii-*.tar.gz
-mv zenii-daemon zenii /usr/local/bin/
+# curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-linux
+# curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-linux
+# chmod +x zenii-linux zenii-daemon-linux
+# mv zenii-linux /usr/local/bin/zenii
+# mv zenii-daemon-linux /usr/local/bin/zenii-daemon
 
 # ... configure and create systemd service
 ```
@@ -1522,9 +1560,11 @@ Oracle offers always-free ARM64 instances — up to 4 OCPU and 24GB RAM.
 
 # 2. SSH and install ARM64 binary
 ssh ubuntu@<instance-ip>
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-aarch64-unknown-linux-gnu.tar.gz
-tar xzf zenii-aarch64-unknown-linux-gnu.tar.gz
-sudo mv zenii-daemon zenii /usr/local/bin/
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-arm64
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-arm64
+chmod +x zenii-arm64 zenii-daemon-arm64
+sudo mv zenii-arm64 /usr/local/bin/zenii
+sudo mv zenii-daemon-arm64 /usr/local/bin/zenii-daemon
 
 # 3. Open port in OCI security list
 #    Network > Virtual Cloud Networks > Security Lists > Add Ingress Rule
@@ -1605,14 +1645,19 @@ This generic guide works for any provider (Vultr, Scaleway, OVH, Contabo, etc.):
 # 1. SSH into your server
 ssh user@<server-ip>
 
-# 2. Download the binary (pick your architecture)
+# 2. Download the binaries (pick your architecture)
 # x86_64:
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-x86_64-unknown-linux-gnu.tar.gz
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-linux
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-linux
+chmod +x zenii-linux zenii-daemon-linux
+sudo mv zenii-linux /usr/local/bin/zenii
+sudo mv zenii-daemon-linux /usr/local/bin/zenii-daemon
 # ARM64:
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-aarch64-unknown-linux-gnu.tar.gz
-
-tar xzf zenii-*.tar.gz
-sudo mv zenii-daemon zenii /usr/local/bin/
+# curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-arm64
+# curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-arm64
+# chmod +x zenii-arm64 zenii-daemon-arm64
+# sudo mv zenii-arm64 /usr/local/bin/zenii
+# sudo mv zenii-daemon-arm64 /usr/local/bin/zenii-daemon
 
 # 3. Configure
 mkdir -p ~/.config/zenii

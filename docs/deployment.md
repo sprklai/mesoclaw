@@ -29,13 +29,13 @@ This document covers deploying Zenii in various environments: native binaries, D
 
 Download the appropriate binary for your platform from GitHub Releases:
 
-| Platform       | Binary Name        | Architecture |
-|----------------|--------------------|--------------|
-| Linux x86_64   | `zenii-daemon`  | x86_64       |
-| Linux ARM64    | `zenii-daemon`  | aarch64      |
-| macOS x86_64   | `zenii-daemon`  | x86_64       |
-| macOS ARM      | `zenii-daemon`  | aarch64      |
-| Windows        | `zenii-daemon.exe` | x86_64    |
+| Platform       | Binary Name              | Architecture |
+|----------------|--------------------------|--------------|
+| Linux x86_64   | `zenii-daemon-linux`     | x86_64       |
+| Linux ARM64    | `zenii-daemon-arm64`     | aarch64      |
+| macOS x86_64   | `zenii-daemon-macos-x86_64` | x86_64    |
+| macOS ARM      | `zenii-daemon-macos-arm64`  | aarch64   |
+| Windows        | `zenii-daemon.exe`       | x86_64       |
 
 ### 2. Set Permissions (Linux/macOS)
 
@@ -270,10 +270,10 @@ Zenii runs well on Raspberry Pi 4/5 with ARM64 (aarch64). SQLite is the only dat
 ### 1. Download ARM64 Binary
 
 ```bash
-# Download the aarch64 build from releases
-wget https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-linux-arm64
-chmod +x zenii-daemon-linux-arm64
-sudo mv zenii-daemon-linux-arm64 /usr/local/bin/zenii-daemon
+# Download the ARM64 build from releases
+wget https://github.com/sprklai/zenii/releases/latest/download/zenii-daemon-arm64
+chmod +x zenii-daemon-arm64
+sudo mv zenii-daemon-arm64 /usr/local/bin/zenii-daemon
 ```
 
 ### 2. Create Configuration

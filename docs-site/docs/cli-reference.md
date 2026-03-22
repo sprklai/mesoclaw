@@ -18,14 +18,14 @@ Download the latest binary for your platform from [GitHub Releases](https://gith
 
 ```bash
 # macOS (Apple Silicon)
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-aarch64-apple-darwin.tar.gz
-tar xzf zenii-aarch64-apple-darwin.tar.gz
-sudo mv zenii /usr/local/bin/
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-macos-arm64
+chmod +x zenii-macos-arm64
+sudo mv zenii-macos-arm64 /usr/local/bin/zenii
 
 # Linux (x86_64)
-curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-x86_64-unknown-linux-gnu.tar.gz
-tar xzf zenii-x86_64-unknown-linux-gnu.tar.gz
-sudo mv zenii /usr/local/bin/
+curl -LO https://github.com/sprklai/zenii/releases/latest/download/zenii-linux
+chmod +x zenii-linux
+sudo mv zenii-linux /usr/local/bin/zenii
 ```
 
 ### From Source
@@ -106,12 +106,12 @@ zenii daemon status
 
 ---
 
-### `setup` -- First-run onboarding wizard
+### `onboard` -- First-run onboarding wizard
 
 Run the interactive onboarding wizard to configure your AI provider, messaging channels, and user profile. This is automatically triggered on first launch if setup is incomplete.
 
 ```bash
-zenii setup
+zenii onboard
 ```
 
 The wizard walks through these steps:
@@ -126,10 +126,10 @@ Examples:
 
 ```bash
 # Run the onboarding wizard
-zenii setup
+zenii onboard
 
-# Re-run setup to change provider or profile
-zenii setup
+# Re-run onboarding to change provider or profile
+zenii onboard
 ```
 
 ---
