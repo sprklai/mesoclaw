@@ -162,11 +162,14 @@ export async function api<T>(
     throw new MesoApiError(response.status, errorCode, details);
   }
 
-  if (response.status === 204) {
+  // Handle responses with no body — read text first, only parse if non-empty.
+  // Covers 204 No Content, 201 Created with no body, 200 OK with no body, etc.
+  const text = await response.text();
+  if (!text) {
     return undefined as T;
   }
 
-  return response.json();
+  return JSON.parse(text) as T;
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

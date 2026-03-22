@@ -195,11 +195,11 @@ zenii/
 │   │   │   ├── memory/     # Memory trait + SqliteMemoryStore (FTS5 + vectors) + InMemoryStore
 │   │   │   ├── credential/ # CredentialStore trait + KeyringStore + FileCredentialStore + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
-│   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 15 built-in tools
+│   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 17 built-in tools (15 base + 2 feature-gated)
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter, context engine, delegation
 │   │   │   │   └── delegation/ # Coordinator, SubAgent, DelegationTask, dependency-wave execution
 │   │   │   ├── workflows/  # WorkflowRegistry, WorkflowExecutor, StepRuntime, templates (feature-gated)
-│   │   │   ├── gateway/    # axum HTTP+WS gateway (63 core + 21 feature-gated = 84 routes, auth middleware, error mapping, ZENII_VALIDATION)
+│   │   │   ├── gateway/    # axum HTTP+WS gateway (86 base + 28 feature-gated = 114 routes, auth middleware, error mapping, ZENII_VALIDATION)
 │   │   │   ├── identity/   # SoulLoader + PromptComposer + defaults (SOUL/IDENTITY/USER.md)
 │   │   │   ├── skills/     # SkillRegistry + bundled/user skills (markdown + YAML frontmatter)
 │   │   │   ├── user/       # UserLearner + SQLite observations + privacy controls
@@ -796,7 +796,7 @@ graph TB
 
 ## Gateway Routes
 
-All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Routes are grouped by subsystem (83 base + 26 feature-gated = 109 total).
+All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Routes are grouped by subsystem (86 base + 28 feature-gated = 114 total).
 
 ### Health (1 route, no auth)
 
@@ -1277,7 +1277,7 @@ Four new agent-callable tools give the AI agent direct control over system funct
 
 ```mermaid
 graph TD
-    subgraph ToolRegistry["ToolRegistry - 15 tools"]
+    subgraph ToolRegistry["ToolRegistry - 17 tools"]
         subgraph Base["Built-in Tools - 15"]
             SysInfo[system_info]
             WebSearch[web_search]

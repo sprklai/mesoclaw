@@ -127,7 +127,7 @@ Or use the desktop app, CLI, or TUI — they all talk to the same backend.
 |-----------|-------------------|
 | **AI tools are islands — ChatGPT, Telegram, scripts, cron all have separate memory and context** | **One shared brain: every interface, channel, and script shares the same memory, tools, and intelligence via `localhost:18981`** |
 | Context resets every AI session | Semantic memory persists across sessions and survives restarts |
-| AI can't do things, only talk | 15 built-in tools: web search, file ops, content search, shell, memory, config, and more. Workflow pipelines and parallel delegation for complex tasks |
+| AI can't do things, only talk | 17 built-in tools: web search, file ops, content search, shell, memory, config, and more. Workflow pipelines and parallel delegation for complex tasks |
 | Locked into one AI provider | 6 built-in providers, switch with one config change |
 | AI tools are cloud-only | 100% local, zero telemetry, encrypted credential storage |
 | "Works on my machine" for AI | Same binary on macOS, Linux, Windows — desktop, CLI, or daemon |
@@ -150,7 +150,7 @@ Get notified on Discord. **Nothing is siloed. Everything converges.**
 
 ## What Zenii is NOT
 
-- Not a chatbot wrapper — it's a full API backend with 84 routes
+- Not a chatbot wrapper — it's a full API backend with 114 routes
 - Not Electron — native Tauri 2, under 20 MB
 - Not a framework you learn — it's infrastructure you call via `curl`
 - Not cloud-dependent — runs fully offline with Ollama
@@ -245,9 +245,9 @@ Your AI gets smarter. You stay in control. No surprises.
 
 - **Self-evolving agent** — proposes skill changes based on your patterns, learns only with your approval
 - **Plugin system** — write plugins in Python, Go, JS, or any language. A plugin is any program that speaks JSON-RPC 2.0 over stdio (~15 lines of Python)
-- **84 API routes** — full REST + WebSocket gateway. Interactive docs at `localhost:18981/api-docs`
+- **114 API routes** — full REST + WebSocket gateway. Interactive docs at `localhost:18981/api-docs`
 - **6 AI providers** built-in (OpenAI, Anthropic, Google Gemini, OpenRouter, Vercel AI Gateway, Ollama) + custom providers
-- **15 built-in tools** — websearch, sysinfo, shell, file ops, content search, memory, config, learn, skill proposal, agent self, patch, process
+- **17 built-in tools** (15 base + 2 feature-gated) — websearch, sysinfo, shell, file ops, content search, memory, config, learn, skill proposal, agent self, patch, process + channel_send, scheduler
 - **Semantic memory** — SQLite FTS5 + vector embeddings, persists across sessions and restarts
 - **Native desktop app** — Tauri 2 + Svelte 5, under 20 MB, not Electron
 - **Compact prompts** — plugin-based prompt strategy with ~65% token reduction
@@ -265,7 +265,7 @@ Your AI gets smarter. You stay in control. No surprises.
 <details>
 <summary><strong>Full feature details</strong> (click to expand)</summary>
 
-- **Tool calling** with 15 built-in tools via DashMap-backed ToolRegistry: websearch, sysinfo, shell, file read/write/list/search, content_search, patch, process, learn, skill_proposal, memory, config, agent_self
+- **Tool calling** with 17 built-in tools (15 base + 2 feature-gated) via DashMap-backed ToolRegistry: websearch, sysinfo, shell, file read/write/list/search, content_search, patch, process, learn, skill_proposal, memory, config, agent_self + channel_send, scheduler
 - **Workflow engine** -- TOML-defined multi-step automation pipelines with 5 step types (Tool, LLM, Condition, Parallel, Delay), petgraph DAG execution, minijinja inter-step templates, retry/timeout policies, failure policies (Stop/Continue/Fallback), DB-persisted run history. Feature-gated behind `workflows`
 - **Agent delegation** -- Coordinator decomposes complex tasks into parallel sub-agents via LLM, executes in dependency waves with JoinSet, aggregates results. Each sub-agent gets an isolated session with tool allowlist filtering and per-agent timeout. Cancellation via `POST /agents/{id}/cancel`
 - **Plugin system** -- external process plugins via JSON-RPC 2.0 protocol, installable from git or local paths, with automatic tool and skill registration. Managed via CLI, Web/Desktop UI, and TUI. See [zenii-plugins](https://github.com/sprklai/zenii-plugins) for official community plugins
@@ -401,7 +401,7 @@ sequenceDiagram
     App->>DB: Open/create database + migrations
     App->>Cred: Initialize credential store (keyring → file → memory)
     App->>AI: Register providers + load API keys
-    App->>AI: Register 15 base + 3 feature-gated agent tools
+    App->>AI: Register 15 base + 2 feature-gated agent tools
     App->>Ctx: Init ContextEngine + BootContext (OS, location, timezone)
     App->>Plug: Scan plugins directory + register tools/skills
     App->>GW: Start axum server (:18981)
@@ -515,7 +515,7 @@ zenii/
 ├── docs/
 │   ├── architecture.md     # Detailed architecture diagrams
 │   ├── processes.md        # Process flow diagrams
-│   ├── api-reference.md    # All 84 REST/WS routes
+│   ├── api-reference.md    # All 114 REST/WS routes
 │   ├── configuration.md    # All 70+ config fields
 │   ├── cli-reference.md    # CLI command reference
 │   ├── deployment.md       # Deployment guide
@@ -811,7 +811,7 @@ Global options: `--host`, `--port`, `--token` (or `ZENII_TOKEN` env var)
 
 - [Installation & Usage](https://docs.zenii.sprklai.com/installation-and-usage) -- Get up and running
 - [CLI Reference](https://docs.zenii.sprklai.com/cli-reference) -- All commands, options, shell completions, recipes
-- [API Reference](https://docs.zenii.sprklai.com/api-reference) -- All 84 REST/WS routes with request/response schemas
+- [API Reference](https://docs.zenii.sprklai.com/api-reference) -- All 114 REST/WS routes with request/response schemas
 - [Configuration](https://docs.zenii.sprklai.com/configuration) -- All 70+ config.toml fields with types and defaults
 - [Deployment Guide](https://docs.zenii.sprklai.com/deployment) -- Native, Docker, systemd, Raspberry Pi, reverse proxy
 - [Development Guide](https://docs.zenii.sprklai.com/development) -- Prerequisites, building, testing, how-to guides

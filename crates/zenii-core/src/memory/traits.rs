@@ -5,13 +5,33 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum MemoryCategory {
     Core,
     Daily,
     Conversation,
     Custom(String),
+}
+
+// Serialize/Deserialize as plain strings so JSON is always `"core"`, `"daily"`, etc.
+// Never `{"Custom":"foo"}` which breaks the frontend.
+impl Serialize for MemoryCategory {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for MemoryCategory {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Ok(MemoryCategory::from(s.as_str()))
+    }
 }
 
 impl fmt::Display for MemoryCategory {
@@ -27,11 +47,11 @@ impl fmt::Display for MemoryCategory {
 
 impl From<&str> for MemoryCategory {
     fn from(s: &str) -> Self {
-        match s {
+        match s.to_ascii_lowercase().as_str() {
             "core" => Self::Core,
             "daily" => Self::Daily,
             "conversation" => Self::Conversation,
-            other => Self::Custom(other.to_string()),
+            _ => Self::Custom(s.to_string()),
         }
     }
 }

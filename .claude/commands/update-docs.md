@@ -14,12 +14,12 @@ Count the actual values from code. Use Grep/Read tools — do NOT guess or use c
 
 #### 1a. Count routes
 
-Read `crates/zenii-core/src/gateway/routes.rs`. Count:
-- **Core routes**: `.route(` calls in `build_router()` function (before any feature-gated blocks)
-- **Feature-gated routes**: `.route(` calls inside functions called from `#[cfg(feature = "...")]` blocks (e.g., `channels_routes()`, `scheduler_routes()`, `workflow_routes()`)
-- **Total**: core + all feature-gated
+Read `no_commit/api-routes.md` (canonical route list). Extract:
+- **Total** from the `## Total:` line at the bottom
+- **Base routes** count from the `## Base Routes (N)` header
+- **Feature-gated** breakdowns from the `## Feature: name (N)` headers
 
-Also check for any route-adding functions called from `build_router` that define routes elsewhere.
+Do NOT re-parse `routes.rs` — the canonical file is the source of truth. If `no_commit/api-routes.md` does not exist, warn the user and skip route counting.
 
 #### 1b. Count tools
 

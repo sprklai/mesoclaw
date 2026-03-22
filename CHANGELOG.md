@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Memory recall with empty query now returns all entries ordered by recency instead of FTS5 error
+- MemoryCategory JSON serialization uses plain strings (`"core"`) instead of tagged enums (`{"Custom":"core"}`)
+- MemoryCategory matching is now case-insensitive (`"Core"` and `"core"` both resolve correctly)
+- Frontend memory store uses correct `created_at` format (ISO string) matching backend
+- Memory page search clears to show all entries when query is emptied
+- API client handles empty response bodies gracefully (not just 204)
+
+### Changed
+- Documentation route count corrected from 84 to 114 across all surfaces
+- Documentation tool count corrected from 15 to 17 (15 base + 2 feature-gated)
+- `update-docs` command uses canonical `no_commit/api-routes.md` instead of re-parsing routes.rs
+
 ## [0.0.45] - 2026-03-22
 
 ### Added

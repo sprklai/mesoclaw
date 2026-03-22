@@ -22,7 +22,7 @@
 	let deleteTarget = $state<string | null>(null);
 	let newKey = $state('');
 	let newContent = $state('');
-	let newCategory = $state('Core');
+	let newCategory = $state('core');
 	let searchTimeout: ReturnType<typeof setTimeout>;
 
 	onMount(() => {
@@ -32,7 +32,11 @@
 	function handleSearch() {
 		clearTimeout(searchTimeout);
 		searchTimeout = setTimeout(() => {
-			memoryStore.search(query);
+			if (query.trim()) {
+				memoryStore.search(query);
+			} else {
+				memoryStore.loadAll();
+			}
 		}, 300);
 	}
 
@@ -42,7 +46,7 @@
 			await memoryStore.create(newKey.trim(), newContent.trim(), newCategory);
 			newKey = '';
 			newContent = '';
-			newCategory = 'Core';
+			newCategory = 'core';
 			addOpen = false;
 		} catch (e) {
 			toast.error('Failed to add memory');

@@ -113,10 +113,47 @@ impl Memory for SqliteMemoryStore {
 
     async fn recall(&self, query: &str, limit: usize, offset: usize) -> Result<Vec<MemoryEntry>> {
         let pool = self.pool.clone();
-        // Wrap query in double quotes to escape FTS5 special characters (AND, OR, *, ", etc.)
-        let query_str = format!("\"{}\"", query.replace('"', "\"\""));
+        let query_trimmed = query.trim().to_string();
         let fts_weight = self.fts_weight;
         let vector_weight = self.vector_weight;
+
+        // Empty query: return all memories ordered by recency (no FTS5 MATCH)
+        if query_trimmed.is_empty() {
+            let all_entries = crate::db::with_db(&pool, move |conn| {
+                let mut stmt = conn
+                    .prepare(
+                        "SELECT id, key, content, category, created_at, updated_at
+                         FROM memories
+                         ORDER BY updated_at DESC
+                         LIMIT ?1 OFFSET ?2",
+                    )
+                    .map_err(ZeniiError::from)?;
+
+                let entries = stmt
+                    .query_map(rusqlite::params![limit as i64, offset as i64], |row| {
+                        Ok(MemoryEntry {
+                            id: row.get(0)?,
+                            key: row.get(1)?,
+                            content: row.get(2)?,
+                            category: MemoryCategory::from(row.get::<_, String>(3)?.as_str()),
+                            score: 1.0,
+                            created_at: row.get(4)?,
+                            updated_at: row.get(5)?,
+                        })
+                    })
+                    .map_err(ZeniiError::from)?
+                    .filter_map(|r| r.ok())
+                    .collect::<Vec<_>>();
+
+                Ok(entries)
+            })
+            .await?;
+
+            return Ok(all_entries);
+        }
+
+        // Wrap query in double quotes to escape FTS5 special characters (AND, OR, *, ", etc.)
+        let query_str = format!("\"{}\"", query_trimmed.replace('"', "\"\""));
 
         // FTS5 search
         let fts_results = crate::db::with_db(&pool, move |conn| {
@@ -537,6 +574,37 @@ mod tests {
         assert!(r2.is_ok());
         let r3 = store.recall("test*", 10, 0).await;
         assert!(r3.is_ok());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn recall_empty_query_returns_all() {
+        let (_dir, store) = setup().await;
+        store
+            .store("key1", "first entry", MemoryCategory::Core)
+            .await
+            .unwrap();
+        store
+            .store("key2", "second entry", MemoryCategory::Daily)
+            .await
+            .unwrap();
+        store
+            .store("key3", "third entry", MemoryCategory::Core)
+            .await
+            .unwrap();
+
+        // Empty query should return all entries (used by frontend loadAll)
+        let results = store.recall("", 50, 0).await.unwrap();
+        assert_eq!(results.len(), 3);
+
+        // Whitespace-only query should also return all
+        let results2 = store.recall("   ", 50, 0).await.unwrap();
+        assert_eq!(results2.len(), 3);
+
+        // Limit and offset should work with empty query
+        let results3 = store.recall("", 2, 0).await.unwrap();
+        assert_eq!(results3.len(), 2);
+        let results4 = store.recall("", 50, 2).await.unwrap();
+        assert_eq!(results4.len(), 1);
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -51,7 +51,7 @@ crates/zenii-core/       # Shared library (ALL business logic, NO Tauri dep)
   src/security/             # SecurityPolicy, AutonomyLevel
   src/tools/                # Agent tools (websearch, sysinfo, shell, file ops)
   src/ai/                   # Rig-based agent + providers
-  src/gateway/              # axum HTTP+WS server (~84 routes)
+  src/gateway/              # axum HTTP+WS server (~114 routes)
   src/identity/             # Soul/Persona (markdown+YAML, comrak+Tera, hot-reload)
   src/skills/               # Prompt templates (SkillRegistry, parameter substitution)
   src/user/                 # User profile + progressive learning

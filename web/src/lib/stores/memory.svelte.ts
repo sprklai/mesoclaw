@@ -5,7 +5,7 @@ export interface MemoryEntry {
   content: string;
   category: string;
   score: number;
-  created_at: number;
+  created_at: string;
 }
 
 export interface UserObservation {
@@ -73,9 +73,9 @@ function createMemoryStore() {
         {
           key,
           content,
-          category: category ?? "Core",
+          category: (category ?? "core").toLowerCase(),
           score: 1,
-          created_at: Date.now(),
+          created_at: new Date().toISOString().replace("T", " ").slice(0, 19),
         },
         ...entries,
       ];
