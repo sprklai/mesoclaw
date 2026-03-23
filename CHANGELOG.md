@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-03-23
+
 ### Fixed
 - Delegation results now render immediately after completion instead of showing blank until re-navigation
 - Delegation sub-agents now run in parallel by default (strengthened decomposition prompt)
