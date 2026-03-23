@@ -1,11 +1,11 @@
 [Desktop Entry]
 Name=Zenii
-GenericName=AI Assistant
-Comment=AI-powered personal assistant
+GenericName=AI Backend
+Comment=Your private AI backend
 Exec=zenii-desktop
 Icon=zenii-desktop
 Terminal=false
 Type=Application
 Categories=Utility;Office;
-Keywords=ai;assistant;chat;llm;
+Keywords=ai;backend;chat;llm;agent;
 StartupWMClass=Zenii

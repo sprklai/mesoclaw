@@ -55,7 +55,7 @@
 
 <!-- Row 4: Quality & i18n -->
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-1306%20Rust%20%2B%20JS-success?style=flat-square" alt="1306 Rust + JS Tests" />
+  <img src="https://img.shields.io/badge/tests-1545%20Rust%20%2B%20TS-success?style=flat-square" alt="1545 Rust + TS Tests" />
   <img src="https://img.shields.io/badge/i18n-EN-blue?style=flat-square" alt="English" />
 </p>
 
@@ -84,10 +84,10 @@
   3. Send chat message with tool call
   4. Response streams back
   See go2market/Mar17_Launch/04_demo_scripts.md for exact script
--->
 <p align="center">
   <img src="docs/assets/demo.gif" alt="Zenii terminal demo" width="720" />
 </p>
+-->
 
 > *"Every tool you use is smart in isolation. Zenii makes them smart together."*
 
@@ -127,7 +127,7 @@ Or use the desktop app, CLI, or TUI — they all talk to the same backend.
 |-----------|-------------------|
 | **AI tools are islands — ChatGPT, Telegram, scripts, cron all have separate memory and context** | **One shared brain: every interface, channel, and script shares the same memory, tools, and intelligence via `localhost:18981`** |
 | Context resets every AI session | Semantic memory persists across sessions and survives restarts |
-| AI can't do things, only talk | 17 built-in tools: web search, file ops, content search, shell, memory, config, and more. Workflow pipelines and parallel delegation for complex tasks |
+| AI can't do things, only talk | 18 built-in tools (15 base + 3 feature-gated): web search, file ops, content search, shell, memory, config, and more. Workflow pipelines and parallel delegation for complex tasks |
 | Locked into one AI provider | 6 built-in providers, switch with one config change |
 | AI tools are cloud-only | 100% local, zero telemetry, encrypted credential storage |
 | "Works on my machine" for AI | Same binary on macOS, Linux, Windows — desktop, CLI, or daemon |
@@ -150,7 +150,7 @@ Get notified on Discord. **Nothing is siloed. Everything converges.**
 
 ## What Zenii is NOT
 
-- Not a chatbot wrapper — it's a full API backend with 114 routes
+- Not a chatbot wrapper — it's a full API backend with [114 routes](docs/api-reference.md)
 - Not Electron — native Tauri 2, under 20 MB
 - Not a framework you learn — it's infrastructure you call via `curl`
 - Not cloud-dependent — runs fully offline with Ollama
@@ -216,7 +216,7 @@ curl -X POST localhost:18981/chat \
 | **Language** | **Rust** | TypeScript | TypeScript + Python | Rust | Go | Python | Python/TS | TypeScript |
 | **Binary** | **<20 MB (w/ GUI)** | ~100 MB+ | Docker container (~500 MB+) | ~3.4 MB | <10 MB RAM | N/A (Python) | N/A (Docker) | N/A (npm) |
 | **Desktop GUI** | **Native (Tauri 2)** | -- | -- | -- | Web console | -- | Browser | -- |
-| **API Routes** | **109 REST+WS** | Chat endpoint | Inherits OpenClaw | Daemon endpoint | Webhook gateway | -- | -- | -- |
+| **API Routes** | **114 REST+WS** | Chat endpoint | Inherits OpenClaw | Daemon endpoint | Webhook gateway | -- | -- | -- |
 | **Plugins** | **Any language** | JS only | Inherits OpenClaw (JS) | Rust only | Tool-based | -- | -- | -- |
 | **Memory** | **FTS5 + vectors** | File-based | Inherits OpenClaw (file) | Basic | Workspace logs | -- | Doc search | -- |
 | **Self-Evolution** | **Human-approved** | Autonomous | Inherits OpenClaw (sandboxed) | -- | Agent-generated | -- | -- | -- |
@@ -224,7 +224,7 @@ curl -X POST localhost:18981/chat \
 | **Offline** | **Ollama** | Ollama | NVIDIA Nemotron primary | Ollama | DuckDuckGo | LiteLLM | Optional | No |
 | **License** | **MIT** | Open source | Apache 2.0 | Open source | MIT | AGPL-3.0 | AGPL-3.0 | Apache 2.0 |
 
-**No other project has ALL of these simultaneously**: native desktop GUI, 109-route REST/WS API where any language, any tool, any channel connects to the same shared intelligence, plugins in any language, semantic vector memory, self-evolution with human approval, under 20 MB binary, cross-system coherence where memory stored from any interface is instantly available everywhere, and MIT licensed. NemoClaw brings the strongest kernel-level sandboxing (Landlock + seccomp + netns) but requires Linux + Docker (~500 MB+) — Zenii delivers built-in 6-layer security natively on macOS, Windows, and Linux in under 20 MB.
+**No other project has ALL of these simultaneously**: native desktop GUI, 114-route REST/WS API where any language, any tool, any channel connects to the same shared intelligence, plugins in any language, semantic vector memory, self-evolution with human approval, under 20 MB binary, cross-system coherence where memory stored from any interface is instantly available everywhere, and MIT licensed. NemoClaw brings the strongest kernel-level sandboxing (Landlock + seccomp + netns) but requires Linux + Docker (~500 MB+) — Zenii delivers built-in 6-layer security natively on macOS, Windows, and Linux in under 20 MB.
 
 ---
 
@@ -245,9 +245,9 @@ Your AI gets smarter. You stay in control. No surprises.
 
 - **Self-evolving agent** — proposes skill changes based on your patterns, learns only with your approval
 - **Plugin system** — write plugins in Python, Go, JS, or any language. A plugin is any program that speaks JSON-RPC 2.0 over stdio (~15 lines of Python)
-- **114 API routes** — full REST + WebSocket gateway. Interactive docs at `localhost:18981/api-docs`
+- **[114 API routes](docs/api-reference.md)** — full REST + WebSocket gateway. Interactive docs at `localhost:18981/api-docs`
 - **6 AI providers** built-in (OpenAI, Anthropic, Google Gemini, OpenRouter, Vercel AI Gateway, Ollama) + custom providers
-- **17 built-in tools** (15 base + 2 feature-gated) — websearch, sysinfo, shell, file ops, content search, memory, config, learn, skill proposal, agent self, patch, process + channel_send, scheduler
+- **18 built-in tools** (15 base + 3 feature-gated) — websearch, sysinfo, shell, file ops, content search, memory, config, learn, skill proposal, agent self, patch, process + channel_send, scheduler, workflow
 - **Semantic memory** — SQLite FTS5 + vector embeddings, persists across sessions and restarts
 - **Native desktop app** — Tauri 2 + Svelte 5, under 20 MB, not Electron
 - **Compact prompts** — plugin-based prompt strategy with ~65% token reduction
@@ -265,7 +265,7 @@ Your AI gets smarter. You stay in control. No surprises.
 <details>
 <summary><strong>Full feature details</strong> (click to expand)</summary>
 
-- **Tool calling** with 17 built-in tools (15 base + 2 feature-gated) via DashMap-backed ToolRegistry: websearch, sysinfo, shell, file read/write/list/search, content_search, patch, process, learn, skill_proposal, memory, config, agent_self + channel_send, scheduler
+- **Tool calling** with 18 built-in tools (15 base + 3 feature-gated) via DashMap-backed ToolRegistry: websearch, sysinfo, shell, file read/write/list/search, content_search, patch, process, learn, skill_proposal, memory, config, agent_self + channel_send, scheduler, workflow
 - **Workflow engine** -- TOML-defined multi-step automation pipelines with 5 step types (Tool, LLM, Condition, Parallel, Delay), petgraph DAG execution, minijinja inter-step templates, retry/timeout policies, failure policies (Stop/Continue/Fallback), DB-persisted run history. Feature-gated behind `workflows`
 - **Agent delegation** -- Coordinator decomposes complex tasks into parallel sub-agents via LLM, executes in dependency waves with JoinSet, aggregates results. Each sub-agent gets an isolated session with tool allowlist filtering and per-agent timeout. Cancellation via `POST /agents/{id}/cancel`
 - **Plugin system** -- external process plugins via JSON-RPC 2.0 protocol, installable from git or local paths, with automatic tool and skill registration. Managed via CLI, Web/Desktop UI, and TUI. See [zenii-plugins](https://github.com/sprklai/zenii-plugins) for official community plugins
@@ -401,7 +401,7 @@ sequenceDiagram
     App->>DB: Open/create database + migrations
     App->>Cred: Initialize credential store (keyring → file → memory)
     App->>AI: Register providers + load API keys
-    App->>AI: Register 15 base + 2 feature-gated agent tools
+    App->>AI: Register 15 base + 3 feature-gated agent tools
     App->>Ctx: Init ContextEngine + BootContext (OS, location, timezone)
     App->>Plug: Scan plugins directory + register tools/skills
     App->>GW: Start axum server (:18981)
@@ -583,7 +583,7 @@ cargo run -p zenii-tui
 cd crates/zenii-desktop && cargo tauri dev
 
 # Start the desktop app connecting to external daemon
-ZENII_GATEWAY_URL=http://localhost:18981 cd crates/zenii-desktop && cargo tauri dev
+cd crates/zenii-desktop && ZENII_GATEWAY_URL=http://localhost:18981 cargo tauri dev
 
 # Frontend dev server (hot reload)
 cd web && bun run dev
@@ -735,73 +735,57 @@ max_tool_retries = 3
 ## CLI Commands
 
 ```bash
-zenii onboard                        # First-run onboarding wizard (provider, API key, model, channels, profile)
-zenii daemon start|stop|status     # Manage the daemon process
-zenii chat [--session ID] [--model M]  # Interactive WS streaming chat
+zenii onboard                             # First-run onboarding wizard
+zenii daemon start|stop|status            # Manage the daemon process
+zenii chat [--session ID] [--model M]     # Interactive WS streaming chat
 zenii run "prompt" [--session] [--model]  # Single prompt, print response
-zenii memory search "query" [--limit N] [--offset N]  # Search memories
-zenii memory add <key> <content>   # Add memory entry
-zenii memory remove <key>          # Remove memory entry
-zenii config show                  # Show current config
-zenii config set <key> <value>     # Set a config value
-zenii key set <provider> <key>     # Set API key
-zenii key remove <provider>        # Remove API key
-zenii key list                     # List stored keys
-zenii provider list                # List AI providers
-zenii provider test <id>           # Test provider connection
-zenii provider add <id> <name> <base_url>  # Add custom provider
-zenii provider remove <id>         # Remove user-defined provider
-zenii provider default <provider> <model>  # Set default model
-zenii embedding activate <provider>       # Activate embeddings (openai/local)
-zenii embedding deactivate                # Deactivate embeddings
-zenii embedding status                    # Show embedding provider status
-zenii embedding test                      # Test embedding generation
-zenii embedding reindex                   # Re-embed all memories
-zenii plugin list                         # List installed plugins
-zenii plugin install <source> [--local] [--all]  # Install from git, monorepo subdir, or local path
-zenii plugin remove <name>                # Remove a plugin
-zenii plugin update <name>                # Update a plugin
-zenii plugin enable <name>                # Enable a plugin
-zenii plugin disable <name>               # Disable a plugin
-zenii plugin info <name>                  # Show plugin details
-zenii workflow list                       # List all workflows
-zenii workflow create <file>              # Create workflow from TOML file
-zenii workflow run <id>                   # Run a workflow
-zenii workflow get <id>                   # Show workflow details
-zenii workflow show <id>                  # Print raw TOML definition
-zenii workflow history <id>               # Show execution history
-zenii workflow delete <id>                # Delete a workflow
-zenii workflow cancel <id>                # Cancel a running workflow
+zenii memory search|add|remove            # Semantic memory CRUD
+zenii config show|set                     # View/update configuration
+zenii key set|remove|list                 # Manage API keys
+zenii key set-channel|remove-channel      # Manage channel credentials
+zenii provider list|test|add|remove|default  # AI provider management
+zenii embedding activate|deactivate|status|test|download|reindex  # Embedding management
+zenii plugin list|install|remove|update|enable|disable|info       # Plugin management
+zenii workflow list|create|run|get|show|history|delete|cancel      # Workflow management
+zenii schedule list|create|update|toggle|delete|history|status     # Scheduler management
+zenii channel list|messages               # View channel conversations
 ```
 
 Global options: `--host`, `--port`, `--token` (or `ZENII_TOKEN` env var)
 
-## Gateway Routes (79 base + 24 feature-gated = 103 total)
+Full reference with all options, arguments, and examples: **[docs/cli-reference.md](docs/cli-reference.md)** | **[docs.zenii.sprklai.com/cli-reference](https://docs.zenii.sprklai.com/cli-reference)**
 
-| Group | Routes | Description |
-|-------|--------|-------------|
-| Health | `GET /health` | Health check (no auth) |
-| Sessions & Chat | `POST /sessions`, `GET /sessions`, `GET/PUT/DELETE /sessions/{id}`, `POST /sessions/{id}/generate-title`, `GET/POST /sessions/{id}/messages`, `POST /chat` | Chat sessions and messaging |
-| Memory | `POST /memory`, `GET /memory`, `GET/PUT/DELETE /memory/{key}` | Semantic memory CRUD |
-| Config | `GET /config`, `PUT /config`, `GET /config/file` | Configuration management |
-| Setup | `GET /setup/status` | First-run onboarding status |
-| Credentials | `POST/GET /credentials`, `DELETE /credentials/{key}`, `GET /credentials/{key}/value`, `GET /credentials/{key}/exists` | Credential management (keyring → encrypted file → memory) |
-| Providers & Models | `GET/POST /providers`, `GET /providers/with-key-status`, `GET/PUT /providers/default`, `GET/PUT/DELETE /providers/{id}`, `POST /providers/{id}/test`, `POST /providers/{id}/models`, `DELETE /providers/{id}/models/{model_id}`, `GET /models` | Multi-provider AI management |
-| Tools | `GET /tools`, `POST /tools/{name}/execute` | Tool listing and execution |
-| Permissions | `GET /permissions`, `GET /permissions/{surface}`, `PUT/DELETE /permissions/{surface}/{tool}` | Per-surface tool permissions |
-| System | `GET /system/info` | System information |
-| Identity | `GET /identity`, `GET/PUT /identity/{name}`, `POST /identity/reload` | Persona management |
-| Skills | `GET /skills`, `GET/PUT/DELETE /skills/{id}`, `POST /skills`, `POST /skills/reload` | Skill CRUD |
-| Skill Proposals | `GET /skills/proposals`, `POST /skills/proposals/{id}/approve`, `POST /skills/proposals/{id}/reject`, `DELETE /skills/proposals/{id}` | Self-evolving skill management |
-| User | `GET/POST/DELETE /user/observations`, `GET/DELETE /user/observations/{key}`, `GET /user/profile` | User learning + privacy |
-| Embeddings | `GET /embeddings/status`, `POST /embeddings/test`, `POST /embeddings/embed`, `POST /embeddings/download`, `POST /embeddings/reindex` | Semantic memory embedding management |
-| Plugins | `GET /plugins`, `POST /plugins/install`, `GET/DELETE /plugins/{name}`, `PUT /plugins/{name}/toggle`, `POST /plugins/{name}/update`, `GET/PUT /plugins/{name}/config` | Plugin management (install, remove, enable/disable, config) |
-| Agent Delegation | `GET /agents/active`, `POST /agents/{id}/cancel` | Multi-agent task delegation |
-| Workflows | `POST /workflows`, `GET /workflows`, `GET/DELETE /workflows/{id}`, `GET /workflows/{id}/raw`, `POST /workflows/{id}/run`, `POST /workflows/{id}/cancel`, `GET /workflows/{id}/history`, `GET /workflows/{id}/runs/{run_id}` (feature-gated: `workflows`) | TOML workflow engine |
-| Channels | `POST /channels/{name}/test` (always); `GET /channels`, `GET /channels/{name}/status`, `POST /channels/{name}/send`, `POST /channels/{name}/connect`, `POST /channels/{name}/disconnect`, `GET /channels/{name}/health`, `POST /channels/{name}/message`, `GET /channels/sessions`, `GET /channels/sessions/{id}/messages` (feature-gated) | Messaging channels |
-| Scheduler | `GET/POST /scheduler/jobs`, `PUT /scheduler/jobs/{id}/toggle`, `DELETE /scheduler/jobs/{id}`, `GET /scheduler/jobs/{id}/history`, `GET /scheduler/status` (feature-gated) | Cron job management |
-| WebSocket | `GET /ws/chat`, `GET /ws/notifications` | Streaming chat + notification push |
-| API Docs | `GET /api-docs`, `GET /api-docs/openapi.json` | Interactive Scalar UI + OpenAPI 3.1 spec (feature-gated: `api-docs`) |
+## Gateway Routes (86 base + 28 feature-gated = 114 total)
+
+| Group | Count | Description |
+|-------|-------|-------------|
+| Health | 1 | `GET /health` (no auth) |
+| Sessions & Chat | 7 | CRUD, title generation, `POST /chat` |
+| Messages | 3 | List, create, delete-and-after |
+| Memory | 5 | Semantic memory CRUD |
+| Config & Setup | 4 | Config get/set, file view, setup status |
+| Credentials | 5 | Keyring-backed credential management |
+| Providers & Models | 12 | Multi-provider AI management, model CRUD |
+| Tools | 2 | List tools, execute by name |
+| Permissions | 4 | Per-surface tool permission management |
+| System | 1 | System info |
+| Identity | 4 | Persona management + reload |
+| Skills | 6 | Skill CRUD + reload |
+| Skill Proposals | 4 | Self-evolving skill approval/rejection |
+| User | 6 | Observations CRUD + profile |
+| Embeddings | 5 | Status, test, embed, download, reindex |
+| Plugins | 9 | Install, remove, toggle, update, config, available |
+| Agent Delegation | 2 | Active agents, cancel |
+| Approvals | 3 | Rule-based approval management |
+| Channels Test | 1 | `POST /channels/{name}/test` (always available) |
+| WebSocket | 2 | `GET /ws/chat`, `GET /ws/notifications` |
+| **Feature-gated** | | |
+| Workflows | 10 | TOML pipeline engine (`workflows` feature) |
+| Channels | 9 | Messaging channels (`channels` feature) |
+| Scheduler | 7 | Cron job management (`scheduler` feature) |
+| API Docs | 2 | Scalar UI + OpenAPI spec (`api-docs` feature) |
+
+Full route reference with request/response schemas: **[docs/api-reference.md](docs/api-reference.md)** | **[docs.zenii.sprklai.com/api-reference](https://docs.zenii.sprklai.com/api-reference)**
 
 ---
 

@@ -17,7 +17,7 @@ authors = ["NSRTech"]
 rust-version = "1.85"
 repository = "https://github.com/sprklai/zenii"
 homepage = "https://zenii.sprklai.com"
-keywords = ["ai", "assistant", "agent"]
+keywords = ["ai", "backend", "agent"]
 categories = ["command-line-utilities"]
 
 [workspace.dependencies]

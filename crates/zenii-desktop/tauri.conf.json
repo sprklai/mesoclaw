@@ -49,8 +49,8 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "shortDescription": "Zenii - AI-powered personal assistant",
-    "longDescription": "Zenii is an AI-powered personal assistant with multi-provider support, memory, tools, and extensible channels.",
+    "shortDescription": "Zenii - Your private AI backend",
+    "longDescription": "Zenii is a private AI backend for everything on your machine — multi-provider support, memory, tools, and extensible channels.",
     "category": "Utility",
     "linux": {
       "deb": {

@@ -220,7 +220,7 @@
 			</div>
 		</Dialog.Header>
 		<Dialog.Description class="space-y-3">
-			<p>AI-powered personal assistant</p>
+			<p>Your private AI backend</p>
 			<div class="text-xs text-muted-foreground space-y-1">
 				<p>SprklAI by NSRTech</p>
 				<p>MIT License</p>
