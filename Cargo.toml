@@ -83,7 +83,7 @@ sqlite-vec = "0.1.6"
 urlencoding = "2"
 
 # Phase 3: AI Agent + Gateway
-rig-core = "0.32"
+rig-core = "0.33"
 tokio-stream = "0.1.17"
 futures = "0.3"
 
