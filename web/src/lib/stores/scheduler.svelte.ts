@@ -39,6 +39,7 @@ function createSchedulerStore() {
   let loading = $state(false);
   let error = $state<string | null>(null);
   let status = $state<SchedulerStatus>({ running: false, job_count: 0 });
+  let loadVersion = 0;
 
   return {
     get jobs() {
@@ -55,6 +56,7 @@ function createSchedulerStore() {
     },
 
     async load() {
+      const version = ++loadVersion;
       loading = true;
       error = null;
       try {
@@ -71,10 +73,13 @@ function createSchedulerStore() {
             return { running: false, job_count: 0 } as SchedulerStatus;
           }),
         ]);
+        if (version !== loadVersion) return; // Stale load from re-navigation
         jobs = jobList;
         status = schedulerStatus;
       } finally {
-        loading = false;
+        if (version === loadVersion) {
+          loading = false;
+        }
       }
     },
 

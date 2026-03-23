@@ -22,6 +22,7 @@ function createMemoryStore() {
   let entries = $state<MemoryEntry[]>([]);
   let observations = $state<UserObservation[]>([]);
   let loading = $state(false);
+  let loadVersion = 0;
 
   return {
     get entries() {
@@ -35,17 +36,21 @@ function createMemoryStore() {
     },
 
     async loadAll() {
+      const version = ++loadVersion;
       loading = true;
       try {
         const [memResult, obsResult] = await Promise.allSettled([
           apiGet<MemoryEntry[]>("/memory?q=&limit=50&offset=0"),
           apiGet<{ observations: UserObservation[] }>("/user/observations"),
         ]);
+        if (version !== loadVersion) return; // Stale load from re-navigation
         entries = memResult.status === "fulfilled" ? memResult.value : [];
         observations =
           obsResult.status === "fulfilled" ? obsResult.value.observations : [];
       } finally {
-        loading = false;
+        if (version === loadVersion) {
+          loading = false;
+        }
       }
     },
 

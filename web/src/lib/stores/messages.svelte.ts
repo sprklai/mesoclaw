@@ -163,7 +163,10 @@ function createMessagesStore() {
       );
     },
 
-    async finishStream(sessionId: string) {
+    async finishStream(
+      sessionId: string,
+      fallbackDelegation?: DelegationRecord,
+    ) {
       activeStreamSessionId = null;
 
       // Reconcile with server-persisted messages (server is source of truth)
@@ -179,6 +182,14 @@ function createMessagesStore() {
 
         if (hasNewResponse) {
           messages = serverMessages;
+          // If server message doesn't have delegation but we have fallback, augment it
+          const last = messages[messages.length - 1];
+          if (last && !last.delegation && fallbackDelegation) {
+            messages = [
+              ...messages.slice(0, -1),
+              { ...last, delegation: fallbackDelegation },
+            ];
+          }
           streamContent = "";
         } else if (streamContent) {
           // Server doesn't have the response yet — keep streamed content as synthetic message
@@ -190,6 +201,7 @@ function createMessagesStore() {
               role: "assistant",
               content: streamContent,
               created_at: Date.now(),
+              delegation: fallbackDelegation,
             } as Message,
           ];
           streamContent = "";
@@ -208,6 +220,7 @@ function createMessagesStore() {
               role: "assistant",
               content: streamContent,
               created_at: Date.now(),
+              delegation: fallbackDelegation,
             } as Message,
           ];
           streamContent = "";

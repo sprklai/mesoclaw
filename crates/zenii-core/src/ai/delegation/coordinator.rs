@@ -84,13 +84,18 @@ impl Coordinator {
         let tools_list = available_tools.join(", ");
         let decompose_prompt = format!(
             "You are a task decomposition agent. Break the following task into {} or fewer \
-             independent sub-tasks that can be executed in parallel by separate AI agents.\n\n\
+             sub-tasks that can be executed IN PARALLEL by separate AI agents.\n\n\
              Available tools: [{tools_list}]\n\n\
              Return a JSON array of tasks. Each task object must have:\n\
              - \"id\": a unique string like \"t1\", \"t2\"\n\
-             - \"description\": what the sub-agent should accomplish\n\
+             - \"description\": what the sub-agent should accomplish (include full context needed)\n\
              - \"tool_allowlist\": optional array of tool names from the available tools list above, or null for all tools\n\
-             - \"depends_on\": array of task IDs this task depends on (empty array for independent tasks)\n\n\
+             - \"depends_on\": array of task IDs this task depends on\n\n\
+             CRITICAL: Set depends_on to [] (empty) for ALL tasks UNLESS one task strictly \
+             requires the output of another. Maximize parallelism — independent research, \
+             analysis, and data gathering tasks should ALWAYS run in parallel with empty \
+             depends_on arrays. Each task description must be self-contained with all context \
+             needed, since agents cannot see each other's work.\n\n\
              Task: {}\n\n\
              Return ONLY a valid JSON array, no markdown formatting or explanation.",
             self.config.max_sub_agents, prompt

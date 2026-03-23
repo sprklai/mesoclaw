@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Delegation results now render immediately after completion instead of showing blank until re-navigation
+- Delegation sub-agents now run in parallel by default (strengthened decomposition prompt)
+- `delegation_completed` WS event no longer silently dropped due to `tokio::select` race in backend
+- Stop button and component unmount during delegation now preserve partial results via fallback
+- Memory and scheduler stores now guard against stale API responses during rapid navigation
+
 ## [0.1.0] - 2026-03-22
 
 ### Added

@@ -108,3 +108,27 @@ function createDelegationStore() {
 }
 
 export const delegationStore = createDelegationStore();
+
+/** Build a DelegationRecord from live delegation state for use as a fallback. */
+export function buildDelegationRecord(
+  state: DelegationState,
+): import("$lib/stores/messages.svelte").DelegationRecord {
+  return {
+    delegation_id: state.delegationId,
+    total_duration_ms: Date.now() - state.startedAt,
+    total_tokens: state.agents.reduce((sum, a) => sum + a.tokensUsed, 0),
+    agents: state.agents.map((a) => ({
+      id: a.id,
+      description: a.description,
+      status:
+        a.status === "completed"
+          ? "Completed"
+          : a.status === "failed"
+            ? "Failed"
+            : "Running",
+      tool_uses: a.toolUses,
+      tokens_used: a.tokensUsed,
+      duration_ms: a.durationMs ?? 0,
+    })),
+  };
+}

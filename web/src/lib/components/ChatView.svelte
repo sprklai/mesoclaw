@@ -33,7 +33,7 @@
 	import { messagesStore } from '$lib/stores/messages.svelte';
 	import { sessionsStore } from '$lib/stores/sessions.svelte';
 	import { providersStore } from '$lib/stores/providers.svelte';
-	import { delegationStore } from '$lib/stores/delegation.svelte';
+	import { delegationStore, buildDelegationRecord } from '$lib/stores/delegation.svelte';
 	import { notificationStore } from '$lib/stores/notifications.svelte';
 	import { approvalsStore } from '$lib/stores/approvals.svelte';
 	import { ToolApproval } from '$lib/components/ai-elements/tool-approval';
@@ -64,8 +64,13 @@
 			activeWs.close();
 			activeWs = null;
 		}
-		if (messagesStore.streaming) {
-			messagesStore.cancelStream();
+		if (messagesStore.streaming && messagesStore.activeStreamSessionId) {
+			const fallbackDelegation = delegationStore.delegation
+				? buildDelegationRecord(delegationStore.delegation)
+				: undefined;
+			messagesStore.finishStream(messagesStore.activeStreamSessionId, fallbackDelegation).then(() => {
+				delegationStore.clear();
+			});
 		}
 	});
 
@@ -175,11 +180,18 @@
 				},
 				onDone() {
 					activeWs = null;
-					delegationStore.clear();
 					approvalsStore.clear();
+					// Capture delegation data before clearing for fallback rendering
+					const fallbackDelegation = delegationStore.delegation
+						? buildDelegationRecord(delegationStore.delegation)
+						: undefined;
 					// P0.2: Only finish if this stream still owns the session
 					if (messagesStore.activeStreamSessionId === capturedSessionId) {
-						messagesStore.finishStream(capturedSessionId);
+						messagesStore.finishStream(capturedSessionId, fallbackDelegation).then(() => {
+							delegationStore.clear();
+						});
+					} else {
+						delegationStore.clear();
 					}
 					if (isFirstMessage) {
 						sessionsStore.generateTitle(capturedSessionId, capturedModel);
@@ -187,8 +199,10 @@
 				},
 				onError(error) {
 					activeWs = null;
-					delegationStore.clear();
 					approvalsStore.clear();
+					const fallbackDelegation = delegationStore.delegation
+						? buildDelegationRecord(delegationStore.delegation)
+						: undefined;
 					const friendlyError =
 						error.toLowerCase().includes('no agent configured') ||
 						error.toLowerCase().includes('no provider')
@@ -197,7 +211,11 @@
 					messagesStore.setError(friendlyError);
 					// P0.2: Only finish if this stream still owns the session
 					if (messagesStore.activeStreamSessionId === capturedSessionId) {
-						messagesStore.finishStream(capturedSessionId);
+						messagesStore.finishStream(capturedSessionId, fallbackDelegation).then(() => {
+							delegationStore.clear();
+						});
+					} else {
+						delegationStore.clear();
 					}
 					console.error('Chat error:', error);
 				}
@@ -219,10 +237,16 @@
 			activeWs.close();
 			activeWs = null;
 		}
-		delegationStore.clear();
+		const fallbackDelegation = delegationStore.delegation
+			? buildDelegationRecord(delegationStore.delegation)
+			: undefined;
 		approvalsStore.clear();
-		if (messagesStore.streaming) {
-			messagesStore.cancelStream();
+		if (messagesStore.streaming && messagesStore.activeStreamSessionId) {
+			messagesStore.finishStream(messagesStore.activeStreamSessionId, fallbackDelegation).then(() => {
+				delegationStore.clear();
+			});
+		} else {
+			delegationStore.clear();
 		}
 	}
 </script>

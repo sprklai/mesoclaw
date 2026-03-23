@@ -902,6 +902,28 @@ async fn handle_delegation(
                 }
             }
             result = &mut result_rx => {
+                // Drain any pending DelegationCompleted event that the select
+                // may not have forwarded yet (race with result_rx).
+                while let Ok(event) = event_rx.try_recv() {
+                    if let crate::event_bus::AppEvent::DelegationCompleted {
+                        delegation_id,
+                        total_duration_ms,
+                        total_tokens,
+                    } = event
+                        && my_delegation_id.as_deref() == Some(delegation_id.as_str())
+                    {
+                        send_outbound(
+                            socket,
+                            &WsOutbound::DelegationDone {
+                                delegation_id,
+                                total_duration_ms,
+                                total_tokens,
+                            },
+                        )
+                        .await;
+                    }
+                }
+
                 match result {
                     Ok(Ok(delegation_result)) => {
                         let response = delegation_result.aggregated_response.clone();
