@@ -91,7 +91,7 @@ futures = "0.3"
 serde_yaml = "0.9"
 
 # Feature 5: Workflow Engine (optional)
-petgraph = "0.7"
+petgraph = "0.8"
 minijinja = "2.9"
 
 # Phase 8.11: Local Embeddings (optional)
