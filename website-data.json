@@ -1,0 +1,15 @@
+{
+  "version": "0.1.0",
+  "agentTools": 18,
+  "llmProviders": 6,
+  "messagingChannels": 3,
+  "backendTests": 1545,
+  "binarySize": 20,
+  "debRpmSize": 16,
+  "startupSeconds": 3,
+  "gatewayEndpoints": 114,
+  "crates": 5,
+  "securityLayers": 6,
+  "platformTargets": 10,
+  "compileFlags": 14
+}
