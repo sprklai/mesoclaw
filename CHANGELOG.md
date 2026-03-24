@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-03-23
+
 ### Added
 - Centralized error enrichment system (`ErrorHint` + `enrich_error()`) with actionable hints for 15+ error patterns
 - Sub-classified agent error codes: `ZENII_AGENT_AUTH`, `ZENII_AGENT_RATE_LIMIT`, `ZENII_AGENT_MAX_TURNS`, `ZENII_AGENT_CONTEXT_LENGTH`, `ZENII_AGENT_MODEL_NOT_FOUND`, `ZENII_AGENT_TIMEOUT`, `ZENII_AGENT_CONNECTION`, `ZENII_AGENT_NOT_CONFIGURED`
