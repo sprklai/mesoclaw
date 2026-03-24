@@ -3,10 +3,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::json;
 
+use crate::ai::session::SessionManager;
 use crate::channels::contacts;
 use crate::channels::message::ChannelMessage;
 use crate::channels::registry::ChannelRegistry;
+use crate::channels::session_map::ChannelSessionMap;
 use crate::db::DbPool;
+use crate::event_bus::{AppEvent, EventBus};
 use crate::{Result, ZeniiError};
 
 use super::traits::{Tool, ToolResult};
@@ -25,11 +28,26 @@ fn recipient_metadata_key(channel: &str) -> &'static str {
 pub struct ChannelSendTool {
     registry: Arc<ChannelRegistry>,
     db: DbPool,
+    session_map: Arc<ChannelSessionMap>,
+    session_manager: Arc<SessionManager>,
+    event_bus: Arc<dyn EventBus>,
 }
 
 impl ChannelSendTool {
-    pub fn new(registry: Arc<ChannelRegistry>, db: DbPool) -> Self {
-        Self { registry, db }
+    pub fn new(
+        registry: Arc<ChannelRegistry>,
+        db: DbPool,
+        session_map: Arc<ChannelSessionMap>,
+        session_manager: Arc<SessionManager>,
+        event_bus: Arc<dyn EventBus>,
+    ) -> Self {
+        Self {
+            registry,
+            db,
+            session_map,
+            session_manager,
+            event_bus,
+        }
     }
 }
 
@@ -129,8 +147,25 @@ impl Tool for ChannelSendTool {
                     }
                 }
 
-                match self.registry.send(channel, msg).await {
-                    Ok(()) => Ok(ToolResult::ok(format!("Message sent to '{channel}'"))),
+                match self.registry.send(channel, msg.clone()).await {
+                    Ok(()) => {
+                        // Persist outgoing message in channel session + notify frontend
+                        let recipient_id = msg.metadata.get(recipient_metadata_key(channel)).cloned();
+                        if let Some(ref rid) = recipient_id {
+                            let channel_key = format!("{channel}:{rid}");
+                            if let Ok(sid) = self.session_map.resolve_session(&channel_key, channel).await {
+                                let _ = self.session_manager.append_message(&sid, "assistant", message).await;
+                                let _ = self.event_bus.publish(AppEvent::ChannelMessageReceived {
+                                    channel: channel.to_string(),
+                                    sender: "agent".to_string(),
+                                    session_id: sid,
+                                    content_preview: message.chars().take(100).collect(),
+                                    role: "assistant".to_string(),
+                                });
+                            }
+                        }
+                        Ok(ToolResult::ok(format!("Message sent to '{channel}'")))
+                    }
                     Err(e) => Ok(ToolResult::err(format!("Failed to send: {e}"))),
                 }
             }
@@ -193,6 +228,7 @@ mod tests {
     use super::*;
     use crate::channels::traits::{Channel, ChannelLifecycle, ChannelSender, ChannelStatus};
     use crate::db;
+    use crate::event_bus::TokioBroadcastBus;
     use rusqlite::{Connection, params};
     use std::sync::atomic::{AtomicBool, Ordering};
     use tokio::sync::{Mutex, mpsc};
@@ -277,11 +313,21 @@ mod tests {
                 id TEXT PRIMARY KEY,
                 title TEXT,
                 channel_key TEXT,
+                source TEXT NOT NULL DEFAULT 'api',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );",
+            );
+            CREATE TABLE IF NOT EXISTS messages (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_channel_key ON sessions(channel_key);",
         )
-        .expect("create sessions table");
+        .expect("create tables");
         Arc::new(Mutex::new(conn))
     }
 
@@ -307,7 +353,10 @@ mod tests {
             .register(Arc::new(MockChannel::new("telegram")))
             .unwrap();
         let db = setup_db();
-        ChannelSendTool::new(registry, db)
+        let session_manager = Arc::new(crate::ai::session::SessionManager::new(db.clone()));
+        let session_map = Arc::new(ChannelSessionMap::new(session_manager.clone()));
+        let event_bus: Arc<dyn EventBus> = Arc::new(TokioBroadcastBus::new(16));
+        ChannelSendTool::new(registry, db, session_map, session_manager, event_bus)
     }
 
     // 17.15 — List channels returns registered channels
@@ -366,7 +415,10 @@ mod tests {
     fn channel_tool_schema() {
         let registry = Arc::new(ChannelRegistry::new());
         let db = setup_db();
-        let tool = ChannelSendTool::new(registry, db);
+        let session_manager = Arc::new(crate::ai::session::SessionManager::new(db.clone()));
+        let session_map = Arc::new(ChannelSessionMap::new(session_manager.clone()));
+        let event_bus: Arc<dyn EventBus> = Arc::new(TokioBroadcastBus::new(16));
+        let tool = ChannelSendTool::new(registry, db, session_map, session_manager, event_bus);
 
         assert_eq!(tool.name(), "channel_send");
         assert!(tool.description().contains("channel"));

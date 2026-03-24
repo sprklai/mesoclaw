@@ -11,6 +11,7 @@
 	import { inboxStore } from '$lib/stores/inbox.svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
+	import { notificationStore } from '$lib/stores/notifications.svelte';
 	import MessageSquarePlus from '@lucide/svelte/icons/message-square-plus';
 	import Radio from '@lucide/svelte/icons/radio';
 	import Brain from '@lucide/svelte/icons/brain';
@@ -19,9 +20,23 @@
 
 	let loading = $state(true);
 	let creating = $state(false);
+	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+	let lastRefreshedActivity = 0;
 
 	$effect(() => {
 		loadDashboardData();
+	});
+
+	// Debounce-refresh dashboard when push events arrive (session/message/channel activity)
+	$effect(() => {
+		const ts = notificationStore.lastActivityAt;
+		if (ts > lastRefreshedActivity) {
+			clearTimeout(refreshTimer);
+			refreshTimer = setTimeout(() => {
+				lastRefreshedActivity = ts;
+				loadDashboardData();
+			}, 2000);
+		}
 	});
 
 	async function loadDashboardData() {

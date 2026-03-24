@@ -256,6 +256,14 @@ function createMessagesStore() {
       }
     },
 
+    /** Reload messages if the given session is currently loaded and not streaming. */
+    reloadIfActive(sessionId: string) {
+      if (streaming || activeStreamSessionId === sessionId) return;
+      if (messages.length > 0 && messages[0]?.session_id === sessionId) {
+        this.load(sessionId);
+      }
+    },
+
     clear() {
       messages = [];
       streaming = false;

@@ -568,12 +568,20 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
 
     // Register ChannelSendTool (post-Arc, DashMap allows it)
     #[cfg(feature = "channels")]
-    tools
-        .register(Arc::new(crate::tools::channel_tool::ChannelSendTool::new(
-            channel_registry.clone(),
-            pool.clone(),
-        )))
-        .unwrap_or_else(|e| tracing::warn!("Failed to register channel_send tool: {e}"));
+    {
+        let tool_session_map = Arc::new(crate::channels::session_map::ChannelSessionMap::new(
+            session_manager.clone(),
+        ));
+        tools
+            .register(Arc::new(crate::tools::channel_tool::ChannelSendTool::new(
+                channel_registry.clone(),
+                pool.clone(),
+                tool_session_map,
+                session_manager.clone(),
+                event_bus.clone(),
+            )))
+            .unwrap_or_else(|e| tracing::warn!("Failed to register channel_send tool: {e}"));
+    }
 
     #[cfg(feature = "channels")]
     info!("Channel registry initialized");

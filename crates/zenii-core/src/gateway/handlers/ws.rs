@@ -755,10 +755,18 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
                                 }
 
                                 match &msg {
-                                    Ok(m) => info!(
-                                        "WS: assistant message stored OK: id={}, session={}",
-                                        m.id, m.session_id
-                                    ),
+                                    Ok(m) => {
+                                        info!(
+                                            "WS: assistant message stored OK: id={}, session={}",
+                                            m.id, m.session_id
+                                        );
+                                        // Notify other connected clients of the new message
+                                        let _ = state.event_bus.publish(crate::event_bus::AppEvent::MessageAdded {
+                                            session_id: sid.to_string(),
+                                            message_id: m.id.clone(),
+                                            role: "assistant".into(),
+                                        });
+                                    }
                                     Err(e) => {
                                         warn!(
                                             "WS: FAILED to store assistant message for session={sid}: {e}"
@@ -974,13 +982,20 @@ async fn handle_delegation(
                             }
 
                             // Store delegation details linked to the assistant message
-                            if let Ok(ref msg) = msg
-                                && let Err(e) = state
+                            if let Ok(ref msg) = msg {
+                                if let Err(e) = state
                                     .session_manager
                                     .store_delegation(&msg.id, sid, &delegation_result)
                                     .await
-                            {
-                                warn!("WS: FAILED to store delegation details for session={sid}: {e}");
+                                {
+                                    warn!("WS: FAILED to store delegation details for session={sid}: {e}");
+                                }
+                                // Notify other connected clients of the new message
+                                let _ = state.event_bus.publish(crate::event_bus::AppEvent::MessageAdded {
+                                    session_id: sid.to_string(),
+                                    message_id: msg.id.clone(),
+                                    role: "assistant".into(),
+                                });
                             }
                         }
 

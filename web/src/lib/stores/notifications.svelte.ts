@@ -2,6 +2,7 @@ import { toast } from "svelte-sonner";
 import { inboxStore } from "./inbox.svelte";
 import { configStore } from "./config.svelte";
 import { sessionsStore } from "./sessions.svelte";
+import { messagesStore } from "./messages.svelte";
 import { isTauri, showNotification } from "$lib/tauri";
 import { workflowsStore } from "./workflows.svelte";
 import { memoryStore } from "./memory.svelte";
@@ -62,6 +63,8 @@ type TauriWsInstance = Awaited<
 class NotificationStore {
   notifications = $state<SchedulerNotification[]>([]);
   channelAgentActivity = $state<ChannelAgentActivity | null>(null);
+  /** Bumped on session/message/channel events — homepage watches this to debounce-refresh. */
+  lastActivityAt = $state(0);
   ws: WebSocket | null = null;
   private tauriWs: TauriWsInstance | null = null;
   connected = $state(false);
@@ -192,6 +195,7 @@ class NotificationStore {
           content_preview: data.content_preview,
           role: data.role,
         });
+        this.lastActivityAt = Date.now();
 
         // Show toast for incoming user messages only, if toast target enabled
         if (data.role === "user" && hasTarget("channel_message", "toast")) {
@@ -245,11 +249,15 @@ class NotificationStore {
             title: data.title,
             source: data.source,
           });
+          this.lastActivityAt = Date.now();
         }
       } else if (data.type === "session_deleted") {
         sessionsStore.removeFromEvent(data.session_id);
+        this.lastActivityAt = Date.now();
       } else if (data.type === "message_added") {
         sessionsStore.bumpSession(data.session_id);
+        messagesStore.reloadIfActive(data.session_id);
+        this.lastActivityAt = Date.now();
       } else if (data.type === "data_changed") {
         const domain = data.domain as string;
         switch (domain) {
