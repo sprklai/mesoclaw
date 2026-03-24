@@ -105,7 +105,7 @@ describe("WebSocket chat streaming", () => {
     const ws = MockWebSocket.instances[0];
     ws.onmessage!({ data: JSON.stringify({ type: "error", error: "fail" }) });
 
-    expect(callbacks.onError).toHaveBeenCalledWith("fail");
+    expect(callbacks.onError).toHaveBeenCalledWith("fail", undefined);
     expect(ws.closed).toBe(true);
   });
 
@@ -117,6 +117,7 @@ describe("WebSocket chat streaming", () => {
 
     expect(callbacks.onError).toHaveBeenCalledWith(
       "Failed to parse WebSocket message",
+      undefined,
     );
   });
 

@@ -150,11 +150,19 @@ impl Tool for ChannelSendTool {
                 match self.registry.send(channel, msg.clone()).await {
                     Ok(()) => {
                         // Persist outgoing message in channel session + notify frontend
-                        let recipient_id = msg.metadata.get(recipient_metadata_key(channel)).cloned();
+                        let recipient_id =
+                            msg.metadata.get(recipient_metadata_key(channel)).cloned();
                         if let Some(ref rid) = recipient_id {
                             let channel_key = format!("{channel}:{rid}");
-                            if let Ok(sid) = self.session_map.resolve_session(&channel_key, channel).await {
-                                let _ = self.session_manager.append_message(&sid, "assistant", message).await;
+                            if let Ok(sid) = self
+                                .session_map
+                                .resolve_session(&channel_key, channel)
+                                .await
+                            {
+                                let _ = self
+                                    .session_manager
+                                    .append_message(&sid, "assistant", message)
+                                    .await;
                                 let _ = self.event_bus.publish(AppEvent::ChannelMessageReceived {
                                     channel: channel.to_string(),
                                     sender: "agent".to_string(),
