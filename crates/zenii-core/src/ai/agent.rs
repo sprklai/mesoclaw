@@ -7,6 +7,7 @@ use rig::message::Message;
 use rig::prelude::CompletionClient;
 use rig::providers::{anthropic, openai};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tokio::sync::broadcast;
 
 use crate::config::AppConfig;
@@ -99,6 +100,22 @@ impl std::fmt::Debug for ZeniiAgent {
     }
 }
 
+/// Enrich rig-core errors with actionable hints for known failure modes.
+fn enrich_agent_error(
+    context: &'static str,
+) -> impl Fn(rig::completion::request::PromptError) -> ZeniiError {
+    move |e| {
+        let msg = e.to_string();
+        if msg.contains("MaxTurns") || msg.contains("max turn") {
+            ZeniiError::Agent(format!(
+                "{context} failed: {msg}. Increase `agent_max_turns` in config.toml for tool-heavy tasks"
+            ))
+        } else {
+            ZeniiError::Agent(format!("{context} failed: {msg}"))
+        }
+    }
+}
+
 impl ZeniiAgent {
     /// Build a new ZeniiAgent from config, credentials, and tools.
     pub async fn new(
@@ -121,7 +138,7 @@ impl ZeniiAgent {
                 let agent = client
                     .agent(&config.provider_model_id)
                     .preamble(preamble)
-                    .max_tokens(config.agent_max_tokens as u64)
+                    .additional_params(json!({"max_completion_tokens": config.agent_max_tokens}))
                     .default_max_turns(config.agent_max_turns)
                     .tools(rig_tools)
                     .build();
@@ -203,7 +220,7 @@ impl ZeniiAgent {
             let agent = client
                 .agent(model_id)
                 .preamble(preamble)
-                .max_tokens(config.agent_max_tokens as u64)
+                .additional_params(json!({"max_completion_tokens": config.agent_max_tokens}))
                 .default_max_turns(config.agent_max_turns)
                 .tools(rig_tools)
                 .build();
@@ -273,7 +290,7 @@ impl ZeniiAgent {
             let agent = client
                 .agent(model_id)
                 .preamble(preamble)
-                .max_tokens(config.agent_max_tokens as u64)
+                .additional_params(json!({"max_completion_tokens": config.agent_max_tokens}))
                 .default_max_turns(config.agent_max_turns)
                 .tools(rig_tools)
                 .build();
@@ -293,12 +310,12 @@ impl ZeniiAgent {
                 .prompt(input)
                 .extended_details()
                 .await
-                .map_err(|e| ZeniiError::Agent(format!("prompt failed: {e}")))?,
+                .map_err(enrich_agent_error("prompt"))?,
             AgentInner::Anthropic(agent) => agent
                 .prompt(input)
                 .extended_details()
                 .await
-                .map_err(|e| ZeniiError::Agent(format!("prompt failed: {e}")))?,
+                .map_err(enrich_agent_error("prompt"))?,
         };
         Ok(AgentResponse {
             output: resp.output,
@@ -314,13 +331,13 @@ impl ZeniiAgent {
                 .with_history(&mut history)
                 .extended_details()
                 .await
-                .map_err(|e| ZeniiError::Agent(format!("chat failed: {e}")))?,
+                .map_err(enrich_agent_error("chat"))?,
             AgentInner::Anthropic(agent) => agent
                 .prompt(input)
                 .with_history(&mut history)
                 .extended_details()
                 .await
-                .map_err(|e| ZeniiError::Agent(format!("chat failed: {e}")))?,
+                .map_err(enrich_agent_error("chat"))?,
         };
         Ok(AgentResponse {
             output: resp.output,

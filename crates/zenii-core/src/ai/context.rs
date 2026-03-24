@@ -1422,7 +1422,7 @@ impl ContextBuilder {
             let agent = client
                 .agent(&self.config.context_summary_model_id)
                 .preamble("You extract structured facts from conversations. Output only the requested format, nothing else.")
-                .max_tokens(512)
+                .max_tokens(self.config.context_extraction_max_tokens as u64)
                 .build();
             agent
                 .prompt(&extraction_prompt)
@@ -1433,7 +1433,7 @@ impl ContextBuilder {
             let agent = client
                 .agent(&self.config.context_summary_model_id)
                 .preamble("You extract structured facts from conversations. Output only the requested format, nothing else.")
-                .max_tokens(512)
+                .additional_params(serde_json::json!({"max_completion_tokens": self.config.context_extraction_max_tokens}))
                 .build();
             agent
                 .prompt(&extraction_prompt)

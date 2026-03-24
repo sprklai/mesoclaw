@@ -117,6 +117,7 @@ pub struct AppConfig {
     pub context_summary_provider_id: String,
     pub context_reinject_gap_minutes: u32,
     pub context_reinject_message_count: u32,
+    pub context_extraction_max_tokens: usize,
 
     // Phase 8: Context Management (Step 15.3)
     pub context_strategy: String,
@@ -281,7 +282,7 @@ impl Default for AppConfig {
             ],
 
             // Agent
-            agent_max_turns: 4,
+            agent_max_turns: 8,
             agent_max_tokens: 4096,
             agent_system_prompt: None,
 
@@ -335,6 +336,7 @@ impl Default for AppConfig {
             context_summary_provider_id: "openai".into(),
             context_reinject_gap_minutes: 30,
             context_reinject_message_count: 20,
+            context_extraction_max_tokens: 512,
 
             // Context Management (Step 15.3)
             context_strategy: "balanced".into(),
@@ -437,7 +439,7 @@ impl AppConfig {
     /// Call this after loading config or before saving.
     pub fn validate(&mut self) {
         self.learning_min_confidence = self.learning_min_confidence.clamp(0.0, 1.0);
-        self.agent_max_turns = self.agent_max_turns.clamp(1, 16);
+        self.agent_max_turns = self.agent_max_turns.clamp(1, 32);
         self.agent_max_continuations = self.agent_max_continuations.clamp(0, 5);
     }
 }
@@ -791,11 +793,11 @@ mod tests {
         assert_eq!(config.agent_max_continuations, 1);
     }
 
-    // TC-S2 — default agent_max_turns is 4
+    // TC-S2 — default agent_max_turns is 8
     #[test]
     fn tc_s2_default_agent_max_turns() {
         let config = AppConfig::default();
-        assert_eq!(config.agent_max_turns, 4);
+        assert_eq!(config.agent_max_turns, 8);
     }
 
     // TC-S3 — default tool_dedup_enabled is true
@@ -815,7 +817,7 @@ mod tests {
         assert!(!config.tool_dedup_enabled);
     }
 
-    // TC-S5 — validate clamps agent_max_turns to 1..=16
+    // TC-S5 — validate clamps agent_max_turns to 1..=32
     #[test]
     fn tc_s5_validate_clamps_agent_max_turns() {
         let mut config = AppConfig::default();
@@ -825,11 +827,11 @@ mod tests {
 
         config.agent_max_turns = 100;
         config.validate();
-        assert_eq!(config.agent_max_turns, 16);
+        assert_eq!(config.agent_max_turns, 32);
 
-        config.agent_max_turns = 8;
+        config.agent_max_turns = 16;
         config.validate();
-        assert_eq!(config.agent_max_turns, 8);
+        assert_eq!(config.agent_max_turns, 16);
     }
 
     // TC-S6 — validate clamps agent_max_continuations to 0..=5

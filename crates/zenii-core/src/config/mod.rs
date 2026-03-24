@@ -130,7 +130,7 @@ mod tests {
         let config = AppConfig::default();
         assert!(config.gateway_auth_token.is_none());
         assert_eq!(config.ws_max_connections, 32);
-        assert_eq!(config.agent_max_turns, 4);
+        assert_eq!(config.agent_max_turns, 8);
         assert_eq!(config.agent_max_tokens, 4096);
         assert!(config.agent_system_prompt.is_none());
     }

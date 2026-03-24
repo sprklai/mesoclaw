@@ -162,17 +162,29 @@ impl SubAgent {
                     description: self.task.description.clone(),
                 }
             }
-            Ok(Err(e)) => TaskResult {
-                task_id: self.task.id,
-                status: TaskStatus::Failed,
-                output: String::new(),
-                usage: TokenUsage::default(),
-                duration_ms: start.elapsed().as_millis() as u64,
-                error: Some(e.to_string()),
-                session_id: self.session_id,
-                tool_uses: final_tool_uses,
-                description: self.task.description.clone(),
-            },
+            Ok(Err(e)) => {
+                let err_str = e.to_string();
+                let error_msg = if err_str.contains("MaxTurnError")
+                    || err_str.contains("max turn limit")
+                {
+                    format!(
+                        "{err_str}. Increase `agent_max_turns` in config.toml (current limit may be too low for tool-heavy tasks)"
+                    )
+                } else {
+                    err_str
+                };
+                TaskResult {
+                    task_id: self.task.id,
+                    status: TaskStatus::Failed,
+                    output: String::new(),
+                    usage: TokenUsage::default(),
+                    duration_ms: start.elapsed().as_millis() as u64,
+                    error: Some(error_msg),
+                    session_id: self.session_id,
+                    tool_uses: final_tool_uses,
+                    description: self.task.description.clone(),
+                }
+            }
             Err(_) => TaskResult {
                 task_id: self.task.id,
                 status: TaskStatus::TimedOut,
