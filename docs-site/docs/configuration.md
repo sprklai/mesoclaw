@@ -147,7 +147,7 @@ security_audit_log_capacity = 1000
 | `provider_base_url` | Option\<String\> | `null` | Custom base URL for the provider API |
 | `provider_model_id` | String | `"gpt-4o"` | Default model ID. Alias: `default_model` |
 | `provider_api_key_env` | Option\<String\> | `null` | Environment variable name for the API key |
-| `agent_max_turns` | usize | `4` | Maximum agent turns (tool call loops) per request |
+| `agent_max_turns` | usize | `8` | Maximum agent turns (tool call loops) per request. Range: 1-32 |
 | `agent_max_tokens` | usize | `4096` | Maximum tokens for agent responses |
 | `agent_timeout_secs` | u64 | `300` | Maximum seconds for agent execution before timeout. WebSocket chat aborts the agent task and returns an error on timeout |
 | `agent_system_prompt` | Option\<String\> | `null` | Additional system prompt appended to identity (never replaces it) |
@@ -158,7 +158,7 @@ provider_type = "openai"
 provider_base_url = "https://api.openai.com/v1"
 provider_model_id = "gpt-4o"
 provider_api_key_env = "OPENAI_API_KEY"
-agent_max_turns = 4
+agent_max_turns = 8
 agent_max_tokens = 4096
 agent_timeout_secs = 300
 agent_system_prompt = "Always respond concisely."
@@ -537,7 +537,7 @@ session_max_age_days = 90
 # AI Agent
 provider_name = "openai"
 provider_model_id = "gpt-4o"
-agent_max_turns = 4
+agent_max_turns = 8
 agent_max_tokens = 4096
 agent_timeout_secs = 300
 

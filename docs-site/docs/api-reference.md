@@ -92,9 +92,12 @@ All errors return JSON with the following structure:
 ```json
 {
   "error_code": "ZENII_*",
-  "message": "Human-readable error description"
+  "message": "Human-readable error description",
+  "hint": "Optional actionable suggestion for the user"
 }
 ```
+
+The `hint` field is optional and only present when the server can suggest a concrete remediation step (e.g., "Check your API key in Settings > Providers").
 
 ## Error Codes
 
@@ -109,7 +112,15 @@ All errors return JSON with the following structure:
 | `ZENII_CONFIG_ERROR` | 422 | `Config` | Invalid configuration value |
 | `ZENII_DB_ERROR` | 503 | `Database` | Database operation failed |
 | `ZENII_SQLITE_ERROR` | 503 | `Sqlite` | SQLite-level error |
-| `ZENII_AGENT_ERROR` | 502 | `Agent` | AI agent call failed |
+| `ZENII_AGENT_AUTH` | 401 | `Agent` | Invalid or expired API key |
+| `ZENII_AGENT_RATE_LIMIT` | 429 | `Agent` | Provider rate limit exceeded |
+| `ZENII_AGENT_MAX_TURNS` | 400 | `Agent` | Exceeded max tool-calling turns |
+| `ZENII_AGENT_CONTEXT_LENGTH` | 400 | `Agent` | Input too long for model context |
+| `ZENII_AGENT_MODEL_NOT_FOUND` | 400 | `Agent` | Requested model unavailable at provider |
+| `ZENII_AGENT_TIMEOUT` | 504 | `Agent` | Agent request timed out |
+| `ZENII_AGENT_CONNECTION` | 502 | `Agent` | Cannot reach AI provider |
+| `ZENII_AGENT_NOT_CONFIGURED` | 503 | `Agent` | No AI provider configured |
+| `ZENII_AGENT_ERROR` | 502 | `Agent` | Generic agent error (fallback) |
 | `ZENII_HTTP_ERROR` | 502 | `Http` | Upstream HTTP request failed |
 | `ZENII_TOOL_ERROR` | 500 | `Tool` | Tool execution failed |
 | `ZENII_MEMORY_ERROR` | 500 | `Memory` | Memory store operation failed |
@@ -121,11 +132,11 @@ All errors return JSON with the following structure:
 | `ZENII_CHANNEL_ERROR` | 500 | `Channel` | Messaging channel error |
 | `ZENII_CONTEXT` | 500 | `Context` | Context engine error |
 | `ZENII_TOML_SERIALIZE_ERROR` | 500 | `TomlSerialize` | TOML serialization failed |
-| `ZENII_P4_IDENTITY` | 500 | `Identity` | Identity system error |
-| `ZENII_P4_IDENTITY_NOT_FOUND` | 404 | `IdentityNotFound` | Identity file not found |
-| `ZENII_P4_SKILL` | 500 | `Skill` | Skill system error |
-| `ZENII_P4_SKILL_NOT_FOUND` | 404 | `SkillNotFound` | Skill not found |
-| `ZENII_P4_USER` | 500 | `User` | User learning system error |
+| `ZENII_IDENTITY_ERROR` | 500 | `Identity` | Identity system error |
+| `ZENII_IDENTITY_NOT_FOUND` | 404 | `IdentityNotFound` | Identity file not found |
+| `ZENII_SKILL_ERROR` | 500 | `Skill` | Skill system error |
+| `ZENII_SKILL_NOT_FOUND` | 404 | `SkillNotFound` | Skill not found |
+| `ZENII_USER_ERROR` | 500 | `User` | User learning system error |
 | `ZENII_YAML_PARSE_ERROR` | 400 | `Yaml` | Invalid YAML syntax |
 | `ZENII_VALIDATION` | 400 | `Validation` | Input validation failed |
 | `ZENII_SCHEDULER_ERROR` | 500 | `Scheduler` | Scheduler operation failed |

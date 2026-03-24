@@ -1342,7 +1342,7 @@ Key components:
 
 | Config | Default | Range | Description |
 |--------|---------|-------|-------------|
-| `agent_max_turns` | 4 | 1-16 | Max rig-core agentic turns per `agent.chat()` |
+| `agent_max_turns` | 8 | 1-32 | Max rig-core agentic turns per `agent.chat()` |
 | `agent_max_continuations` | 1 | 0-5 | Max ReasoningEngine continuation rounds |
 | `tool_dedup_enabled` | true | -- | Enable per-request tool call cache |
 

@@ -168,7 +168,7 @@ flowchart TD
     Match -->|Serialization| Ser["400 ZENII_BAD_REQUEST"]
     Match -->|Config| Cfg["422 ZENII_CONFIG_ERROR"]
     Match -->|RateLimited| RL["429 ZENII_RATE_LIMITED"]
-    Match -->|Agent| AI["502 ZENII_AGENT_ERROR"]
+    Match -->|Agent| AI["ZENII_AGENT_* sub-classified"]
     Match -->|Database| DB["503 ZENII_DB_ERROR"]
     Match -->|Tool / Gateway| TG["500 ZENII_TOOL_ERROR /<br>ZENII_GATEWAY_ERROR"]
 ```
