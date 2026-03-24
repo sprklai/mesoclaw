@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-03-24
+
+### Fixed
+- Rustfmt line-length violations in channel_tool.rs
+- WebSocket test assertions updated to match 2-arg onError(error, hint) signature
+
+### Changed
+- website-data.json now included in version-bump.sh (9th synced file)
+- Updated website-data.json stats: backendTests 1524, crates 6
+
+### Docs
+- Added demo GIF to README with Git LFS
+
 ## [0.1.3] - 2026-03-24
 
 ### Fixed
