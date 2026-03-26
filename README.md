@@ -5,7 +5,7 @@
 </p>
 
 <h1 align="center">20 megabytes. AI everywhere.</h1>
-<p align="center"><em>Every tool on your machine shares one AI brain.</em></p>
+<h3 align="center"><em>Every tool on your machine shares one AI brain.</em></h3>
 
 <p align="center">
   Install <strong>one binary</strong>. Now your scripts have <strong>AI memory</strong>. Your cron jobs <strong>reason</strong>. Your Telegram bot <strong>thinks</strong>.<br>
