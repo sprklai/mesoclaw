@@ -1,10 +1,11 @@
-# Zenii
+# Zenii *(zen-ee-eye)*
 
 <p align="center">
   <img src="crates/zenii-desktop/icons/icon.png" alt="Zenii" width="180" />
 </p>
 
 <h1 align="center">20 megabytes. AI everywhere.</h1>
+<p align="center"><em>Every tool on your machine shares one AI brain.</em></p>
 
 <p align="center">
   Install <strong>one binary</strong>. Now your scripts have <strong>AI memory</strong>. Your cron jobs <strong>reason</strong>. Your Telegram bot <strong>thinks</strong>.<br>
