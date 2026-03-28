@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { DelegationRecord } from '$lib/stores/messages.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let {
 		delegation
@@ -38,7 +39,7 @@
 
 <div class="rounded-lg border border-border bg-muted/30 p-3 font-mono text-sm">
 	<div class="font-semibold text-cyan-500">
-		Delegated to {delegation.agents.length} agent{delegation.agents.length !== 1 ? 's' : ''} ({formatDuration(delegation.total_duration_ms)}) &middot; {formatTokens(delegation.total_tokens)} tokens
+		{m.delegation_summary_header({ count: String(delegation.agents.length), duration: formatDuration(delegation.total_duration_ms), tokens: formatTokens(delegation.total_tokens) })}
 	</div>
 	{#each delegation.agents as agent, i}
 		{@const isLast = i === delegation.agents.length - 1}
@@ -50,7 +51,7 @@
 				{statusIcon(agent.status)} {agent.description}
 			</span>
 			<span class="text-muted-foreground">
-				&middot; {agent.tool_uses} tool{agent.tool_uses !== 1 ? 's' : ''} &middot; {formatTokens(agent.tokens_used)} tokens &middot; {formatDuration(agent.duration_ms)}
+				&middot; {m.delegation_summary_agent_stats({ toolUses: String(agent.tool_uses), tokens: formatTokens(agent.tokens_used), duration: formatDuration(agent.duration_ms) })}
 			</span>
 		</div>
 		{#if agent.error}

@@ -9,15 +9,19 @@
 	import { getBaseUrl, setBaseUrl, getToken, setToken, isValidBaseUrl } from '$lib/api/client';
 	import { isTauri } from '$lib/tauri';
 	import { themeStore, type Theme } from '$lib/stores/theme.svelte';
+	import { localeStore } from '$lib/stores/locale.svelte';
+	import * as m from '$lib/paraglide/messages';
+	import { locales } from '$lib/paraglide/runtime';
 	import Sun from '@lucide/svelte/icons/sun';
 	import Moon from '@lucide/svelte/icons/moon';
 	import Monitor from '@lucide/svelte/icons/monitor';
+	import Languages from '@lucide/svelte/icons/languages';
 	import { onMount } from 'svelte';
 
-	const themeOptions: { value: Theme; label: string; icon: typeof Sun }[] = [
-		{ value: 'light', label: 'Light', icon: Sun },
-		{ value: 'dark', label: 'Dark', icon: Moon },
-		{ value: 'system', label: 'System', icon: Monitor },
+	const themeOptions: { value: Theme; label: () => string; icon: typeof Sun }[] = [
+		{ value: 'light', label: () => m.settings_general_theme_light(), icon: Sun },
+		{ value: 'dark', label: () => m.settings_general_theme_dark(), icon: Moon },
+		{ value: 'system', label: () => m.settings_general_theme_system(), icon: Monitor },
 	];
 
 	let baseUrl = $state(getBaseUrl());
@@ -79,7 +83,7 @@
 	function handleSaveConnection() {
 		urlError = '';
 		if (baseUrl && !isValidBaseUrl(baseUrl)) {
-			urlError = 'Invalid URL. Must be a valid http:// or https:// address.';
+			urlError = m.settings_general_url_error();
 			return;
 		}
 		setBaseUrl(baseUrl);
@@ -127,22 +131,22 @@
 		}
 	}
 
-	const EVENT_TYPES: { key: keyof NotificationRouting; label: string }[] = [
-		{ key: 'scheduler_notification', label: 'Scheduler Notifications' },
-		{ key: 'scheduler_job_completed', label: 'Job Completed' },
-		{ key: 'channel_message', label: 'Channel Messages' },
+	const EVENT_TYPES: { key: keyof NotificationRouting; label: () => string }[] = [
+		{ key: 'scheduler_notification', label: () => m.settings_general_event_scheduler_notifications() },
+		{ key: 'scheduler_job_completed', label: () => m.settings_general_event_job_completed() },
+		{ key: 'channel_message', label: () => m.settings_general_event_channel_messages() },
 	];
 
 	const TARGETS = [
-		{ id: 'toast', label: 'Toast' },
-		{ id: 'desktop', label: 'Desktop', requiresTauri: true },
+		{ id: 'toast', label: () => m.settings_general_target_toast() },
+		{ id: 'desktop', label: () => m.settings_general_target_desktop(), requiresTauri: true },
 	];
 </script>
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title>Appearance</Card.Title>
-		<Card.Description>Choose your preferred color theme</Card.Description>
+		<Card.Title>{m.settings_general_appearance_title()}</Card.Title>
+		<Card.Description>{m.settings_general_appearance_description()}</Card.Description>
 	</Card.Header>
 	<Card.Content>
 		<div class="flex gap-2">
@@ -155,7 +159,7 @@
 					onclick={() => themeStore.set(opt.value)}
 				>
 					<opt.icon class="h-4 w-4" />
-					{opt.label}
+					{opt.label()}
 				</button>
 			{/each}
 		</div>
@@ -164,22 +168,46 @@
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title>Connection</Card.Title>
-		<Card.Description>Gateway connection settings</Card.Description>
+		<Card.Title class="flex items-center gap-2">
+			<Languages class="h-4 w-4" />
+			{m.settings_general_language_title()}
+		</Card.Title>
+		<Card.Description>{m.settings_general_language_description()}</Card.Description>
+	</Card.Header>
+	<Card.Content>
+		<select
+			class="bg-background text-foreground border border-input rounded-md px-3 py-2 text-sm w-full max-w-xs"
+			value={localeStore.locale}
+			onchange={(e) => {
+				const target = e.currentTarget as HTMLSelectElement;
+				localeStore.set(target.value as (typeof locales)[number]);
+			}}
+		>
+			{#each locales as loc (loc)}
+				<option value={loc}>{localeStore.label(loc)}</option>
+			{/each}
+		</select>
+	</Card.Content>
+</Card.Root>
+
+<Card.Root>
+	<Card.Header>
+		<Card.Title>{m.settings_general_connection_title()}</Card.Title>
+		<Card.Description>{m.settings_general_connection_description()}</Card.Description>
 	</Card.Header>
 	<Card.Content class="space-y-3">
 		<div class="space-y-1">
-			<label class="text-sm font-medium" for="base-url">Gateway URL</label>
-			<Input id="base-url" bind:value={baseUrl} placeholder="http://127.0.0.1:18981" />
+			<label class="text-sm font-medium" for="base-url">{m.settings_general_gateway_url_label()}</label>
+			<Input id="base-url" bind:value={baseUrl} placeholder={m.settings_general_gateway_url_placeholder()} />
 		</div>
 		<div class="space-y-1">
-			<label class="text-sm font-medium" for="token">Auth Token</label>
-			<Input id="token" type="password" bind:value={token} placeholder="Bearer token" />
+			<label class="text-sm font-medium" for="token">{m.settings_general_auth_token_label()}</label>
+			<Input id="token" type="password" bind:value={token} placeholder={m.settings_general_auth_token_placeholder()} />
 		</div>
 		{#if urlError}
 			<p class="text-sm text-red-500">{urlError}</p>
 		{/if}
-		<Button onclick={handleSaveConnection}>Save Connection</Button>
+		<Button onclick={handleSaveConnection}>{m.settings_general_save_connection_button()}</Button>
 	</Card.Content>
 </Card.Root>
 
@@ -188,28 +216,28 @@
 {:else if Object.keys(configStore.config).length > 0}
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>User Profile</Card.Title>
-			<Card.Description>Personalize your experience and help the AI give context-aware responses</Card.Description>
+			<Card.Title>{m.settings_general_profile_title()}</Card.Title>
+			<Card.Description>{m.settings_general_profile_description()}</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-3">
 			<div class="space-y-1">
-				<label class="text-sm font-medium" for="user-name">Your Name</label>
-				<Input id="user-name" bind:value={userName} placeholder="e.g., John Doe" />
+				<label class="text-sm font-medium" for="user-name">{m.settings_general_name_label()}</label>
+				<Input id="user-name" bind:value={userName} placeholder={m.settings_general_name_placeholder()} />
 			</div>
 			<div class="space-y-1">
-				<label class="text-sm font-medium" for="user-location">Location</label>
-				<Input id="user-location" bind:value={userLocation} placeholder="e.g., Toronto, Canada" />
+				<label class="text-sm font-medium" for="user-location">{m.settings_general_location_label()}</label>
+				<Input id="user-location" bind:value={userLocation} placeholder={m.settings_general_location_placeholder()} />
 			</div>
 			<div class="space-y-1">
-				<label class="text-sm font-medium" for="user-timezone">Timezone</label>
-				<Input id="user-timezone" bind:value={userTimezone} placeholder="e.g., America/Toronto" />
+				<label class="text-sm font-medium" for="user-timezone">{m.settings_general_timezone_label()}</label>
+				<Input id="user-timezone" bind:value={userTimezone} placeholder={m.settings_general_timezone_placeholder()} />
 			</div>
 			<div class="flex items-center gap-2">
 				<Button onclick={saveProfile} disabled={profileSaving} size="sm">
-					{profileSaving ? 'Saving...' : 'Save Profile'}
+					{profileSaving ? m.settings_general_saving_button() : m.settings_general_save_profile_button()}
 				</Button>
 				{#if profileSaved}
-					<span class="text-sm text-green-600">Saved</span>
+					<span class="text-sm text-green-600">{m.settings_general_saved_label()}</span>
 				{/if}
 			</div>
 		</Card.Content>
@@ -217,14 +245,14 @@
 
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>Notifications</Card.Title>
-			<Card.Description>Choose how you receive notifications for each event type</Card.Description>
+			<Card.Title>{m.settings_general_notifications_title()}</Card.Title>
+			<Card.Description>{m.settings_general_notifications_description()}</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<div class="space-y-4">
 				{#each EVENT_TYPES as eventType}
 					<div class="flex items-center justify-between gap-4">
-						<p class="text-sm font-medium min-w-[160px]">{eventType.label}</p>
+						<p class="text-sm font-medium min-w-[160px]">{eventType.label()}</p>
 						<div class="flex items-center gap-4">
 							{#each TARGETS as target}
 								{#if !target.requiresTauri || isTauri}
@@ -235,7 +263,7 @@
 											onchange={(e) => toggleRoutingTarget(eventType.key, target.id, e.currentTarget.checked)}
 											class="accent-primary h-3.5 w-3.5"
 										/>
-										{target.label}
+										{target.label()}
 									</label>
 								{/if}
 							{/each}
@@ -248,14 +276,14 @@
 
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>Agent Features</Card.Title>
-			<Card.Description>Toggle context injection and self-evolution at runtime</Card.Description>
+			<Card.Title>{m.settings_general_agent_features_title()}</Card.Title>
+			<Card.Description>{m.settings_general_agent_features_description()}</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-4">
 			<div class="flex items-center justify-between gap-4">
 				<div>
-					<p class="text-sm font-medium">Context Injection</p>
-					<p class="text-xs text-muted-foreground">Prepends identity files, soul, persona, environment details, and user profile into every agent prompt. Provides richer, more personalized responses at the cost of additional input tokens per message.</p>
+					<p class="text-sm font-medium">{m.settings_general_context_injection_label()}</p>
+					<p class="text-xs text-muted-foreground">{m.settings_general_context_injection_description()}</p>
 				</div>
 				<Switch
 					checked={configStore.config.context_injection_enabled === true}
@@ -264,8 +292,8 @@
 			</div>
 			<div class="flex items-center justify-between gap-4">
 				<div>
-					<p class="text-sm font-medium">Self-Evolution</p>
-					<p class="text-xs text-muted-foreground">Agent observes your preferences and usage patterns to store learnings, refine its behavior over time, and propose skill updates. Uses additional tokens for observation analysis and memory writes.</p>
+					<p class="text-sm font-medium">{m.settings_general_self_evolution_label()}</p>
+					<p class="text-xs text-muted-foreground">{m.settings_general_self_evolution_description()}</p>
 				</div>
 				<Switch
 					checked={configStore.config.self_evolution_enabled === true}
@@ -274,8 +302,8 @@
 			</div>
 			<div class="flex items-center justify-between">
 				<div>
-					<p class="text-sm font-medium">Context Strategy</p>
-					<p class="text-xs text-muted-foreground">Controls how much conversation history and memory is injected</p>
+					<p class="text-sm font-medium">{m.settings_general_context_strategy_label()}</p>
+					<p class="text-xs text-muted-foreground">{m.settings_general_context_strategy_description()}</p>
 				</div>
 				<Select.Root
 					type="single"
@@ -286,16 +314,16 @@
 						{String(configStore.config.context_strategy ?? 'balanced')}
 					</Select.Trigger>
 					<Select.Content>
-						<Select.Item value="minimal">Minimal</Select.Item>
-						<Select.Item value="balanced">Balanced</Select.Item>
-						<Select.Item value="full">Full</Select.Item>
+						<Select.Item value="minimal">{m.settings_general_context_strategy_minimal()}</Select.Item>
+						<Select.Item value="balanced">{m.settings_general_context_strategy_balanced()}</Select.Item>
+						<Select.Item value="full">{m.settings_general_context_strategy_full()}</Select.Item>
 					</Select.Content>
 				</Select.Root>
 			</div>
 			<div class="flex items-center justify-between gap-4">
 				<div>
-					<p class="text-sm font-medium">Compact Prompts</p>
-					<p class="text-xs text-muted-foreground">Uses compact axiom-based preamble instead of verbose prose. Reduces token usage by ~60-80% while maintaining response quality.</p>
+					<p class="text-sm font-medium">{m.settings_general_compact_prompts_label()}</p>
+					<p class="text-xs text-muted-foreground">{m.settings_general_compact_prompts_description()}</p>
 				</div>
 				<Switch
 					checked={configStore.config.prompt_compact_identity === true}
@@ -304,8 +332,8 @@
 			</div>
 			<div class="flex items-center justify-between gap-4">
 				<div class="flex-1">
-					<p class="text-sm font-medium">Max Preamble Tokens</p>
-					<p class="text-xs text-muted-foreground">Token budget for system preamble. Overflow trims lowest-priority context.</p>
+					<p class="text-sm font-medium">{m.settings_general_max_preamble_tokens_label()}</p>
+					<p class="text-xs text-muted-foreground">{m.settings_general_max_preamble_tokens_description()}</p>
 				</div>
 				<Input
 					type="number"

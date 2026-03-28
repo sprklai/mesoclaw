@@ -6,6 +6,7 @@
 	import { embeddingsStore } from '$lib/stores/embeddings.svelte';
 	import { providersStore } from '$lib/stores/providers.svelte';
 	import { onMount, onDestroy } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let testResult = $state<{ success: boolean; dimensions?: number; latency_ms: number; error?: string } | null>(null);
 	let testing = $state(false);
@@ -97,8 +98,8 @@
 {:else}
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>Provider Selection <span class="text-xs font-normal text-muted-foreground">(Experimental)</span></Card.Title>
-			<Card.Description>Choose how semantic embeddings are generated for memory search</Card.Description>
+			<Card.Title>{m.settings_embeddings_provider_title()} <span class="text-xs font-normal text-muted-foreground">{m.settings_embeddings_provider_experimental()}</span></Card.Title>
+			<Card.Description>{m.settings_embeddings_provider_description()}</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-3">
 			<div class="flex gap-2">
@@ -107,27 +108,27 @@
 					disabled={switching}
 					onclick={() => setProvider('none')}
 				>
-					None (FTS5 only)
+					{m.settings_embeddings_provider_none()}
 				</Button>
 				<Button
 					variant="outline"
 					disabled={true}
 					class="opacity-50 cursor-not-allowed"
 				>
-					Local (fastembed) <span class="text-xs ml-1">(Experimental)</span>
+					{m.settings_embeddings_provider_local()} <span class="text-xs ml-1">{m.settings_embeddings_provider_local_experimental()}</span>
 				</Button>
 				<Button
 					variant={embeddingsStore.status.provider === 'openai' ? 'default' : 'outline'}
 					disabled={switching}
 					onclick={() => setProvider('openai')}
 				>
-					OpenAI API
+					{m.settings_embeddings_provider_openai()}
 				</Button>
 			</div>
 
 			{#if embeddingsStore.status.provider === 'none'}
 				<p class="text-sm text-muted-foreground">
-					Semantic search is disabled. Select a provider to enable.
+					{m.settings_embeddings_disabled_message()}
 				</p>
 			{/if}
 		</Card.Content>
@@ -136,23 +137,23 @@
 	{#if embeddingsStore.status.provider === 'local'}
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>Local Model</Card.Title>
-				<Card.Description>Manage the local embedding model</Card.Description>
+				<Card.Title>{m.settings_embeddings_local_model_title()}</Card.Title>
+				<Card.Description>{m.settings_embeddings_local_model_description()}</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-3">
 				<div class="space-y-1">
-					<p class="text-sm font-medium">Model: {embeddingsStore.status.model || 'bge-small-en-v1.5'}</p>
-					<p class="text-xs text-muted-foreground">Dimensions: {embeddingsStore.status.dimensions}</p>
+					<p class="text-sm font-medium">{m.settings_embeddings_local_model_prefix()} {embeddingsStore.status.model || 'bge-small-en-v1.5'}</p>
+					<p class="text-xs text-muted-foreground">{m.settings_embeddings_local_dimensions_prefix()} {embeddingsStore.status.dimensions}</p>
 				</div>
 				{#if embeddingsStore.status.model_available}
-					<p class="text-sm text-green-600 dark:text-green-400 font-medium">Available</p>
+					<p class="text-sm text-green-600 dark:text-green-400 font-medium">{m.settings_embeddings_local_available()}</p>
 				{:else}
 					<div class="flex items-center gap-2">
 						<svg class="h-4 w-4 animate-spin text-muted-foreground" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
 							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 						</svg>
-						<p class="text-sm text-muted-foreground">Downloading model...</p>
+						<p class="text-sm text-muted-foreground">{m.settings_embeddings_local_downloading()}</p>
 					</div>
 				{/if}
 			</Card.Content>
@@ -162,21 +163,21 @@
 	{#if embeddingsStore.status.provider === 'openai'}
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>OpenAI Configuration</Card.Title>
-				<Card.Description>Uses your OpenAI API key from Settings &gt; Providers</Card.Description>
+				<Card.Title>{m.settings_embeddings_openai_title()}</Card.Title>
+				<Card.Description>{m.settings_embeddings_openai_description()}</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-3">
 				{#if hasOpenAiKey}
 					<p class="text-sm text-muted-foreground">
-						Model: text-embedding-3-small ({embeddingsStore.status.dimensions} dimensions)
+						{m.settings_embeddings_openai_model_info({ dimensions: String(embeddingsStore.status.dimensions) })}
 					</p>
 				{:else}
 					<p class="text-sm text-red-600 dark:text-red-400">
-						OpenAI API key is required. Add it in Settings &gt; Providers.
+						{m.settings_embeddings_openai_key_required()}
 					</p>
 				{/if}
 				<Button variant="outline" onclick={() => { window.location.hash = 'providers'; }}>
-					Manage Providers
+					{m.settings_embeddings_manage_providers_button()}
 				</Button>
 			</Card.Content>
 		</Card.Root>
@@ -185,21 +186,21 @@
 	{#if embeddingsStore.status.provider !== 'none'}
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>Status</Card.Title>
+				<Card.Title>{m.settings_embeddings_status_title()}</Card.Title>
 			</Card.Header>
 			<Card.Content class="space-y-3">
 				<div class="grid grid-cols-2 gap-2 text-sm">
-					<span class="text-muted-foreground">Provider:</span>
+					<span class="text-muted-foreground">{m.settings_embeddings_status_provider()}</span>
 					<span>{embeddingsStore.status.provider}</span>
-					<span class="text-muted-foreground">Model:</span>
+					<span class="text-muted-foreground">{m.settings_embeddings_status_model()}</span>
 					<span>{embeddingsStore.status.model || '-'}</span>
-					<span class="text-muted-foreground">Dimensions:</span>
+					<span class="text-muted-foreground">{m.settings_embeddings_status_dimensions()}</span>
 					<span>{embeddingsStore.status.dimensions}</span>
 				</div>
 
 				<div class="flex gap-2 pt-2">
 					<Button variant="outline" size="sm" onclick={runTest} disabled={testing || !embeddingsStore.status.model_available}>
-						{testing ? 'Testing...' : 'Test Connection'}
+						{testing ? m.settings_embeddings_testing_button() : m.settings_embeddings_test_connection_button()}
 					</Button>
 					<Button
 						variant="outline"
@@ -207,16 +208,16 @@
 						onclick={triggerReindex}
 						disabled={reindexing || !embeddingsStore.status.model_available}
 					>
-						{reindexing ? 'Re-indexing...' : 'Re-index All Memories'}
+						{reindexing ? m.settings_embeddings_reindexing_button() : m.settings_embeddings_reindex_button()}
 					</Button>
 				</div>
 
 				{#if testResult}
 					<div class="text-sm mt-2 p-2 rounded bg-muted">
 						{#if testResult.success}
-							<p class="text-green-600 dark:text-green-400">Test passed ({testResult.dimensions} dims, {testResult.latency_ms}ms)</p>
+							<p class="text-green-600 dark:text-green-400">{m.settings_embeddings_test_passed({ dimensions: String(testResult.dimensions ?? 0), latency_ms: String(testResult.latency_ms) })}</p>
 						{:else}
-							<p class="text-red-600 dark:text-red-400">Test failed: {testResult.error}</p>
+							<p class="text-red-600 dark:text-red-400">{m.settings_embeddings_test_failed({ error: testResult.error ?? '' })}</p>
 						{/if}
 					</div>
 				{/if}

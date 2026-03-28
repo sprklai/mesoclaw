@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { inboxStore } from '$lib/stores/inbox.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	function channelIcon(source: string): string {
 		switch (source) {
@@ -23,7 +24,7 @@
 	function timeAgo(dateStr: string): string {
 		const diff = Date.now() - new Date(dateStr).getTime();
 		const mins = Math.floor(diff / 60000);
-		if (mins < 1) return 'now';
+		if (mins < 1) return m.inbox_time_now();
 		if (mins < 60) return `${mins}m`;
 		const hours = Math.floor(mins / 60);
 		if (hours < 24) return `${hours}h`;
@@ -33,9 +34,9 @@
 
 <div class="flex-1 overflow-y-auto">
 	{#if inboxStore.loading}
-		<div class="p-4 text-sm text-muted-foreground">Loading...</div>
+		<div class="p-4 text-sm text-muted-foreground">{m.inbox_loading()}</div>
 	{:else if inboxStore.conversations.length === 0}
-		<div class="p-4 text-sm text-muted-foreground">No channel conversations yet</div>
+		<div class="p-4 text-sm text-muted-foreground">{m.inbox_no_conversations()}</div>
 	{:else}
 		{#each inboxStore.conversations as conv (conv.id)}
 			<button
@@ -58,7 +59,7 @@
 					{/if}
 				</div>
 				<div class="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-					<span>{conv.message_count} messages</span>
+					<span>{m.inbox_message_count({ count: conv.message_count.toString() })}</span>
 					<span class="ml-auto">{timeAgo(conv.updated_at)}</span>
 				</div>
 			</button>

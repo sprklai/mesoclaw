@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as Card from '$lib/components/ui/card';
@@ -37,7 +38,7 @@
 	let error = $state('');
 	let disclaimerAccepted = $state(false);
 
-	const stepLabels = ['AI Provider', 'Default Model', 'Channels', 'Your Profile'];
+	const stepLabels = [m.onboarding_step_ai_provider(), m.onboarding_step_default_model(), m.onboarding_step_channels(), m.onboarding_step_profile()];
 
 	const currentModelLabel = $derived(
 		providersStore.configuredModels.find((m) => m.value === providersStore.selectedModel)?.label ??
@@ -101,11 +102,11 @@
 
 	async function handleFinish() {
 		if (!userName.trim()) {
-			error = 'Your name is required';
+			error = m.onboarding_name_required();
 			return;
 		}
 		if (!userLocation.trim()) {
-			error = 'Your location is required';
+			error = m.onboarding_location_required();
 			return;
 		}
 		saving = true;
@@ -133,8 +134,8 @@
 	<div class="w-full max-w-2xl space-y-6">
 		<!-- Header -->
 		<div class="text-center space-y-2">
-			<h1 class="text-3xl font-bold tracking-tight">Welcome to Zenii</h1>
-			<p class="text-muted-foreground">Let's get you set up so you can start chatting.</p>
+			<h1 class="text-3xl font-bold tracking-tight">{m.onboarding_title()}</h1>
+			<p class="text-muted-foreground">{m.onboarding_description()}</p>
 		</div>
 
 		<!-- Step Indicator -->
@@ -144,7 +145,7 @@
 				size="icon"
 				onclick={() => (step = step - 1)}
 				disabled={step === 1}
-				aria-label="Previous step"
+				aria-label={m.onboarding_prev_step_aria()}
 			>
 				<ChevronLeft class="h-5 w-5" />
 			</Button>
@@ -178,7 +179,7 @@
 				size="icon"
 				onclick={() => (step = step + 1)}
 				disabled={step === TOTAL_STEPS || !canAdvance(step)}
-				aria-label="Next step"
+				aria-label={m.onboarding_next_step_aria()}
 			>
 				<ChevronRight class="h-5 w-5" />
 			</Button>
@@ -191,14 +192,12 @@
 					<Card.Header>
 						<div class="flex items-center justify-between">
 							<div>
-								<Card.Title>Set up an AI Provider</Card.Title>
+								<Card.Title>{m.onboarding_provider_title()}</Card.Title>
 								<Card.Description>
-									Add an API key for at least one provider to enable chat. Expand a provider below, enter
-									your key, and save it.
+									{m.onboarding_provider_description()}
 								</Card.Description>
 								<p class="mt-2 text-xs text-muted-foreground">
-									Need a different provider? Any OpenAI API-compatible service can be added via the
-									<strong>+ Add Provider</strong> button above the list.
+									{m.onboarding_provider_add_hint()}
 								</p>
 							</div>
 							<Button
@@ -207,7 +206,7 @@
 								size="lg"
 								class="shrink-0 ml-4"
 							>
-								{providersStore.hasUsableModel ? 'Next' : 'Add a key first'}
+								{providersStore.hasUsableModel ? m.common_next() : m.onboarding_add_key_first()}
 							</Button>
 						</div>
 					</Card.Header>
@@ -219,10 +218,9 @@
 			<div class="space-y-4">
 				<Card.Root>
 					<Card.Header>
-						<Card.Title>Choose Your Default Model</Card.Title>
+						<Card.Title>{m.onboarding_default_model_title()}</Card.Title>
 						<Card.Description>
-							Select the AI model Zenii will use by default. You can always switch models later in the
-							chat toolbar.
+							{m.onboarding_default_model_description()}
 						</Card.Description>
 					</Card.Header>
 					<Card.Content>
@@ -235,7 +233,7 @@
 							<PromptInputModelSelectTrigger class="w-full border border-border">
 								<PromptInputModelSelectValue
 									value={currentModelLabel}
-									placeholder="Select a model"
+									placeholder={m.onboarding_default_model_placeholder()}
 								/>
 							</PromptInputModelSelectTrigger>
 							<PromptInputModelSelectContent>
@@ -251,14 +249,14 @@
 
 				{#if currentModelLabel}
 					<div class="rounded-md border border-green-500/50 bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-400">
-						Default model set to <strong>{currentModelLabel}</strong>
+						{m.onboarding_default_model_confirmation({ model: currentModelLabel })}
 					</div>
 				{/if}
 
 				<div class="flex justify-between">
-					<Button variant="ghost" onclick={() => (step = 1)}>Back</Button>
+					<Button variant="ghost" onclick={() => (step = 1)}>{m.common_back()}</Button>
 					<Button onclick={handleModelNext} disabled={!providersStore.selectedModel} size="lg">
-						Next
+						{m.common_next()}
 					</Button>
 				</div>
 			</div>
@@ -268,18 +266,17 @@
 					<Card.Header>
 						<div class="flex items-center justify-between">
 							<div>
-								<Card.Title>Connect Channels</Card.Title>
+								<Card.Title>{m.onboarding_channels_title()}</Card.Title>
 								<Card.Description>
-									Optionally connect messaging channels like Telegram, Slack, or Discord so Zenii can
-									reach you there. You can skip this and set them up later in Settings.
+									{m.onboarding_channels_description()}
 								</Card.Description>
 							</div>
 							<div class="flex gap-2 shrink-0 ml-4">
 								<Button variant="ghost" onclick={() => (step = 4)}>
-									Skip
+									{m.common_skip()}
 								</Button>
 								<Button onclick={() => (step = 4)}>
-									Next
+									{m.common_next()}
 								</Button>
 							</div>
 						</div>
@@ -291,37 +288,37 @@
 		{:else}
 			<Card.Root>
 				<Card.Header>
-					<Card.Title>Your Profile</Card.Title>
+					<Card.Title>{m.onboarding_profile_title()}</Card.Title>
 					<Card.Description>
-						Tell Zenii a bit about yourself so it can give you personalized, context-aware responses.
+						{m.onboarding_profile_description()}
 					</Card.Description>
 				</Card.Header>
 				<Card.Content class="space-y-4">
 					<div class="space-y-1">
-						<label class="text-sm font-medium" for="onboard-name">Your Name</label>
+						<label class="text-sm font-medium" for="onboard-name">{m.onboarding_name_label()}</label>
 						<Input
 							id="onboard-name"
 							bind:value={userName}
-							placeholder="e.g., John"
+							placeholder={m.onboarding_name_placeholder()}
 						/>
 					</div>
 					<div class="space-y-1">
-						<label class="text-sm font-medium" for="onboard-location">Location</label>
+						<label class="text-sm font-medium" for="onboard-location">{m.onboarding_location_label()}</label>
 						<Input
 							id="onboard-location"
 							bind:value={userLocation}
-							placeholder="e.g., Toronto, Canada"
+							placeholder={m.onboarding_location_placeholder()}
 						/>
 					</div>
 					<div class="space-y-1">
-						<label class="text-sm font-medium" for="onboard-timezone">Timezone</label>
+						<label class="text-sm font-medium" for="onboard-timezone">{m.onboarding_timezone_label()}</label>
 						<Input
 							id="onboard-timezone"
 							bind:value={userTimezone}
-							placeholder="e.g., America/Toronto"
+							placeholder={m.onboarding_timezone_placeholder()}
 						/>
 						<p class="text-xs text-muted-foreground">
-							Auto-detected from your system. Edit if incorrect.
+							{m.onboarding_timezone_hint()}
 						</p>
 					</div>
 					{#if error}
@@ -332,21 +329,18 @@
 
 			<div class="rounded-md border border-border bg-muted/50 px-4 py-3 space-y-2">
 				<p class="text-xs text-muted-foreground leading-relaxed">
-					Zenii uses large language models (LLMs) to generate responses and can execute system-level
-					actions (shell commands, file operations) on your behalf. LLM outputs may be inaccurate,
-					incomplete, or inappropriate. System actions run with your user permissions. Always review
-					AI-suggested actions before confirming. Use at your own risk.
+					{m.onboarding_disclaimer_text()}
 				</p>
 				<label class="flex items-center gap-2 text-sm cursor-pointer">
 					<input type="checkbox" bind:checked={disclaimerAccepted} class="accent-primary h-4 w-4" />
-					<span>I understand and accept</span>
+					<span>{m.onboarding_disclaimer_accept()}</span>
 				</label>
 			</div>
 
 			<div class="flex justify-between">
-				<Button variant="ghost" onclick={() => (step = 3)}>Back</Button>
+				<Button variant="ghost" onclick={() => (step = 3)}>{m.common_back()}</Button>
 				<Button onclick={handleFinish} disabled={saving || !disclaimerAccepted} size="lg">
-					{saving ? 'Saving...' : 'Get Started'}
+					{saving ? m.onboarding_saving() : m.onboarding_finish_button()}
 				</Button>
 			</div>
 		{/if}

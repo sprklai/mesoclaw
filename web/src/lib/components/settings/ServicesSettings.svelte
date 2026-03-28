@@ -6,6 +6,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { apiGet, apiPost, apiDelete } from '$lib/api/client';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	interface ServiceDef {
 		id: string;
@@ -14,8 +15,8 @@
 	}
 
 	const BUILTIN_SERVICES: ServiceDef[] = [
-		{ id: 'tavily', name: 'Tavily', type: 'Web Search API' },
-		{ id: 'brave', name: 'Brave Search', type: 'Web Search API' },
+		{ id: 'tavily', name: m.settings_services_service_tavily(), type: m.settings_services_type_web_search() },
+		{ id: 'brave', name: m.settings_services_service_brave(), type: m.settings_services_type_web_search() },
 	];
 
 	let loading = $state(true);
@@ -76,8 +77,8 @@
 </script>
 
 <div class="flex items-center justify-between mb-4">
-	<h2 class="text-lg font-semibold">Services</h2>
-	<span class="text-xs text-muted-foreground">Custom services coming soon</span>
+	<h2 class="text-lg font-semibold">{m.settings_services_title()}</h2>
+	<span class="text-xs text-muted-foreground">{m.settings_services_coming_soon()}</span>
 </div>
 
 {#if loading}
@@ -101,7 +102,7 @@
 								<Card.Title class="text-base">{service.name}</Card.Title>
 								<Badge variant="outline">{service.type}</Badge>
 								<Badge variant={configured ? 'default' : 'secondary'}>
-									{configured ? 'Configured' : 'Not configured'}
+									{configured ? m.settings_services_badge_configured() : m.settings_services_badge_not_configured()}
 								</Badge>
 							</div>
 							<span class="text-xs text-muted-foreground">
@@ -114,12 +115,12 @@
 				{#if expandedId === service.id}
 					<Card.Content class="pt-0 space-y-4">
 						<div class="space-y-2">
-							<label class="text-sm font-medium" for="key-{service.id}">API Key</label>
+							<label class="text-sm font-medium" for="key-{service.id}">{m.settings_services_api_key_label()}</label>
 							<div class="flex gap-2">
 								<Input
 									id="key-{service.id}"
 									type={showKey[service.id] ? 'text' : 'password'}
-									placeholder={configured ? '••••••••  (key is set)' : 'Enter API key...'}
+									placeholder={configured ? m.settings_services_api_key_placeholder_set() : m.settings_services_api_key_placeholder_empty()}
 									bind:value={apiKeyInputs[service.id]}
 								/>
 								<Button
@@ -127,7 +128,7 @@
 									size="sm"
 									onclick={() => (showKey[service.id] = !showKey[service.id])}
 								>
-									{showKey[service.id] ? 'Hide' : 'Show'}
+									{showKey[service.id] ? m.settings_services_hide_button() : m.settings_services_show_button()}
 								</Button>
 							</div>
 							<div class="flex gap-2">
@@ -136,7 +137,7 @@
 									disabled={!apiKeyInputs[service.id]?.trim() || saving[service.id]}
 									onclick={() => saveKey(service)}
 								>
-									{saving[service.id] ? 'Saving...' : 'Save Key'}
+									{saving[service.id] ? m.settings_services_saving_button() : m.settings_services_save_key_button()}
 								</Button>
 								{#if configured}
 									<Button
@@ -145,7 +146,7 @@
 										disabled={saving[service.id]}
 										onclick={() => removeKey(service)}
 									>
-										Remove Key
+										{m.settings_services_remove_key_button()}
 									</Button>
 								{/if}
 							</div>

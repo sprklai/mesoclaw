@@ -18,6 +18,7 @@
 	import { getAppVersion, checkForUpdate, installUpdate, onUpdateAvailable, openInBrowser } from '$lib/tauri';
 	import type { UpdateInfo } from '$lib/tauri';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	const tabLoaders: Record<string, () => Promise<{ default: Component }>> = {
 		general: () => import('$lib/components/settings/GeneralSettings.svelte'),
@@ -45,16 +46,16 @@
 	}
 
 	const tabs = [
-		{ id: 'general', label: 'General', icon: SettingsIcon },
-		{ id: 'providers', label: 'AI Providers', icon: Cpu },
-		{ id: 'persona', label: 'Persona', icon: User },
-		{ id: 'channels', label: 'Channels', icon: MessageSquare },
-		{ id: 'permissions', label: 'Permissions', icon: Shield },
-		{ id: 'notifications', label: 'Notifications', icon: Bell },
-		{ id: 'services', label: 'Services', icon: KeyRound },
-		{ id: 'embeddings', label: 'Embeddings', icon: Brain },
-		{ id: 'configurations', label: 'Configurations', icon: FileText },
-		{ id: 'plugins', label: 'Plugins', icon: Puzzle },
+		{ id: 'general', label: m.settings_tab_general(), icon: SettingsIcon },
+		{ id: 'providers', label: m.settings_tab_providers(), icon: Cpu },
+		{ id: 'persona', label: m.settings_tab_persona(), icon: User },
+		{ id: 'channels', label: m.settings_tab_channels(), icon: MessageSquare },
+		{ id: 'permissions', label: m.settings_tab_permissions(), icon: Shield },
+		{ id: 'notifications', label: m.settings_tab_notifications(), icon: Bell },
+		{ id: 'services', label: m.settings_tab_services(), icon: KeyRound },
+		{ id: 'embeddings', label: m.settings_tab_embeddings(), icon: Brain },
+		{ id: 'configurations', label: m.settings_tab_configurations(), icon: FileText },
+		{ id: 'plugins', label: m.settings_tab_plugins(), icon: Puzzle },
 	];
 
 	let activeTab = $state('general');
@@ -144,7 +145,7 @@
 			onclick={() => { updateOpen = true; handleCheckUpdate(); }}
 		>
 			<Download class="h-4 w-4" />
-			Updates
+			{m.settings_tab_updates()}
 			{#if updateAvailable}
 				<span class="absolute top-1.5 left-7 h-2 w-2 rounded-full bg-primary animate-pulse"></span>
 			{/if}
@@ -155,7 +156,7 @@
 			onclick={() => { aboutOpen = true; }}
 		>
 			<Info class="h-4 w-4" />
-			About
+			{m.settings_tab_about()}
 		</button>
 	</nav>
 
@@ -176,7 +177,7 @@
 			onclick={() => { updateOpen = true; handleCheckUpdate(); }}
 		>
 			<Download class="h-3.5 w-3.5" />
-			Updates
+			{m.settings_tab_updates()}
 			{#if updateAvailable}
 				<span class="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse"></span>
 			{/if}
@@ -186,13 +187,13 @@
 			onclick={() => { aboutOpen = true; }}
 		>
 			<Info class="h-3.5 w-3.5" />
-			About
+			{m.settings_tab_about()}
 		</button>
 	</div>
 
 	<!-- Content area -->
 	<div class="flex-1 min-w-0 space-y-4">
-		<h1 class="text-2xl font-bold">{tabs.find((t) => t.id === activeTab)?.label ?? 'Settings'}</h1>
+		<h1 class="text-2xl font-bold">{tabs.find((t) => t.id === activeTab)?.label ?? m.settings_fallback_title()}</h1>
 
 		{#await activeComponent}
 			<div class="flex items-center justify-center py-12">
@@ -201,7 +202,7 @@
 		{:then TabComponent}
 			<TabComponent />
 		{:catch error}
-			<p class="text-destructive text-sm">Failed to load settings tab: {error.message}</p>
+			<p class="text-destructive text-sm">{m.settings_loading_error({ message: error.message })}</p>
 		{/await}
 	</div>
 </div>
@@ -212,27 +213,27 @@
 			<div class="flex items-center gap-3">
 				<img src="/app-icon-32.png" alt="Zenii" class="h-10 w-10" />
 				<div>
-					<Dialog.Title class="text-xl">Zenii</Dialog.Title>
+					<Dialog.Title class="text-xl">{m.settings_about_title()}</Dialog.Title>
 					{#if appVersion}
-						<p class="text-sm text-muted-foreground">v{appVersion}</p>
+						<p class="text-sm text-muted-foreground">{m.settings_about_version({ version: appVersion })}</p>
 					{/if}
 				</div>
 			</div>
 		</Dialog.Header>
 		<Dialog.Description class="space-y-3">
-			<p>Your private AI backend</p>
+			<p>{m.settings_about_tagline()}</p>
 			<div class="text-xs text-muted-foreground space-y-1">
-				<p>SprklAI by NSRTech</p>
-				<p>MIT License</p>
+				<p>{m.settings_about_company()}</p>
+				<p>{m.settings_about_license()}</p>
 			</div>
 			<div class="flex gap-3 text-sm">
-				<a href="https://zenii.sprklai.com" target="_blank" rel="noopener" class="text-primary hover:underline">Website</a>
-				<a href="https://github.com/sprklai/zenii" target="_blank" rel="noopener" class="text-primary hover:underline">GitHub</a>
+				<a href="https://zenii.sprklai.com" target="_blank" rel="noopener" class="text-primary hover:underline">{m.settings_about_website()}</a>
+				<a href="https://github.com/sprklai/zenii" target="_blank" rel="noopener" class="text-primary hover:underline">{m.settings_about_github()}</a>
 			</div>
 			<Separator class="my-2" />
 			<div class="text-xs text-muted-foreground leading-relaxed">
-				<p class="font-medium text-foreground">Disclaimer</p>
-				<p>Zenii uses large language models (LLMs) to generate responses and can execute system-level actions (shell commands, file operations) on your behalf. LLM outputs may be inaccurate, incomplete, or inappropriate. System actions run with your user permissions. Always review AI-suggested actions before confirming. Use at your own risk.</p>
+				<p class="font-medium text-foreground">{m.settings_about_disclaimer_title()}</p>
+				<p>{m.settings_about_disclaimer_body()}</p>
 			</div>
 		</Dialog.Description>
 	</Dialog.Content>
@@ -244,9 +245,9 @@
 			<div class="flex items-center gap-3">
 				<Download class="h-8 w-8 text-primary" />
 				<div>
-					<Dialog.Title class="text-xl">Software Update</Dialog.Title>
+					<Dialog.Title class="text-xl">{m.settings_updates_title()}</Dialog.Title>
 					{#if appVersion}
-						<p class="text-sm text-muted-foreground">Current: v{appVersion}</p>
+						<p class="text-sm text-muted-foreground">{m.settings_updates_current_version({ version: appVersion })}</p>
 					{/if}
 				</div>
 			</div>
@@ -255,11 +256,11 @@
 			{#if updateChecking}
 				<div class="flex items-center gap-3 py-4">
 					<div class="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-					<p class="text-sm">Checking for updates...</p>
+					<p class="text-sm">{m.settings_updates_checking()}</p>
 				</div>
 			{:else if updateInstalling}
 				<div class="space-y-3 py-2">
-					<p class="text-sm font-medium">Installing update v{updateAvailable?.version}...</p>
+					<p class="text-sm font-medium">{m.settings_updates_installing({ version: updateAvailable?.version ?? '' })}</p>
 					<div class="w-full bg-muted rounded-full h-2">
 						<div
 							class="bg-primary h-2 rounded-full transition-all duration-300"
@@ -272,7 +273,7 @@
 				<div class="space-y-3">
 					<div class="flex items-center gap-2">
 						<span class="h-2 w-2 rounded-full bg-primary"></span>
-						<p class="text-sm font-medium">Version {updateAvailable.version} is available</p>
+						<p class="text-sm font-medium">{m.settings_updates_available({ version: updateAvailable.version })}</p>
 					</div>
 					{#if updateAvailable.body}
 						<div class="text-xs text-muted-foreground bg-muted rounded-md p-3 max-h-40 overflow-y-auto">
@@ -283,31 +284,31 @@
 						class="w-full px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
 						onclick={handleInstallUpdate}
 					>
-						Install & Restart
+						{m.settings_updates_install_button()}
 					</button>
 				</div>
 			{:else}
 				<div class="flex items-center gap-3 py-4">
 					<span class="text-green-500">&#10003;</span>
-					<p class="text-sm">You're up to date!</p>
+					<p class="text-sm">{m.settings_updates_up_to_date()}</p>
 				</div>
 			{/if}
 
 			<Separator />
 			<div class="space-y-1.5">
-				<p class="text-xs text-muted-foreground">Or check manually:</p>
+				<p class="text-xs text-muted-foreground">{m.settings_updates_check_manually()}</p>
 				<div class="flex gap-3">
 					<button
 						class="inline-flex items-center gap-1 text-xs text-primary hover:underline"
 						onclick={() => openInBrowser('https://github.com/sprklai/zenii/releases/')}
 					>
-						GitHub Releases <ExternalLink class="h-3 w-3" />
+						{m.settings_updates_github_releases()} <ExternalLink class="h-3 w-3" />
 					</button>
 					<button
 						class="inline-flex items-center gap-1 text-xs text-primary hover:underline"
 						onclick={() => openInBrowser('https://zenii.sprklai.com/#download')}
 					>
-						Download Page <ExternalLink class="h-3 w-3" />
+						{m.settings_updates_download_page()} <ExternalLink class="h-3 w-3" />
 					</button>
 				</div>
 			</div>

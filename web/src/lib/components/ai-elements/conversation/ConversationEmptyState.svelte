@@ -13,10 +13,12 @@
 </script>
 
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
+
 	let {
 		class: className,
-		title = "No messages yet",
-		description = "Start a conversation to see messages here",
+		title = m.chat_empty_title(),
+		description = m.chat_empty_description(),
 		icon,
 		children,
 		ref = $bindable(null),

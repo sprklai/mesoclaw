@@ -2,6 +2,7 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { UseClipboard } from "$lib/hooks/use-clipboard.svelte";
 	import { cn } from "$lib/utils";
+	import * as m from '$lib/paraglide/messages';
 	import CheckIcon from "@lucide/svelte/icons/check";
 	import CopyIcon from "@lucide/svelte/icons/copy";
 	import XIcon from "@lucide/svelte/icons/x";
@@ -44,12 +45,12 @@
 	{#if clipboard.status === "success"}
 		<div in:scale={{ duration: animationDuration, start: 0.85 }}>
 			<CheckIcon tabindex={-1} strokeWidth={1.8} />
-			<span class="sr-only">Copied</span>
+			<span class="sr-only">{m.copy_button_copied_sr()}</span>
 		</div>
 	{:else if clipboard.status === "failure"}
 		<div in:scale={{ duration: animationDuration, start: 0.85 }}>
 			<XIcon tabindex={-1} strokeWidth={1.8} />
-			<span class="sr-only">Failed to copy</span>
+			<span class="sr-only">{m.copy_button_failed_sr()}</span>
 		</div>
 	{:else}
 		<div in:scale={{ duration: animationDuration, start: 0.85 }}>
@@ -58,7 +59,7 @@
 			{:else}
 				<CopyIcon tabindex={-1} strokeWidth={1.8} />
 			{/if}
-			<span class="sr-only">Copy</span>
+			<span class="sr-only">{m.copy_button_copy_sr()}</span>
 		</div>
 	{/if}
 	{@render children?.()}

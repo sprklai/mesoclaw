@@ -14,6 +14,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { apiGet, apiPut, apiPost, apiDelete } from '$lib/api/client';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	interface IdentityFile {
 		name: string;
@@ -125,7 +126,7 @@
 	<Card.Root>
 		<Card.Header>
 			<div class="flex items-center justify-between">
-				<Card.Title>Identity Files</Card.Title>
+				<Card.Title>{m.settings_persona_identity_title()}</Card.Title>
 				<Button variant="ghost" size="icon" onclick={handleReloadIdentity}>
 					<RefreshCw class="h-4 w-4" />
 				</Button>
@@ -137,7 +138,7 @@
 					<div>
 						<span class="font-medium">{file.name}</span>
 						{#if file.is_default}
-							<Badge variant="secondary" class="ml-2">default</Badge>
+							<Badge variant="secondary" class="ml-2">{m.settings_persona_badge_default()}</Badge>
 						{/if}
 					</div>
 					<Button variant="ghost" size="icon" class="h-7 w-7" onclick={() => handleEditFile(file.name)}>
@@ -153,7 +154,7 @@
 	<Card.Root>
 		<Card.Header>
 			<div class="flex items-center justify-between">
-				<Card.Title>Skills</Card.Title>
+				<Card.Title>{m.settings_persona_skills_title()}</Card.Title>
 				<div class="flex gap-1">
 					<Button variant="ghost" size="icon" onclick={handleReloadSkills}>
 						<RefreshCw class="h-4 w-4" />
@@ -193,7 +194,7 @@
 				</div>
 			{/each}
 			{#if skills.length === 0}
-				<p class="text-muted-foreground text-sm">No skills configured</p>
+				<p class="text-muted-foreground text-sm">{m.settings_persona_no_skills()}</p>
 			{/if}
 		</Card.Content>
 	</Card.Root>
@@ -202,11 +203,11 @@
 <Dialog.Root open={!!editingFile} onOpenChange={(open) => { if (!open) editingFile = null; }}>
 	<Dialog.Content class="sm:max-w-lg">
 		<Dialog.Header>
-			<Dialog.Title>Edit: {editingFile?.name}</Dialog.Title>
+			<Dialog.Title>{m.settings_persona_edit_dialog_title({ name: editingFile?.name ?? '' })}</Dialog.Title>
 		</Dialog.Header>
 		{#if editingFile}
 			<Textarea bind:value={editingFile.content} rows={15} class="font-mono text-sm" />
-			<Button class="w-full" onclick={handleSaveFile}>Save</Button>
+			<Button class="w-full" onclick={handleSaveFile}>{m.settings_persona_save_button()}</Button>
 		{/if}
 	</Dialog.Content>
 </Dialog.Root>
@@ -214,11 +215,11 @@
 <Dialog.Root open={!!editingSkill} onOpenChange={(open) => { if (!open) editingSkill = null; }}>
 	<Dialog.Content class="sm:max-w-3xl">
 		<Dialog.Header>
-			<Dialog.Title>Edit: {editingSkill?.id}</Dialog.Title>
+			<Dialog.Title>{m.settings_persona_edit_dialog_title({ name: editingSkill?.id ?? '' })}</Dialog.Title>
 		</Dialog.Header>
 		{#if editingSkill}
 			<Textarea bind:value={editingSkill.content} rows={25} class="font-mono text-sm" />
-			<Button class="w-full" onclick={handleSaveSkill}>Save</Button>
+			<Button class="w-full" onclick={handleSaveSkill}>{m.settings_persona_save_button()}</Button>
 		{/if}
 	</Dialog.Content>
 </Dialog.Root>
@@ -226,19 +227,19 @@
 <Dialog.Root bind:open={addSkillOpen}>
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>Add Skill</Dialog.Title>
+			<Dialog.Title>{m.settings_persona_add_skill_title()}</Dialog.Title>
 		</Dialog.Header>
 		<div class="space-y-3">
-			<Input placeholder="Skill ID" bind:value={newSkillId} />
-			<Textarea placeholder="Skill content (markdown)" bind:value={newSkillContent} rows={8} class="font-mono text-sm" />
-			<Button class="w-full" onclick={handleAddSkill}>Create</Button>
+			<Input placeholder={m.settings_persona_skill_id_placeholder()} bind:value={newSkillId} />
+			<Textarea placeholder={m.settings_persona_skill_content_placeholder()} bind:value={newSkillContent} rows={8} class="font-mono text-sm" />
+			<Button class="w-full" onclick={handleAddSkill}>{m.settings_persona_create_button()}</Button>
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
 
 <ConfirmDialog
 	bind:open={skillDeleteOpen}
-	title="Delete skill?"
-	description="This will permanently delete this skill."
+	title={m.settings_persona_confirm_delete_title()}
+	description={m.settings_persona_confirm_delete_description()}
 	onConfirm={confirmDeleteSkill}
 />

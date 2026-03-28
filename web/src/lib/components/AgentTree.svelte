@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import type { DelegationState } from '$lib/stores/delegation.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let {
 		delegation
@@ -49,9 +50,9 @@
 <div class="rounded-lg border border-border bg-muted/30 p-3 font-mono text-sm">
 	<div class="font-semibold text-cyan-500">
 		{#if allDone}
-			All {totalCount} agents finished ({elapsed}s)
+			{m.agent_tree_all_finished({ totalCount: String(totalCount), elapsed: String(elapsed) })}
 		{:else}
-			Running {finishedCount}/{totalCount} agents... ({elapsed}s)
+			{m.agent_tree_running({ finishedCount: String(finishedCount), totalCount: String(totalCount), elapsed: String(elapsed) })}
 		{/if}
 	</div>
 	{#each delegation.agents as agent, i}
@@ -65,16 +66,16 @@
 			</span>
 			<span class="text-muted-foreground">
 				{#if agent.status === 'completed' && agent.durationMs}
-					&middot; completed ({(agent.durationMs / 1000).toFixed(1)}s) &middot;
+					&middot; {m.agent_tree_completed_duration({ duration: (agent.durationMs / 1000).toFixed(1) })} &middot;
 				{/if}
-				{#if agent.status === 'failed'} &middot; failed &middot; {/if}
-				{agent.toolUses} tool uses &middot; {formatTokens(agent.tokensUsed)} tokens
+				{#if agent.status === 'failed'} &middot; {m.agent_tree_failed()} &middot; {/if}
+				{m.agent_tree_tool_uses({ count: String(agent.toolUses) })} &middot; {m.agent_tree_tokens({ count: formatTokens(agent.tokensUsed) })}
 			</span>
 		</div>
 		{#if agent.currentActivity || agent.status === 'pending'}
 			<div class="text-muted-foreground">
 				<span>{subConnector}\u2514 </span>
-				{agent.currentActivity || 'Pending...'}
+				{agent.currentActivity || m.agent_tree_pending()}
 			</div>
 		{/if}
 	{/each}

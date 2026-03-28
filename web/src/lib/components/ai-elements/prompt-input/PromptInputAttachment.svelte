@@ -5,6 +5,7 @@
 	import { getAttachmentsContext, type FileWithId } from "./attachments-context.svelte.js";
 	import PaperclipIcon from "./PaperclipIcon.svelte";
 	import XIcon from "./XIcon.svelte";
+	import * as m from '$lib/paraglide/messages';
 
 	interface Props {
 		data: FileWithId;
@@ -28,7 +29,7 @@
 >
 	{#if mediaType === "image"}
 		<img
-			alt={data.filename || "attachment"}
+			alt={data.filename || m.prompt_input_attachment_alt()}
 			class="size-full rounded-md object-cover"
 			height={56}
 			src={data.url}
@@ -42,7 +43,7 @@
 			<Tooltip.Root delayDuration={400}>
 				<Tooltip.Trigger class="min-w-0 flex-1">
 					<h4 class="w-full truncate text-left text-sm font-medium">
-						{data.filename || "Unknown file"}
+						{data.filename || m.prompt_input_unknown_file()}
 					</h4>
 				</Tooltip.Trigger>
 				<Tooltip.Content>
@@ -50,7 +51,7 @@
 						<h4
 							class="max-w-[240px] overflow-hidden text-left text-sm font-semibold break-words whitespace-normal"
 						>
-							{data.filename || "Unknown file"}
+							{data.filename || m.prompt_input_unknown_file()}
 						</h4>
 						{#if data.mediaType}
 							<div>{data.mediaType}</div>
@@ -61,7 +62,7 @@
 		</div>
 	{/if}
 	<Button
-		aria-label="Remove attachment"
+		aria-label={m.prompt_input_remove_attachment_aria()}
 		class="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100"
 		onclick={() => attachments.remove(data.id)}
 		size="icon"

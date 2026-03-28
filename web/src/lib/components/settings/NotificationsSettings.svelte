@@ -5,19 +5,20 @@
 	import { Label } from '$lib/components/ui/label';
 	import { configStore } from '$lib/stores/config.svelte';
 	import { channelsStore } from '$lib/stores/channels.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	const EVENT_TYPES = [
-		{ key: 'scheduler_notification', label: 'Scheduler Notification' },
-		{ key: 'scheduler_job_completed', label: 'Job Completed' },
-		{ key: 'channel_message', label: 'Channel Message' }
+		{ key: 'scheduler_notification', label: () => m.settings_notifications_event_scheduler() },
+		{ key: 'scheduler_job_completed', label: () => m.settings_notifications_event_job_completed() },
+		{ key: 'channel_message', label: () => m.settings_notifications_event_channel_message() }
 	] as const;
 
 	const TARGETS = [
-		{ key: 'toast', label: 'Toast', channelId: null },
-		{ key: 'desktop', label: 'Desktop', channelId: null },
-		{ key: 'telegram', label: 'Telegram', channelId: 'telegram' },
-		{ key: 'slack', label: 'Slack', channelId: 'slack' },
-		{ key: 'discord', label: 'Discord', channelId: 'discord' }
+		{ key: 'toast', label: () => m.settings_notifications_target_toast(), channelId: null },
+		{ key: 'desktop', label: () => m.settings_notifications_target_desktop(), channelId: null },
+		{ key: 'telegram', label: () => m.settings_notifications_target_telegram(), channelId: 'telegram' },
+		{ key: 'slack', label: () => m.settings_notifications_target_slack(), channelId: 'slack' },
+		{ key: 'discord', label: () => m.settings_notifications_target_discord(), channelId: 'discord' }
 	] as const;
 
 	let saving = $state(false);
@@ -71,9 +72,9 @@
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title>Notification Routing</Card.Title>
+		<Card.Title>{m.settings_notifications_title()}</Card.Title>
 		<Card.Description>
-			Configure where notifications are delivered for each event type.
+			{m.settings_notifications_description()}
 		</Card.Description>
 	</Card.Header>
 	<Card.Content>
@@ -81,10 +82,10 @@
 			<table class="w-full text-sm">
 				<thead>
 					<tr class="border-b">
-						<th class="text-left py-2 pr-4 font-medium text-muted-foreground">Event</th>
+						<th class="text-left py-2 pr-4 font-medium text-muted-foreground">{m.settings_permissions_column_event()}</th>
 						{#each TARGETS as target}
 							<th class="text-center py-2 px-3 font-medium text-muted-foreground">
-								{target.label}
+								{target.label()}
 							</th>
 						{/each}
 					</tr>
@@ -93,7 +94,7 @@
 					{#each EVENT_TYPES as event}
 						<tr class="border-b last:border-0">
 							<td class="py-3 pr-4">
-								<Label>{event.label}</Label>
+								<Label>{event.label()}</Label>
 							</td>
 							{#each TARGETS as target}
 								{@const configured = isChannelConfigured(target.channelId)}
@@ -106,7 +107,7 @@
 										/>
 									</div>
 									{#if !configured}
-										<p class="text-[10px] text-muted-foreground mt-0.5">N/A</p>
+										<p class="text-[10px] text-muted-foreground mt-0.5">{m.settings_notifications_not_available()}</p>
 									{/if}
 								</td>
 							{/each}

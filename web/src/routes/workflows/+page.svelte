@@ -23,6 +23,7 @@
 		type WorkflowRun,
 		type StepOutput
 	} from '$lib/stores/workflows.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let showForm = $state(false);
 	let showHistory = $state<string | null>(null);
@@ -49,7 +50,7 @@
 	async function handleCreate() {
 		formError = '';
 		if (!tomlContent.trim()) {
-			formError = 'TOML content is required';
+			formError = m.workflows_validation_toml_required();
 			return;
 		}
 
@@ -62,7 +63,7 @@
 			resetForm();
 			showForm = false;
 		} catch (e) {
-			formError = e instanceof Error ? e.message : editTarget ? 'Failed to update workflow' : 'Failed to create workflow';
+			formError = e instanceof Error ? e.message : editTarget ? m.workflows_update_error() : m.workflows_create_error();
 		}
 	}
 
@@ -136,12 +137,12 @@
 
 <div class="max-w-3xl mx-auto space-y-4">
 	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold">Workflows</h1>
+		<h1 class="text-2xl font-bold">{m.workflows_page_title()}</h1>
 		<Button size="sm" onclick={() => { showForm = !showForm; if (showForm) resetForm(); }}>
 			{#if showForm}
-				<X class="h-4 w-4 mr-1" /> Cancel
+				<X class="h-4 w-4 mr-1" /> {m.workflows_cancel_button()}
 			{:else}
-				<Plus class="h-4 w-4 mr-1" /> New Workflow
+				<Plus class="h-4 w-4 mr-1" /> {m.workflows_new_button()}
 			{/if}
 		</Button>
 	</div>
@@ -150,7 +151,7 @@
 	{#if showForm}
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>{editTarget ? 'Edit Workflow' : 'Create Workflow'}</Card.Title>
+				<Card.Title>{editTarget ? m.workflows_edit_title() : m.workflows_create_title()}</Card.Title>
 			</Card.Header>
 			<Card.Content class="space-y-4">
 				{#if formError}
@@ -158,31 +159,31 @@
 				{/if}
 
 				<div class="space-y-2">
-					<label for="toml-content" class="text-sm font-medium">TOML Definition</label>
+					<label for="toml-content" class="text-sm font-medium">{m.workflows_toml_label()}</label>
 					<textarea
 						id="toml-content"
 						bind:value={tomlContent}
-						placeholder={'id = "my-workflow"\nname = "My Workflow"\ndescription = "A sample workflow"\n\n[[steps]]\nname = "check-system"\ntype = "tool"\ntool = "system_info"\n\n[steps.args]\naction = "os"'}
+						placeholder={m.workflows_toml_placeholder()}
 						rows="12"
 						class="w-full rounded-md border bg-background text-foreground px-3 py-2 text-sm font-mono resize-y"
 					></textarea>
 				</div>
 
-				<Button onclick={handleCreate} class="w-full">{editTarget ? 'Update Workflow' : 'Create Workflow'}</Button>
+				<Button onclick={handleCreate} class="w-full">{editTarget ? m.workflows_update_button() : m.workflows_create_button()}</Button>
 			</Card.Content>
 		</Card.Root>
 	{/if}
 
 	<!-- Workflow List -->
 	{#if workflowsStore.loading}
-		<p class="text-sm text-muted-foreground">Loading...</p>
+		<p class="text-sm text-muted-foreground">{m.workflows_loading()}</p>
 	{:else if workflowsStore.workflows.length === 0 && !showForm}
 		<Card.Root>
 			<Card.Content class="flex flex-col items-center justify-center py-8 text-center">
 				<WorkflowIcon class="h-12 w-12 text-muted-foreground mb-4" />
-				<h2 class="text-lg font-medium">No workflows</h2>
+				<h2 class="text-lg font-medium">{m.workflows_empty_title()}</h2>
 				<p class="text-muted-foreground mt-1">
-					Create a workflow to orchestrate multi-step tasks.
+					{m.workflows_empty_description()}
 				</p>
 			</Card.Content>
 		</Card.Root>
@@ -205,7 +206,7 @@
 									{#if workflow.description}
 										<span>{workflow.description}</span>
 									{/if}
-									<span>{workflow.steps.length} step{workflow.steps.length !== 1 ? 's' : ''}</span>
+									<span>{workflow.steps.length !== 1 ? m.workflows_step_count_plural({ count: workflow.steps.length.toString() }) : m.workflows_step_count({ count: workflow.steps.length.toString() })}</span>
 								</div>
 							</div>
 							<div class="flex items-center gap-1">
@@ -213,7 +214,7 @@
 									variant="ghost"
 									size="icon"
 									onclick={() => handleStartEdit(workflow)}
-									title="Edit"
+									title={m.workflows_edit_button_title()}
 								>
 									<Pencil class="h-4 w-4" />
 								</Button>
@@ -222,7 +223,7 @@
 										variant="ghost"
 										size="icon"
 										onclick={() => handleCancel(workflow.id)}
-										title="Stop"
+										title={m.workflows_stop_button_title()}
 									>
 										<Square class="h-4 w-4 text-red-500" />
 									</Button>
@@ -231,7 +232,7 @@
 										variant="ghost"
 										size="icon"
 										onclick={() => handleRun(workflow.id)}
-										title="Run"
+										title={m.workflows_run_button_title()}
 									>
 										<Play class="h-4 w-4" />
 									</Button>
@@ -240,7 +241,7 @@
 									variant="ghost"
 									size="icon"
 									onclick={() => handleShowHistory(workflow.id)}
-									title="History"
+									title={m.workflows_history_button_title()}
 								>
 									<History class="h-4 w-4" />
 								</Button>
@@ -248,7 +249,7 @@
 									variant="ghost"
 									size="icon"
 									onclick={() => handleDelete(workflow.id)}
-									title="Delete"
+									title={m.workflows_delete_button_title()}
 								>
 									<Trash2 class="h-4 w-4 text-red-500" />
 								</Button>
@@ -260,9 +261,9 @@
 								<div class="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
 									<Loader2 class="h-3 w-3 animate-spin" />
 									<span>
-										{progress.completedSteps.length}/{workflow.steps.length} steps
+										{m.workflows_progress_steps({ completed: progress.completedSteps.length.toString(), total: workflow.steps.length.toString() })}
 										{#if progress.completedSteps.length > 0}
-											— last: {progress.completedSteps[progress.completedSteps.length - 1].stepName}
+											{m.workflows_progress_last({ stepName: progress.completedSteps[progress.completedSteps.length - 1].stepName })}
 										{/if}
 									</span>
 								</div>
@@ -276,7 +277,7 @@
 					<Card.Root>
 						<Card.Header>
 							<div class="flex items-center justify-between">
-								<Card.Title>Run History</Card.Title>
+								<Card.Title>{m.workflows_history_title()}</Card.Title>
 								<Button variant="ghost" size="icon" onclick={() => (showHistory = null)}>
 									<X class="h-4 w-4" />
 								</Button>
@@ -284,7 +285,7 @@
 						</Card.Header>
 						<Card.Content>
 							{#if historyEntries.length === 0}
-								<p class="text-sm text-muted-foreground">No runs yet.</p>
+								<p class="text-sm text-muted-foreground">{m.workflows_history_empty()}</p>
 							{:else}
 								<div class="space-y-2 max-h-80 overflow-y-auto">
 									{#each historyEntries as run (run.id)}
@@ -325,7 +326,7 @@
 															<div class="min-w-0 flex-1">
 																<div class="flex items-center gap-2">
 																	<span class="font-medium">{step.step_name}</span>
-																	<span class="text-muted-foreground">{step.duration_ms}ms</span>
+																	<span class="text-muted-foreground">{m.workflows_duration_ms({ value: step.duration_ms.toString() })}</span>
 																</div>
 																{#if step.error}
 																	<p class="text-red-400 mt-0.5">{step.error}</p>
@@ -351,7 +352,7 @@
 
 <ConfirmDialog
 	bind:open={confirmOpen}
-	title="Delete workflow?"
-	description="This will permanently remove this workflow and its run history."
+	title={m.workflows_delete_confirm_title()}
+	description={m.workflows_delete_confirm_description()}
 	onConfirm={confirmDelete}
 />

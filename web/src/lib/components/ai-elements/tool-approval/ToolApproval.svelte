@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PendingApproval } from '$lib/stores/approvals.svelte';
 	import { ShieldAlert, Check, ShieldCheck, X } from '@lucide/svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let {
 		approval,
@@ -53,7 +54,7 @@
 <div class="rounded-lg border {riskBg} p-3 space-y-2">
 	<div class="flex items-center gap-2 text-sm font-medium {riskColor}">
 		<ShieldAlert class="size-4" />
-		<span>Tool "{approval.toolName}" needs approval</span>
+		<span>{m.tool_approval_needs_approval({ toolName: approval.toolName })}</span>
 		<span class="ml-auto text-xs text-muted-foreground">{remainingSecs}s</span>
 	</div>
 
@@ -78,24 +79,24 @@
 				onclick={() => onRespond(approval.approvalId, 'approve')}
 			>
 				<Check class="size-3" />
-				Approve
+				{m.tool_approval_approve()}
 			</button>
 			<button
 				class="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
 				onclick={() => onRespond(approval.approvalId, 'approve_always')}
 			>
 				<ShieldCheck class="size-3" />
-				Always Allow
+				{m.tool_approval_always_allow()}
 			</button>
 			<button
 				class="inline-flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
 				onclick={() => onRespond(approval.approvalId, 'deny')}
 			>
 				<X class="size-3" />
-				Deny
+				{m.tool_approval_deny()}
 			</button>
 		</div>
 	{:else}
-		<div class="text-xs text-muted-foreground">Timed out — automatically denied.</div>
+		<div class="text-xs text-muted-foreground">{m.tool_approval_timed_out()}</div>
 	{/if}
 </div>

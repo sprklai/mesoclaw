@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import * as m from '$lib/paraglide/messages';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Separator } from '$lib/components/ui/separator';
 	import { Button } from '$lib/components/ui/button';
@@ -59,11 +60,11 @@
 	});
 
 	const navItems = [
-		{ href: '/', icon: Home, label: 'Home' },
-		{ href: '/channels', icon: MessageSquare, label: 'Channels' },
-		{ href: '/memory', icon: Database, label: 'Memory' },
-		{ href: '/schedule', icon: Calendar, label: 'Schedule' },
-		{ href: '/workflows', icon: Workflow, label: 'Workflows' }
+		{ href: '/', icon: Home, label: m.nav_home() },
+		{ href: '/channels', icon: MessageSquare, label: m.nav_channels() },
+		{ href: '/memory', icon: Database, label: m.nav_memory() },
+		{ href: '/schedule', icon: Calendar, label: m.nav_schedule() },
+		{ href: '/workflows', icon: Workflow, label: m.nav_workflows() }
 	];
 
 	function handleApiDocs() {
@@ -78,8 +79,8 @@
 		<Sidebar.Root>
 			<Sidebar.Header class="sticky top-0 z-10 bg-sidebar-accent/50 border-b border-sidebar-border">
 				<div class="flex items-center gap-2 px-2 py-1">
-					<img src="/app-icon-32.png" alt="Zenii" class="h-6 w-6" />
-					<span class="font-semibold text-lg">Zenii</span>
+					<img src="/app-icon-32.png" alt={m.app_name()} class="h-6 w-6" />
+					<span class="font-semibold text-lg">{m.app_name()}</span>
 					{#if appVersion}
 						<span class="text-xs text-muted-foreground">v{appVersion}</span>
 					{/if}
@@ -120,18 +121,18 @@
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton onclick={() => openInBrowser('https://github.com/sprklai/zenii')}>
 							<Star class="h-4 w-4" />
-							<span>Star on GitHub</span>
+							<span>{m.nav_star_github()}</span>
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 					<Sidebar.MenuItem>
 						<div class="flex items-center gap-0 rounded-md border border-sidebar-border overflow-hidden">
 							<Sidebar.MenuButton onclick={() => openInBrowser('https://docs.zenii.sprklai.com/installation-and-usage')} class="flex-1 !rounded-none border-r border-sidebar-border">
 								<FileText class="h-4 w-4" />
-								<span>Docs</span>
+								<span>{m.nav_docs()}</span>
 							</Sidebar.MenuButton>
 							<Sidebar.MenuButton onclick={handleApiDocs} class="flex-1 !rounded-none">
 								<BookOpen class="h-4 w-4" />
-								<span>API Docs</span>
+								<span>{m.nav_api_docs()}</span>
 							</Sidebar.MenuButton>
 						</div>
 					</Sidebar.MenuItem>
@@ -141,7 +142,7 @@
 							onclick={() => goto('/settings')}
 						>
 							<Settings class="h-4 w-4" />
-							<span>Settings</span>
+							<span>{m.nav_settings()}</span>
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
@@ -152,14 +153,14 @@
 			{#if notificationStore.disconnectedPermanently}
 				<div class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
 					<WifiOff class="h-4 w-4 shrink-0" />
-					<span>Real-time notifications disconnected.</span>
+					<span>{m.nav_notifications_disconnected()}</span>
 					<Button
 						variant="outline"
 						size="sm"
 						class="ml-auto h-7 border-destructive/30 text-destructive hover:bg-destructive/10"
 						onclick={() => notificationStore.retryConnection()}
 					>
-						Reconnect
+						{m.nav_reconnect_button()}
 					</Button>
 				</div>
 			{/if}

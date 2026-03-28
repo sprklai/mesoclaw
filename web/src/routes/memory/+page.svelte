@@ -14,6 +14,7 @@
 	import { memoryStore } from '$lib/stores/memory.svelte';
 	import { toast } from 'svelte-sonner';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let query = $state('');
 	let addOpen = $state(false);
@@ -49,7 +50,7 @@
 			newCategory = 'core';
 			addOpen = false;
 		} catch (e) {
-			toast.error('Failed to add memory');
+			toast.error(m.memory_add_error());
 			console.error('handleAdd failed:', e);
 		}
 	}
@@ -60,7 +61,7 @@
 			await memoryStore.update(editEntry.key, editEntry.content, editEntry.category);
 			editEntry = null;
 		} catch (e) {
-			toast.error('Failed to update memory');
+			toast.error(m.memory_update_error());
 			console.error('handleEdit failed:', e);
 		}
 	}
@@ -75,7 +76,7 @@
 		try {
 			await memoryStore.remove(deleteTarget);
 		} catch (e) {
-			toast.error('Failed to delete memory');
+			toast.error(m.memory_delete_error());
 			console.error('confirmDelete failed:', e);
 		}
 	}
@@ -83,17 +84,17 @@
 
 <div class="max-w-3xl mx-auto space-y-4">
 	<div class="flex items-center justify-between">
-		<h1 class="text-2xl font-bold">Memory</h1>
+		<h1 class="text-2xl font-bold">{m.memory_page_title()}</h1>
 		<Button size="sm" onclick={() => (addOpen = true)} class="gap-1">
 			<Plus class="h-4 w-4" />
-			Add
+			{m.memory_add_button()}
 		</Button>
 	</div>
 
 	<div class="relative">
 		<Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 		<Input
-			placeholder="Search memories..."
+			placeholder={m.memory_search_placeholder()}
 			class="pl-9"
 			bind:value={query}
 			oninput={handleSearch}
@@ -109,8 +110,8 @@
 	{:else}
 		{#if memoryStore.observations.length > 0}
 			<div class="space-y-2">
-				<h2 class="text-lg font-semibold">Learned Observations</h2>
-				<p class="text-sm text-muted-foreground">Facts the agent has learned about you from conversations.</p>
+				<h2 class="text-lg font-semibold">{m.memory_learned_observations_title()}</h2>
+				<p class="text-sm text-muted-foreground">{m.memory_learned_observations_description()}</p>
 				<div class="space-y-2">
 					{#each memoryStore.observations as obs (obs.id)}
 						<Card.Root>
@@ -121,7 +122,7 @@
 											<span class="font-medium text-sm">{obs.key}</span>
 											<Badge variant="outline" class="text-xs">{obs.category}</Badge>
 											<span class="text-xs text-muted-foreground">
-												{Math.round(obs.confidence * 100)}% confidence
+												{m.memory_confidence_label({ value: Math.round(obs.confidence * 100).toString() })}
 											</span>
 										</div>
 										<p class="text-sm text-muted-foreground">{obs.value}</p>
@@ -136,7 +137,7 @@
 
 		{#if memoryStore.entries.length > 0}
 			<div class="space-y-2">
-				<h2 class="text-lg font-semibold">Stored Memories</h2>
+				<h2 class="text-lg font-semibold">{m.memory_stored_memories_title()}</h2>
 				{#each memoryStore.entries as entry (entry.key)}
 					<Card.Root>
 						<Card.Content class="p-3">
@@ -175,9 +176,9 @@
 
 		{#if memoryStore.entries.length === 0 && memoryStore.observations.length === 0}
 			{#if query}
-				<p class="text-center text-muted-foreground py-6">No memories found for "{query}"</p>
+				<p class="text-center text-muted-foreground py-6">{m.memory_empty_no_results({ query })}</p>
 			{:else}
-				<p class="text-center text-muted-foreground py-6">No memories yet. Add one or chat with the agent to build memory.</p>
+				<p class="text-center text-muted-foreground py-6">{m.memory_empty_no_results_default()}</p>
 			{/if}
 		{/if}
 	{/if}
@@ -186,13 +187,13 @@
 <Dialog.Root bind:open={addOpen}>
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>Add Memory</Dialog.Title>
+			<Dialog.Title>{m.memory_add_dialog_title()}</Dialog.Title>
 		</Dialog.Header>
 		<div class="space-y-3">
-			<Input placeholder="Key" bind:value={newKey} />
-			<Textarea placeholder="Content" bind:value={newContent} rows={4} />
-			<Input placeholder="Category" bind:value={newCategory} />
-			<Button class="w-full" onclick={handleAdd}>Save</Button>
+			<Input placeholder={m.memory_key_placeholder()} bind:value={newKey} />
+			<Textarea placeholder={m.memory_content_placeholder()} bind:value={newContent} rows={4} />
+			<Input placeholder={m.memory_category_placeholder()} bind:value={newCategory} />
+			<Button class="w-full" onclick={handleAdd}>{m.memory_save_button()}</Button>
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
@@ -200,13 +201,13 @@
 <Dialog.Root open={!!editEntry} onOpenChange={(open) => { if (!open) editEntry = null; }}>
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>Edit Memory: {editEntry?.key}</Dialog.Title>
+			<Dialog.Title>{m.memory_edit_dialog_title({ key: editEntry?.key ?? '' })}</Dialog.Title>
 		</Dialog.Header>
 		{#if editEntry}
 			<div class="space-y-3">
 				<Textarea bind:value={editEntry.content} rows={4} />
-				<Input placeholder="Category" bind:value={editEntry.category} />
-				<Button class="w-full" onclick={handleEdit}>Update</Button>
+				<Input placeholder={m.memory_category_placeholder()} bind:value={editEntry.category} />
+				<Button class="w-full" onclick={handleEdit}>{m.memory_update_button()}</Button>
 			</div>
 		{/if}
 	</Dialog.Content>
@@ -214,7 +215,7 @@
 
 <ConfirmDialog
 	bind:open={confirmOpen}
-	title="Delete memory?"
-	description="This will permanently remove this memory entry."
+	title={m.memory_delete_confirm_title()}
+	description={m.memory_delete_confirm_description()}
 	onConfirm={confirmDelete}
 />

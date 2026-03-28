@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Button } from '$lib/components/ui/button';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -37,10 +38,10 @@
 		if (creating) return;
 		creating = true;
 		try {
-			const session = await sessionsStore.create('New Chat');
+			const session = await sessionsStore.create(m.chat_new());
 			goto(`/chat/${session.id}`);
 		} catch (e) {
-			toast.error('Failed to create chat session');
+			toast.error(m.chat_session_create_error());
 			console.error('handleNew failed:', e);
 		} finally {
 			creating = false;
@@ -62,7 +63,7 @@
 				goto('/');
 			}
 		} catch (e) {
-			toast.error('Failed to delete chat session');
+			toast.error(m.session_delete_error());
 			console.error('confirmDelete failed:', e);
 		}
 	}
@@ -78,7 +79,7 @@
 			try {
 				await sessionsStore.update(editingId, editTitle.trim());
 			} catch (e) {
-				toast.error('Failed to rename chat session');
+				toast.error(m.session_rename_error());
 				console.error('saveEdit failed:', e);
 			}
 		}
@@ -101,7 +102,7 @@
 
 <Sidebar.Group>
 	<Sidebar.GroupLabel class="flex items-center justify-between">
-		<span>Chats</span>
+		<span>{m.session_chats_label()}</span>
 		<div class="flex items-center gap-0.5">
 			<Button variant="ghost" size="icon" class="h-5 w-5" onclick={handleRefresh} disabled={sessionsStore.loading}>
 				<RefreshCw class="h-3.5 w-3.5 {sessionsStore.loading ? 'animate-spin' : ''}" />
@@ -163,7 +164,7 @@
 
 <ConfirmDialog
 	bind:open={confirmOpen}
-	title="Delete chat?"
-	description="This will permanently delete this chat and all its messages."
+	title={m.session_delete_confirm_title()}
+	description={m.session_delete_confirm_description()}
 	onConfirm={confirmDelete}
 />

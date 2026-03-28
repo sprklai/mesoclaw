@@ -6,6 +6,7 @@
 	import { isTauri, openConfigFile } from '$lib/tauri';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import * as m from '$lib/paraglide/messages';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 
@@ -29,12 +30,12 @@
 		try {
 			const backupPath = await openConfigFile();
 			if (backupPath) {
-				toast.success('Config file opened in editor', {
-					description: `Backup saved to ${backupPath}`
+				toast.success(m.settings_config_toast_opened(), {
+					description: m.settings_config_toast_opened_description({ backupPath })
 				});
 			}
 		} catch (e) {
-			toast.error('Failed to open config file', {
+			toast.error(m.settings_config_toast_failed(), {
 				description: e instanceof Error ? e.message : String(e)
 			});
 		}
@@ -49,12 +50,12 @@
 	<Card.Header>
 		<div class="flex items-center justify-between">
 			<div>
-				<Card.Title>Configuration File</Card.Title>
-				<Card.Description>Raw TOML configuration — edit directly on disk or use settings above</Card.Description>
+				<Card.Title>{m.settings_config_title()}</Card.Title>
+				<Card.Description>{m.settings_config_description()}</Card.Description>
 			</div>
 			<div class="flex items-center gap-1">
 				{#if isTauri}
-					<Button variant="ghost" size="icon" onclick={handleOpenInEditor} title="Open in editor">
+					<Button variant="ghost" size="icon" onclick={handleOpenInEditor} title={m.settings_config_open_in_editor_tooltip()}>
 						<ExternalLink class="h-4 w-4" />
 					</Button>
 				{/if}
@@ -71,11 +72,11 @@
 			<p class="text-sm text-destructive">{error}</p>
 		{:else if configFile}
 			<div class="space-y-1">
-				<p class="text-sm font-medium">File Path</p>
+				<p class="text-sm font-medium">{m.settings_config_file_path_label()}</p>
 				<code class="block rounded bg-muted px-3 py-2 text-xs break-all">{configFile.path}</code>
 			</div>
 			<div class="space-y-1">
-				<p class="text-sm font-medium">Content</p>
+				<p class="text-sm font-medium">{m.settings_config_content_label()}</p>
 				<pre class="rounded bg-muted px-3 py-2 text-xs overflow-x-auto max-h-96 whitespace-pre-wrap">{configFile.content}</pre>
 			</div>
 		{/if}

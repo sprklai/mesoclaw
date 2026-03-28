@@ -8,6 +8,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { pluginsStore, type PluginDetail } from '$lib/stores/plugins.svelte';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let installSource = $state('');
 	let installLocal = $state(false);
@@ -114,12 +115,12 @@
 <!-- Install form -->
 <Card.Root>
 	<Card.Header class="py-3">
-		<Card.Title class="text-base">Install Plugin</Card.Title>
+		<Card.Title class="text-base">{m.settings_plugins_install_title()}</Card.Title>
 	</Card.Header>
 	<Card.Content class="space-y-3">
 		<div class="flex gap-2">
 			<Input
-				placeholder="Git URL or local path"
+				placeholder={m.settings_plugins_install_placeholder()}
 				bind:value={installSource}
 				onkeydown={(e: KeyboardEvent) => {
 					if (e.key === 'Enter') handleInstall();
@@ -130,7 +131,7 @@
 				disabled={!installSource.trim() || pluginsStore.installing}
 				onclick={handleInstall}
 			>
-				{pluginsStore.installing ? 'Installing...' : 'Install'}
+				{pluginsStore.installing ? m.settings_plugins_installing_button() : m.settings_plugins_install_button()}
 			</Button>
 		</div>
 		<div class="flex items-center gap-4">
@@ -143,7 +144,7 @@
 					onchange={() => { if (!installLocal) installAll = false; }}
 				/>
 				<label class="text-sm text-muted-foreground" for="install-local">
-					Local directory
+					{m.settings_plugins_local_directory_label()}
 				</label>
 			</div>
 			{#if installLocal}
@@ -155,7 +156,7 @@
 						bind:checked={installAll}
 					/>
 					<label class="text-sm text-muted-foreground" for="install-all">
-						Install all plugins in directory
+						{m.settings_plugins_install_all_label()}
 					</label>
 				</div>
 			{/if}
@@ -170,14 +171,14 @@
 {#if !showBrowse}
 	<div class="flex justify-center py-2">
 		<Button variant="outline" onclick={handleBrowse}>
-			Browse Official Plugins
+			{m.settings_plugins_browse_button()}
 		</Button>
 	</div>
 {:else}
 	<Card.Root>
 		<Card.Header class="py-3">
 			<div class="flex items-center justify-between">
-				<Card.Title class="text-base">Official Plugins</Card.Title>
+				<Card.Title class="text-base">{m.settings_plugins_official_title()}</Card.Title>
 				<div class="flex items-center gap-2">
 					{#if pluginsStore.available.length > 0 && !pluginsStore.browsing}
 						<label class="flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer">
@@ -187,7 +188,7 @@
 								checked={allSelected}
 								onchange={toggleSelectAll}
 							/>
-							Select all
+							{m.settings_plugins_select_all_label()}
 						</label>
 						<Button
 							size="sm"
@@ -195,8 +196,8 @@
 							onclick={handleInstallSelected}
 						>
 							{pluginsStore.installing
-								? 'Installing...'
-								: `Install Selected (${selected.size})`}
+								? m.settings_plugins_installing_button()
+								: m.settings_plugins_install_selected_button({ count: String(selected.size) })}
 						</Button>
 					{/if}
 					<Button
@@ -204,7 +205,7 @@
 						variant="ghost"
 						onclick={() => { showBrowse = false; }}
 					>
-						Close
+						{m.settings_plugins_close_button()}
 					</Button>
 				</div>
 			</div>
@@ -217,7 +218,7 @@
 					<Skeleton class="h-12 w-full" />
 				</div>
 			{:else if pluginsStore.available.length === 0}
-				<p class="text-sm text-muted-foreground">No plugins found in official repository.</p>
+				<p class="text-sm text-muted-foreground">{m.settings_plugins_no_official()}</p>
 			{:else}
 				<div class="space-y-2">
 					{#each pluginsStore.available as plugin (plugin.name)}
@@ -237,7 +238,7 @@
 									<span class="font-medium text-sm">{plugin.name}</span>
 									<Badge variant="outline" class="text-xs">v{plugin.version}</Badge>
 									{#if plugin.installed}
-										<Badge variant="secondary" class="text-xs">Installed</Badge>
+										<Badge variant="secondary" class="text-xs">{m.settings_plugins_badge_installed()}</Badge>
 									{/if}
 									<span class="text-xs text-muted-foreground">
 										{plugin.tools_count} tool{plugin.tools_count !== 1 ? 's' : ''}{#if plugin.skills_count > 0}, {plugin.skills_count} skill{plugin.skills_count !== 1 ? 's' : ''}{/if}
@@ -260,7 +261,7 @@
 		<Skeleton class="h-16 w-full" />
 	</div>
 {:else if pluginsStore.plugins.length === 0}
-	<p class="text-sm text-muted-foreground py-4">No plugins installed.</p>
+	<p class="text-sm text-muted-foreground py-4">{m.settings_plugins_no_installed()}</p>
 {:else}
 	<div class="space-y-2">
 		{#each pluginsStore.plugins as plugin (plugin.name)}
@@ -296,25 +297,25 @@
 						<div class="grid grid-cols-2 gap-2 text-sm">
 							{#if detail.manifest.plugin.author}
 								<div>
-									<span class="font-medium">Author:</span>
+									<span class="font-medium">{m.settings_plugins_detail_author()}</span>
 									{detail.manifest.plugin.author}
 								</div>
 							{/if}
 							{#if detail.manifest.plugin.license}
 								<div>
-									<span class="font-medium">License:</span>
+									<span class="font-medium">{m.settings_plugins_detail_license()}</span>
 									{detail.manifest.plugin.license}
 								</div>
 							{/if}
 							<div>
-								<span class="font-medium">Installed:</span>
+								<span class="font-medium">{m.settings_plugins_detail_installed()}</span>
 								{detail.installed_at.slice(0, 19)}
 							</div>
 						</div>
 
 						{#if detail.manifest.tools.length > 0}
 							<div>
-								<h4 class="text-sm font-semibold mb-1">Tools</h4>
+								<h4 class="text-sm font-semibold mb-1">{m.settings_plugins_detail_tools_title()}</h4>
 								<ul class="text-sm text-muted-foreground space-y-0.5">
 									{#each detail.manifest.tools as tool}
 										<li>
@@ -328,7 +329,7 @@
 
 						{#if detail.manifest.skills.length > 0}
 							<div>
-								<h4 class="text-sm font-semibold mb-1">Skills</h4>
+								<h4 class="text-sm font-semibold mb-1">{m.settings_plugins_detail_skills_title()}</h4>
 								<ul class="text-sm text-muted-foreground space-y-0.5">
 									{#each detail.manifest.skills as skill}
 										<li>{skill.name}</li>
@@ -343,7 +344,7 @@
 								variant="destructive"
 								onclick={() => confirmRemove(plugin.name)}
 							>
-								Remove
+								{m.settings_plugins_remove_button()}
 							</Button>
 						</div>
 					</Card.Content>
@@ -355,8 +356,8 @@
 
 <ConfirmDialog
 	bind:open={confirmOpen}
-	title="Remove plugin?"
-	description="This will uninstall the plugin and remove all its files."
-	confirmLabel="Remove"
+	title={m.settings_plugins_confirm_remove_title()}
+	description={m.settings_plugins_confirm_remove_description()}
+	confirmLabel={m.settings_plugins_confirm_remove_label()}
 	onConfirm={handleRemove}
 />

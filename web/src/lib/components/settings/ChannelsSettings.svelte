@@ -7,6 +7,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { channelsStore, type ChannelWithStatus } from '$lib/stores/channels.svelte';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let expandedId = $state<string | null>(null);
 	let confirmOpen = $state(false);
@@ -176,14 +177,14 @@
 								<label class="text-sm font-medium" for="cred-{k}">
 									{cred.label}
 									{#if isSet}
-										<Badge variant="default" class="ml-2 text-xs">Set</Badge>
+										<Badge variant="default" class="ml-2 text-xs">{m.settings_channels_badge_set()}</Badge>
 									{/if}
 								</label>
 								<div class="flex gap-2">
 									<Input
 										id="cred-{k}"
 										type={secret ? 'password' : 'text'}
-										placeholder={isSet ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022  (value is set)' : cred.placeholder}
+										placeholder={isSet ? m.settings_channels_credential_placeholder_set() : cred.placeholder}
 										bind:value={credInputs[k]}
 									/>
 								</div>
@@ -193,7 +194,7 @@
 										disabled={!credInputs[k]?.trim() || saving[k]}
 										onclick={() => saveCredential(channel.id, cred.key)}
 									>
-										{saving[k] ? 'Saving...' : 'Save'}
+										{saving[k] ? m.settings_channels_saving_button() : m.settings_channels_save_button()}
 									</Button>
 									{#if isSet}
 										<Button
@@ -202,7 +203,7 @@
 											disabled={saving[k]}
 											onclick={() => removeCredential(channel.id, cred.key)}
 										>
-											Remove
+											{m.settings_channels_remove_button()}
 										</Button>
 									{/if}
 								</div>
@@ -217,7 +218,7 @@
 									disabled={testing[channel.id]}
 									onclick={() => testConnection(channel.id)}
 								>
-									{testing[channel.id] ? 'Testing...' : 'Test Connection'}
+									{testing[channel.id] ? m.settings_channels_testing_button() : m.settings_channels_test_connection_button()}
 								</Button>
 								{#if channel.connected}
 									<Button
@@ -226,24 +227,24 @@
 										disabled={disconnecting[channel.id]}
 										onclick={() => disconnectChannel(channel.id)}
 									>
-										{disconnecting[channel.id] ? 'Disconnecting...' : 'Disconnect'}
+										{disconnecting[channel.id] ? m.settings_channels_disconnecting_button() : m.settings_channels_disconnect_button()}
 									</Button>
 								{/if}
 								{#if connecting[channel.id]}
 									<span class="text-sm text-muted-foreground">
-										Test passed, connecting...
+										{m.settings_channels_test_passed_connecting()}
 									</span>
 								{:else if testResult[channel.id]}
 									{#if testResult[channel.id]?.healthy && channel.connected}
 										<span class="text-sm text-green-600">
-											Connected
+											{m.settings_channels_connected()}
 											{#if testResult[channel.id]?.latency_ms}
 												({testResult[channel.id]?.latency_ms}ms)
 											{/if}
 										</span>
 									{:else if !testResult[channel.id]?.healthy}
 										<span class="text-sm text-destructive">
-											{testResult[channel.id]?.error ?? 'Connection failed'}
+											{testResult[channel.id]?.error ?? m.settings_channels_connection_failed()}
 										</span>
 									{/if}
 								{/if}
@@ -252,21 +253,21 @@
 
 						{#if channel.id === 'telegram'}
 							<div class="border-t pt-4 space-y-3">
-								<h3 class="text-sm font-semibold">Telegram Settings</h3>
+								<h3 class="text-sm font-semibold">{m.settings_channels_telegram_settings_title()}</h3>
 								<div class="space-y-1">
-									<label class="text-sm font-medium" for="tg-dm-policy">DM Policy</label>
+									<label class="text-sm font-medium" for="tg-dm-policy">{m.settings_channels_telegram_dm_policy_label()}</label>
 									<select
 										id="tg-dm-policy"
 										class="flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm"
 										bind:value={tgDmPolicy}
 									>
-										<option value="allowlist">Allowlist Only</option>
-										<option value="open">Open</option>
-										<option value="disabled">Disabled</option>
+										<option value="allowlist">{m.settings_channels_telegram_dm_allowlist()}</option>
+										<option value="open">{m.settings_channels_telegram_dm_open()}</option>
+										<option value="disabled">{m.settings_channels_telegram_dm_disabled()}</option>
 									</select>
 								</div>
 								<div class="space-y-1">
-									<label class="text-sm font-medium" for="tg-polling">Polling Timeout (seconds)</label>
+									<label class="text-sm font-medium" for="tg-polling">{m.settings_channels_telegram_polling_label()}</label>
 									<Input
 										id="tg-polling"
 										type="number"
@@ -283,11 +284,11 @@
 										bind:checked={tgGroupMentionOnly}
 									/>
 									<label class="text-sm font-medium" for="tg-group-mention">
-										Group: respond only when mentioned
+										{m.settings_channels_telegram_group_mention_label()}
 									</label>
 								</div>
 								<Button size="sm" onclick={saveTelegramConfig}>
-									Save Telegram Settings
+									{m.settings_channels_telegram_save_button()}
 								</Button>
 							</div>
 						{/if}
@@ -300,8 +301,8 @@
 
 <ConfirmDialog
 	bind:open={confirmOpen}
-	title="Remove credential?"
-	description="This will remove the stored credential for this channel."
-	confirmLabel="Remove"
+	title={m.settings_channels_confirm_remove_title()}
+	description={m.settings_channels_confirm_remove_description()}
+	confirmLabel={m.settings_channels_confirm_remove_label()}
 	onConfirm={confirmRemoveCredential}
 />

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
 	import {
 		Conversation,
 		ConversationContent,
@@ -256,8 +257,8 @@
 		<ConversationContent>
 			{#if messagesStore.messages.length === 0 && !messagesStore.streaming}
 				<ConversationEmptyState
-					title="Start a conversation"
-					description="Send a message to begin chatting with Zenii"
+					title={m.chat_empty_title()}
+					description={m.chat_empty_description()}
 				/>
 			{:else}
 				<div class="space-y-2">
@@ -268,13 +269,13 @@
 									<p class="whitespace-pre-wrap">{msg.content}</p>
 								</MessageContent>
 								<MessageActions class="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
-									<MessageAction tooltip="Copy" onclick={() => copyMessage(msg.content)}>
+									<MessageAction tooltip={m.chat_copy_tooltip()} onclick={() => copyMessage(msg.content)}>
 										<Copy class="size-3.5" />
 									</MessageAction>
-									<MessageAction tooltip="Edit" onclick={() => editMessage(idx)}>
+									<MessageAction tooltip={m.chat_edit_tooltip()} onclick={() => editMessage(idx)}>
 										<Pencil class="size-3.5" />
 									</MessageAction>
-									<MessageAction tooltip="Retry" onclick={() => retryMessage(idx)}>
+									<MessageAction tooltip={m.chat_retry_tooltip()} onclick={() => retryMessage(idx)}>
 										<RefreshCw class="size-3.5" />
 									</MessageAction>
 								</MessageActions>
@@ -302,10 +303,10 @@
 									<MessageResponse content={msg.content} />
 								</MessageContent>
 								<MessageActions class="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
-									<MessageAction tooltip="Copy" onclick={() => copyMessage(msg.content)}>
+									<MessageAction tooltip={m.chat_copy_tooltip()} onclick={() => copyMessage(msg.content)}>
 										<Copy class="size-3.5" />
 									</MessageAction>
-									<MessageAction tooltip="Retry" onclick={() => retryMessage(idx)}>
+									<MessageAction tooltip={m.chat_retry_tooltip()} onclick={() => retryMessage(idx)}>
 										<RefreshCw class="size-3.5" />
 									</MessageAction>
 								</MessageActions>
@@ -317,7 +318,7 @@
 						<AgentTree delegation={delegationStore.delegation} />
 						{#if delegationStore.aggregating && !messagesStore.streamContent}
 							<div class="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-								<Shimmer content_length={30} duration={1.5}>Synthesizing agent results...</Shimmer>
+								<Shimmer content_length={30} duration={1.5}>{m.chat_synthesizing()}</Shimmer>
 							</div>
 						{/if}
 					{/if}
@@ -334,7 +335,7 @@
 												<ToolOutput output={tc.output} />
 											{:else if tc.state === 'input-available'}
 												<div class="px-3 pb-3">
-													<Shimmer content_length={40} duration={1.5}>Processing...</Shimmer>
+													<Shimmer content_length={40} duration={1.5}>{m.chat_tool_processing()}</Shimmer>
 												</div>
 											{/if}
 										</ToolContent>
@@ -363,7 +364,7 @@
 						<MessageContent>
 							<div class="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
 								<Shimmer content_length={30} duration={1.5}>
-									Processing {notificationStore.channelAgentActivity.channel} message from @{notificationStore.channelAgentActivity.sender}...
+									{m.chat_processing_channel({ channel: notificationStore.channelAgentActivity.channel, sender: notificationStore.channelAgentActivity.sender })}
 								</Shimmer>
 							</div>
 						</MessageContent>
@@ -373,14 +374,14 @@
 				{#if messagesStore.error}
 						<div class="mx-auto max-w-xl rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
 							{#if messagesStore.error === '__NO_PROVIDER__'}
-								No AI provider configured.
-								<a href="/settings#providers" class="underline font-medium hover:text-red-900 dark:hover:text-red-200">Go to Settings &rarr; Providers</a>
-								to set up a provider and model.
+								{m.chat_error_no_provider()}
+								<a href="/settings#providers" class="underline font-medium hover:text-red-900 dark:hover:text-red-200">{m.chat_error_no_provider_link()}</a>
+								{m.chat_error_no_provider_suffix()}
 							{:else}
 								{messagesStore.error}
 								{#if messagesStore.errorHint}
 									<p class="mt-1 text-xs opacity-70">
-										Hint: {messagesStore.errorHint}
+										{m.chat_error_hint_prefix({ hint: messagesStore.errorHint })}
 									</p>
 								{/if}
 							{/if}
@@ -395,17 +396,17 @@
 	<div class="p-4">
 		{#if providersLoaded && !hasUsableModel}
 			<div class="rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-				No API key found — your key may not have persisted across restarts.
+				{m.chat_no_api_key_warning()}
 				<a href="/settings#providers" class="underline font-medium hover:text-amber-900 dark:hover:text-amber-200">
-					Add one in Settings &rarr; Providers
+					{m.chat_no_api_key_link()}
 				</a>
-				to start chatting.
+				{m.chat_no_api_key_suffix()}
 			</div>
 		{/if}
 		<PromptInput onSubmit={handleSubmit}>
 			<PromptInputTextarea
 				bind:value={editText}
-				placeholder={hasUsableModel ? 'Send a message...' : 'Configure a provider to start chatting...'}
+				placeholder={hasUsableModel ? m.chat_placeholder() : m.chat_configure_provider_placeholder()}
 			/>
 			<PromptInputToolbar>
 				{#if providersStore.configuredModels.length > 0}
@@ -418,7 +419,7 @@
 						<PromptInputModelSelectTrigger>
 							<PromptInputModelSelectValue
 								value={currentModelLabel}
-								placeholder="Select model"
+								placeholder={m.chat_select_model_placeholder()}
 							/>
 						</PromptInputModelSelectTrigger>
 						<PromptInputModelSelectContent>
@@ -430,9 +431,9 @@
 						</PromptInputModelSelectContent>
 					</PromptInputModelSelect>
 				{/if}
-				<label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none" title="Enable multi-agent delegation">
+				<label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none" title={m.chat_delegate_tooltip()}>
 					<input type="checkbox" bind:checked={delegationEnabled} class="accent-cyan-500" />
-					Delegate
+					{m.chat_delegate_label()}
 				</label>
 				<div class="flex-1"></div>
 				<PromptInputSubmit

@@ -4,6 +4,7 @@
 	import ConversationThread from '$lib/components/inbox/ConversationThread.svelte';
 	import { inboxStore } from '$lib/stores/inbox.svelte';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	onMount(() => {
 		inboxStore.load();
@@ -14,7 +15,7 @@
 	<!-- Left panel: filter + conversation list -->
 	<div class="w-80 shrink-0 border-r border-border flex flex-col bg-background">
 		<div class="border-b border-border px-3 py-2">
-			<h1 class="font-semibold text-lg">Channels</h1>
+			<h1 class="font-semibold text-lg">{m.channels_page_title()}</h1>
 		</div>
 		<ChannelFilterTabs />
 		<ConversationList />

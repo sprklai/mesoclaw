@@ -5,6 +5,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { permissionsStore, type ToolPermissionInfo } from '$lib/stores/permissions.svelte';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let loading = $state(true);
 
@@ -74,8 +75,8 @@
 </script>
 
 <div class="flex items-center justify-between mb-4">
-	<h2 class="text-lg font-semibold">Tool Permissions</h2>
-	<span class="text-xs text-muted-foreground">Configure which tools are available on each surface</span>
+	<h2 class="text-lg font-semibold">{m.settings_permissions_title()}</h2>
+	<span class="text-xs text-muted-foreground">{m.settings_permissions_subtitle()}</span>
 </div>
 
 {#if loading}
@@ -93,7 +94,7 @@
 {:else if getToolList().length === 0}
 	<Card.Root>
 		<Card.Content class="py-6 text-center text-muted-foreground">
-			No tools registered. Start the daemon to see available tools.
+			{m.settings_permissions_no_tools()}
 		</Card.Content>
 	</Card.Root>
 {:else}
@@ -101,13 +102,13 @@
 		<table class="w-full text-sm">
 			<thead>
 				<tr class="border-b border-border bg-muted/50">
-					<th class="text-left px-3 py-2.5 font-medium text-muted-foreground min-w-[220px]">Tool</th>
+					<th class="text-left px-3 py-2.5 font-medium text-muted-foreground min-w-[220px]">{m.settings_permissions_column_tool()}</th>
 					{#each permissionsStore.surfaces as surface (surface)}
 						<th class="text-center px-2 py-2.5 font-medium text-muted-foreground whitespace-nowrap min-w-[70px]">
 							<div class="flex flex-col items-center gap-0.5">
 								<span>{surfaceLabel(surface)}</span>
 								{#if isLocalSurface(surface)}
-									<span class="text-[9px] leading-none bg-green-500/20 text-green-600 dark:text-green-400 px-1 py-0.5 rounded">Local</span>
+									<span class="text-[9px] leading-none bg-green-500/20 text-green-600 dark:text-green-400 px-1 py-0.5 rounded">{m.settings_permissions_surface_local_badge()}</span>
 								{/if}
 							</div>
 						</th>
@@ -120,7 +121,7 @@
 					<tr class="bg-muted/30">
 						<td colspan={permissionsStore.surfaces.length + 1} class="px-3 py-1.5">
 							<Badge variant={riskColor(group.risk)} class="text-[10px] uppercase tracking-wider">
-								{group.risk} risk
+								{m.settings_permissions_risk_badge({ risk: group.risk })}
 							</Badge>
 						</td>
 					</tr>
@@ -152,6 +153,6 @@
 	</div>
 
 	<p class="text-xs text-muted-foreground mt-3">
-		Local surfaces (Desktop, CLI, TUI) have all tools enabled by default. Remote channels deny high-risk tools by default.
+		{m.settings_permissions_footer()}
 	</p>
 {/if}

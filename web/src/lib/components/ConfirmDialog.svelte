@@ -1,12 +1,13 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Button } from '$lib/components/ui/button';
 
 	let {
 		open = $bindable(false),
-		title = 'Are you sure?',
-		description = 'This action cannot be undone.',
-		confirmLabel = 'Delete',
+		title = m.dialog_confirm_default_title(),
+		description = m.dialog_confirm_default_description(),
+		confirmLabel = m.dialog_confirm_default_label(),
 		onConfirm
 	}: {
 		open: boolean;
@@ -29,7 +30,7 @@
 			<AlertDialog.Description>{description}</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
-			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Cancel>{m.common_cancel()}</AlertDialog.Cancel>
 			<Button variant="destructive" onclick={handleConfirm}>{confirmLabel}</Button>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>

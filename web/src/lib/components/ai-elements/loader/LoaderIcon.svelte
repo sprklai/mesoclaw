@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
+
 	type LoaderIconProps = {
 		size?: number;
 	};
@@ -12,7 +14,7 @@
 	viewBox="0 0 16 16"
 	width={size}
 >
-	<title>Loader</title>
+	<title>{m.loader_icon_title()}</title>
 	<g clip-path="url(#clip0_2393_1490)">
 		<path d="M8 0V4" stroke="currentColor" stroke-width="1.5" />
 		<path d="M8 16V12" opacity="0.5" stroke="currentColor" stroke-width="1.5" />

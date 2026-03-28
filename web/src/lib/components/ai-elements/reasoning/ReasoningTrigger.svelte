@@ -4,6 +4,7 @@
 	import { getReasoningContext } from "./reasoning-context.svelte.js";
 	import BrainIcon from "@lucide/svelte/icons/brain";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+	import * as m from '$lib/paraglide/messages';
 
 	interface Props {
 		class?: string;
@@ -18,12 +19,12 @@
 		let { isStreaming, duration } = reasoningContext;
 
 		if (isStreaming || duration === 0) {
-			return "Thinking...";
+			return m.reasoning_thinking();
 		}
 		if (duration === undefined) {
-			return "Thought for a few seconds";
+			return m.reasoning_thought_few_seconds();
 		}
-		return `Thought for ${duration} seconds`;
+		return m.reasoning_thought_duration({ duration: String(duration) });
 	});
 </script>
 

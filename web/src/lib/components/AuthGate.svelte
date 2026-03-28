@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -217,7 +218,7 @@
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 		if (!tokenInput.trim()) {
-			error = 'Token is required';
+			error = m.auth_token_required();
 			return;
 		}
 		checking = true;
@@ -228,7 +229,7 @@
 			authenticated = true;
 			checkSetupStatus();
 		} else {
-			error = 'Could not connect to daemon. Check the token and ensure the daemon is running.';
+			error = m.auth_connection_failed_error();
 		}
 		checking = false;
 	}
@@ -292,7 +293,7 @@
 					d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 				></path>
 			</svg>
-			<p class="text-sm text-muted-foreground">Starting Zenii...</p>
+			<p class="text-sm text-muted-foreground">{m.auth_boot_starting()}</p>
 			{#if diagLog.length > 0}
 				<pre class="w-full mt-2 text-[10px] leading-tight text-muted-foreground bg-muted p-2 rounded max-h-32 overflow-auto whitespace-pre-wrap">{diagLog.join('\n')}</pre>
 			{/if}
@@ -315,9 +316,9 @@
 					d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 				></path>
 			</svg>
-			<p class="text-sm text-muted-foreground">Connecting to Zenii...</p>
+			<p class="text-sm text-muted-foreground">{m.auth_connecting_status()}</p>
 			<Button variant="ghost" size="sm" onclick={handleReset}>
-				Reset connection
+				{m.auth_reset_connection_button()}
 			</Button>
 		</div>
 	</div>
@@ -326,7 +327,7 @@
 		<div class="flex flex-col items-center gap-4 max-w-lg text-center">
 			{#if isTauri}
 				<p class="text-sm text-destructive">
-					{bootErrorMessage || 'Zenii failed to start. Check the logs for errors.'}
+					{bootErrorMessage || m.auth_boot_error_fallback()}
 				</p>
 				<Button
 					variant="default"
@@ -336,15 +337,15 @@
 						waitForBoot();
 					}}
 				>
-					Retry
+					{m.auth_retry_button()}
 				</Button>
 			{:else}
 				<p class="text-sm text-destructive">
-					Cannot reach Zenii at {getBaseUrl()}. Check that the daemon is running.
+					{m.auth_connection_failed({ url: getBaseUrl() })}
 				</p>
 				<div class="flex gap-2">
 					<Button variant="outline" size="sm" onclick={handleReset}>
-						Change URL / Reset
+						{m.auth_reset_button()}
 					</Button>
 					<Button
 						variant="default"
@@ -354,13 +355,13 @@
 							waitForGateway();
 						}}
 					>
-						Retry
+						{m.auth_retry_button()}
 					</Button>
 				</div>
 			{/if}
 			{#if diagLog.length > 0}
 				<details class="w-full text-left mt-4">
-					<summary class="text-xs text-muted-foreground cursor-pointer">Diagnostic log ({diagLog.length} entries)</summary>
+					<summary class="text-xs text-muted-foreground cursor-pointer">{m.auth_diag_log_summary({ count: diagLog.length })}</summary>
 					<pre class="mt-2 text-[10px] leading-tight text-muted-foreground bg-muted p-2 rounded max-h-48 overflow-auto whitespace-pre-wrap">{diagLog.join('\n')}</pre>
 				</details>
 			{/if}
@@ -370,22 +371,22 @@
 	<Dialog.Root open={true}>
 		<Dialog.Content class="sm:max-w-md">
 			<Dialog.Header>
-				<Dialog.Title>Connect to Zenii</Dialog.Title>
+				<Dialog.Title>{m.auth_connect_title()}</Dialog.Title>
 				<Dialog.Description>
-					Enter your gateway authentication token to connect.
+					{m.auth_connect_description()}
 				</Dialog.Description>
 			</Dialog.Header>
 			<form onsubmit={handleSubmit} class="space-y-4">
 				<Input
 					type="password"
-					placeholder="Bearer token"
+					placeholder={m.auth_token_placeholder()}
 					bind:value={tokenInput}
 				/>
 				{#if error}
 					<p class="text-sm text-destructive">{error}</p>
 				{/if}
 				<Button type="submit" class="w-full" disabled={checking}>
-					{checking ? 'Connecting...' : 'Connect'}
+					{checking ? m.auth_connecting() : m.auth_connect_button()}
 				</Button>
 			</form>
 		</Dialog.Content>

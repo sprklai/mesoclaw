@@ -6,6 +6,7 @@
 	import * as Dialog from "./index.js";
 	import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
 	import type { ComponentProps } from "svelte";
+	import * as m from '$lib/paraglide/messages';
 
 	let {
 		ref = $bindable(null),
@@ -38,7 +39,7 @@
 				class="ring-offset-background focus:ring-ring absolute end-4 top-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
 			>
 				<XIcon />
-				<span class="sr-only">Close</span>
+				<span class="sr-only">{m.sidebar_close_sr()}</span>
 			</DialogPrimitive.Close>
 		{/if}
 	</DialogPrimitive.Content>

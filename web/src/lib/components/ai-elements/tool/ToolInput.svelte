@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cn } from "$lib/utils";
 	import * as Code from "$lib/components/ai-elements/code/index.js";
+	import * as m from '$lib/paraglide/messages';
 
 	interface ToolInputProps {
 		class?: string;
@@ -18,7 +19,7 @@
 </script>
 
 <div {id} class={cn("space-y-2 overflow-hidden p-4", className)} {...restProps}>
-	<h4 class="text-muted-foreground text-xs font-medium tracking-wide uppercase">Parameters</h4>
+	<h4 class="text-muted-foreground text-xs font-medium tracking-wide uppercase">{m.tool_input_parameters_heading()}</h4>
 	<div class="bg-muted/50 rounded-md">
 		<Code.Root code={formattedInput} lang="json" hideLines>
 			<Code.CopyButton />

@@ -10,6 +10,7 @@ import { schedulerStore } from "./scheduler.svelte";
 import { providersStore } from "./providers.svelte";
 import { pluginsStore } from "./plugins.svelte";
 import { withTimeout } from "$lib/api/client";
+import * as m from '$lib/paraglide/messages';
 
 export interface NotificationRouting {
   scheduler_notification: string[];
@@ -229,16 +230,16 @@ class NotificationStore {
         // Refresh workflow list so history is available immediately
         workflowsStore.load();
         if (data.status === "completed") {
-          toast.success(`Workflow "${data.workflow_id}" completed`);
+          toast.success(m.notification_workflow_completed({ workflowId: data.workflow_id }));
         } else if (data.status === "cancelled") {
-          toast.info(`Workflow "${data.workflow_id}" cancelled`);
+          toast.info(m.notification_workflow_cancelled({ workflowId: data.workflow_id }));
         } else if (data.status === "failed") {
-          toast.error(`Workflow "${data.workflow_id}" failed`);
+          toast.error(m.notification_workflow_failed({ workflowId: data.workflow_id }));
         }
         // Desktop notification for workflow completion
         if (isTauri) {
           const detail =
-            data.status === "completed" ? "completed successfully" : "failed";
+            data.status === "completed" ? m.notification_workflow_detail_success() : m.notification_workflow_detail_failed();
           showNotification(`Workflow "${data.workflow_id}"`, detail);
         }
       } else if (data.type === "session_created") {
@@ -307,26 +308,26 @@ class NotificationStore {
           }
         } else if (data.event_type === "heartbeat_alert") {
           if (hasTarget("heartbeat_alert", "toast")) {
-            toast.info(data.message ?? "Heartbeat");
+            toast.info(data.message ?? m.notification_heartbeat_fallback());
           }
           if (hasTarget("heartbeat_alert", "desktop") && isTauri) {
-            showNotification("Heartbeat", data.message ?? "");
+            showNotification(m.notification_heartbeat_fallback(), data.message ?? "");
           }
         } else if (data.event_type === "scheduler_job_completed") {
           if (hasTarget("scheduler_job_completed", "toast")) {
             if (data.status === "success") {
-              toast.success(`Job "${data.job_name}" completed`);
+              toast.success(m.notification_job_completed({ jobName: data.job_name }));
             } else if (data.status === "failed") {
               toast.error(
-                `Job "${data.job_name}" failed${data.error ? ": " + data.error : ""}`,
+                m.notification_job_failed({ jobName: data.job_name, error: data.error ?? "" }),
               );
             }
           }
           if (hasTarget("scheduler_job_completed", "desktop") && isTauri) {
             const detail =
               data.status === "success"
-                ? "completed successfully"
-                : `failed${data.error ? ": " + data.error : ""}`;
+                ? m.notification_job_detail_success()
+                : m.notification_job_detail_failed({ error: data.error ?? "" });
             showNotification(`Job "${data.job_name}"`, detail);
           }
         }

@@ -16,6 +16,7 @@
 		PromptInputModelSelectValue
 	} from '$lib/components/ai-elements/prompt-input';
 	import { onMount } from 'svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let { hideDefaultModel = false }: { hideDefaultModel?: boolean } = $props();
 
@@ -185,63 +186,61 @@
 
 	function confirmTitle(): string {
 		if (!deleteAction) return '';
-		if (deleteAction.type === 'key') return 'Remove API key?';
-		if (deleteAction.type === 'provider') return 'Delete provider?';
-		return 'Delete model?';
+		if (deleteAction.type === 'key') return m.settings_providers_confirm_remove_key_title();
+		if (deleteAction.type === 'provider') return m.settings_providers_confirm_delete_provider_title();
+		return m.settings_providers_confirm_delete_model_title();
 	}
 
 	function confirmDescription(): string {
 		if (!deleteAction) return '';
-		if (deleteAction.type === 'key') return 'This will remove the stored API key for this provider.';
-		if (deleteAction.type === 'provider') return 'This will permanently delete this provider and all its models.';
-		return 'This will remove this custom model from the provider.';
+		if (deleteAction.type === 'key') return m.settings_providers_confirm_remove_key_description();
+		if (deleteAction.type === 'provider') return m.settings_providers_confirm_delete_provider_description();
+		return m.settings_providers_confirm_delete_model_description();
 	}
 
 	function statusBadge(provider: ProviderWithKeyStatus): { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' } {
-		if (!provider.requires_api_key) return { label: 'Local', variant: 'outline' };
-		if (provider.has_api_key) return { label: 'Configured', variant: 'default' };
-		return { label: 'Not configured', variant: 'secondary' };
+		if (!provider.requires_api_key) return { label: m.settings_providers_badge_local(), variant: 'outline' };
+		if (provider.has_api_key) return { label: m.settings_providers_badge_configured(), variant: 'default' };
+		return { label: m.settings_providers_badge_not_configured(), variant: 'secondary' };
 	}
 </script>
 
 {#if !hideDefaultModel}
 	<div class="flex items-center justify-between mb-2">
-		<h2 class="text-lg font-semibold">AI Providers</h2>
+		<h2 class="text-lg font-semibold">{m.settings_providers_title()}</h2>
 		<Button size="sm" variant="outline" onclick={() => (showAddProvider = !showAddProvider)}>
-			{showAddProvider ? 'Cancel' : '+ Add Provider'}
+			{showAddProvider ? m.settings_providers_cancel_button() : m.settings_providers_add_button()}
 		</Button>
 	</div>
 	<p class="mb-1 text-sm text-muted-foreground">
-		Add an API key for at least one provider to enable chat. Expand a provider below, enter
-		your key, and save it.
+		{m.settings_providers_instructions()}
 	</p>
 	<p class="mb-4 text-xs text-muted-foreground">
-		Need a different provider? Any OpenAI API-compatible service can be added via the
-		<strong>+ Add Provider</strong> button above the list.
+		{m.settings_providers_custom_hint()}
 	</p>
 {:else}
 	<div class="flex justify-end mb-2">
 		<Button size="sm" variant="outline" onclick={() => (showAddProvider = !showAddProvider)}>
-			{showAddProvider ? 'Cancel' : '+ Add Provider'}
+			{showAddProvider ? m.settings_providers_cancel_button() : m.settings_providers_add_button()}
 		</Button>
 	</div>
 {/if}
 
 {#if !hideDefaultModel && defaultProviderMissingKey}
 	<div class="mb-4 rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-		<strong>No API key for default provider.</strong> Your config defaults to
+		<strong>{m.settings_providers_missing_key_warning()}</strong> Your config defaults to
 		<code class="rounded bg-amber-500/20 px-1">{configStore.get('provider_name')}</code> /
 		<code class="rounded bg-amber-500/20 px-1">{configStore.get('provider_model_id')}</code>,
-		but no API key is configured for that provider. Add a key below or select a different default model.
+		{m.settings_providers_missing_key_detail()}
 	</div>
 {/if}
 
 {#if !hideDefaultModel && providersStore.configuredModels.length > 0}
 	<Card.Root class="mb-4">
 		<Card.Header class="py-3">
-			<Card.Title class="text-base">Default Model</Card.Title>
+			<Card.Title class="text-base">{m.settings_providers_default_model_title()}</Card.Title>
 			<Card.Description class="text-sm">
-				The model Zenii uses by default. You can override this per-conversation in the chat toolbar.
+				{m.settings_providers_default_model_description()}
 			</Card.Description>
 		</Card.Header>
 		<Card.Content class="pt-0">
@@ -252,7 +251,7 @@
 				<PromptInputModelSelectTrigger class="w-full border border-border">
 					<PromptInputModelSelectValue
 						value={currentModelLabel}
-						placeholder="Select default model"
+						placeholder={m.settings_providers_default_model_placeholder()}
 					/>
 				</PromptInputModelSelectTrigger>
 				<PromptInputModelSelectContent>
@@ -270,22 +269,22 @@
 {#if showAddProvider}
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>Add Custom Provider</Card.Title>
+			<Card.Title>{m.settings_providers_add_custom_title()}</Card.Title>
 		</Card.Header>
 		<Card.Content class="space-y-3">
 			<div class="grid grid-cols-2 gap-3">
 				<div class="space-y-1">
-					<label class="text-sm font-medium" for="new-id">Provider ID</label>
-					<Input id="new-id" placeholder="my-gateway" bind:value={newProvider.id} />
+					<label class="text-sm font-medium" for="new-id">{m.settings_providers_provider_id_label()}</label>
+					<Input id="new-id" placeholder={m.settings_providers_provider_id_placeholder()} bind:value={newProvider.id} />
 				</div>
 				<div class="space-y-1">
-					<label class="text-sm font-medium" for="new-name">Display Name</label>
-					<Input id="new-name" placeholder="My Gateway" bind:value={newProvider.name} />
+					<label class="text-sm font-medium" for="new-name">{m.settings_providers_display_name_label()}</label>
+					<Input id="new-name" placeholder={m.settings_providers_display_name_placeholder()} bind:value={newProvider.name} />
 				</div>
 			</div>
 			<div class="space-y-1">
-				<label class="text-sm font-medium" for="new-url">Base URL</label>
-				<Input id="new-url" placeholder="https://my-proxy.com/v1" bind:value={newProvider.baseUrl} />
+				<label class="text-sm font-medium" for="new-url">{m.settings_providers_base_url_label()}</label>
+				<Input id="new-url" placeholder={m.settings_providers_base_url_placeholder()} bind:value={newProvider.baseUrl} />
 			</div>
 			<div class="flex items-center gap-2">
 				<input
@@ -294,14 +293,14 @@
 					bind:checked={newProvider.requiresApiKey}
 					class="rounded"
 				/>
-				<label class="text-sm" for="new-requires-key">Requires API key</label>
+				<label class="text-sm" for="new-requires-key">{m.settings_providers_requires_api_key_label()}</label>
 			</div>
 			<Button
 				size="sm"
 				disabled={!newProvider.id.trim() || !newProvider.name.trim() || !newProvider.baseUrl.trim() || addingProvider}
 				onclick={addProvider}
 			>
-				{addingProvider ? 'Adding...' : 'Add Provider'}
+				{addingProvider ? m.settings_providers_adding_button() : m.settings_providers_add_provider_button()}
 			</Button>
 		</Card.Content>
 	</Card.Root>
@@ -314,7 +313,7 @@
 		<Skeleton class="h-16 w-full" />
 	</div>
 {:else if providersStore.providers.length === 0}
-	<p class="text-muted-foreground">No providers found. Is the daemon running?</p>
+	<p class="text-muted-foreground">{m.settings_providers_no_providers()}</p>
 {:else}
 	<div class="space-y-2">
 		{#each providersStore.providers as provider (provider.id)}
@@ -341,7 +340,7 @@
 					<Card.Content class="pt-0 space-y-4">
 						<div class="flex items-center justify-between">
 							<div class="text-sm text-muted-foreground">
-								<span class="font-medium">Base URL:</span> {provider.base_url}
+								<span class="font-medium">{m.settings_providers_base_url_prefix()}</span> {provider.base_url}
 							</div>
 							{#if provider.is_user_defined}
 								<Button
@@ -350,19 +349,19 @@
 									disabled={deletingProvider[provider.id]}
 									onclick={() => deleteProvider(provider.id)}
 								>
-									{deletingProvider[provider.id] ? 'Deleting...' : 'Delete Provider'}
+									{deletingProvider[provider.id] ? m.settings_providers_deleting_button() : m.settings_providers_delete_provider_button()}
 								</Button>
 							{/if}
 						</div>
 
 						{#if provider.requires_api_key}
 							<div class="space-y-2">
-								<label class="text-sm font-medium" for="key-{provider.id}">API Key</label>
+								<label class="text-sm font-medium" for="key-{provider.id}">{m.settings_providers_api_key_label()}</label>
 								<div class="flex gap-2">
 									<Input
 										id="key-{provider.id}"
 										type={showKey[provider.id] ? 'text' : 'password'}
-										placeholder={provider.has_api_key ? '••••••••  (key is set)' : 'Enter API key...'}
+										placeholder={provider.has_api_key ? m.settings_providers_api_key_placeholder_set() : m.settings_providers_api_key_placeholder_empty()}
 										bind:value={apiKeyInputs[provider.id]}
 									/>
 									<Button
@@ -370,7 +369,7 @@
 										size="sm"
 										onclick={() => (showKey[provider.id] = !showKey[provider.id])}
 									>
-										{showKey[provider.id] ? 'Hide' : 'Show'}
+										{showKey[provider.id] ? m.settings_providers_hide_button() : m.settings_providers_show_button()}
 									</Button>
 								</div>
 								<div class="flex gap-2">
@@ -379,7 +378,7 @@
 										disabled={!apiKeyInputs[provider.id]?.trim() || saving[provider.id]}
 										onclick={() => saveKey(provider)}
 									>
-										{saving[provider.id] ? 'Saving...' : 'Save Key'}
+										{saving[provider.id] ? m.settings_providers_saving_button() : m.settings_providers_save_key_button()}
 									</Button>
 									{#if provider.has_api_key}
 										<Button
@@ -388,7 +387,7 @@
 											disabled={saving[provider.id]}
 											onclick={() => removeKey(provider)}
 										>
-											Remove Key
+											{m.settings_providers_remove_key_button()}
 										</Button>
 										<Button
 											variant="outline"
@@ -396,7 +395,7 @@
 											disabled={testing[provider.id]}
 											onclick={() => testConnection(provider)}
 										>
-											{testing[provider.id] ? 'Testing...' : 'Test Connection'}
+											{testing[provider.id] ? m.settings_providers_testing_button() : m.settings_providers_test_connection_button()}
 										</Button>
 									{/if}
 								</div>
@@ -404,7 +403,7 @@
 									{@const result = testResult[provider.id]!}
 									<p class="text-sm {result.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
 										{#if result.success}
-											Connected{result.latency_ms ? ` — ${result.latency_ms}ms` : ''}
+											{result.latency_ms ? m.settings_providers_connected_latency({ latency_ms: String(result.latency_ms) }) : m.settings_providers_connected()}
 										{:else}
 											{result.message}
 										{/if}
@@ -412,19 +411,19 @@
 								{/if}
 							</div>
 						{:else}
-							<p class="text-sm text-muted-foreground italic">No API key required (local provider)</p>
+							<p class="text-sm text-muted-foreground italic">{m.settings_providers_no_api_key_required()}</p>
 						{/if}
 
 						<div class="space-y-2">
 							<span class="text-sm font-medium inline-flex items-center gap-1.5">
-								Models
+								{m.settings_providers_models_label()}
 								{#if providerDocsUrls[provider.id]}
 									<a
 										href={providerDocsUrls[provider.id]}
 										target="_blank"
 										rel="noopener noreferrer"
 										class="text-muted-foreground hover:text-primary transition-colors"
-										title="Browse model IDs"
+										title={m.settings_providers_browse_model_ids_tooltip()}
 									>
 										<ArrowUpRight class="h-3.5 w-3.5" />
 									</a>
@@ -438,7 +437,7 @@
 											{#if model.is_custom}
 												<button
 													class="ml-1 text-muted-foreground hover:text-destructive"
-													title="Remove model"
+													title={m.settings_providers_remove_model_tooltip()}
 													onclick={() => deleteModel(provider.id, model.model_id)}
 												>&times;</button>
 											{/if}
@@ -446,12 +445,12 @@
 									{/each}
 								</div>
 							{:else}
-								<p class="text-xs text-muted-foreground">No models</p>
+								<p class="text-xs text-muted-foreground">{m.settings_providers_no_models()}</p>
 							{/if}
 							<div class="flex gap-2">
 								<Input
 									class="h-8 text-sm"
-									placeholder="Add model ID (e.g. gpt-4o-mini)"
+									placeholder={m.settings_providers_add_model_placeholder()}
 									bind:value={newModelInputs[provider.id]}
 								/>
 								<Button
@@ -460,7 +459,7 @@
 									disabled={!newModelInputs[provider.id]?.trim() || addingModel[provider.id]}
 									onclick={() => addModel(provider.id)}
 								>
-									{addingModel[provider.id] ? 'Adding...' : 'Add'}
+									{addingModel[provider.id] ? m.settings_providers_add_model_adding() : m.settings_providers_add_model_button()}
 								</Button>
 							</div>
 						</div>
@@ -475,6 +474,6 @@
 	bind:open={confirmOpen}
 	title={confirmTitle()}
 	description={confirmDescription()}
-	confirmLabel="Remove"
+	confirmLabel={m.settings_providers_confirm_remove_label()}
 	onConfirm={confirmDelete}
 />
