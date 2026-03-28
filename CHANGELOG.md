@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-03-28
+
 ### Added
 - Multilingual UI: 8 languages (English, Chinese, Spanish, Japanese, Hindi, Portuguese, Korean, French)
 - Language switcher in Settings > General with auto-detection from browser language
-- 577 i18n message keys across 40+ components via paraglide-js
+- 607 i18n message keys across 40+ components via paraglide-js
 - Locale auto-detection from paraglide runtime (no hardcoded locale list)
+- i18n for tool status labels, channel config metadata, attachment labels, workflow errors
+
+### Fixed
+- Language switch now takes effect immediately (reactive `$derived` + `{#key}` blocks)
+- CI: paraglide compilation before svelte-check with correct outdir
+- CI: `@{sender}` JSDoc parse error in paraglide-generated code
 
 ## [0.1.4] - 2026-03-24
 
