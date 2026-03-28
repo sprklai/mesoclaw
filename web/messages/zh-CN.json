@@ -68,7 +68,7 @@
   "chat_no_api_key_suffix": "以开始聊天。",
   "chat_no_api_key_warning": "未找到 API 密钥 — 您的密钥可能在重启后未被保留。",
   "chat_placeholder": "发送消息...",
-  "chat_processing_channel": "正在处理来自 @{sender} 的 {channel} 消息...",
+  "chat_processing_channel": "正在处理来自 {sender} 的 {channel} 消息...",
   "chat_retry_tooltip": "重试",
   "chat_select_model_placeholder": "选择模型",
   "chat_session_create_error": "创建聊天会话失败",

@@ -68,7 +68,7 @@
   "chat_no_api_key_suffix": "してチャットを開始してください。",
   "chat_no_api_key_warning": "API キーが見つかりません — 再起動後にキーが保持されなかった可能性があります。",
   "chat_placeholder": "メッセージを送信...",
-  "chat_processing_channel": "@{sender} からの {channel} メッセージを処理中...",
+  "chat_processing_channel": "{sender} からの {channel} メッセージを処理中...",
   "chat_retry_tooltip": "再試行",
   "chat_select_model_placeholder": "モデルを選択",
   "chat_session_create_error": "チャットセッションの作成に失敗しました",

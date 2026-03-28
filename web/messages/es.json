@@ -68,7 +68,7 @@
   "chat_no_api_key_suffix": "para comenzar a chatear.",
   "chat_no_api_key_warning": "No se encontró clave API — tu clave puede no haberse conservado entre reinicios.",
   "chat_placeholder": "Envía un mensaje...",
-  "chat_processing_channel": "Procesando mensaje de {channel} de @{sender}...",
+  "chat_processing_channel": "Procesando mensaje de {channel} de {sender}...",
   "chat_retry_tooltip": "Reintentar",
   "chat_select_model_placeholder": "Seleccionar modelo",
   "chat_session_create_error": "Error al crear sesión de chat",

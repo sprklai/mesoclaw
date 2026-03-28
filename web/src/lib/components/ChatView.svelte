@@ -364,7 +364,7 @@
 						<MessageContent>
 							<div class="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
 								<Shimmer content_length={30} duration={1.5}>
-									{m.chat_processing_channel({ channel: notificationStore.channelAgentActivity.channel, sender: notificationStore.channelAgentActivity.sender })}
+									{m.chat_processing_channel({ channel: notificationStore.channelAgentActivity.channel, sender: `@${notificationStore.channelAgentActivity.sender}` })}
 								</Shimmer>
 							</div>
 						</MessageContent>

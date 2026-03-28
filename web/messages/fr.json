@@ -68,7 +68,7 @@
   "chat_no_api_key_suffix": "pour commencer à discuter.",
   "chat_no_api_key_warning": "Aucune clé API trouvée — votre clé n'a peut-être pas été conservée entre les redémarrages.",
   "chat_placeholder": "Envoyer un message...",
-  "chat_processing_channel": "Traitement du message {channel} de @{sender}...",
+  "chat_processing_channel": "Traitement du message {channel} de {sender}...",
   "chat_retry_tooltip": "Réessayer",
   "chat_select_model_placeholder": "Sélectionner un modèle",
   "chat_session_create_error": "Échec de la création de la session de discussion",

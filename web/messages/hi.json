@@ -68,7 +68,7 @@
   "chat_no_api_key_suffix": "चैट शुरू करने के लिए।",
   "chat_no_api_key_warning": "कोई API कुंजी नहीं मिली — हो सकता है कि आपकी कुंजी पुनः आरंभ के बाद सहेजी न गई हो।",
   "chat_placeholder": "एक संदेश भेजें...",
-  "chat_processing_channel": "{channel} से @{sender} का संदेश प्रोसेस हो रहा है...",
+  "chat_processing_channel": "{channel} से {sender} का संदेश प्रोसेस हो रहा है...",
   "chat_retry_tooltip": "पुनः प्रयास करें",
   "chat_select_model_placeholder": "मॉडल चुनें",
   "chat_session_create_error": "चैट सत्र बनाने में विफल",

@@ -68,7 +68,7 @@
   "chat_no_api_key_suffix": "to start chatting.",
   "chat_no_api_key_warning": "No API key found — your key may not have persisted across restarts.",
   "chat_placeholder": "Send a message...",
-  "chat_processing_channel": "Processing {channel} message from @{sender}...",
+  "chat_processing_channel": "Processing {channel} message from {sender}...",
   "chat_retry_tooltip": "Retry",
   "chat_select_model_placeholder": "Select model",
   "chat_session_create_error": "Failed to create chat session",
