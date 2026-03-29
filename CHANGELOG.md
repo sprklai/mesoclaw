@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-03-29
+
+### Fixed
+- Onboarding wizard now starts at the correct step on first open instead of skipping to profile
+
+### Changed
+- README tagline: "30+ models" → "6+ model providers" for accuracy
+
 ## [0.1.5] - 2026-03-28
 
 ### Added

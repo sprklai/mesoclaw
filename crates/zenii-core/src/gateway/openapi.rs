@@ -13,7 +13,7 @@ use super::state::AppState;
 #[openapi(
     info(
         title = "Zenii API",
-        version = "0.1.5",
+        version = "0.1.6",
         description = "Zenii AI assistant gateway API.\n\nAuthentication: Bearer token via `Authorization: Bearer <token>` header.\nWebSocket endpoints also accept `?token=<token>` query parameter.",
         contact(name = "SprklAI by NSRTech", url = "https://zenii.sprklai.com"),
         license(name = "MIT", url = "https://github.com/sprklai/zenii/blob/main/LICENSE"),
