@@ -22,10 +22,12 @@
 	let {
 		detectedTimezone = '',
 		missing = [] as string[],
+		hasUsableModel = false,
 		oncomplete
 	}: {
 		detectedTimezone: string;
 		missing?: string[];
+		hasUsableModel?: boolean;
 		oncomplete: () => void;
 	} = $props();
 
@@ -81,17 +83,19 @@
 		await providersStore.load();
 		await channelsStore.load();
 
-		// Auto-skip to first incomplete step based on missing fields
-		if (missing.length > 0) {
-			const needsApiKey = missing.includes('api_key');
-			const needsProfile = missing.includes('user_name') || missing.includes('user_location');
-
-			if (needsApiKey) {
-				step = 1; // Start at provider setup
-			} else if (needsProfile) {
-				step = 4; // Skip directly to profile
+		// Resume at first incomplete step for partial onboarding re-entry.
+		// On first open (no provider configured), step stays at 1 (the default).
+		// All checks are read-only — no data is modified here.
+		if (hasUsableModel && providersStore.configuredModels.length > 0) {
+			// Step 1 complete (has at least one provider with API key + models)
+			if (providersStore.selectedModel) {
+				// Step 2 complete (has a selected/default model)
+				step = 3; // Resume at channels (skippable -> profile)
+			} else {
+				step = 2; // Resume at model selection
 			}
 		}
+		// else: no usable provider -> step stays at 1 (default from $state(1))
 	});
 
 	function stepState(i: number): 'done' | 'active' | 'upcoming' {

@@ -24,6 +24,7 @@
 	let showSetup = $state(false);
 	let detectedTimezone = $state('');
 	let missingFields = $state<string[]>([]);
+	let hasUsableModel = $state(false);
 	let connecting = $state(false);
 	let booting = $state(false);
 	let tokenInput = $state('');
@@ -240,10 +241,12 @@
 				needs_setup: boolean;
 				missing: string[];
 				detected_timezone?: string;
+				has_usable_model?: boolean;
 			}>('/setup/status');
 			if (status.needs_setup) {
 				detectedTimezone = status.detected_timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? '';
 				missingFields = status.missing ?? [];
+				hasUsableModel = status.has_usable_model ?? false;
 				showSetup = true;
 			}
 		} catch {
@@ -271,6 +274,7 @@
 		<OnboardingWizard
 			{detectedTimezone}
 			missing={missingFields}
+			{hasUsableModel}
 			oncomplete={() => (showSetup = false)}
 		/>
 	{:else}
