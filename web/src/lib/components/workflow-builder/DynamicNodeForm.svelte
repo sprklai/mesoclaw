@@ -21,7 +21,7 @@
 
 	function updateStepName(value: string) {
 		if (!node) return;
-		builderStore.updateNodeData(node.id, { stepName: value });
+		builderStore.renameNode(node.id, value);
 	}
 
 	function updateCommon(key: string, value: unknown) {

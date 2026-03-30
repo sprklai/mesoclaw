@@ -109,10 +109,13 @@ function createWorkflowBuilderStore() {
 
     // Add an edge (connection)
     addEdge(edge: Edge) {
-      // Prevent duplicates
+      // Prevent duplicates (same source, target, and sourceHandle)
       if (
         edges.some(
-          (e) => e.source === edge.source && e.target === edge.target,
+          (e) =>
+            e.source === edge.source &&
+            e.target === edge.target &&
+            e.sourceHandle === edge.sourceHandle,
         )
       )
         return;
@@ -131,6 +134,24 @@ function createWorkflowBuilderStore() {
       nodes = nodes.map((n) =>
         n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n,
       );
+      isDirty = true;
+    },
+
+    // Rename a node: update its id, data.stepName, and any edges referencing it
+    renameNode(oldId: string, newId: string) {
+      if (oldId === newId) return;
+      nodes = nodes.map((n) =>
+        n.id === oldId ? { ...n, id: newId, data: { ...n.data, stepName: newId } } : n,
+      );
+      edges = edges.map((e) => ({
+        ...e,
+        source: e.source === oldId ? newId : e.source,
+        target: e.target === oldId ? newId : e.target,
+        id: e.source === oldId || e.target === oldId
+          ? `e-${e.source === oldId ? newId : e.source}-${e.target === oldId ? newId : e.target}`
+          : e.id,
+      }));
+      if (selectedNodeId === oldId) selectedNodeId = newId;
       isDirty = true;
     },
 

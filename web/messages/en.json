@@ -751,5 +751,203 @@
   "wb_field_if_true": "If True",
   "wb_field_if_false": "If False",
   "wb_field_steps": "Steps",
-  "wb_field_name": "Name"
+  "wb_field_name": "Name",
+  "wb_unsaved_confirm": "Unsaved Changes",
+  "wb_unsaved_confirm_desc": "You have unsaved changes. Are you sure you want to leave?",
+  "wb_unsaved_leave": "Leave",
+
+  "wb_handle_true": "True",
+  "wb_handle_false": "False",
+
+  "wb_node_trigger_cron_description": "Trigger this workflow on a cron schedule",
+  "wb_node_trigger_manual_description": "Trigger this workflow manually on demand",
+  "wb_node_llm_description": "Send a prompt to a language model and capture the response",
+  "wb_node_agent_turn_description": "Run a full agentic conversation turn with tool access",
+  "wb_node_web_search_description": "Search the web and return results",
+  "wb_node_system_info_description": "Retrieve system information (CPU, memory, disk, etc.)",
+  "wb_node_shell_description": "Execute a shell command and capture its output",
+  "wb_node_process_description": "List, find, or kill running processes",
+  "wb_node_file_read_description": "Read the contents of a file",
+  "wb_node_file_write_description": "Write content to a file",
+  "wb_node_file_search_description": "Search for files matching a pattern",
+  "wb_node_file_list_description": "List files in a directory",
+  "wb_node_patch_description": "Apply a text replacement patch to a file",
+  "wb_node_memory_store_description": "Save a piece of information to agent memory",
+  "wb_node_memory_recall_description": "Search and retrieve entries from agent memory",
+  "wb_node_memory_forget_description": "Delete an entry from agent memory by ID",
+  "wb_node_channel_send_description": "Send a message to a configured messaging channel",
+  "wb_node_notify_description": "Publish an in-app notification",
+  "wb_node_config_read_description": "Read a configuration value",
+  "wb_node_config_update_description": "Update a configuration value",
+  "wb_node_create_job_description": "Create a new scheduled job",
+  "wb_node_toggle_job_description": "Enable or disable an existing scheduled job",
+  "wb_node_delay_description": "Pause workflow execution for a number of seconds",
+  "wb_node_condition_description": "Branch workflow execution based on an expression",
+  "wb_node_parallel_description": "Execute multiple steps concurrently",
+
+  "wb_field_cron_expr_label": "Cron Expression",
+  "wb_field_cron_expr_placeholder": "e.g. 0 9 * * 1-5",
+  "wb_field_cron_expr_description": "Standard cron expression (5 or 6 fields)",
+
+  "wb_field_prompt_label": "Prompt",
+  "wb_field_prompt_description": "Prompt text sent to the model. Use {{steps.X.output}} for step references.",
+  "wb_field_agent_prompt_placeholder": "Enter agent prompt (supports {{steps.X.output}})",
+  "wb_field_agent_prompt_description": "Prompt for the agent turn. The agent has access to all registered tools.",
+
+  "wb_field_model_label": "Model",
+  "wb_field_model_placeholder": "Optional model override",
+  "wb_field_model_description": "Override the default model for this step only",
+
+  "wb_field_session_target_label": "Session Target",
+  "wb_field_session_target_description": "Whether to use the main session or an isolated one",
+  "wb_option_session_main": "Main",
+  "wb_option_session_isolated": "Isolated",
+
+  "wb_field_query_label": "Query",
+  "wb_field_search_query_placeholder": "Search query",
+  "wb_field_search_query_description": "The search query string",
+  "wb_field_recall_query_placeholder": "Recall query",
+  "wb_field_recall_query_description": "Text or semantic query to search agent memory",
+
+  "wb_field_max_results_label": "Max Results",
+  "wb_field_max_results_description": "Maximum number of search results to return",
+  "wb_field_file_search_max_results_description": "Maximum number of file search results to return",
+
+  "wb_field_action_label": "Action",
+  "wb_field_sysinfo_action_description": "Which system information category to retrieve",
+  "wb_field_process_action_description": "Action to perform on processes",
+  "wb_option_action_os": "OS",
+  "wb_option_action_cpu": "CPU",
+  "wb_option_action_memory": "Memory",
+  "wb_option_action_disk": "Disk",
+  "wb_option_action_network": "Network",
+  "wb_option_action_processes": "Processes",
+  "wb_option_action_all": "All",
+  "wb_option_process_list": "List",
+  "wb_option_process_find": "Find",
+  "wb_option_process_kill": "Kill",
+
+  "wb_field_command_label": "Command",
+  "wb_field_command_placeholder": "Shell command to execute",
+  "wb_field_command_description": "The shell command to run",
+
+  "wb_field_timeout_secs_label": "Timeout (seconds)",
+  "wb_field_timeout_secs_placeholder": "Optional timeout in seconds",
+  "wb_field_timeout_secs_description": "Maximum time to wait for the command to complete",
+
+  "wb_field_target_label": "Target",
+  "wb_field_process_target_placeholder": "Process name or PID",
+  "wb_field_process_target_description": "Process name or PID for find/kill actions",
+
+  "wb_field_path_label": "Path",
+  "wb_field_file_path_placeholder": "Absolute or relative file path",
+  "wb_field_dir_path_placeholder": "Directory path",
+  "wb_field_file_read_path_description": "Path to the file to read",
+  "wb_field_file_write_path_description": "Path to the file to write",
+  "wb_field_patch_path_description": "Path to the file to patch",
+  "wb_field_file_list_path_description": "Path to the directory to list",
+  "wb_field_search_path_placeholder": "Directory to search in (optional)",
+  "wb_field_search_path_description": "Base directory for the file search",
+
+  "wb_field_content_label": "Content",
+  "wb_field_file_content_placeholder": "File content",
+  "wb_field_file_content_description": "The content to write to the file",
+  "wb_field_memory_content_placeholder": "Information to store in memory",
+  "wb_field_memory_store_content_description": "The content to save to agent memory",
+
+  "wb_field_pattern_label": "Pattern",
+  "wb_field_search_pattern_placeholder": "Glob or regex pattern",
+  "wb_field_search_pattern_description": "File search pattern (supports glob and regex)",
+
+  "wb_field_recursive_label": "Recursive",
+  "wb_field_recursive_description": "Whether to recurse into subdirectories",
+
+  "wb_field_original_label": "Original Text",
+  "wb_field_original_placeholder": "Exact text to replace",
+  "wb_field_original_description": "The exact text that will be replaced",
+
+  "wb_field_replacement_label": "Replacement Text",
+  "wb_field_replacement_placeholder": "Replacement text",
+  "wb_field_replacement_description": "The text to insert in place of the original",
+
+  "wb_field_tags_label": "Tags",
+  "wb_field_tags_placeholder": "Comma-separated tags (optional)",
+  "wb_field_tags_description": "Optional tags for categorizing the memory entry",
+
+  "wb_field_limit_label": "Limit",
+  "wb_field_recall_limit_description": "Maximum number of memory entries to return",
+
+  "wb_field_memory_id_label": "Memory ID",
+  "wb_field_memory_id_placeholder": "Memory entry ID",
+  "wb_field_memory_id_description": "The unique ID of the memory entry to delete",
+
+  "wb_field_channel_label": "Channel",
+  "wb_field_channel_placeholder": "Channel name (e.g. telegram)",
+  "wb_field_channel_description": "Name of the messaging channel to send to",
+
+  "wb_field_message_label": "Message",
+  "wb_field_channel_message_placeholder": "Message body",
+  "wb_field_channel_message_description": "The message content to send",
+
+  "wb_field_title_label": "Title",
+  "wb_field_notify_title_placeholder": "Notification title",
+  "wb_field_notify_title_description": "Title for the notification",
+
+  "wb_field_body_label": "Body",
+  "wb_field_notify_body_placeholder": "Notification body (optional)",
+  "wb_field_notify_body_description": "Optional body text for the notification",
+
+  "wb_field_level_label": "Level",
+  "wb_field_notify_level_description": "Severity level for the notification",
+  "wb_option_level_info": "Info",
+  "wb_option_level_warn": "Warning",
+  "wb_option_level_error": "Error",
+
+  "wb_field_config_key_label": "Config Key",
+  "wb_field_config_key_description": "The whitelisted configuration key to read or update",
+  "wb_option_context_injection_enabled": "Context Injection",
+  "wb_option_self_evolution_enabled": "Self-Evolution",
+  "wb_option_learning_enabled": "Learning",
+  "wb_option_agent_system_prompt": "Agent System Prompt",
+
+  "wb_field_value_label": "Value",
+  "wb_field_config_value_placeholder": "New value",
+  "wb_field_config_value_description": "The new value to set for the configuration key",
+
+  "wb_field_job_name_label": "Job Name",
+  "wb_field_job_name_placeholder": "e.g. daily-report",
+  "wb_field_job_name_description": "Unique name for the scheduled job",
+  "wb_field_toggle_job_name_description": "Name of the job to enable or disable",
+
+  "wb_field_schedule_label": "Schedule",
+  "wb_field_schedule_placeholder": "Cron expression",
+  "wb_field_schedule_description": "Cron schedule for when to run the job",
+
+  "wb_field_payload_type_label": "Payload Type",
+  "wb_field_payload_type_description": "The type of action the job will execute",
+  "wb_option_payload_heartbeat": "Heartbeat",
+  "wb_option_payload_agent_turn": "Agent Turn",
+  "wb_option_payload_notify": "Notify",
+  "wb_option_payload_send_via_channel": "Send via Channel",
+  "wb_option_payload_workflow": "Workflow",
+
+  "wb_field_enabled_label": "Enabled",
+  "wb_field_enabled_description": "Whether the job should be enabled (true) or disabled (false)",
+
+  "wb_field_seconds_label": "Seconds",
+  "wb_field_seconds_placeholder": "Duration in seconds",
+  "wb_field_delay_seconds_description": "Number of seconds to pause before continuing",
+
+  "wb_field_expression_label": "Expression",
+  "wb_field_expression_placeholder": "e.g. steps.check.output == \"ok\"",
+  "wb_field_expression_description": "Boolean expression evaluated to determine the branch",
+
+  "wb_field_if_true_label": "If True",
+  "wb_field_if_true_description": "Step to execute when the expression evaluates to true",
+
+  "wb_field_if_false_label": "If False",
+  "wb_field_if_false_description": "Step to execute when the expression evaluates to false",
+
+  "wb_field_steps_label": "Steps",
+  "wb_field_parallel_steps_description": "Steps to execute concurrently"
 }

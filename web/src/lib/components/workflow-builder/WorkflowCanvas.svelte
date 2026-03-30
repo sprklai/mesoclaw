@@ -1,12 +1,15 @@
 <script lang="ts">
-	import { SvelteFlow, Controls, Background, type NodeTypes, type Connection, type Edge } from '@xyflow/svelte';
+	import { SvelteFlow, Controls, Background, useSvelteFlow, type NodeTypes, type Connection, type Edge } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import StandardNode from './nodes/StandardNode.svelte';
 	import ConditionNode from './nodes/ConditionNode.svelte';
 	import TriggerNode from './nodes/TriggerNode.svelte';
 	import { builderStore } from '$lib/stores/workflow-builder.svelte';
+	import { themeStore } from '$lib/stores/theme.svelte';
 	import { nodeRegistry } from './node-registry';
 	import { generateStepName } from './graph-utils';
+
+	const { screenToFlowPosition } = useSvelteFlow();
 
 	const nodeTypes: NodeTypes = {
 		standard: StandardNode as unknown as NodeTypes[string],
@@ -74,12 +77,8 @@
 			}
 		}
 
-		// Approximate canvas position from drop coordinates
-		const bounds = (e.currentTarget as HTMLElement).getBoundingClientRect();
-		const position = {
-			x: e.clientX - bounds.left,
-			y: e.clientY - bounds.top
-		};
+		// Convert screen coordinates to flow canvas position
+		const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
 		builderStore.addNode({
 			id: stepName,
@@ -110,15 +109,15 @@
 	ondrop={handleDrop}
 >
 	<SvelteFlow
-		nodes={builderStore.nodes}
-		edges={builderStore.edges}
+		bind:nodes={builderStore.nodes}
+		bind:edges={builderStore.edges}
 		{nodeTypes}
 		onconnect={handleConnect}
 		onnodeclick={handleNodeClick}
 		onpaneclick={handlePaneClick}
 		ondelete={handleDelete}
 		fitView
-		colorMode="dark"
+		colorMode={themeStore.isDark ? 'dark' : 'light'}
 		deleteKey={[]}
 	>
 		<Controls />

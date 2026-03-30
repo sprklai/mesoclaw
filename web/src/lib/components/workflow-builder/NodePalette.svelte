@@ -41,7 +41,7 @@
 		})
 	);
 
-	const grouped = $derived(() => {
+	const grouped = $derived.by(() => {
 		const map = new Map<NodeCategory, NodeDefinition[]>();
 		for (const d of visibleDefs) {
 			const arr = map.get(d.category) || [];
@@ -78,7 +78,7 @@
 
 	<div class="flex-1 overflow-y-auto">
 		{#each CATEGORY_ORDER as cat}
-			{@const defs = grouped().get(cat)}
+			{@const defs = grouped.get(cat)}
 			{#if defs && defs.length > 0}
 				<div class="border-b">
 					<button

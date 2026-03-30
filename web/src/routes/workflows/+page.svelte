@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { toast } from 'svelte-sonner';
 	import * as Card from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import WorkflowIcon from '@lucide/svelte/icons/workflow';
@@ -81,15 +82,15 @@
 			formError = '';
 			showForm = true;
 		} catch (e) {
-			// Fallback: could show error
+			toast.error(e instanceof Error ? e.message : m.workflows_update_error());
 		}
 	}
 
 	async function handleRun(id: string) {
 		try {
 			await workflowsStore.run(id);
-		} catch {
-			// Could show a toast here
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : m.workflows_create_error());
 		}
 	}
 
@@ -115,8 +116,8 @@
 		try {
 			const raw = await workflowsStore.getRawToml(wf.id);
 			exportWorkflowToml(raw, wf.name);
-		} catch {
-			// Could show a toast here
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : t('wb_import_error_parse'));
 		}
 	}
 

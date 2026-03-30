@@ -98,25 +98,37 @@ export function graphToWorkflow(
     incomingEdges.set(edge.target, existing);
   }
 
-  const steps: WorkflowStep[] = nodes.map((node) => {
-    const data = node.data as Record<string, unknown>;
-    const defType = data.definitionType as string | undefined;
-    const def = defType ? nodeRegistry.get(defType) : undefined;
-    const stepFields = def?.toStep ? def.toStep(data) : {};
+  // Identify trigger nodes (visual-only, no backend StepType equivalent)
+  const triggerNodeIds = new Set(
+    nodes
+      .filter((n) => {
+        const dt = (n.data as Record<string, unknown>).definitionType as string | undefined;
+        return dt === 'trigger_manual' || dt === 'trigger_cron';
+      })
+      .map((n) => n.id),
+  );
 
-    const step: WorkflowStep = {
-      ...(stepFields as Partial<WorkflowStep>),
-      type: (stepFields as Record<string, unknown>).type as string ?? 'tool',
-      name: (data.stepName as string) || node.id,
-      depends_on: incomingEdges.get(node.id) ?? [],
-    };
+  const steps: WorkflowStep[] = nodes
+    .filter((node) => !triggerNodeIds.has(node.id))
+    .map((node) => {
+      const data = node.data as Record<string, unknown>;
+      const defType = data.definitionType as string | undefined;
+      const def = defType ? nodeRegistry.get(defType) : undefined;
+      const stepFields = def?.toStep ? def.toStep(data) : {};
 
-    if (data.timeout_secs !== undefined) step.timeout_secs = data.timeout_secs as number;
-    if (data.retry !== undefined) step.retry = data.retry as number;
-    if (data.failure_policy !== undefined) step.failure_policy = data.failure_policy as string;
+      const step: WorkflowStep = {
+        ...(stepFields as Partial<WorkflowStep>),
+        type: (stepFields as Record<string, unknown>).type as string ?? 'tool',
+        name: (data.stepName as string) || node.id,
+        depends_on: (incomingEdges.get(node.id) ?? []).filter((id) => !triggerNodeIds.has(id)),
+      };
 
-    return step;
-  });
+      if (data.timeout_secs !== undefined) step.timeout_secs = data.timeout_secs as number;
+      if (data.retry !== undefined) step.retry = data.retry as number;
+      if (data.failure_policy !== undefined) step.failure_policy = data.failure_policy as string;
+
+      return step;
+    });
 
   const layout: WorkflowLayout = {};
   for (const node of nodes) {
@@ -267,6 +279,68 @@ export function generateStepName(baseName: string, existingNames: string[]): str
   }
 
   return `${baseName}_${counter}`;
+}
+
+/**
+ * Serialize a Workflow object to TOML string suitable for the backend API.
+ */
+export function workflowToToml(wf: Workflow): string {
+  const lines: string[] = [];
+  lines.push(`id = ${tomlStr(wf.id)}`);
+  lines.push(`name = ${tomlStr(wf.name)}`);
+  lines.push(`description = ${tomlStr(wf.description)}`);
+  if (wf.schedule) lines.push(`schedule = ${tomlStr(wf.schedule)}`);
+  lines.push('');
+
+  for (const step of wf.steps) {
+    lines.push('[[steps]]');
+    lines.push(`name = ${tomlStr(step.name)}`);
+    lines.push(`type = ${tomlStr(step.type)}`);
+    if (step.tool) lines.push(`tool = ${tomlStr(step.tool)}`);
+    if (step.prompt) lines.push(`prompt = ${tomlStr(step.prompt)}`);
+    if (step.model) lines.push(`model = ${tomlStr(step.model)}`);
+    if (step.seconds !== undefined) lines.push(`seconds = ${step.seconds}`);
+    if (step.expression) lines.push(`expression = ${tomlStr(step.expression)}`);
+    if (step.if_true) lines.push(`if_true = ${tomlStr(step.if_true)}`);
+    if (step.if_false) lines.push(`if_false = ${tomlStr(step.if_false)}`);
+    if (step.steps && step.steps.length > 0) {
+      lines.push(`steps = [${step.steps.map(tomlStr).join(', ')}]`);
+    }
+    if (step.depends_on.length > 0) {
+      lines.push(`depends_on = [${step.depends_on.map(tomlStr).join(', ')}]`);
+    }
+    if (step.timeout_secs) lines.push(`timeout_secs = ${step.timeout_secs}`);
+    if (step.args && Object.keys(step.args).length > 0) {
+      lines.push(`args = ${tomlInlineTable(step.args)}`);
+    }
+    lines.push('');
+  }
+
+  if (wf.layout && Object.keys(wf.layout).length > 0) {
+    lines.push('[layout]');
+    for (const [name, pos] of Object.entries(wf.layout)) {
+      lines.push(`${name} = { x = ${pos.x.toFixed(1)}, y = ${pos.y.toFixed(1)} }`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+/** Escape a string for TOML (double-quoted). */
+function tomlStr(s: string): string {
+  return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}"`;
+}
+
+/** Serialize a flat object as a TOML inline table: { key = "val", num = 5 } */
+function tomlInlineTable(obj: Record<string, unknown>): string {
+  const pairs: string[] = [];
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === 'string') pairs.push(`${k} = ${tomlStr(v)}`);
+    else if (typeof v === 'number' || typeof v === 'boolean') pairs.push(`${k} = ${v}`);
+    else if (Array.isArray(v)) pairs.push(`${k} = [${v.map(item => typeof item === 'string' ? tomlStr(item) : String(item)).join(', ')}]`);
+  }
+  return `{ ${pairs.join(', ')} }`;
 }
 
 /**

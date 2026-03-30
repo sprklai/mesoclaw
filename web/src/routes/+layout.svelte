@@ -24,6 +24,7 @@
 	import { page } from '$app/state';
 	import { sessionsStore } from '$lib/stores/sessions.svelte';
 	import { notificationStore } from '$lib/stores/notifications.svelte';
+	import { capabilitiesStore } from '$lib/stores/capabilities.svelte';
 	import { getBaseUrl, getToken } from '$lib/api/client';
 	import { getAppVersion, openInBrowser } from '$lib/tauri';
 	import { onDestroy } from 'svelte';
@@ -40,6 +41,7 @@
 	/** Called by AuthGate once the gateway is authenticated and ready. */
 	function handleGatewayReady() {
 		sessionsStore.load();
+		capabilitiesStore.load();
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 
 		const baseUrl = getBaseUrl();
