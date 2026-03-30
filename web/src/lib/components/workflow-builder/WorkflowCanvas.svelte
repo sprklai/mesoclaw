@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SvelteFlow, Controls, Background, useSvelteFlow, type NodeTypes, type Connection, type Edge } from '@xyflow/svelte';
+	import { SvelteFlow, Controls, Background, type NodeTypes, type Connection, type Edge } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import StandardNode from './nodes/StandardNode.svelte';
 	import ConditionNode from './nodes/ConditionNode.svelte';
@@ -8,8 +8,6 @@
 	import { themeStore } from '$lib/stores/theme.svelte';
 	import { nodeRegistry } from './node-registry';
 	import { generateStepName } from './graph-utils';
-
-	const { screenToFlowPosition } = useSvelteFlow();
 
 	const nodeTypes: NodeTypes = {
 		standard: StandardNode as unknown as NodeTypes[string],
@@ -77,8 +75,12 @@
 			}
 		}
 
-		// Convert screen coordinates to flow canvas position
-		const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+		// Approximate canvas position from drop coordinates
+		const bounds = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		const position = {
+			x: e.clientX - bounds.left,
+			y: e.clientY - bounds.top
+		};
 
 		builderStore.addNode({
 			id: stepName,
