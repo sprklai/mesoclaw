@@ -16,7 +16,7 @@
   "devDependencies": {
     "@inlang/plugin-message-format": "^4.3.0",
     "@internationalized/date": "^3.10.0",
-    "@lucide/svelte": "^0.577.0",
+    "@lucide/svelte": "^1.7.0",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.50.2",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
