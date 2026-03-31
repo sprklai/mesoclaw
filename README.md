@@ -4,8 +4,14 @@
   <img src="crates/zenii-desktop/icons/icon.png" alt="Zenii" width="180" />
 </p>
 
+<p align="center">
+  <img src="assets/zenii-master.gif" alt="Zenii Demo" width="720" />
+</p>
+
 <h1 align="center">20 megabytes. AI everywhere.</h1>
 <h3 align="center"><em>Every tool on your machine shares one AI brain.</em></h3>
+
+<p align="center">If Zenii looks useful, <a href="https://github.com/sprklai/zenii">star the repo</a> to help others find it.</p>
 
 <p align="center"><code>20 MB desktop · 114 API routes · 18 tools · 6+ model providers · 1,500+ tests · One shared brain</code></p>
 
@@ -17,74 +23,23 @@
   <a href="https://docs.zenii.sprklai.com">https://docs.zenii.sprklai.com</a>
 </p>
 
-<!-- Row 1: CI & Release -->
 <p align="center">
-  <a href="https://github.com/sprklai/zenii/actions/workflows/release.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/sprklai/zenii/release.yml?style=flat-square&label=release" alt="Release Build" />
+  <a href="https://github.com/sprklai/zenii/releases/latest">
+    <img src="https://img.shields.io/github/v/release/sprklai/zenii?style=flat-square" alt="Latest Release" />
   </a>
   <a href="https://github.com/sprklai/zenii/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/sprklai/zenii/ci.yml?style=flat-square&label=CI" alt="CI" />
   </a>
-  <a href="https://github.com/sprklai/zenii/releases/latest">
-    <img src="https://img.shields.io/github/v/release/sprklai/zenii?style=flat-square" alt="Latest Release" />
-  </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License" />
   </a>
-  <a href="https://docs.zenii.sprklai.com">
-    <img src="https://img.shields.io/badge/docs-zenii-blue?style=flat-square" alt="Documentation" />
-  </a>
-</p>
-
-<!-- Row 2: Tech Stack -->
-<p align="center">
-  <img src="https://img.shields.io/badge/Rust-2024%20Edition-orange?style=flat-square&logo=rust" alt="Rust 2024 Edition" />
-  <img src="https://img.shields.io/badge/Tauri-2-24C8D8?style=flat-square&logo=tauri&logoColor=white" alt="Tauri 2" />
-  <img src="https://img.shields.io/badge/Svelte-5-FF3E00?style=flat-square&logo=svelte&logoColor=white" alt="Svelte 5" />
-  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/SQLite-rusqlite%20%2B%20sqlite--vec-003B57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite + rusqlite + sqlite-vec" />
-</p>
-
-<!-- Row 3: App Modes & Platform -->
-<p align="center">
-  <img src="https://img.shields.io/badge/mode-Desktop%20GUI-8B5CF6?style=flat-square" alt="Desktop GUI" />
-  <img src="https://img.shields.io/badge/mode-CLI-4B5563?style=flat-square" alt="CLI" />
-  <img src="https://img.shields.io/badge/mode-Daemon-1F2937?style=flat-square" alt="Daemon" />
-  <img src="https://img.shields.io/badge/Windows-0078D4?style=flat-square&logo=windows&logoColor=white" alt="Windows" />
-  <img src="https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS" />
-  <img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux" />
-  <img src="https://img.shields.io/badge/ARM64-CLI-6C757D?style=flat-square&logo=arm&logoColor=white" alt="ARM64 CLI" />
-  <!-- <img src="https://img.shields.io/badge/i18n-8%20languages-2196F3?style=flat-square&logo=translate&logoColor=white" alt="i18n 8 languages" /> -->
-</p>
-
-<!-- Row 4: Languages -->
-<p align="center">
-  <img src="https://img.shields.io/badge/🌐-languages-555?style=flat-square" alt="Languages" />
-  <img src="https://img.shields.io/badge/English-en-4B5563?style=flat-square" alt="English" />
-  <img src="https://img.shields.io/badge/中文-zh--CN-E53935?style=flat-square" alt="Chinese" />
-  <img src="https://img.shields.io/badge/Español-es-F9A825?style=flat-square" alt="Spanish" />
-  <img src="https://img.shields.io/badge/日本語-ja-EC407A?style=flat-square" alt="Japanese" />
-  <img src="https://img.shields.io/badge/%E0%A4%B9%E0%A4%BF%E0%A4%A8%E0%A5%8D%E0%A4%A6%E0%A5%80-hi-FF7043?style=flat-square" alt="Hindi" />
-  <img src="https://img.shields.io/badge/Português-pt--BR-43A047?style=flat-square" alt="Portuguese" />
-  <img src="https://img.shields.io/badge/한국어-ko-7E57C2?style=flat-square" alt="Korean" />
-  <img src="https://img.shields.io/badge/Français-fr-1E88E5?style=flat-square" alt="French" />
-</p>
-
-<!-- Row 5: Community -->
-<p align="center">
   <a href="https://github.com/sprklai/zenii/stargazers">
     <img src="https://img.shields.io/github/stars/sprklai/zenii?style=flat-square" alt="GitHub Stars" />
-  </a>
-  <a href="https://github.com/sprklai/zenii/issues">
-    <img src="https://img.shields.io/github/issues/sprklai/zenii?style=flat-square" alt="GitHub Issues" />
   </a>
   <a href="https://github.com/sprklai/zenii/pulls">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome" />
   </a>
-</p>
-
-<p align="center">
-  <img src="assets/zenii-master.gif" alt="Zenii Demo" width="720" />
+  <img src="https://img.shields.io/badge/i18n-8%20languages-2196F3?style=flat-square&logo=translate&logoColor=white" alt="i18n 8 languages" />
 </p>
 
 ---
@@ -92,6 +47,18 @@
 > *"ChatGPT is a tab you open. Zenii is a capability your machine gains."*
 
 > *"Every tool you use is smart in isolation. Zenii makes them smart together."*
+
+## Try It in 30 Seconds
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | bash
+zenii-daemon &
+curl -s -X POST http://localhost:18981/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"hello","prompt":"What can you do?"}' | jq .response
+```
+
+That's it. One binary, one address, AI everywhere. Now read on for what you can build with it.
 
 ## Quick Start
 
@@ -798,8 +765,6 @@ Full route reference with request/response schemas: **[docs/api-reference.md](do
 ---
 
 ## Contributing
-
-If Zenii looks useful, consider giving it a [star on GitHub](https://github.com/sprklai/zenii) — it helps others discover the project.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines. Quick summary:
 
