@@ -78,7 +78,7 @@ pulldown-cmark = { version = "0.13", optional = true, default-features = false, 
 fastembed = { workspace = true, optional = true }
 
 # Phase 8: Scheduler (optional)
-cron = { version = "0.15", optional = true }
+cron = { version = "0.16", optional = true }
 
 # Feature 5: Workflow Engine (optional)
 petgraph = { workspace = true, optional = true }
