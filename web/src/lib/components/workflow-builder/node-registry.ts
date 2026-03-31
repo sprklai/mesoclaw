@@ -620,7 +620,12 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
 		handles: STANDARD_HANDLES,
 		featureGate: 'channels',
 		fromStep: toolFromStep(['channel', 'message']),
-		toStep: toolToStep('channel_send', ['channel', 'message'])
+		toStep(data: StepRec): StepRec {
+			const args: StepRec = { action: 'send' };
+			if (data.channel !== undefined) args.channel = data.channel;
+			if (data.message !== undefined) args.message = data.message;
+			return { type: 'tool', tool: 'channel_send', args };
+		}
 	},
 	{
 		type: 'notify',
