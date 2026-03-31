@@ -1,14 +1,14 @@
 # Zenii *(zen-ee-eye)*
 
-<p align="center">
+<!-- <p align="center">
   <img src="crates/zenii-desktop/icons/icon.png" alt="Zenii" width="180" />
-</p>
+</p> -->
 
 <p align="center">
   <img src="assets/zenii-master.gif" alt="Zenii Demo" width="720" />
 </p>
 
-<h1 align="center">20 megabytes. AI everywhere.</h1>
+<h1 align="center">Zenii: 20 megabytes. AI everywhere.</h1>
 <h3 align="center"><em>Every tool on your machine shares one AI brain.</em></h3>
 
 <p align="center">If Zenii looks useful, <a href="https://github.com/sprklai/zenii">star the repo</a> to help others find it.</p>
@@ -124,6 +124,7 @@ Get notified on Discord. **Nothing is siloed. Everything converges.**
 - Not a framework you learn — it's infrastructure you call via `curl`
 - Not cloud-dependent — runs fully offline with Ollama
 - Not opinionated about your stack — any language, any tool, JSON over HTTP
+- Not a walled garden — supports [MCP](https://modelcontextprotocol.io/) and [A2A](https://github.com/a2aproject/A2A) protocols for agent interoperability. See [AGENT.md](AGENT.md) for integration details.
 
 ---
 
