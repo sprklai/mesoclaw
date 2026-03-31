@@ -201,8 +201,8 @@ function createWorkflowBuilderStore() {
       isDirty = false;
       viewMode = "visual";
       isRunning = false;
-      // Release after SvelteFlow processes the initial bind:nodes/bind:edges update
-      requestAnimationFrame(() => { suppressDirty = false; });
+      // Release after SvelteFlow fully processes bind:nodes/bind:edges + fitView
+      setTimeout(() => { suppressDirty = false; }, 150);
     },
 
     // Reset for a new workflow
@@ -218,13 +218,17 @@ function createWorkflowBuilderStore() {
       isDirty = false;
       viewMode = "visual";
       isRunning = false;
-      requestAnimationFrame(() => { suppressDirty = false; });
+      setTimeout(() => { suppressDirty = false; }, 150);
     },
 
     // Mark as saved (clears dirty flag)
+    // Must suppress SvelteFlow's reactive bind:nodes/bind:edges writeback
+    // which otherwise immediately re-sets isDirty via the setters.
     markSaved(id?: string) {
+      suppressDirty = true;
       if (id) workflowId = id;
       isDirty = false;
+      setTimeout(() => { suppressDirty = false; }, 150);
     },
   };
 }
