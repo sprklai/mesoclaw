@@ -18,6 +18,11 @@ export interface WorkflowLayout {
   [stepName: string]: NodePosition;
 }
 
+export interface RetryConfig {
+  max_retries: number;
+  retry_delay_ms: number;
+}
+
 export interface WorkflowStep {
   name: string;
   type: string;
@@ -32,8 +37,8 @@ export interface WorkflowStep {
   if_false?: string;
   steps?: string[];
   timeout_secs?: number;
-  retry?: number;
-  failure_policy?: string;
+  retry?: RetryConfig;
+  failure_policy?: string | { Fallback: { step: string } };
 }
 
 export interface Workflow {
@@ -91,8 +96,20 @@ export function graphToWorkflow(
   edges: Edge[],
   meta: WorkflowMeta,
 ): Workflow {
+  // Build a set of condition node IDs so we can filter their handle edges from depends_on
+  const conditionNodeIds = new Set(
+    nodes
+      .filter((n) => (n.data as Record<string, unknown>).definitionType === 'condition')
+      .map((n) => n.id),
+  );
+
+  // Build incoming dependency edges, excluding condition branch edges (true/false handles)
   const incomingEdges = new Map<string, string[]>();
   for (const edge of edges) {
+    // Skip edges from condition node's true/false handles — those are represented by if_true/if_false fields
+    if (conditionNodeIds.has(edge.source) && (edge.sourceHandle === 'true' || edge.sourceHandle === 'false')) {
+      continue;
+    }
     const existing = incomingEdges.get(edge.target) ?? [];
     existing.push(edge.source);
     incomingEdges.set(edge.target, existing);
@@ -124,8 +141,24 @@ export function graphToWorkflow(
       };
 
       if (data.timeout_secs !== undefined) step.timeout_secs = data.timeout_secs as number;
-      if (data.retry !== undefined) step.retry = data.retry as number;
-      if (data.failure_policy !== undefined) step.failure_policy = data.failure_policy as string;
+
+      // Retry: accept RetryConfig object from node data
+      if (data.retry !== undefined && data.retry !== null) {
+        const r = data.retry as Record<string, unknown>;
+        if (typeof r === 'object' && r.max_retries !== undefined) {
+          step.retry = { max_retries: Number(r.max_retries), retry_delay_ms: Number(r.retry_delay_ms ?? 1000) };
+        }
+      }
+
+      // Failure policy: accept string or Fallback object
+      if (data.failure_policy !== undefined) {
+        const fp = data.failure_policy;
+        if (typeof fp === 'string') {
+          step.failure_policy = fp === 'stop' ? undefined : fp;
+        } else {
+          step.failure_policy = fp as { Fallback: { step: string } };
+        }
+      }
 
       return step;
     });
@@ -243,12 +276,13 @@ export function autoLayout(nodes: Node[], edges: Edge[]): Node[] {
 }
 
 /**
- * Derive edges from workflow step dependency declarations.
+ * Derive edges from workflow step dependency declarations and condition branches.
  */
 export function deriveEdges(steps: WorkflowStep[]): Edge[] {
   const edges: Edge[] = [];
 
   for (const step of steps) {
+    // Dependency edges
     for (const dep of step.depends_on) {
       edges.push({
         id: `e-${dep}-${step.name}`,
@@ -257,6 +291,30 @@ export function deriveEdges(steps: WorkflowStep[]): Edge[] {
         animated: false,
         type: 'default',
       });
+    }
+
+    // Condition branch edges — reconstruct from if_true/if_false fields
+    if (step.type === 'condition') {
+      if (step.if_true) {
+        edges.push({
+          id: `e-${step.name}-true-${step.if_true}`,
+          source: step.name,
+          target: step.if_true,
+          sourceHandle: 'true',
+          animated: false,
+          type: 'default',
+        });
+      }
+      if (step.if_false) {
+        edges.push({
+          id: `e-${step.name}-false-${step.if_false}`,
+          source: step.name,
+          target: step.if_false,
+          sourceHandle: 'false',
+          animated: false,
+          type: 'default',
+        });
+      }
     }
   }
 
@@ -310,6 +368,16 @@ export function workflowToToml(wf: Workflow): string {
       lines.push(`depends_on = [${step.depends_on.map(tomlStr).join(', ')}]`);
     }
     if (step.timeout_secs) lines.push(`timeout_secs = ${step.timeout_secs}`);
+    if (step.retry) {
+      lines.push(`retry = { max_retries = ${step.retry.max_retries}, retry_delay_ms = ${step.retry.retry_delay_ms} }`);
+    }
+    if (step.failure_policy !== undefined) {
+      if (typeof step.failure_policy === 'string') {
+        lines.push(`failure_policy = ${tomlStr(step.failure_policy)}`);
+      } else if (step.failure_policy.Fallback) {
+        lines.push(`failure_policy = { Fallback = { step = ${tomlStr(step.failure_policy.Fallback.step)} } }`);
+      }
+    }
     if (step.args && Object.keys(step.args).length > 0) {
       lines.push(`args = ${tomlInlineTable(step.args)}`);
     }

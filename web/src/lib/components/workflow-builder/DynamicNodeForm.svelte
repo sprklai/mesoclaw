@@ -8,6 +8,15 @@
 	const node = $derived(builderStore.selectedNode);
 	const definition = $derived(node ? nodeRegistry.get(node.data.definitionType as string) : undefined);
 
+	const fpValue = $derived.by(() => {
+		if (!node) return 'stop';
+		const fp = node.data.failure_policy;
+		if (!fp || fp === 'stop') return 'stop';
+		if (fp === 'continue') return 'continue';
+		if (typeof fp === 'object') return 'fallback';
+		return String(fp);
+	});
+
 	function getNodeStepNames(): string[] {
 		return builderStore.nodes
 			.filter(n => n.id !== node?.id)
@@ -170,19 +179,48 @@
 				/>
 			</div>
 			<div class="space-y-1">
-				<label class="text-xs font-medium text-muted-foreground">{t('wb_config_retry_label')}</label>
+				<label class="text-xs font-medium text-muted-foreground">{t('wb_config_retry_max_label')}</label>
 				<input
 					type="number"
-					value={String(node.data.retry ?? '')}
-					oninput={(e) => updateCommon('retry', Number((e.target as HTMLInputElement).value) || undefined)}
+					value={String(((node.data.retry as Record<string, unknown>)?.max_retries) ?? '')}
+					oninput={(e) => {
+						const val = Number((e.target as HTMLInputElement).value);
+						if (!val) { updateCommon('retry', undefined); return; }
+						const prev = (node.data.retry as Record<string, unknown>) ?? {};
+						updateCommon('retry', { max_retries: val, retry_delay_ms: Number(prev.retry_delay_ms ?? 1000) });
+					}}
+					placeholder="3"
+					class="w-full rounded-md border bg-background text-foreground px-2 py-1.5 text-sm"
+				/>
+			</div>
+			<div class="space-y-1">
+				<label class="text-xs font-medium text-muted-foreground">{t('wb_config_retry_delay_label')}</label>
+				<input
+					type="number"
+					value={String(((node.data.retry as Record<string, unknown>)?.retry_delay_ms) ?? '')}
+					oninput={(e) => {
+						const val = Number((e.target as HTMLInputElement).value);
+						const prev = (node.data.retry as Record<string, unknown>) ?? {};
+						const maxRetries = Number(prev.max_retries ?? 3);
+						if (!val && !maxRetries) { updateCommon('retry', undefined); return; }
+						updateCommon('retry', { max_retries: maxRetries, retry_delay_ms: val || 1000 });
+					}}
+					placeholder="1000"
 					class="w-full rounded-md border bg-background text-foreground px-2 py-1.5 text-sm"
 				/>
 			</div>
 			<div class="space-y-1">
 				<label class="text-xs font-medium text-muted-foreground">{t('wb_config_failure_policy_label')}</label>
 				<select
-					value={String(node.data.failure_policy ?? 'stop')}
-					onchange={(e) => updateCommon('failure_policy', (e.target as HTMLSelectElement).value)}
+					value={fpValue}
+					onchange={(e) => {
+						const val = (e.target as HTMLSelectElement).value;
+						if (val === 'fallback') {
+							updateCommon('failure_policy', { Fallback: { step: '' } });
+						} else {
+							updateCommon('failure_policy', val);
+						}
+					}}
 					class="w-full rounded-md border bg-background text-foreground px-2 py-1.5 text-sm"
 				>
 					<option value="stop">{t('wb_config_failure_policy_stop')}</option>
@@ -190,6 +228,21 @@
 					<option value="fallback">{t('wb_config_failure_policy_fallback')}</option>
 				</select>
 			</div>
+			{#if fpValue === 'fallback'}
+				<div class="space-y-1">
+					<label class="text-xs font-medium text-muted-foreground">{t('wb_config_fallback_step_label')}</label>
+					<select
+						value={String((node.data.failure_policy as Record<string, Record<string, string>>)?.Fallback?.step ?? '')}
+						onchange={(e) => updateCommon('failure_policy', { Fallback: { step: (e.target as HTMLSelectElement).value } })}
+						class="w-full rounded-md border bg-background text-foreground px-2 py-1.5 text-sm"
+					>
+						<option value="">---</option>
+						{#each getNodeStepNames() as name}
+							<option value={name}>{name}</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

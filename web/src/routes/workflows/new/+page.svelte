@@ -17,7 +17,6 @@
 	import * as m from '$lib/paraglide/messages';
 
 	let codeContent = $state('');
-	let codeError = $state<string | null>(null);
 	let unsavedDialogOpen = $state(false);
 	let pendingNavigationUrl = $state<string | null>(null);
 
@@ -97,10 +96,6 @@
 		goto('/workflows');
 	}
 
-	function handleCodeInput(value: string) {
-		codeContent = value;
-		codeError = null;
-	}
 </script>
 
 <svelte:window onbeforeunload={handleBeforeUnload} onkeydown={handleKeyDown} />
@@ -116,8 +111,6 @@
 	{#if builderStore.viewMode === 'code'}
 		<CodeView
 			value={codeContent}
-			oninput={handleCodeInput}
-			error={codeError}
 		/>
 	{:else}
 		<div class="flex flex-1 min-h-0">

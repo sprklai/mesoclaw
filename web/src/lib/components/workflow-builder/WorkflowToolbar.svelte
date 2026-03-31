@@ -9,6 +9,7 @@
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import Circle from '@lucide/svelte/icons/circle';
+	import Clock from '@lucide/svelte/icons/clock';
 	import { t } from './i18n-utils';
 
 	let {
@@ -38,6 +39,17 @@
 			oninput={(e) => builderStore.updateMeta({ name: (e.target as HTMLInputElement).value })}
 			placeholder={t('wb_field_name')}
 			class="bg-transparent border-none text-sm font-medium focus:outline-none focus:ring-0 w-full"
+		/>
+	</div>
+
+	<div class="flex items-center gap-1.5">
+		<Clock class="h-3 w-3 text-muted-foreground" />
+		<input
+			type="text"
+			value={builderStore.workflowSchedule ?? ''}
+			oninput={(e) => builderStore.updateMeta({ schedule: (e.target as HTMLInputElement).value || null })}
+			placeholder={t('wb_toolbar_schedule_placeholder')}
+			class="bg-transparent border border-dashed rounded px-1.5 py-0.5 text-xs text-muted-foreground focus:outline-none focus:border-foreground/40 w-32 font-mono"
 		/>
 	</div>
 

@@ -1,4 +1,5 @@
 import type { Node, Edge } from "@xyflow/svelte";
+import { nodeRegistry } from "$lib/components/workflow-builder/node-registry";
 
 function createWorkflowBuilderStore() {
   // Canvas state
@@ -137,12 +138,33 @@ function createWorkflowBuilderStore() {
       isDirty = true;
     },
 
-    // Rename a node: update its id, data.stepName, and any edges referencing it
+    // Rename a node: update its id, data.stepName, edges, and step-ref fields in other nodes
     renameNode(oldId: string, newId: string) {
       if (oldId === newId) return;
-      nodes = nodes.map((n) =>
-        n.id === oldId ? { ...n, id: newId, data: { ...n.data, stepName: newId } } : n,
-      );
+      nodes = nodes.map((n) => {
+        if (n.id === oldId) {
+          return { ...n, id: newId, data: { ...n.data, stepName: newId } };
+        }
+        // Rewrite step-ref/step-refs fields in other nodes that reference the old name
+        const defType = (n.data as Record<string, unknown>).definitionType as string | undefined;
+        const def = defType ? nodeRegistry.get(defType) : undefined;
+        if (!def) return n;
+        let changed = false;
+        const newData = { ...n.data } as Record<string, unknown>;
+        for (const field of def.fields) {
+          if (field.type === 'step-ref' && newData[field.key] === oldId) {
+            newData[field.key] = newId;
+            changed = true;
+          } else if (field.type === 'step-refs' && Array.isArray(newData[field.key])) {
+            const arr = newData[field.key] as string[];
+            if (arr.includes(oldId)) {
+              newData[field.key] = arr.map((s) => (s === oldId ? newId : s));
+              changed = true;
+            }
+          }
+        }
+        return changed ? { ...n, data: newData } : n;
+      });
       edges = edges.map((e) => ({
         ...e,
         source: e.source === oldId ? newId : e.source,

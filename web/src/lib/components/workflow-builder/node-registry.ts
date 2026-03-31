@@ -48,6 +48,7 @@ export interface NodeDefinition {
 	fields: NodeFieldDef[];
 	handles: HandleDef[];
 	featureGate?: string;
+	hidden?: boolean;
 	fromStep(step: Record<string, unknown>): Record<string, unknown>;
 	toStep(data: Record<string, unknown>): Record<string, unknown>;
 }
@@ -130,6 +131,7 @@ const CONFIG_KEY_OPTIONS = [
 
 export const NODE_DEFINITIONS: NodeDefinition[] = [
 	// ── Triggers ──────────────────────────────────────────────────────────
+	// Hidden: trigger nodes are visual-only — schedule is set via toolbar metadata
 	{
 		type: 'trigger_cron',
 		label: 'wb_node_trigger_cron_label',
@@ -137,6 +139,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
 		icon: 'Clock',
 		description: 'wb_node_trigger_cron_description',
 		visual: 'trigger',
+		hidden: true,
 		fields: [
 			{
 				key: 'cron_expr',
@@ -163,6 +166,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
 		icon: 'PlayCircle',
 		description: 'wb_node_trigger_manual_description',
 		visual: 'trigger',
+		hidden: true,
 		fields: [],
 		handles: TRIGGER_HANDLES,
 		fromStep() {
@@ -854,6 +858,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
 			return out;
 		}
 	},
+	// Hidden: backend parallel execution not yet implemented (executor.rs:349)
 	{
 		type: 'parallel',
 		label: 'wb_node_parallel_label',
@@ -861,6 +866,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
 		icon: 'GitFork',
 		description: 'wb_node_parallel_description',
 		visual: 'standard',
+		hidden: true,
 		fields: [
 			{
 				key: 'steps',
@@ -926,6 +932,6 @@ export const nodeRegistry = {
 	 */
 	getVisible(capabilities: string[]): NodeDefinition[] {
 		const caps = new Set(capabilities);
-		return NODE_DEFINITIONS.filter((def) => !def.featureGate || caps.has(def.featureGate));
+		return NODE_DEFINITIONS.filter((def) => !def.hidden && (!def.featureGate || caps.has(def.featureGate)));
 	}
 };

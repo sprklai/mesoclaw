@@ -616,6 +616,7 @@
   "wb_toolbar_view_visual": "Visual",
   "wb_toolbar_view_code": "Code",
   "wb_toolbar_unsaved": "Unsaved changes",
+  "wb_toolbar_schedule_placeholder": "Cron schedule",
 
   "wb_palette_title": "Nodes",
   "wb_palette_search": "Search nodes...",
@@ -626,11 +627,15 @@
   "wb_config_name_placeholder": "Unique step name",
   "wb_config_timeout_label": "Timeout (seconds)",
   "wb_config_retry_label": "Max Retries",
+  "wb_config_retry_max_label": "Max Retries",
+  "wb_config_retry_delay_label": "Retry Delay (ms)",
+  "wb_config_fallback_step_label": "Fallback Step",
   "wb_config_failure_policy_label": "On Failure",
   "wb_config_failure_policy_stop": "Stop",
   "wb_config_failure_policy_continue": "Continue",
   "wb_config_failure_policy_fallback": "Fallback",
 
+  "wb_code_readonly_notice": "Read-only. Edit nodes in the visual builder.",
   "wb_code_validation_error": "TOML validation error",
 
   "wb_import_button": "Import",
