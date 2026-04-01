@@ -1,3 +1,4 @@
+pub mod agent_card;
 pub mod approvals;
 #[cfg(feature = "channels")]
 pub mod channels;

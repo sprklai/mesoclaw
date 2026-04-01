@@ -222,6 +222,14 @@ pub struct AppConfig {
     pub learning_archive_threshold: f64,
     pub learning_archive_after_days: u32,
     pub skill_proposal_expiry_days: u32,
+
+    // MCP (Model Context Protocol)
+    /// Prefix prepended to tool names when exposed via MCP (e.g., "zenii_")
+    pub mcp_server_tool_prefix: String,
+    /// Allowlist of tool names to expose via MCP. Empty = expose all.
+    pub mcp_server_exposed_tools: Vec<String>,
+    /// Denylist of tool names to hide from MCP. Applied after allowlist.
+    pub mcp_server_hidden_tools: Vec<String>,
 }
 
 impl Default for AppConfig {
@@ -430,6 +438,11 @@ impl Default for AppConfig {
             learning_archive_threshold: 0.3,
             learning_archive_after_days: 30,
             skill_proposal_expiry_days: 7,
+
+            // MCP
+            mcp_server_tool_prefix: "zenii_".into(),
+            mcp_server_exposed_tools: vec![],
+            mcp_server_hidden_tools: vec![],
         }
     }
 }

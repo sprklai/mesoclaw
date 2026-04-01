@@ -117,6 +117,9 @@ pub enum ZeniiError {
     #[error("approval timed out: {0}")]
     ApprovalTimeout(String),
 
+    #[error("MCP error: {0}")]
+    Mcp(String),
+
     #[error("{0}")]
     Other(String),
 }

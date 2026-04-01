@@ -44,6 +44,7 @@ slug: /architecture
 - [Agent Delegation](#agent-delegation)
   - [Delegation System Flow](#delegation-system-flow)
 - [Workflow Engine](#workflow-engine)
+- [MCP Integration](#mcp-integration)
 - [Concurrency Rules](#concurrency-rules)
 - [Lessons Learned from v1](#lessons-learned-from-v1)
 
@@ -2164,6 +2165,66 @@ depends_on = ["fetch"]
 
 - `workflow_runs` -- run history: id, workflow_id, workflow_name, status, started_at, completed_at, error
 - `workflow_step_results` -- per-step results: id, run_id, step_name, output, success, duration_ms, error, executed_at
+
+---
+
+## MCP Integration
+
+Zenii supports the [Model Context Protocol](https://modelcontextprotocol.io/) as both a **server** (exposing tools to external AI agents) and a **client** (consuming tools from external MCP servers).
+
+### MCP Server Architecture
+
+```mermaid
+graph LR
+    subgraph External["MCP Clients"]
+        CC[Claude Code]
+        Cursor[Cursor]
+        VSCode[VS Code]
+    end
+
+    subgraph Zenii["zenii-mcp-server"]
+        Handler[ZeniiMcpServer]
+        Convert[convert module]
+    end
+
+    subgraph Core["zenii-core"]
+        TR[ToolRegistry]
+        SP[SecurityPolicy]
+    end
+
+    CC -->|stdio JSON-RPC| Handler
+    Cursor -->|stdio JSON-RPC| Handler
+    VSCode -->|stdio JSON-RPC| Handler
+    Handler --> Convert
+    Convert --> TR
+    Handler --> SP
+```
+
+**Key components:**
+- `ZeniiMcpServer` — implements `rmcp::ServerHandler` manually (tools are dynamic from `ToolRegistry`, not static)
+- `convert` module — bidirectional conversion between Zenii `ToolInfo`/`ToolResult` and rmcp `Tool`/`CallToolResult`
+- Security enforcement — every `call_tool` goes through `SecurityPolicy::validate_tool_execution()`
+- Tool filtering — configurable `mcp_server_exposed_tools` (allowlist) and `mcp_server_hidden_tools` (denylist)
+- Tool prefix — all tools exposed with `zenii_` prefix (configurable via `mcp_server_tool_prefix`)
+
+**Files:**
+- `crates/zenii-core/src/mcp/server.rs` — `ZeniiMcpServer` handler
+- `crates/zenii-core/src/mcp/convert.rs` — type conversions
+- `crates/zenii-mcp-server/src/main.rs` — thin binary (~75 lines)
+
+### A2A Agent Card
+
+The `GET /.well-known/agent.json` endpoint serves an A2A Agent Card for agent-to-agent discovery. This is a public endpoint (no auth required), served before the auth middleware layer alongside `/health`.
+
+**File:** `crates/zenii-core/src/gateway/handlers/agent_card.rs`
+
+### Feature Gates
+
+| Feature | What It Enables | New Deps |
+|---------|----------------|----------|
+| `mcp-server` | `ZeniiMcpServer`, convert module | rmcp, schemars |
+
+This feature is not in the default set — zero size impact on existing binaries.
 
 ---
 

@@ -15,8 +15,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     let cors = build_cors(&state.config.load().gateway_cors_origins);
 
     Router::new()
-        // System (no auth for health)
+        // System (no auth for health / agent card)
         .route("/health", get(handlers::health::health))
+        .route(
+            "/.well-known/agent.json",
+            get(handlers::agent_card::agent_card),
+        )
         // Sessions
         .route(
             "/sessions",

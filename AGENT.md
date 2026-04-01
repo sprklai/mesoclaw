@@ -273,11 +273,23 @@ Client Agent                         Zenii (A2A Server)
 
 ## MCP Integration (Model Context Protocol)
 
-[MCP](https://modelcontextprotocol.io/) is Anthropic's protocol for connecting AI agents to tools and data sources. Zenii can act as both an **MCP server** (exposing its tools to Claude Code, Cursor, etc.) and an **MCP client** (consuming tools from external MCP servers).
+[MCP](https://modelcontextprotocol.io/) is Anthropic's protocol for connecting AI agents to tools and data sources. Zenii acts as an **MCP server**, exposing its tools to Claude Code, Cursor, and any MCP-compatible client.
 
-### Zenii as MCP Server
+### Zenii as MCP Server (Implemented)
 
-Zenii's 18 tools map directly to MCP tool definitions. The [`rmcp`](https://crates.io/crates/rmcp) crate (official Rust MCP SDK) provides the `#[tool]` macro for zero-boilerplate tool exposure over stdio and HTTP transports.
+Zenii ships a standalone `zenii-mcp-server` binary that exposes all registered tools via the Model Context Protocol over stdio transport. Built with [`rmcp`](https://crates.io/crates/rmcp) v1.3 (official Rust MCP SDK).
+
+**Quick start:**
+
+```bash
+# Build the MCP server
+cargo build -p zenii-mcp-server --release
+
+# Test it works (sends initialize + tools/list)
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | ./target/release/zenii-mcp-server --transport stdio
+```
+
+All tools are exposed with a configurable `zenii_` prefix. Security policy enforcement applies — tools blocked by `SecurityPolicy` are denied via MCP too. Tool filtering is configurable via `mcp_server_exposed_tools` (allowlist) and `mcp_server_hidden_tools` (denylist) in `config.toml`.
 
 **MCP Tool Definitions** (what Zenii exposes to MCP clients):
 
@@ -346,17 +358,6 @@ Zenii's 18 tools map directly to MCP tool definitions. The [`rmcp`](https://crat
   }
 ]
 ```
-
-### Zenii as MCP Client
-
-[rig-core](https://crates.io/crates/rig-core) (Zenii's AI framework) already supports MCP via the `rmcp` feature flag. When enabled, Zenii can consume tools from any MCP server — GitHub, Postgres, Slack, filesystem servers, etc.
-
-```toml
-# In Cargo.toml (future):
-rig-core = { version = "0.33", features = ["rmcp"] }
-```
-
-This turns Zenii into an MCP hub: a single agent that orchestrates tools from the entire MCP ecosystem (1000+ servers) alongside its own 18 built-in tools.
 
 ### Claude Code Configuration
 

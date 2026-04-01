@@ -1,0 +1,30 @@
+[package]
+name = "zenii-mcp-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "MCP server for Zenii AI backend — exposes tools via Model Context Protocol"
+
+[[bin]]
+name = "zenii-mcp-server"
+path = "src/main.rs"
+
+[dependencies]
+zenii-core = { workspace = true, default-features = false, features = ["gateway", "ai", "mcp-server"] }
+rmcp = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+arc-swap = { workspace = true }
+
+[features]
+default = ["keyring"]
+keyring = ["zenii-core/keyring"]
+vendored-openssl = ["zenii-core/vendored-openssl"]
+
+[lints]
+workspace = true

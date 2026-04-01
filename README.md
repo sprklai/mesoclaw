@@ -124,7 +124,7 @@ Get notified on Discord. **Nothing is siloed. Everything converges.**
 - Not a framework you learn — it's infrastructure you call via `curl`
 - Not cloud-dependent — runs fully offline with Ollama
 - Not opinionated about your stack — any language, any tool, JSON over HTTP
-- Not a walled garden — supports [MCP](https://modelcontextprotocol.io/) and [A2A](https://github.com/a2aproject/A2A) protocols for agent interoperability. See [AGENT.md](AGENT.md) for integration details.
+- Not a walled garden — built-in [MCP server](https://modelcontextprotocol.io/) lets Claude Code, Cursor, and any MCP client use Zenii's tools natively. [A2A](https://github.com/a2aproject/A2A) Agent Card at `/.well-known/agent.json`. See [AGENT.md](AGENT.md) for integration details.
 
 ---
 
@@ -177,6 +177,40 @@ curl -X POST localhost:18981/chat \
 
 ---
 
+## MCP: Use Zenii from Claude Code, Cursor, or Any AI Agent
+
+Zenii ships a standalone **MCP server** binary. Any MCP-compatible client — Claude Code, Cursor, VS Code, Windsurf — can use Zenii's 18 tools natively.
+
+**Setup (Claude Code)** — add to your project `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "zenii": {
+      "command": "zenii-mcp-server",
+      "args": ["--transport", "stdio"]
+    }
+  }
+}
+```
+
+Now Claude Code can search the web, read/write files, execute shell commands, store/recall persistent memory, and more — all through Zenii's tool registry with security policy enforcement.
+
+**What MCP clients see:**
+
+```bash
+# Tools exposed (with zenii_ prefix):
+zenii_system_info, zenii_web_search, zenii_file_read, zenii_file_write,
+zenii_file_list, zenii_file_search, zenii_content_search, zenii_shell,
+zenii_process, zenii_patch, zenii_memory, zenii_learn, zenii_config, ...
+```
+
+**A2A Agent Card** — other agents can discover Zenii at `GET /.well-known/agent.json`.
+
+See [AGENT.md](AGENT.md) for full integration docs, tool schemas, and multi-agent examples.
+
+---
+
 ## How It Fits
 
 Zenii is a local AI infrastructure layer — not a chatbot, not a framework, not an API wrapper.
@@ -218,6 +252,8 @@ Your AI gets smarter. You stay in control. No surprises.
 - **Agent delegation** — parallel sub-agents for complex tasks with dependency waves, tool filtering, cancellation
 - **Cron scheduler** — automated recurring AI tasks
 - **6-layer security** — OS keyring with encrypted file fallback, autonomy levels, FS sandbox, injection detection (9 blocked commands + pipe patterns), rate limits, audit trail, agent timeout + abort on disconnect
+- **MCP server** — expose all tools to Claude Code, Cursor, and any MCP client via `zenii-mcp-server` binary (stdio transport). Feature-gated `mcp-server`
+- **A2A Agent Card** — `/.well-known/agent.json` endpoint for agent-to-agent discovery
 - **Cross-platform** — Linux, macOS, Windows, ARM (Raspberry Pi)
 
 <!-- Detailed feature descriptions below for SEO / deep readers -->
@@ -266,6 +302,7 @@ Your AI gets smarter. You stay in control. No surprises.
 | Desktop | Tauri 2 |
 | CLI | clap |
 | Plugins | JSON-RPC 2.0 external processes |
+| MCP | rmcp (server + client) -- feature-gated |
 | Channels | Telegram (teloxide), Slack, Discord (serenity) -- feature-gated |
 | Content | serde_yaml (YAML frontmatter parsing) |
 | i18n | paraglide-js -- 8 languages (EN, ZH, ES, JA, HI, PT, KO, FR) |
@@ -300,6 +337,7 @@ graph TD
     cli --> tungstenite["tokio-tungstenite<br>#40;WS#41;"]
     tui[zenii-tui] --> core
     daemon[zenii-daemon] --> core
+    mcpserver[zenii-mcp-server] --> core
 
     core --> axum["axum<br>#40;gateway#41;"]
     core --> rusqlite["rusqlite<br>#40;database#41;"]
@@ -449,6 +487,7 @@ graph TD
     Daemon --> Sc["--features scheduler"]
     Daemon --> Wf["--features workflows"]
     Daemon --> Wd["--features web-dashboard"]
+    Daemon --> Mcp["--features mcp-server"]
 
     Default --> GW["zenii-core/gateway"]
     GW --> Axum[axum + tower-http]
@@ -457,6 +496,8 @@ graph TD
     Wf --> WfCore[zenii-core/workflows]
     Wd --> WdCore[zenii-core/web-dashboard]
     WdCore --> GW
+    Mcp --> McpCore[zenii-core/mcp-server]
+    McpCore --> rmcp["rmcp<br>#40;MCP protocol#41;"]
 ```
 
 </details>
@@ -481,12 +522,13 @@ zenii/
 │   ├── deployment.md       # Deployment guide
 │   └── development.md      # Development guide
 ├── crates/
-│   ├── zenii-core/      # Shared library (NO Tauri dependency)
-│   ├── zenii-desktop/   # Tauri 2.10 shell (macOS, Windows, Linux)
-│   ├── zenii-mobile/    # Tauri 2 shell (iOS, Android) (future release)
-│   ├── zenii-cli/       # clap CLI
-│   ├── zenii-tui/       # ratatui TUI
-│   └── zenii-daemon/    # Headless daemon
+│   ├── zenii-core/         # Shared library (NO Tauri dependency)
+│   ├── zenii-desktop/      # Tauri 2.10 shell (macOS, Windows, Linux)
+│   ├── zenii-mobile/       # Tauri 2 shell (iOS, Android) (future release)
+│   ├── zenii-cli/          # clap CLI
+│   ├── zenii-tui/          # ratatui TUI
+│   ├── zenii-daemon/       # Headless daemon
+│   └── zenii-mcp-server/   # MCP server (stdio transport)
 └── web/                    # Svelte 5 SPA frontend (shared by desktop + mobile)
 ```
 

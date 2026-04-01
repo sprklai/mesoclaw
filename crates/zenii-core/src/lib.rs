@@ -21,6 +21,8 @@ pub mod boot;
 pub mod channels;
 #[cfg(feature = "gateway")]
 pub mod gateway;
+#[cfg(feature = "mcp-server")]
+pub mod mcp;
 #[cfg(feature = "scheduler")]
 pub mod scheduler;
 #[cfg(feature = "workflows")]

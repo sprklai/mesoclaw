@@ -44,6 +44,7 @@ slug: /architecture
 - [Agent Delegation](#agent-delegation)
   - [Delegation System Flow](#delegation-system-flow)
 - [Workflow Engine](#workflow-engine)
+- [MCP Integration](#mcp-integration)
 - [Concurrency Rules](#concurrency-rules)
 - [Lessons Learned from v1](#lessons-learned-from-v1)
 
@@ -195,11 +196,11 @@ zenii/
 │   │   │   ├── memory/     # Memory trait + SqliteMemoryStore (FTS5 + vectors) + InMemoryStore
 │   │   │   ├── credential/ # CredentialStore trait + KeyringStore + FileCredentialStore + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
-│   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 15 built-in tools
+│   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 17 built-in tools (15 base + 2 feature-gated)
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter, context engine, delegation
 │   │   │   │   └── delegation/ # Coordinator, SubAgent, DelegationTask, dependency-wave execution
 │   │   │   ├── workflows/  # WorkflowRegistry, WorkflowExecutor, StepRuntime, templates (feature-gated)
-│   │   │   ├── gateway/    # axum HTTP+WS gateway (63 core + 21 feature-gated = 84 routes, auth middleware, error mapping, ZENII_VALIDATION)
+│   │   │   ├── gateway/    # axum HTTP+WS gateway (86 base + 28 feature-gated = 114 routes, auth middleware, error mapping, ZENII_VALIDATION)
 │   │   │   ├── identity/   # SoulLoader + PromptComposer + defaults (SOUL/IDENTITY/USER.md)
 │   │   │   ├── skills/     # SkillRegistry + bundled/user skills (markdown + YAML frontmatter)
 │   │   │   ├── user/       # UserLearner + SQLite observations + privacy controls
@@ -245,7 +246,7 @@ zenii/
     │   │   │   ├── SessionList.svelte
     │   │   │   └── ThemeToggle.svelte
     │   │   ├── stores/      # 7 Svelte 5 rune stores ($state, includes channels)
-    │   │   ├── paraglide/   # i18n (paraglide-js, EN only, 24 keys)
+    │   │   ├── paraglide/   # i18n (paraglide-js, 8 locales, 577 keys)
     │   │   └── utils.ts     # shadcn utility helpers
     │   └── routes/          # 9 SPA routes
     │       ├── +page.svelte           # Home
@@ -498,7 +499,7 @@ graph TB
     end
 
     subgraph ChGateway["Gateway"]
-        Routes["6 feature-gated routes<br>+ 1 always-available test route"]
+        Routes["9 feature-gated routes<br>+ 1 always-available test route"]
     end
 
     subgraph ChFrontend["Frontend"]
@@ -796,7 +797,7 @@ graph TB
 
 ## Gateway Routes
 
-All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Routes are grouped by subsystem (83 base + 26 feature-gated = 109 total).
+All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Routes are grouped by subsystem (86 base + 28 feature-gated = 114 total).
 
 ### Health (1 route, no auth)
 
@@ -1111,6 +1112,15 @@ The frontend detects the Tauri environment via `window.__TAURI__` and provides t
 
 All wrappers are no-ops when running in a browser (non-Tauri) context, so the same frontend works for both desktop and web.
 
+### Frontend i18n
+
+- paraglide-js v2 for compile-time, type-safe translations
+- 8 locales auto-detected from `project.inlang/settings.json` (EN, ZH, ES, JA, HI, PT, KO, FR)
+- Locale store (`locale.svelte.ts`) mirrors theme store pattern
+- `messages/{locale}.json` flat-key files with `_meta_label` for native names
+- 577 message keys across 40+ components
+- Language switcher in Settings > General
+
 ## Scheduler Notification Flow (Stage 8.6.1)
 
 The `PayloadExecutor` (`scheduler/payload_executor.rs`) handles 4 payload types dispatched by the scheduler tick loop. The `TokioScheduler` and `AppState` have a circular dependency resolved via `OnceCell` — the scheduler is constructed first, then wired to `AppState` post-construction via `wire()`.
@@ -1277,7 +1287,7 @@ Four new agent-callable tools give the AI agent direct control over system funct
 
 ```mermaid
 graph TD
-    subgraph ToolRegistry["ToolRegistry - 15 tools"]
+    subgraph ToolRegistry["ToolRegistry - 17 tools"]
         subgraph Base["Built-in Tools - 15"]
             SysInfo[system_info]
             WebSearch[web_search]
@@ -2155,6 +2165,96 @@ depends_on = ["fetch"]
 
 - `workflow_runs` -- run history: id, workflow_id, workflow_name, status, started_at, completed_at, error
 - `workflow_step_results` -- per-step results: id, run_id, step_name, output, success, duration_ms, error, executed_at
+
+---
+
+## MCP Integration
+
+Zenii supports the [Model Context Protocol](https://modelcontextprotocol.io/) as both a **server** (exposing tools to external AI agents) and a **client** (consuming tools from external MCP servers).
+
+### MCP Server Architecture
+
+```mermaid
+graph LR
+    subgraph External["MCP Clients"]
+        CC[Claude Code]
+        Cursor[Cursor]
+        VSCode[VS Code]
+    end
+
+    subgraph Zenii["zenii-mcp-server"]
+        Handler[ZeniiMcpServer]
+        Convert[convert module]
+    end
+
+    subgraph Core["zenii-core"]
+        TR[ToolRegistry]
+        SP[SecurityPolicy]
+    end
+
+    CC -->|stdio JSON-RPC| Handler
+    Cursor -->|stdio JSON-RPC| Handler
+    VSCode -->|stdio JSON-RPC| Handler
+    Handler --> Convert
+    Convert --> TR
+    Handler --> SP
+```
+
+**Key components:**
+- `ZeniiMcpServer` — implements `rmcp::ServerHandler` manually (tools are dynamic from `ToolRegistry`, not static)
+- `convert` module — bidirectional conversion between Zenii `ToolInfo`/`ToolResult` and rmcp `Tool`/`CallToolResult`
+- Security enforcement — every `call_tool` goes through `SecurityPolicy::validate_tool_execution()`
+- Tool filtering — configurable `mcp_server_exposed_tools` (allowlist) and `mcp_server_hidden_tools` (denylist)
+- Tool prefix — all tools exposed with `zenii_` prefix (configurable via `mcp_server_tool_prefix`)
+
+**Files:**
+- `crates/zenii-core/src/mcp/server.rs` — `ZeniiMcpServer` handler
+- `crates/zenii-core/src/mcp/convert.rs` — type conversions
+- `crates/zenii-mcp-server/src/main.rs` — thin binary (~75 lines)
+
+### MCP Client Architecture
+
+```mermaid
+graph LR
+    subgraph Zenii["zenii-core"]
+        MCM[McpClientManager]
+        Agent[ZeniiAgent]
+    end
+
+    subgraph External["External MCP Servers"]
+        GH[GitHub MCP]
+        PG[Postgres MCP]
+        FS[Filesystem MCP]
+    end
+
+    MCM -->|stdio| GH
+    MCM -->|stdio| PG
+    MCM -->|stdio| FS
+    MCM -->|tools + sinks| Agent
+```
+
+**Key components:**
+- `McpClientManager` — spawns external MCP servers as child processes, connects via stdio transport
+- `list_tools()` returns `Vec<(McpTool, ServerSink)>` ready for rig-core's `AgentBuilder::rmcp_tools()`
+- Configuration via `mcp_client_servers` array in `config.toml`
+
+**Files:**
+- `crates/zenii-core/src/mcp/client.rs` — `McpClientManager`
+
+### A2A Agent Card
+
+The `GET /.well-known/agent.json` endpoint serves an A2A Agent Card for agent-to-agent discovery. This is a public endpoint (no auth required), served before the auth middleware layer alongside `/health`.
+
+**File:** `crates/zenii-core/src/gateway/handlers/agent_card.rs`
+
+### Feature Gates
+
+| Feature | What It Enables | New Deps |
+|---------|----------------|----------|
+| `mcp-server` | `ZeniiMcpServer`, convert module | rmcp, schemars |
+| `mcp-client` | `McpClientManager`, rig-core rmcp integration | rmcp (+ rig-core/rmcp) |
+
+Neither feature is in the default set — zero size impact on existing binaries.
 
 ---
 
