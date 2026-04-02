@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-04-02
+
 ### Added
 - MCP server binary (`zenii-mcp-server`) — exposes all tools via Model Context Protocol over stdio transport
 - MCP tool visibility enforcement — `mcp_server_exposed_tools` (allowlist) and `mcp_server_hidden_tools` (denylist) in config
 - MCP tool prefix (`zenii_`) with configurable naming via `mcp_server_tool_prefix`
 - A2A Agent Card endpoint at `GET /.well-known/agent.json`
 - Security policy enforcement for MCP tool calls
+- `AGENT.md` — integration guide for Claude Code, Cursor, Gemini CLI, and MCP clients
 
 ### Removed
 - MCP client module — removed non-functional client code and `mcp-client` feature flag
