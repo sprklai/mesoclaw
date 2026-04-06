@@ -93,7 +93,7 @@ serde_yaml = "0.9"
 
 # Feature 5: Workflow Engine (optional)
 petgraph = "0.8"
-minijinja = "2.9"
+minijinja = "2.19"
 
 # Phase 8.11: Local Embeddings (optional)
 fastembed = "4"
