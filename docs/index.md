@@ -6,24 +6,37 @@ title: Welcome
 
 # Zenii Documentation
 
-Welcome to the Zenii documentation. Zenii is a local AI backend that's private, fast, and extensible.
+Zenii is a local AI backend for developers who want one service behind their scripts, desktop UI, terminal tools, and MCP clients.
 
-## Quick Links
+## Start Here
 
-- **[Installation & Usage](./installation-and-usage.md)** — Get up and running in minutes
-- **[Configuration](./configuration.md)** — Customize Zenii to your needs
-- **[CLI Reference](./cli-reference.md)** — Command-line interface guide
-- **[API Reference](./api-reference.md)** — REST & WebSocket API docs
-- **[Architecture](./architecture.md)** — System design and internals
+- **[Installation & Usage](./installation-and-usage)** — Get up and running in minutes
+- **[API Reference](./api-reference)** — HTTP and WebSocket endpoints
+- **[CLI Reference](./cli-reference)** — Command-line usage and recipes
+- **[Configuration](./configuration)** — Runtime settings and defaults
+- **[Architecture](./architecture)** — System design and internals
+- **[Deployment](./deployment)** — Native, Docker, and server deployment
+- **[Development](./development)** — Build, test, and contribute
 
-## What is Zenii?
+## What Ships Today
 
-Zenii is a Rust-based local AI backend that provides:
+- **Daemon API** — Local REST and WebSocket service at `http://localhost:18981`
+- **Shipped interfaces** — Desktop app, CLI, TUI, and MCP server
+- **Persistent memory** — Shared local state across interfaces and automations
+- **Built-in tools** — 15 base tools, with channels, scheduler, and workflows behind feature flags
+- **Local-first deployment** — Self-hosted, MIT licensed, zero telemetry in the product surface
 
-- **5 client interfaces** — Desktop (Tauri), Mobile, CLI, TUI, and Daemon
-- **Privacy-first** — All data stays on your machine
-- **Extensible** — Plugin system, tool registry, and channel integrations
-- **OpenAI-compatible API** — Drop-in replacement for existing workflows
+## Good Fit
+
+- Developers building local automations, coding workflows, or agent tooling
+- Teams that want one internal AI backend instead of separate per-tool integrations
+- People who want a native desktop UI and a scriptable local API backed by the same service
+
+## Current Boundaries
+
+- Zenii is not a hosted SaaS
+- Zenii is not a drop-in OpenAI-compatible server today
+- Mobile is planned, but not shipped in this repository
 
 ## Interactive API Explorer
 

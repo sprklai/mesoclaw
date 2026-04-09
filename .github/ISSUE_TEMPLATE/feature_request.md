@@ -5,13 +5,17 @@ title: "[FEATURE] "
 labels: enhancement
 ---
 
-## Use Case
+## Problem
 
-Describe the problem or need this feature addresses.
+Describe the user problem or workflow gap first.
 
 ## Proposed Solution
 
 Describe your proposed solution.
+
+## Success Criteria
+
+How would you know this feature is complete and useful?
 
 ## Alternatives Considered
 

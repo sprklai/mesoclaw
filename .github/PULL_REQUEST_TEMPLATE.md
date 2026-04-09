@@ -22,6 +22,10 @@ Fixes #(issue number)
 - [ ] Documentation updated (if applicable)
 - [ ] No breaking changes (or documented in description)
 
+## Risk
+
+Anything reviewers should watch for, verify manually, or consider a possible regression.
+
 ## Screenshots
 
 If applicable, add screenshots for UI changes.

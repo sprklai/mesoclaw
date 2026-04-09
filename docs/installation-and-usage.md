@@ -6,12 +6,31 @@ slug: /installation-and-usage
 
 # Zenii Installation and Usage Guide
 
-A complete guide to installing, running, and integrating Zenii across all supported platforms, interfaces, and programming languages.
+A practical guide to installing Zenii, starting the local daemon, and verifying that the shared backend works before moving on to deeper integrations.
 
-> **Note**: This document was generated with AI assistance and may contain inaccuracies. If you find errors, please [report an issue](https://github.com/sprklai/zenii/issues).
+## Fastest Path
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | bash
+zenii-daemon &
+```
+
+## Verify It Works
+
+```bash
+curl -s -X POST http://localhost:18981/memory \
+  -H "Content-Type: application/json" \
+  -d '{"key":"deploy","content":"Production database is on port 5434"}' >/dev/null
+
+curl -s -X POST http://localhost:18981/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"ops","prompt":"What port is the production database on?"}' | jq -r '.response'
+```
 
 ## Table of Contents
 
+- [Fastest Path](#fastest-path)
+- [Verify It Works](#verify-it-works)
 - [Overview](#overview)
 - [Interfaces](#interfaces)
 - [Installation by Platform](#installation-by-platform)
@@ -426,7 +445,7 @@ zenii --host 192.168.1.100 --port 18981 --token secret chat
 
 ### TUI (Terminal UI)
 
-> **Note:** The TUI is planned but not yet implemented. It will be available in a future release.
+The TUI connects to a running daemon and uses the same backend, memory, and providers as the CLI and desktop app.
 
 ```bash
 # Start TUI (connects to running daemon)
@@ -469,7 +488,7 @@ log_level = "info"             # trace, debug, info, warn, error
 gateway_cors_origins = ["http://localhost:5173"]
 ```
 
-See [docs/configuration.md](configuration.md) for the full field reference.
+See the [Configuration reference](./configuration) for the full field reference.
 
 ---
 

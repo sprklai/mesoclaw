@@ -28,7 +28,7 @@ slug: /architecture
 - [Scheduler Notification Flow](#scheduler-notification-flow-stage-861)
 - [Channel Router Pipeline](#channel-router-pipeline-stage-87)
 - [Channel Lifecycle Hooks](#channel-lifecycle-hooks-stage-88)
-- [Test Debt and Hardening](#test-debt--hardening-stage-89)
+- [Test Debt and Hardening](#test-debt-and-hardening-stage-89)
 - [Agent Action Tools](#agent-action-tools-phase-810)
 - [Autonomous Reasoning Engine](#autonomous-reasoning-engine-phase-811)
 - [Semantic Memory and Embeddings](#semantic-memory-and-embeddings-phase-811)
@@ -196,7 +196,7 @@ zenii/
 │   │   │   ├── memory/     # Memory trait + SqliteMemoryStore (FTS5 + vectors) + InMemoryStore
 │   │   │   ├── credential/ # CredentialStore trait + KeyringStore + FileCredentialStore + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
-│   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 17 built-in tools (15 base + 2 feature-gated)
+│   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 18 built-in tools (15 base + 3 feature-gated)
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter, context engine, delegation
 │   │   │   │   └── delegation/ # Coordinator, SubAgent, DelegationTask, dependency-wave execution
 │   │   │   ├── workflows/  # WorkflowRegistry, WorkflowExecutor, StepRuntime, templates (feature-gated)
@@ -226,7 +226,6 @@ zenii/
 │   │       ├── lib.rs       # Builder: plugins, tray, IPC, close-to-tray
 │   │       ├── commands.rs  # 4 IPC + boot_gateway() + 7 tests
 │   │       └── tray.rs      # Show/Hide/Quit menu + 1 test
-│   ├── zenii-mobile/    # Tauri 2 shell (iOS + Android) (future release)
 │   ├── zenii-cli/       # clap CLI
 │   ├── zenii-tui/       # ratatui TUI
 │   └── zenii-daemon/    # Headless daemon (full gateway server)

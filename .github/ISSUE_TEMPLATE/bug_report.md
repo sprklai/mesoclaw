@@ -13,13 +13,18 @@ A clear description of the bug.
 
 - **OS**: [e.g., Ubuntu 24.04, macOS 15, Windows 11]
 - **Zenii Version**: [output of `zenii --version`]
-- **Interface**: [Desktop / CLI / Daemon / Web]
+- **Interface**: [Desktop / CLI / TUI / Daemon / MCP]
+- **Config / flags**: [relevant config values, feature flags, or startup args]
 
 ## Steps to Reproduce
 
 1.
 2.
 3.
+
+## Reproduction Command or Request
+
+If possible, paste the exact CLI command, curl request, or workflow input that triggers the issue.
 
 ## Expected Behavior
 

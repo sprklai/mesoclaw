@@ -6,8 +6,6 @@ slug: /configuration
 
 # Zenii Configuration Reference
 
-> **Note**: This document was generated with AI assistance and may contain inaccuracies. If you find errors, please [report an issue](https://github.com/sprklai/zenii/issues).
-
 ## Table of Contents
 
 - [File Location](#file-location)
@@ -346,7 +344,7 @@ plugin_auto_update = false
 
 ### Tool Permissions
 
-Risk-based, per-surface tool permission system. See [Architecture: Tool Permission System](architecture.md#tool-permission-system-phase-19) for details.
+Risk-based, per-surface tool permission system. See [Architecture: Tool Permission System](./architecture#tool-permission-system-phase-19) for details.
 
 | Field | Type | Default | Description |
 |---|---|---|---|

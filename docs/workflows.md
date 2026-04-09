@@ -8,8 +8,6 @@ slug: /workflows
 
 Zenii workflows are multi-step automation pipelines defined in TOML. They chain tools, LLM calls, conditions, and delays into a directed acyclic graph (DAG) that executes in topological order with per-step retries, timeouts, and failure policies.
 
-> **Note**: This document was generated with AI assistance and may contain inaccuracies. If you find errors, please [report an issue](https://github.com/sprklai/zenii/issues).
-
 ## Table of Contents
 
 - [Quick Start](#quick-start)

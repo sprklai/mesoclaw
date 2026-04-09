@@ -8,8 +8,6 @@ slug: /scheduling
 
 Zenii includes a built-in job scheduler for recurring tasks like periodic agent prompts, notifications, heartbeat checks, and channel messages. The scheduler is **feature-gated** — enable it with the `scheduler` feature flag.
 
-> **Note**: This document was generated with AI assistance and may contain inaccuracies. If you find errors, please [report an issue](https://github.com/sprklai/zenii/issues).
-
 ## Quick Start
 
 ### Enable the scheduler

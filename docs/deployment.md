@@ -8,8 +8,6 @@ slug: /deployment
 
 This document covers deploying Zenii in various environments: native binaries, Docker containers, Raspberry Pi, and behind reverse proxies.
 
-> **Note**: This document was generated with AI assistance and may contain inaccuracies. If you find errors, please [report an issue](https://github.com/sprklai/zenii/issues).
-
 ## Table of Contents
 
 - [Native Deployment](#native-deployment)
