@@ -80,7 +80,7 @@ globset = "0.4"
 regex = "1"
 diffy = "0.4.2"
 lru = "0.16.3"
-sqlite-vec = "0.1.6"
+sqlite-vec = "0.1.9"
 urlencoding = "2"
 
 # Phase 3: AI Agent + Gateway
