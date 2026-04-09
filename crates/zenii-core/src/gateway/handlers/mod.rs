@@ -26,6 +26,7 @@ pub mod tools;
 pub mod user;
 #[cfg(feature = "workflows")]
 pub mod workflows;
+pub mod wiki;
 pub mod ws;
 
 #[cfg(test)]
@@ -101,6 +102,9 @@ pub(crate) mod tests {
             3,
         ));
 
+        let wiki_dir = dir.path().join("wiki");
+        let wiki = std::sync::Arc::new(crate::wiki::WikiManager::new(wiki_dir).unwrap());
+
         let state = Arc::new(AppState {
             config: Arc::new(arc_swap::ArcSwap::from(config)),
             config_path: dir.path().join("config.toml"),
@@ -163,6 +167,7 @@ pub(crate) mod tests {
             approval_broker: Some(Arc::new(crate::security::approval::ApprovalBroker::new(
                 pool.clone(),
             ))),
+            wiki,
         });
         (dir, state)
     }

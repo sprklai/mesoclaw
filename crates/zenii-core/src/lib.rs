@@ -13,6 +13,7 @@ pub mod security;
 pub mod skills;
 pub mod tools;
 pub mod user;
+pub mod wiki;
 
 #[cfg(feature = "ai")]
 pub mod ai;

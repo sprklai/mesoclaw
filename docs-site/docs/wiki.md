@@ -111,6 +111,35 @@ ws.send(JSON.stringify({
 }));
 ```
 
+## Ingesting via the Web UI
+
+Open **Knowledge Wiki** in the sidebar, click **Ingest**, then drag-and-drop or paste a file. The
+gateway writes it to `wiki/pages/topics/` and returns the new page slug.
+
+### Page Title Resolution
+
+When a document has no YAML frontmatter `title:` field, the title is derived in this order:
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 | Frontmatter `title:` | `title: "My Page"` |
+| 2 | First `# Heading` | `# My Page` in body |
+| 3 | Filename | `GitHub Stars.md` → `"GitHub Stars"` |
+| 4 | Humanized slug | `my-doc` → `"My Doc"` |
+
+To control page type and metadata, include a YAML frontmatter block:
+
+```markdown
+---
+title: "My Page"
+type: concept        # concept | entity | topic | comparison | query
+tags: [rust, async]
+updated: 2026-04-09
+---
+
+Content here.
+```
+
 ## Operations
 
 | Operation | Trigger | What happens |

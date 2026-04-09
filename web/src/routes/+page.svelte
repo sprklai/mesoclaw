@@ -10,6 +10,7 @@
 	import { workflowsStore } from '$lib/stores/workflows.svelte';
 	import { channelsStore } from '$lib/stores/channels.svelte';
 	import { inboxStore } from '$lib/stores/inbox.svelte';
+	import { wikiStore } from '$lib/stores/wiki.svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { notificationStore } from '$lib/stores/notifications.svelte';
@@ -18,6 +19,7 @@
 	import Brain from '@lucide/svelte/icons/brain';
 	import Clock from '@lucide/svelte/icons/clock';
 	import GitBranch from '@lucide/svelte/icons/git-branch';
+	import BookOpen from '@lucide/svelte/icons/book-open';
 
 	let loading = $state(true);
 	let creating = $state(false);
@@ -50,6 +52,7 @@
 				workflowsStore.load(),
 				channelsStore.load(),
 				inboxStore.load(),
+				wikiStore.load(),
 			]);
 		} finally {
 			loading = false;
@@ -287,9 +290,43 @@
 			</Card.Content>
 		</Card.Root>
 
-		<!-- Workflows Card (full width) -->
+		<!-- Wiki Card -->
 		<Card.Root
-			class="cursor-pointer transition-colors hover:bg-accent/50 md:col-span-2"
+			class="cursor-pointer transition-colors hover:bg-accent/50"
+			onclick={() => goto('/wiki')}
+		>
+			<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
+				<div class="flex items-center gap-2">
+					<BookOpen class="h-5 w-5 text-muted-foreground" />
+					<Card.Title class="text-base font-semibold">{m.dashboard_card_wiki_title()}</Card.Title>
+				</div>
+			</Card.Header>
+			<Card.Content>
+				{#if loading}
+					<Skeleton class="h-4 w-24" />
+					<div class="mt-3 flex gap-6">
+						<Skeleton class="h-10 w-16" />
+					</div>
+				{:else}
+					<p class="text-xs text-muted-foreground">
+						{m.dashboard_wiki_pages_count({ count: wikiStore.pages.length, suffix: wikiStore.pages.length !== 1 ? 's' : '' })}
+					</p>
+					{#if wikiStore.pages.length > 0}
+						<div class="mt-2 flex flex-wrap gap-1">
+							{#each [...new Set(wikiStore.pages.map(p => p.page_type))].slice(0, 5) as type}
+								<span class="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{type}</span>
+							{/each}
+						</div>
+					{:else}
+						<p class="mt-1 text-sm text-muted-foreground">{m.dashboard_wiki_no_pages()}</p>
+					{/if}
+				{/if}
+			</Card.Content>
+		</Card.Root>
+
+		<!-- Workflows Card -->
+		<Card.Root
+			class="cursor-pointer transition-colors hover:bg-accent/50"
 			onclick={() => goto('/workflows')}
 		>
 			<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">

@@ -89,6 +89,7 @@ pub struct Services {
     /// Whether the local embedding model is downloaded and ready.
     pub embedding_model_available: Arc<AtomicBool>,
     pub approval_broker: Option<Arc<crate::security::approval::ApprovalBroker>>,
+    pub wiki: Arc<crate::wiki::WikiManager>,
 }
 
 /// Initialize all services from config.
@@ -393,6 +394,15 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         config.skill_max_content_size,
     )?);
     info!("Skills loaded from {}", skills_dir.display());
+
+    // Wiki
+    let wiki_dir = config
+        .wiki_dir
+        .as_ref()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| data_dir.join("wiki"));
+    let wiki = Arc::new(crate::wiki::WikiManager::new(wiki_dir.clone())?);
+    info!("Wiki initialized at {}", wiki_dir.display());
 
     info!("User learner initialized");
 
@@ -888,6 +898,7 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         approval_broker: Some(Arc::new(crate::security::approval::ApprovalBroker::new(
             pool,
         ))),
+        wiki,
     })
 }
 
@@ -946,6 +957,7 @@ impl From<Services> for AppState {
             usage_logger: s.usage_logger,
             embedding_model_available: s.embedding_model_available,
             approval_broker: s.approval_broker,
+            wiki: s.wiki,
         }
     }
 }

@@ -10,4 +10,5 @@ pub mod plugin;
 pub mod provider;
 pub mod run;
 pub mod schedule;
+pub mod wiki;
 pub mod workflow;

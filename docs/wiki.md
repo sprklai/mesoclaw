@@ -91,6 +91,34 @@ ws.send(JSON.stringify({
 
 ---
 
+## Ingesting via the Web UI
+
+Open **Knowledge Wiki** in the sidebar, click **Ingest**, then drag-and-drop or paste a file. The
+gateway writes it to `wiki/pages/topics/` and returns the slug.
+
+### Page Title Resolution
+
+When a document has no YAML frontmatter `title:` field, the title is derived in order:
+
+1. **Frontmatter** — `title: "My Title"` in the `---` block (highest priority)
+2. **First `# Heading`** — the first `# ` line in the document body
+3. **Filename** — original filename without extension, preserving casing
+   (e.g. `GitHub Stars Growth Tips.md` → `"GitHub Stars Growth Tips"`)
+4. **Slug** — humanized slug as last resort (`my-doc-slug` → `"My Doc Slug"`)
+
+To set the page type, tags, or other metadata, include a YAML frontmatter block:
+
+```markdown
+---
+title: "My Page"
+type: concept        # concept | entity | topic | comparison | query
+tags: [rust, async]
+updated: 2026-04-09
+---
+
+Content here.
+```
+
 ## Supported Source Formats
 
 Anything the LLM agent can read:
