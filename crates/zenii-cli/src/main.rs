@@ -105,6 +105,11 @@ enum Commands {
         #[command(subcommand)]
         action: WorkflowAction,
     },
+    /// Browse and search the LLM wiki
+    Wiki {
+        #[command(subcommand)]
+        action: commands::wiki::WikiAction,
+    },
     /// Interactive onboarding wizard
     Onboard,
     /// Generate shell completions (hidden from --help)
@@ -630,6 +635,14 @@ async fn main() {
             WorkflowAction::Cancel { id, run_id } => {
                 commands::workflow::cancel(&client, &id, &run_id).await
             }
+        },
+        Commands::Wiki { action } => match action {
+            commands::wiki::WikiAction::List => commands::wiki::list(&client).await,
+            commands::wiki::WikiAction::Search { query } => {
+                commands::wiki::search(&client, &query).await
+            }
+            commands::wiki::WikiAction::Show { slug } => commands::wiki::show(&client, &slug).await,
+            commands::wiki::WikiAction::Sync => commands::wiki::sync(&client).await,
         },
         Commands::Onboard => commands::onboard::run(&client).await,
         Commands::Completions { shell } => {

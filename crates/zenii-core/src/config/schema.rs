@@ -223,6 +223,10 @@ pub struct AppConfig {
     pub learning_archive_after_days: u32,
     pub skill_proposal_expiry_days: u32,
 
+    // Wiki
+    /// Override path for the wiki directory. Default: {data_dir}/wiki/
+    pub wiki_dir: Option<String>,
+
     // MCP (Model Context Protocol)
     /// Prefix prepended to tool names when exposed via MCP (e.g., "zenii_")
     pub mcp_server_tool_prefix: String,
@@ -438,6 +442,9 @@ impl Default for AppConfig {
             learning_archive_threshold: 0.3,
             learning_archive_after_days: 30,
             skill_proposal_expiry_days: 7,
+
+            // Wiki
+            wiki_dir: None,
 
             // MCP
             mcp_server_tool_prefix: "zenii_".into(),

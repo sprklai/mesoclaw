@@ -390,6 +390,7 @@ mod tests {
             usage_logger: base_state.usage_logger.clone(),
             embedding_model_available: base_state.embedding_model_available.clone(),
             approval_broker: base_state.approval_broker.clone(),
+            wiki: base_state.wiki.clone(),
         });
         (dir, state)
     }

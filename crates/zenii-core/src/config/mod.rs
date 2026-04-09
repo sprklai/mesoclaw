@@ -240,3 +240,5 @@ default_model = "my-model"
         assert_eq!(config.provider_model_id, "my-model");
     }
 }
+
+mod wiki_config_tests;

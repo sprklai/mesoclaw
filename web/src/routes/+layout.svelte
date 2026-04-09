@@ -70,7 +70,8 @@
 			{ href: '/channels', icon: MessageSquare, label: m.nav_channels() },
 			{ href: '/memory', icon: Database, label: m.nav_memory() },
 			{ href: '/schedule', icon: Calendar, label: m.nav_schedule() },
-			{ href: '/workflows', icon: Workflow, label: m.nav_workflows() }
+			{ href: '/workflows', icon: Workflow, label: m.nav_workflows() },
+			{ href: '/wiki', icon: BookOpen, label: m.nav_wiki() }
 		];
 	});
 
