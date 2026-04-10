@@ -480,6 +480,40 @@ impl WikiManager {
         }
     }
 
+    /// Write new content to `wiki/INGEST_PROMPT.md`.
+    /// Validates: non-empty, max 4000 chars.
+    pub fn set_prompt(&self, content: &str) -> Result<(), ZeniiError> {
+        if content.is_empty() {
+            return Err(ZeniiError::Validation("prompt content cannot be empty".into()));
+        }
+        if content.chars().count() > 4000 {
+            return Err(ZeniiError::Validation(
+                "prompt content exceeds 4000 character limit".into(),
+            ));
+        }
+        let path = self.wiki_dir.join("INGEST_PROMPT.md");
+        std::fs::write(&path, content)?;
+        Ok(())
+    }
+
+    /// Delete all `.md` files under `wiki/pages/` and reset `index.md` to empty stub.
+    /// Does NOT touch `wiki/sources/`, `SCHEMA.md`, or `INGEST_PROMPT.md`.
+    /// Returns the count of deleted page files.
+    pub fn delete_all_pages(&self) -> Result<usize, ZeniiError> {
+        let pages_dir = self.wiki_dir.join("pages");
+        let count = delete_md_files_in_dir(&pages_dir)?;
+        // Reset index.md to empty stub
+        let index_path = self.wiki_dir.join("index.md");
+        std::fs::write(
+            &index_path,
+            "# Wiki Index\n<!-- LLM maintains this file. Do not edit manually. -->\n\n_No pages yet. Ingest your first source to get started._\n",
+        )?;
+        // Clear pages from manifest
+        let (sources, _pages) = self.read_manifest()?;
+        self.write_manifest(&sources, &[])?;
+        Ok(count)
+    }
+
     // ── Sources ──────────────────────────────────────────────────────────────
 
     /// List all source files in `wiki/sources/`.
@@ -692,6 +726,26 @@ fn remove_source_from_frontmatter(content: &str, filename: &str) -> Result<Strin
     // serde_yaml serializes with a leading "---\n" prefix — strip it to avoid double delimiter
     let new_fm = new_fm.strip_prefix("---\n").unwrap_or(&new_fm);
     Ok(format!("---\n{new_fm}---{body}"))
+}
+
+/// Recursively delete all `.md` files under `dir`. Returns count deleted.
+fn delete_md_files_in_dir(dir: &Path) -> Result<usize, ZeniiError> {
+    if !dir.exists() {
+        return Ok(0);
+    }
+    let mut count = 0usize;
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let ft = entry.file_type()?;
+        let path = entry.path();
+        if ft.is_dir() {
+            count += delete_md_files_in_dir(&path)?;
+        } else if ft.is_file() && path.extension().and_then(|e| e.to_str()) == Some("md") {
+            std::fs::remove_file(&path)?;
+            count += 1;
+        }
+    }
+    Ok(count)
 }
 
 fn walk_pages_dir(dir: &Path, pages: &mut Vec<WikiPage>) -> Result<(), ZeniiError> {
@@ -1385,5 +1439,52 @@ No outbound links here.
             !issues.iter().any(|i| i.kind == "missing_index_entry"),
             "no missing index entries expected"
         );
+    }
+
+    #[test]
+    fn test_set_prompt_writes_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let wm = WikiManager::new(dir.path().to_path_buf()).unwrap();
+        wm.set_prompt("Custom prompt content").unwrap();
+        let content = std::fs::read_to_string(dir.path().join("INGEST_PROMPT.md")).unwrap();
+        assert_eq!(content, "Custom prompt content");
+    }
+
+    #[test]
+    fn test_set_prompt_rejects_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let wm = WikiManager::new(dir.path().to_path_buf()).unwrap();
+        assert!(wm.set_prompt("").is_err());
+    }
+
+    #[test]
+    fn test_set_prompt_rejects_too_long() {
+        let dir = tempfile::tempdir().unwrap();
+        let wm = WikiManager::new(dir.path().to_path_buf()).unwrap();
+        let long = "x".repeat(4001);
+        assert!(wm.set_prompt(&long).is_err());
+    }
+
+    #[test]
+    fn test_delete_all_pages_removes_md_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let wm = WikiManager::new(dir.path().to_path_buf()).unwrap();
+        // Write a page file
+        let page_path = dir.path().join("pages").join("concepts").join("test.md");
+        std::fs::create_dir_all(page_path.parent().unwrap()).unwrap();
+        std::fs::write(&page_path, "# Test\npage_type: concept\n").unwrap();
+        let count = wm.delete_all_pages().unwrap();
+        assert_eq!(count, 1);
+        assert!(!page_path.exists());
+    }
+
+    #[test]
+    fn test_delete_all_pages_resets_index() {
+        let dir = tempfile::tempdir().unwrap();
+        let wm = WikiManager::new(dir.path().to_path_buf()).unwrap();
+        std::fs::write(dir.path().join("index.md"), "# Wiki Index\n- [[foo]]\n").unwrap();
+        wm.delete_all_pages().unwrap();
+        let index = std::fs::read_to_string(dir.path().join("index.md")).unwrap();
+        assert!(index.contains("No pages yet"));
     }
 }
