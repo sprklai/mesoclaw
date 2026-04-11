@@ -103,7 +103,9 @@ pub(crate) mod tests {
         ));
 
         let wiki_dir = dir.path().join("wiki");
-        let wiki = std::sync::Arc::new(crate::wiki::WikiManager::new(wiki_dir).unwrap());
+        let wiki = Arc::new(tokio::sync::Mutex::new(
+            crate::wiki::WikiManager::new(wiki_dir).unwrap(),
+        ));
 
         let state = Arc::new(AppState {
             config: Arc::new(arc_swap::ArcSwap::from(config)),

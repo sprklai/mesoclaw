@@ -120,6 +120,7 @@ const PAGE_SUBDIRS: &[&str] = &["concepts", "entities", "topics", "comparisons",
 
 // ── WikiManager ──────────────────────────────────────────────────────────────
 
+#[derive(Clone)]
 pub struct WikiManager {
     wiki_dir: PathBuf,
 }
@@ -590,11 +591,16 @@ impl WikiManager {
     }
 
     /// Append one run record to the append-only `.meta/runs.jsonl`.
+    ///
+    /// Uses O(1) atomic file-append to avoid the read-then-write race (C3 fix).
     pub fn append_run(&self, run: &RunRecord) -> Result<(), ZeniiError> {
+        use std::io::Write;
         let path = self.wiki_dir.join(".meta").join("runs.jsonl");
-        let line = format!("{}\n", serde_json::to_string(run)?);
-        let existing = if path.exists() { std::fs::read_to_string(&path)? } else { String::new() };
-        std::fs::write(&path, format!("{existing}{line}"))?;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)?;
+        writeln!(file, "{}", serde_json::to_string(run)?)?;
         Ok(())
     }
 
@@ -748,11 +754,11 @@ impl WikiManager {
     /// Create the staged build workspace at `wiki/.rebuild/`.
     /// Mirrors the `pages/` subdirectory structure.
     pub fn begin_staged_build(&self) -> Result<PathBuf, ZeniiError> {
-        let rebuild_dir = self.wiki_dir.join(".rebuild");
-        // Remove any leftover from a previous failed build
-        if rebuild_dir.exists() {
-            std::fs::remove_dir_all(&rebuild_dir)?;
-        }
+        // Use a unique-named directory per operation so concurrent builds don't
+        // clobber each other (C2 fix: no more shared .rebuild/ path).
+        let rebuild_dir = self
+            .wiki_dir
+            .join(format!(".rebuild-{}", uuid::Uuid::new_v4()));
         for subdir in PAGE_SUBDIRS {
             std::fs::create_dir_all(rebuild_dir.join(subdir))?;
         }
@@ -850,16 +856,16 @@ impl WikiManager {
     }
 
     /// Append a log entry to wiki/log.md.
+    ///
+    /// Uses O(1) atomic file-append to avoid the read-then-write race (C3 fix).
     pub fn append_log(&self, entry: &str) -> Result<(), ZeniiError> {
+        use std::io::Write;
         let log_path = self.wiki_dir.join("log.md");
-        let existing = if log_path.exists() {
-            std::fs::read_to_string(&log_path)?
-        } else {
-            "# Wiki Log\n<!-- Append-only. LLM appends entries after each operation. -->\n"
-                .to_string()
-        };
-        let updated = format!("{existing}\n{entry}\n");
-        std::fs::write(&log_path, updated)?;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)?;
+        writeln!(file, "\n{entry}")?;
         Ok(())
     }
 }

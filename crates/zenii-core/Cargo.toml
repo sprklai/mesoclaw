@@ -37,6 +37,7 @@ keyring = { workspace = true, optional = true }
 zeroize = { workspace = true }
 aes-gcm = { workspace = true }
 sha2 = { workspace = true }
+tempfile = "3"
 
 # Auth hardening
 subtle = "2"

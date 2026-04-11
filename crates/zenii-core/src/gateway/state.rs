@@ -91,7 +91,7 @@ pub struct AppState {
     /// Whether the local embedding model is downloaded and ready.
     pub embedding_model_available: Arc<AtomicBool>,
     pub approval_broker: Option<Arc<crate::security::approval::ApprovalBroker>>,
-    pub wiki: std::sync::Arc<crate::wiki::WikiManager>,
+    pub wiki: Arc<tokio::sync::Mutex<crate::wiki::WikiManager>>,
     pub converter: std::sync::Arc<dyn crate::wiki::convert::DocumentConverter>,
 }
 
