@@ -257,9 +257,11 @@ pub async fn ingest_wiki_source(
     .await;
 
     // ── Step 4: Staged build + manifest update (blocking, holds mutex) ───────
-    let (pages, used_llm) = if let Ok(llm_pages) = llm_result {
+    // run_compiler returns (LlmPage, source_filename) pairs; for a single-source ingest
+    // the source is always body.filename so we just extract the page.
+    let (pages, used_llm) = if let Ok(llm_pages_with_source) = llm_result {
         let wiki = Arc::clone(&state.wiki).lock_owned().await;
-        let llm_pages_c = llm_pages.clone();
+        let llm_pages_c: Vec<LlmPage> = llm_pages_with_source.into_iter().map(|(p, _)| p).collect();
         tokio::task::spawn_blocking(move || {
             match wiki.begin_staged_build() {
                 Ok(rebuild_dir) => {
@@ -499,14 +501,18 @@ pub async fn get_wiki_dir(State(state): State<Arc<AppState>>) -> impl IntoRespon
 
 /// POST /wiki/regenerate — clear all source-generated pages and recompile from all sources.
 ///
-/// Preserves `user_query` pages. Uses staged builds for atomicity.
+/// Preserves `user_query` pages. Uses staged builds for atomicity: pages are never
+/// deleted until after the LLM compile succeeds and the staged build is committed.
 pub async fn regenerate_wiki(
     State(state): State<Arc<AppState>>,
     Json(body): Json<RegenerateRequest>,
 ) -> impl IntoResponse {
+    use std::collections::HashMap;
     use crate::wiki::{PageRecord, RunRecord, SourceRecord, WikiManager};
 
-    // ── Step 1: Read manifest + collect sources + delete managed pages (blocking) ──
+    // ── Step 1: Read manifest + collect sources (blocking) ─────────────────────
+    // NOTE: live pages are NOT deleted here — deletion happens inside Step 3 only
+    // after the staged build is committed (H3 fix: atomic swap, no pre-delete).
     struct PrepResult {
         sources_list: Vec<(String, String)>,
         manifest_pages: Vec<PageRecord>,
@@ -532,14 +538,6 @@ pub async fn regenerate_wiki(
                     })
                     .collect()
             };
-            let managed_pages: Vec<PageRecord> = manifest_pages
-                .iter()
-                .filter(|r| r.managed_by == "source_ingest")
-                .cloned()
-                .collect();
-            if let Err(e) = wiki.delete_page_files(&managed_pages) {
-                tracing::warn!("failed to delete managed pages before regenerate: {e}");
-            }
             PrepResult { sources_list, manifest_pages }
         })
         .await
@@ -562,8 +560,9 @@ pub async fn regenerate_wiki(
     }
 
     // ── Step 2: LLM compiler (async, no mutex held) ──────────────────────────
+    // Returns (LlmPage, source_filename) pairs for correct provenance tracking (C6 fix).
     let llm_result = run_compiler(&state, &prep.sources_list, body.model.as_deref()).await;
-    let llm_pages = match llm_result {
+    let llm_pages_with_source = match llm_result {
         Ok(p) if !p.is_empty() => p,
         _ => {
             let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
@@ -576,26 +575,42 @@ pub async fn regenerate_wiki(
             .await;
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "LLM unavailable or returned no pages; managed pages were deleted. Re-ingest sources manually to recover."})),
+                Json(serde_json::json!({"error": "LLM unavailable or returned no pages. Live pages were not modified."})),
             )
                 .into_response();
         }
     };
 
-    // ── Step 3: Staged build + write final pages + manifest (blocking, holds mutex) ──
+    // ── Step 3: Staged build + atomic swap + manifest (blocking, holds mutex) ──
+    // Dedup slugs: first-write-wins policy across sources (C6 fix).
     let sources_list_c = prep.sources_list.clone();
     let manifest_pages_c = prep.manifest_pages;
     let model_c = body.model.clone();
-    let llm_pages_c = llm_pages.clone();
+    let llm_pages_with_source_c = llm_pages_with_source.clone();
     let write_result = {
         let wiki = Arc::clone(&state.wiki).lock_owned().await;
         tokio::task::spawn_blocking(move || {
             let rebuild_dir = wiki.begin_staged_build()?;
-            for p in &llm_pages_c {
+
+            // Build dedup map: slug → source_filename (first-write-wins, C6 fix)
+            let mut slug_to_source: HashMap<String, String> = HashMap::new();
+            for (p, source_filename) in &llm_pages_with_source_c {
+                if let Some(existing_source) = slug_to_source.get(&p.slug) {
+                    tracing::warn!(
+                        slug = %p.slug,
+                        first_source = %existing_source,
+                        duplicate_source = %source_filename,
+                        "duplicate slug from multiple sources — skipping duplicate (first-write-wins)"
+                    );
+                    continue;
+                }
+                slug_to_source.insert(p.slug.clone(), source_filename.clone());
                 if let Err(e) = wiki.write_staged_page(&rebuild_dir, &p.page_type, &p.slug, &p.content) {
                     tracing::warn!("skipping page '{}': {e}", p.slug);
+                    slug_to_source.remove(&p.slug);
                 }
             }
+
             let committed = match wiki.commit_staged_build(&rebuild_dir) {
                 Ok(c) => c,
                 Err(e) => {
@@ -603,6 +618,16 @@ pub async fn regenerate_wiki(
                     return Err(e);
                 }
             };
+
+            // Delete old managed pages only AFTER successful commit (H3 fix: atomic swap)
+            let old_managed_pages: Vec<PageRecord> = manifest_pages_c
+                .iter()
+                .filter(|r| r.managed_by == "source_ingest")
+                .cloned()
+                .collect();
+            if let Err(e) = wiki.delete_page_files(&old_managed_pages) {
+                tracing::warn!("failed to delete old managed pages after commit: {e}");
+            }
 
             let run_id = WikiManager::new_run_id();
             let prompt_hash = WikiManager::hash_content(&wiki.read_ingest_prompt().unwrap_or_default());
@@ -613,15 +638,17 @@ pub async fn regenerate_wiki(
             let mut written_pages = Vec::new();
             let mut new_page_records: Vec<PageRecord> = Vec::new();
             for (ptype, slug) in &committed {
-                if let Some(lp) = llm_pages_c.iter().find(|p| &p.slug == slug)
+                // Find the (page, source) pair for this slug
+                if let Some((lp, src)) = llm_pages_with_source_c.iter().find(|(p, _)| &p.slug == slug)
                     && let Ok(page) = wiki.write_page(ptype, slug, &lp.content)
                 {
                     written_pages.push(page);
+                    // Use the actual source that produced this page (C6 fix: correct provenance)
                     new_page_records.push(PageRecord {
                         slug: slug.clone(),
                         page_type: ptype.clone(),
                         path: format!("pages/{ptype}/{slug}.md"),
-                        sources: sources_list_c.iter().map(|(f, _)| f.clone()).collect(),
+                        sources: vec![src.clone()],
                         last_run_id: run_id.clone(),
                         managed_by: "source_ingest".to_string(),
                     });
@@ -712,8 +739,9 @@ pub async fn regenerate_wiki(
 
 /// POST /wiki/sources/:filename/regenerate — re-run the LLM compiler over a single source.
 ///
-/// Deletes pages exclusively or partially derived from this source, then recompiles
-/// from just this one source. Shared pages (those that list multiple contributing sources)
+/// Recompiles from just this one source. Pages derived from this source are replaced
+/// atomically: the LLM must produce pages successfully before any live files are removed
+/// (H3 fix: no pre-delete). Shared pages (those that list multiple contributing sources)
 /// are deleted and rebuilt from this source only — run a full regeneration to restore
 /// multi-source synthesis.
 pub async fn regenerate_wiki_source(
@@ -725,7 +753,9 @@ pub async fn regenerate_wiki_source(
 
     let model = body.as_ref().and_then(|b| b.model.as_deref().map(String::from));
 
-    // ── Step 1: Verify source, read manifest, delete affected pages (blocking) ──
+    // ── Step 1: Verify source, read manifest (blocking) ─────────────────────────
+    // NOTE: live pages are NOT deleted here — deletion happens inside Step 3 only
+    // after the staged build is committed (H3 fix: atomic swap, no pre-delete).
     struct SourcePrep {
         source_content: String,
         manifest_sources: Vec<crate::wiki::SourceRecord>,
@@ -743,9 +773,6 @@ pub async fn regenerate_wiki_source(
                 .filter(|p| p.sources.contains(&filename_c) && p.managed_by == "source_ingest")
                 .cloned()
                 .collect();
-            if let Err(e) = wiki.delete_page_files(&source_pages) {
-                tracing::warn!("failed to delete pages before per-source regenerate: {e}");
-            }
             Ok::<_, crate::error::ZeniiError>(SourcePrep {
                 source_content,
                 manifest_sources,
@@ -781,18 +808,12 @@ pub async fn regenerate_wiki_source(
         }
     };
 
-    // Remove affected pages from memory (async)
-    for page in &prep.source_pages {
-        let key = format!("wiki:{}", page.slug);
-        if let Err(e) = state.memory.forget(&key).await {
-            tracing::warn!("failed to forget wiki page '{}' from memory: {e}", page.slug);
-        }
-    }
-
     // ── Step 2: LLM compiler (async, no mutex held) ──────────────────────────
+    // Returns (LlmPage, source_filename) pairs. Source is always `filename` here
+    // since we compile a single source.
     let sources_list = vec![(filename.clone(), prep.source_content.clone())];
     let llm_result = run_compiler(&state, &sources_list, model.as_deref()).await;
-    let llm_pages = match llm_result {
+    let llm_pages_with_source = match llm_result {
         Ok(p) if !p.is_empty() => p,
         _ => {
             let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
@@ -800,30 +821,32 @@ pub async fn regenerate_wiki_source(
             let filename_c = filename.clone();
             let _ = tokio::task::spawn_blocking(move || {
                 wiki.append_log(&format!(
-                    "## [{date}] regenerate-source | {filename_c} — failed: LLM unavailable"
+                    "## [{date}] regenerate-source | {filename_c} — failed: LLM unavailable, live pages unchanged"
                 ))
             })
             .await;
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "LLM unavailable or returned no pages"})),
+                Json(serde_json::json!({"error": "LLM unavailable or returned no pages. Live pages were not modified."})),
             )
                 .into_response();
         }
     };
 
-    // ── Step 3: Staged build + manifest update (blocking, holds mutex) ────────
+    // ── Step 3: Staged build + atomic swap + manifest update (blocking, holds mutex) ──
+    // Old pages are deleted only AFTER the staged build is committed (H3 fix: no pre-delete).
     let filename_c = filename.clone();
     let manifest_sources_c = prep.manifest_sources;
     let manifest_pages_c = prep.manifest_pages;
-    let llm_pages_c = llm_pages.clone();
+    let source_pages_c = prep.source_pages.clone();
+    let llm_pages_with_source_c = llm_pages_with_source.clone();
     let source_content_c = prep.source_content.clone();
     let model_c = model.clone();
     let write_result = {
         let wiki = Arc::clone(&state.wiki).lock_owned().await;
         tokio::task::spawn_blocking(move || {
             let rebuild_dir = wiki.begin_staged_build()?;
-            for p in &llm_pages_c {
+            for (p, _src) in &llm_pages_with_source_c {
                 if let Err(e) = wiki.write_staged_page(&rebuild_dir, &p.page_type, &p.slug, &p.content) {
                     tracing::warn!("skipping page '{}': {e}", p.slug);
                 }
@@ -836,6 +859,11 @@ pub async fn regenerate_wiki_source(
                 }
             };
 
+            // Delete old pages derived from this source only AFTER successful commit (H3 fix)
+            if let Err(e) = wiki.delete_page_files(&source_pages_c) {
+                tracing::warn!("failed to delete old pages after per-source regenerate commit: {e}");
+            }
+
             let run_id = WikiManager::new_run_id();
             let prompt_hash = WikiManager::hash_content(&wiki.read_ingest_prompt().unwrap_or_default());
             let schema_hash = WikiManager::hash_content(
@@ -845,7 +873,7 @@ pub async fn regenerate_wiki_source(
             let mut written_pages = Vec::new();
             let mut new_page_records: Vec<PageRecord> = Vec::new();
             for (ptype, slug) in &committed {
-                if let Some(lp) = llm_pages_c.iter().find(|p| &p.slug == slug)
+                if let Some((lp, _src)) = llm_pages_with_source_c.iter().find(|(p, _)| &p.slug == slug)
                     && let Ok(page) = wiki.write_page(ptype, slug, &lp.content)
                 {
                     written_pages.push(page);
@@ -1146,11 +1174,13 @@ pub async fn delete_wiki_source(
     }
 
     // ── Step 2: Optionally rebuild shared pages via LLM (async) ─────────────
+    // run_compiler returns (LlmPage, source_filename) pairs; extract pages for rebuild.
     let rebuilt_pages = if !prep.remaining_sources.is_empty() {
         match run_compiler(&state, &prep.remaining_sources, params.model.as_deref()).await {
-            Ok(llm_pages) if !llm_pages.is_empty() => {
+            Ok(llm_pages_with_source) if !llm_pages_with_source.is_empty() => {
                 let rebuilt_slugs_c = prep.rebuilt_slugs.clone();
-                let llm_pages_c = llm_pages.clone();
+                // Discard source tag — delete_wiki_source manages provenance separately
+                let llm_pages_c: Vec<LlmPage> = llm_pages_with_source.into_iter().map(|(p, _)| p).collect();
                 let wiki = Arc::clone(&state.wiki).lock_owned().await;
                 tokio::task::spawn_blocking(move || {
                     let rebuild_dir = match wiki.begin_staged_build() {
@@ -1263,12 +1293,14 @@ pub async fn delete_wiki_source(
 /// Shared compiler pipeline: call the LLM to generate wiki pages from a list of sources.
 ///
 /// Reads `INGEST_PROMPT.md` and `SCHEMA.md` at runtime (no hardcoded prompts).
-/// Returns `Ok(pages)` on success or `Err(())` when the agent or JSON parsing fails.
+/// Returns `Ok(pages_with_source)` where each entry is `(LlmPage, source_filename)` so
+/// callers can track which source produced each page (C6 fix: correct provenance).
+/// Returns `Err(())` when the agent or JSON parsing fails.
 async fn run_compiler(
     state: &AppState,
     sources: &[(String, String)],
     model: Option<&str>,
-) -> Result<Vec<LlmPage>, ()> {
+) -> Result<Vec<(LlmPage, String)>, ()> {
     use crate::ai::resolve_agent;
 
     if sources.is_empty() {
@@ -1290,7 +1322,7 @@ async fn run_compiler(
 
     let system_prompt = format!("{ingest_prompt}\n\n{schema}");
 
-    let mut all_pages: Vec<LlmPage> = Vec::new();
+    let mut all_pages: Vec<(LlmPage, String)> = Vec::new();
 
     for (filename, content) in sources {
         // Provide existing wiki context so LLM can update/merge pages (blocking, holds mutex).
@@ -1342,7 +1374,8 @@ async fn run_compiler(
             .trim();
 
         if let Ok(pages) = serde_json::from_str::<Vec<LlmPage>>(raw) {
-            all_pages.extend(pages);
+            // Tag each page with the source filename that produced it
+            all_pages.extend(pages.into_iter().map(|p| (p, filename.clone())));
         }
     }
 
