@@ -9,7 +9,7 @@
 	import { Streamdown } from 'svelte-streamdown';
 	import Code from 'svelte-streamdown/code';
 	import WikiGraph from '$lib/components/wiki/WikiGraph.svelte';
-	import { wikiStore, type WikiPage, type LintIssue, type QueryResult } from '$lib/stores/wiki.svelte';
+	import { wikiStore, type WikiPage, type LintIssue, type FixedIssue, type QueryResult } from '$lib/stores/wiki.svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
 	import { shikiThemes } from '$lib/components/ai-elements/code/shiki';
 	import { isTauri, openPath, openConfigFile } from '$lib/tauri';
@@ -33,6 +33,7 @@
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import Settings from '@lucide/svelte/icons/settings';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import RotateCw from '@lucide/svelte/icons/rotate-cw';
 
 	const CATEGORIES = ['all', 'concepts', 'entities', 'topics', 'comparisons', 'queries'] as const;
 	// Add new accepted types here — drives both the file input and the drop zone hint
@@ -281,6 +282,42 @@
 	let confirmDeleteOpen = $state(false);
 	let regenerateConfirmOpen = $state(false);
 
+	// Sources search & filter
+	let sourceSearch = $state('');
+	let sourceSearchDebounced = $state('');
+	let sourceSearchTimeout: ReturnType<typeof setTimeout>;
+	let sourceFilter = $state<'all' | 'active' | 'inactive'>('all');
+	let regeneratingSource = $state<string | null>(null);
+
+	// Lint search & filter
+	let lintSearch = $state('');
+	let lintSearchDebounced = $state('');
+	let lintSearchTimeout: ReturnType<typeof setTimeout>;
+	type LintKindFilter = 'all' | 'broken_wikilink' | 'orphan_page' | 'missing_index_entry' | 'missing_updated';
+	let lintKindFilter = $state<LintKindFilter>('all');
+
+	const visibleSources = $derived(
+		wikiStore.sources
+			.filter(s =>
+				sourceFilter === 'all' ||
+				(sourceFilter === 'active' ? s.active : !s.active)
+			)
+			.filter(s =>
+				!sourceSearchDebounced ||
+				s.filename.toLowerCase().includes(sourceSearchDebounced.toLowerCase())
+			)
+	);
+
+	const visibleIssues = $derived(
+		(wikiStore.lintIssues ?? [])
+			.filter(i => lintKindFilter === 'all' || i.kind === lintKindFilter)
+			.filter(i =>
+				!lintSearchDebounced ||
+				i.page_slug.toLowerCase().includes(lintSearchDebounced.toLowerCase()) ||
+				i.detail.toLowerCase().includes(lintSearchDebounced.toLowerCase())
+			)
+	);
+
 	async function handleToggleSources() {
 		if (sourcesPopOpen) {
 			sourcesPopOpen = false;
@@ -429,6 +466,51 @@
 		}
 	}
 
+	function handleSourceSearch(e: Event) {
+		clearTimeout(sourceSearchTimeout);
+		const val = (e.currentTarget as HTMLInputElement).value;
+		sourceSearch = val;
+		sourceSearchTimeout = setTimeout(() => { sourceSearchDebounced = val; }, 300);
+	}
+
+	function handleLintSearch(e: Event) {
+		clearTimeout(lintSearchTimeout);
+		const val = (e.currentTarget as HTMLInputElement).value;
+		lintSearch = val;
+		lintSearchTimeout = setTimeout(() => { lintSearchDebounced = val; }, 300);
+	}
+
+	function sourceForSlug(slug: string): string | null {
+		return wikiStore.sources.find(s => s.pages.includes(slug))?.filename ?? null;
+	}
+
+	async function handleRegenerateSource(filename: string) {
+		regeneratingSource = filename;
+		try {
+			await wikiStore.regenerateSource(filename);
+			toast.success(`Regenerated pages from "${filename}"`);
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : 'Regeneration failed');
+			console.error('[wiki] regenerateSource failed:', filename, e);
+		} finally {
+			regeneratingSource = null;
+		}
+	}
+
+	async function handleRegenerateFromIssue(issue: LintIssue) {
+		const src = sourceForSlug(issue.page_slug);
+		if (!src) return;
+		try {
+			await wikiStore.regenerateSource(src);
+			toast.success(`Regenerated pages from "${src}"`);
+			// Re-lint to update issue list
+			await wikiStore.lint();
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : 'Regeneration failed');
+			console.error('[wiki] regenerateFromIssue failed:', issue, e);
+		}
+	}
+
 	function typeColor(type: string): string {
 		switch (type) {
 			case 'concept': return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
@@ -511,7 +593,7 @@
 					{/if}
 				</Button>
 				{#if lintPopOpen}
-					<div class="absolute right-0 top-full z-50 mt-1.5 w-80 rounded-lg border bg-popover shadow-lg" onclick={(e) => e.stopPropagation()}>
+					<div class="absolute right-0 top-full z-50 mt-1.5 w-[22rem] rounded-lg border bg-popover shadow-lg" onclick={(e) => e.stopPropagation()}>
 						<div class="flex items-center justify-between border-b px-3 py-2">
 							<span class="text-sm font-semibold">{m.wiki_lint_button()}</span>
 							<div class="flex items-center gap-2">
@@ -523,17 +605,61 @@
 								<button class="rounded p-0.5 text-muted-foreground hover:bg-muted" onclick={() => (lintPopOpen = false)}><X class="h-3.5 w-3.5" /></button>
 							</div>
 						</div>
+						<!-- Auto-fix summary -->
+						{#if wikiStore.lintFixed.length > 0}
+							<div class="border-b bg-green-500/5 px-3 py-1.5 text-xs text-green-700 dark:text-green-400">
+								Auto-fixed {wikiStore.lintFixed.length} issue{wikiStore.lintFixed.length === 1 ? '' : 's'}
+							</div>
+						{/if}
+						<!-- Search + filter bar (only when there are issues) -->
 						{#if wikiStore.lintIssues !== null && wikiStore.lintIssues.length > 0}
+							<div class="border-b px-2 py-2 space-y-1.5">
+								<input
+									class="w-full rounded-md border bg-background px-2.5 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+									placeholder="Filter issues..."
+									value={lintSearch}
+									oninput={handleLintSearch}
+								/>
+								<div class="flex flex-wrap gap-1">
+									{#each [
+										{ v: 'all', label: 'All' },
+										{ v: 'broken_wikilink', label: '🔗 Broken' },
+										{ v: 'orphan_page', label: '🏝 Orphan' },
+										{ v: 'missing_index_entry', label: '📋 Index' },
+										{ v: 'missing_updated', label: '📅 Date' }
+									] as f}
+										<button
+											class="rounded px-2 py-0.5 text-[11px] font-medium transition-colors {lintKindFilter === f.v ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}"
+											onclick={() => { lintKindFilter = f.v as LintKindFilter; }}
+										>{f.label}</button>
+									{/each}
+								</div>
+							</div>
+						{/if}
+						<!-- Issue list -->
+						{#if wikiStore.lintIssues !== null && visibleIssues.length > 0}
 							<div class="max-h-52 overflow-y-auto p-2 space-y-1.5">
-								{#each wikiStore.lintIssues as issue}
+								{#each visibleIssues as issue}
 									<div class="rounded-md border bg-background p-2 text-xs">
-										<div class="flex items-center gap-1.5">
-											<AlertTriangle class="h-3.5 w-3.5 shrink-0 text-yellow-500" />
-											<span class="font-mono font-medium text-yellow-600 dark:text-yellow-400">{issue.kind}</span>
-											<button
-												class="font-medium text-primary hover:underline"
-												onclick={() => { handleSelectPage(issue.page_slug); lintPopOpen = false; }}
-											>{issue.page_slug}</button>
+										<div class="flex items-center justify-between gap-1.5">
+											<div class="flex min-w-0 flex-1 items-center gap-1.5">
+												<AlertTriangle class="h-3.5 w-3.5 shrink-0 text-yellow-500" />
+												<span class="font-mono font-medium text-yellow-600 dark:text-yellow-400">{issue.kind}</span>
+												<button
+													class="truncate font-medium text-primary hover:underline"
+													onclick={() => { handleSelectPage(issue.page_slug); lintPopOpen = false; }}
+												>{issue.page_slug}</button>
+											</div>
+											{#if sourceForSlug(issue.page_slug)}
+												<button
+													class="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-40"
+													onclick={() => handleRegenerateFromIssue(issue)}
+													disabled={wikiStore.regenerating}
+													title="Regenerate pages from source"
+												>
+													<RotateCw class="h-3 w-3" />
+												</button>
+											{/if}
 										</div>
 										<p class="mt-1 text-muted-foreground">{issue.detail}</p>
 										{#if issue.fix}
@@ -542,7 +668,11 @@
 									</div>
 								{/each}
 							</div>
-						{:else if wikiStore.lintIssues === null}
+						{:else if wikiStore.lintIssues !== null && wikiStore.lintIssues.length > 0 && visibleIssues.length === 0}
+							<p class="p-3 text-center text-sm text-muted-foreground">No issues match filter</p>
+						{:else if wikiStore.lintIssues !== null && wikiStore.lintIssues.length === 0}
+							<p class="p-3 text-center text-sm text-muted-foreground">{m.wiki_lint_no_issues()}</p>
+						{:else}
 							<p class="p-3 text-center text-sm text-muted-foreground">Run lint to check for issues</p>
 						{/if}
 						<div class="border-t p-2">
@@ -572,21 +702,40 @@
 					{/if}
 				</Button>
 				{#if sourcesPopOpen}
-					<div class="absolute right-0 top-full z-50 mt-1.5 w-80 rounded-lg border bg-popover shadow-lg" onclick={(e) => e.stopPropagation()}>
+					<div class="absolute right-0 top-full z-50 mt-1.5 w-[22rem] rounded-lg border bg-popover shadow-lg" onclick={(e) => e.stopPropagation()}>
 						<div class="flex items-center justify-between border-b px-3 py-2">
 							<span class="text-sm font-semibold">{m.wiki_sources_button()}</span>
 							<button class="rounded p-0.5 text-muted-foreground hover:bg-muted" onclick={() => (sourcesPopOpen = false)}><X class="h-3.5 w-3.5" /></button>
 						</div>
-						<div class="max-h-52 overflow-y-auto p-2">
+						<!-- Search + filter bar -->
+						<div class="border-b px-2 py-2 space-y-1.5">
+							<input
+								class="w-full rounded-md border bg-background px-2.5 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+								placeholder="Search sources..."
+								value={sourceSearch}
+								oninput={handleSourceSearch}
+							/>
+							<div class="flex gap-1">
+								{#each ['all', 'active', 'inactive'] as f}
+									<button
+										class="rounded px-2 py-0.5 text-[11px] font-medium transition-colors {sourceFilter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}"
+										onclick={() => { sourceFilter = f as typeof sourceFilter; }}
+									>{f === 'all' ? 'All' : f === 'active' ? 'Active' : 'Inactive'}</button>
+								{/each}
+							</div>
+						</div>
+						<div class="max-h-48 overflow-y-auto p-2">
 							{#if wikiStore.sourcesLoading}
 								<div class="space-y-1.5">
 									{#each Array(3) as _}<Skeleton class="h-8 w-full" />{/each}
 								</div>
-							{:else if wikiStore.sources.length === 0}
-								<p class="py-2 text-center text-sm text-muted-foreground">{m.wiki_sources_empty()}</p>
+							{:else if visibleSources.length === 0}
+								<p class="py-2 text-center text-sm text-muted-foreground">
+									{wikiStore.sources.length === 0 ? m.wiki_sources_empty() : 'No sources match filter'}
+								</p>
 							{:else}
 								<div class="space-y-1">
-									{#each wikiStore.sources as source (source.filename)}
+									{#each visibleSources as source (source.filename)}
 										<div class="flex items-center justify-between rounded-md border bg-background px-2.5 py-1.5 text-xs">
 											<div class="flex min-w-0 flex-1 items-center gap-2">
 												<span class="truncate font-medium">{source.filename}</span>
@@ -595,10 +744,24 @@
 													{source.active ? m.wiki_source_status_active() : m.wiki_source_status_inactive()}
 												</span>
 											</div>
-											<button
-												class="ml-2 shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-												onclick={() => handleDeleteSourceClick(source.filename)}
-											><Trash2 class="h-3.5 w-3.5" /></button>
+											<div class="ml-2 flex shrink-0 items-center gap-0.5">
+												<button
+													class="rounded p-1 text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-40"
+													onclick={() => handleRegenerateSource(source.filename)}
+													disabled={regeneratingSource === source.filename || wikiStore.regenerating}
+													title="Regenerate pages from this source"
+												>
+													{#if regeneratingSource === source.filename}
+														<Loader2 class="h-3.5 w-3.5 animate-spin" />
+													{:else}
+														<RotateCw class="h-3.5 w-3.5" />
+													{/if}
+												</button>
+												<button
+													class="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+													onclick={() => handleDeleteSourceClick(source.filename)}
+												><Trash2 class="h-3.5 w-3.5" /></button>
+											</div>
 										</div>
 									{/each}
 								</div>
@@ -669,7 +832,7 @@
 								onclick={handleOpenConfig}
 							>
 								<ExternalLink class="h-3.5 w-3.5 text-muted-foreground" />
-								{m.settings_config_open_in_editor_tooltip()}
+								Edit graph settings
 							</button>
 						{/if}
 						<div class="my-1 h-px bg-border"></div>

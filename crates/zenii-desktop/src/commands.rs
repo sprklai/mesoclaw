@@ -194,9 +194,15 @@ pub async fn get_boot_status(
 pub fn open_config_file() -> Result<String, String> {
     let config_path = zenii_core::config::default_config_path();
     let backup_path = config_path.with_extension("toml.bak");
+    // Back up the current file before modifying it.
     if config_path.exists() {
         std::fs::copy(&config_path, &backup_path).map_err(|e| e.to_string())?;
     }
+    // Load the current config (merges disk values with Rust defaults), then
+    // write it back so any fields added since the last save — e.g. new
+    // wiki_graph_* fields — appear in the file before the user opens it.
+    let config = zenii_core::config::load_config(&config_path).map_err(|e| e.to_string())?;
+    zenii_core::config::save_config(&config_path, &config).map_err(|e| e.to_string())?;
     opener::open(config_path.to_string_lossy().as_ref()).map_err(|e| e.to_string())?;
     Ok(backup_path.to_string_lossy().into_owned())
 }
