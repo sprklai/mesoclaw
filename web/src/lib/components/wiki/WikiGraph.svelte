@@ -149,6 +149,19 @@
 	let simulation: Simulation<SimNode, SimLink> | null = null;
 	let observer: ResizeObserver | null = null;
 
+	// ── topology guard (L5 fix) ───────────────────────────────────────────────
+	// Build a stable key from node IDs and edge pairs. The simulation is only
+	// rebuilt when this key changes — not when visual config props like colors or
+	// label thresholds change. Without this guard, any configStore update that
+	// touches GC (e.g. a theme change via wiki_graph_* keys) would tear down and
+	// re-run the expensive D3 force simulation.
+	const topoKey = $derived(
+		nodes.map((n) => n.id).sort().join(',') +
+		'|' +
+		edges.map((e) => `${e.from}>${e.to}`).sort().join(',')
+	);
+	let lastTopoKey = '';
+
 	// ── helpers ───────────────────────────────────────────────────────────────
 
 	const pageMap = $derived(new Map(pages.map((p) => [p.slug, p])));
@@ -275,6 +288,7 @@
 				// First valid measurement: build and fit
 				width = newW;
 				height = newH;
+				lastTopoKey = topoKey;
 				buildSimulation(width, height);
 				fitView();
 			} else {
@@ -287,6 +301,19 @@
 			}
 		});
 		observer.observe(svgEl);
+	});
+
+	// ── topology-driven simulation rebuild (L5 fix) ───────────────────────────
+	// Re-run buildSimulation only when node/edge topology changes, not on every
+	// reactive update of config values like colors or label thresholds.
+	$effect(() => {
+		const key = topoKey; // explicit dep on topology key only
+		if (key === lastTopoKey || width === 0 || height === 0) return;
+		lastTopoKey = key;
+		simulation?.stop();
+		simulation = null;
+		buildSimulation(width, height);
+		fitView();
 	});
 
 	onDestroy(() => {

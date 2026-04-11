@@ -17,6 +17,13 @@ pub struct SearchQuery {
     pub q: Option<String>,
 }
 
+/// L4: pagination query params for GET /wiki
+#[derive(Deserialize, Default)]
+pub struct ListQuery {
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
 #[derive(Deserialize, Default)]
 pub struct LintRequest {
     pub auto_fix: Option<bool>,
@@ -132,12 +139,26 @@ const QUERY_MIN_SCORE: u32 = 1;
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
-/// GET /wiki — list all wiki pages.
-pub async fn list_wiki_pages(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+/// GET /wiki?limit=50&offset=0 — list wiki pages with pagination (L4).
+pub async fn list_wiki_pages(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<ListQuery>,
+) -> impl IntoResponse {
+    let limit = params.limit.unwrap_or(50).min(200);
+    let offset = params.offset.unwrap_or(0);
     let wiki = Arc::clone(&state.wiki).lock_owned().await;
     let result = tokio::task::spawn_blocking(move || wiki.list_pages()).await;
     match result {
-        Ok(Ok(pages)) => (StatusCode::OK, Json(serde_json::json!(pages))).into_response(),
+        Ok(Ok(pages)) => {
+            let total = pages.len();
+            let page_slice: Vec<_> = pages.into_iter().skip(offset).take(limit).collect();
+            (StatusCode::OK, Json(serde_json::json!({
+                "pages": page_slice,
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+            }))).into_response()
+        }
         Ok(Err(e)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
@@ -1413,11 +1434,11 @@ pub async fn delete_wiki_source(
             if let Err(e) = wiki.update_index() {
                 tracing::warn!("wiki index update failed after delete-source: {e}");
             }
-            if let Err(e) = wiki.append_log(&format!(
+            if let Err(e) = wiki.append_log_with_limit(&format!(
                 "## [{date}] delete-source | {filename_c} — {} deleted, {} rebuilt",
                 deleted_slugs_c.len(),
                 rebuilt_pages_c.len()
-            )) {
+            ), log_max_lines) {
                 tracing::warn!("wiki log append failed: {e}");
             }
         })
@@ -1580,6 +1601,8 @@ pub async fn query_wiki(
 ) -> impl IntoResponse {
     use crate::ai::resolve_agent;
 
+    let log_max_lines = state.config.load().wiki_log_max_lines;
+
     // Read the current index, pages, and schema (blocking, holds mutex).
     let (index, pages, schema) = {
         let wiki = Arc::clone(&state.wiki).lock_owned().await;
@@ -1669,18 +1692,54 @@ pub async fn query_wiki(
     let question_c = body.question.clone();
     let save_c = body.save.unwrap_or(false);
     let saved_page = tokio::task::spawn_blocking(move || {
+        use crate::wiki::{PageRecord, RunRecord, WikiManager};
         let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let log_entry = format!("## [{date}] query | {question_c}");
-        if let Err(e) = wiki.append_log(&log_entry) {
+        if let Err(e) = wiki.append_log_with_limit(&log_entry, log_max_lines) {
             tracing::warn!("wiki log append failed after query: {e}");
         }
         if save_c {
-            let slug = slugify_question(&question_c);
+            // L11: append 8-char SHA-256 hex prefix to ensure slug uniqueness across similar questions
+            let base_slug = slugify_question(&question_c);
+            let hash_prefix = {
+                use sha2::{Digest, Sha256};
+                let h = Sha256::digest(question_c.as_bytes());
+                format!("{:02x}{:02x}{:02x}{:02x}", h[0], h[1], h[2], h[3])
+            };
+            let slug = format!("{base_slug}-{hash_prefix}");
+            // Truncate to 64 chars (slug validation limit)
+            let slug: String = slug.chars().take(64).collect();
             let first_line = answer_c.lines().next().unwrap_or("").to_string();
             let content = format!(
                 "---\ntitle: \"{question_c}\"\ntype: query\ntags: []\nsources: []\nupdated: {date}\n---\n\n## TLDR\n{first_line}\n\n## Body\n{answer_c}\n",
             );
             if let Ok(page) = wiki.write_page("queries", &slug, &content) {
+                // L12: record PageRecord + RunRecord for saved query pages
+                if let Ok((sources, mut page_records)) = wiki.read_manifest_or_bootstrap() {
+                    let run_id = WikiManager::new_run_id();
+                    page_records.retain(|r| r.slug != slug);
+                    page_records.push(PageRecord {
+                        slug: slug.clone(),
+                        page_type: "query".to_string(),
+                        path: format!("pages/queries/{slug}.md"),
+                        sources: vec![],
+                        last_run_id: run_id.clone(),
+                        managed_by: "user_query".to_string(),
+                    });
+                    if let Err(e) = wiki.write_manifest(&sources, &page_records) {
+                        tracing::warn!("manifest write failed after saving query page: {e}");
+                    }
+                    let _ = wiki.append_run(&RunRecord {
+                        run_id,
+                        timestamp: chrono::Utc::now().to_rfc3339(),
+                        model: None,
+                        prompt_hash: String::new(),
+                        schema_hash: String::new(),
+                        sources: vec![],
+                        status: "success".to_string(),
+                        pages_written: vec![slug.clone()],
+                    });
+                }
                 if let Err(e) = wiki.update_index() {
                     tracing::warn!("wiki index update failed after saving query page: {e}");
                 }
@@ -1713,6 +1772,7 @@ pub async fn lint_wiki(
     body: Option<Json<LintRequest>>,
 ) -> impl IntoResponse {
     let auto_fix = body.as_ref().and_then(|b| b.auto_fix).unwrap_or(false);
+    let log_max_lines = state.config.load().wiki_log_max_lines;
 
     let wiki = Arc::clone(&state.wiki).lock_owned().await;
     let lint_result = tokio::task::spawn_blocking(move || {
@@ -1753,7 +1813,7 @@ pub async fn lint_wiki(
             format!(" | auto-fixed {} issue(s)", fixed.len())
         };
         let log_entry = format!("## [{date}] lint | {summary}{fixed_summary}");
-        if let Err(e) = wiki.append_log(&log_entry) {
+        if let Err(e) = wiki.append_log_with_limit(&log_entry, log_max_lines) {
             tracing::warn!("wiki log append failed after lint: {e}");
         }
 
@@ -1832,6 +1892,7 @@ pub async fn set_wiki_prompt(
 
 /// DELETE /wiki/sources — delete all source files, clear manifest source records, and remove ingest pages.
 pub async fn delete_all_wiki_sources(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let log_max_lines = state.config.load().wiki_log_max_lines;
     let wiki = Arc::clone(&state.wiki).lock_owned().await;
     let delete_result = tokio::task::spawn_blocking(move || {
         let (deleted, ingest_pages) = wiki.delete_all_sources()?;
@@ -1839,10 +1900,10 @@ pub async fn delete_all_wiki_sources(State(state): State<Arc<AppState>>) -> impl
         if let Err(e) = wiki.update_index() {
             tracing::warn!("wiki index update failed after delete-all-sources: {e}");
         }
-        let _ = wiki.append_log(&format!(
+        let _ = wiki.append_log_with_limit(&format!(
             "## [{date}] delete-all-sources | {deleted} source(s) deleted, {} pages removed",
             ingest_pages.len()
-        ));
+        ), log_max_lines);
         Ok::<_, crate::error::ZeniiError>((deleted, ingest_pages))
     })
     .await;
@@ -2042,7 +2103,7 @@ mod tests {
             .with_state(state)
     }
 
-    /// H1: GET /wiki with no pages → 200 with empty array `[]`
+    /// H1: GET /wiki with no pages → 200 with paginated response containing empty pages array
     #[tokio::test]
     async fn wiki_list_empty_returns_200_empty_array() {
         let (_dir, state) = test_state().await;
@@ -2053,11 +2114,12 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
 
         let body = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
-        let pages: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-        assert!(pages.is_empty(), "expected empty array");
+        let resp_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let pages = resp_json["pages"].as_array().expect("expected pages array");
+        assert!(pages.is_empty(), "expected empty pages array");
     }
 
-    /// H2: GET /wiki → 200 with a JSON array (even if empty during stub phase)
+    /// H2: GET /wiki → 200 with paginated response object containing pages array
     #[tokio::test]
     async fn wiki_list_returns_pages() {
         let (_dir, state) = test_state().await;
@@ -2068,8 +2130,10 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
 
         let body = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
-        // Body must be a valid JSON array
-        let _pages: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        // Body must be a valid paginated response object with pages, total, limit, offset fields
+        let resp_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(resp_json["pages"].is_array(), "expected pages array in response");
+        assert!(resp_json["total"].is_number(), "expected total count in response");
     }
 
     /// H3: GET /wiki/{slug} for a page that exists → 200
@@ -2362,7 +2426,8 @@ mod tests {
         let list_req = Request::builder().uri("/wiki").body(Body::empty()).unwrap();
         let list_resp = app(state).oneshot(list_req).await.unwrap();
         let list_bytes = axum::body::to_bytes(list_resp.into_body(), 64 * 1024).await.unwrap();
-        let pages: Vec<serde_json::Value> = serde_json::from_slice(&list_bytes).unwrap();
+        let resp_json: serde_json::Value = serde_json::from_slice(&list_bytes).unwrap();
+        let pages = resp_json["pages"].as_array().expect("expected pages array");
         let count = pages.iter().filter(|p| p["slug"].as_str() == Some(&slug)).count();
         assert_eq!(count, 1, "slug '{slug}' must appear exactly once after two ingests");
     }

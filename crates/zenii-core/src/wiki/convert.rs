@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::time::Duration;
 
 use async_trait::async_trait;
 
@@ -37,11 +38,25 @@ pub trait DocumentConverter: Send + Sync {
 pub struct MarkItDownConverter {
     /// Path to the markitdown binary (default: "markitdown", resolved via PATH).
     bin: String,
+    /// Maximum time to wait for the subprocess before killing it and returning an error.
+    /// Prevents a hanging PDF from blocking a Tokio thread indefinitely (L9 fix).
+    timeout: Duration,
 }
 
 impl MarkItDownConverter {
     pub fn new(bin: impl Into<String>) -> Self {
-        Self { bin: bin.into() }
+        Self {
+            bin: bin.into(),
+            timeout: Duration::from_secs(60),
+        }
+    }
+
+    /// Create a converter with an explicit subprocess timeout (L9 fix).
+    pub fn with_timeout(bin: impl Into<String>, timeout_secs: u64) -> Self {
+        Self {
+            bin: bin.into(),
+            timeout: Duration::from_secs(timeout_secs),
+        }
     }
 }
 
@@ -53,10 +68,20 @@ impl DocumentConverter for MarkItDownConverter {
 
     async fn convert(&self, path: &Path) -> Result<String, ZeniiError> {
         // tokio::process::Command is epoll/kqueue-backed — does NOT block the tokio runtime.
-        let output = tokio::process::Command::new(&self.bin)
+        // Wrap with tokio::time::timeout to kill hanging subprocesses (L9 fix).
+        let output_future = tokio::process::Command::new(&self.bin)
             .arg(path)
-            .output()
+            .output();
+
+        let output = tokio::time::timeout(self.timeout, output_future)
             .await
+            .map_err(|_| {
+                ZeniiError::Conversion(format!(
+                    "'{}' timed out after {}s — increase wiki_convert_timeout_secs in config",
+                    self.bin,
+                    self.timeout.as_secs()
+                ))
+            })?
             .map_err(|e| {
                 ZeniiError::Conversion(format!(
                     "'{}' not found or failed to launch: {} — install with: pip install markitdown[all]",

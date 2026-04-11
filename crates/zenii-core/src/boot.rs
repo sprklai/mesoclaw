@@ -407,7 +407,10 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
     ));
     info!("Wiki initialized at {}", wiki_dir.display());
     let converter: Arc<dyn crate::wiki::convert::DocumentConverter> = Arc::new(
-        crate::wiki::convert::MarkItDownConverter::new(&config.doc_converter_bin),
+        crate::wiki::convert::MarkItDownConverter::with_timeout(
+            &config.doc_converter_bin,
+            config.wiki_convert_timeout_secs,
+        ),
     );
 
     info!("User learner initialized");
