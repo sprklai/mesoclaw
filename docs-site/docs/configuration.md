@@ -607,4 +607,10 @@ keyring_service_id = "com.sprklai.zenii"
 # Self-Evolution
 self_evolution_enabled = true
 skill_proposal_expiry_days = 7
+
+# Wiki
+# wiki_dir = "/custom/wiki/path"         # Default: {data_dir}/wiki/
+# doc_converter_bin = "markitdown"       # Binary for document-to-markdown conversion
+                                         # Install: pip install markitdown[all]
+                                         # Override with full path or alternate tool
 ```

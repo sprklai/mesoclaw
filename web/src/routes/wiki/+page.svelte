@@ -143,7 +143,10 @@
 	let pageDragOver = $state(false);
 
 	function handlePageDragOver(e: DragEvent) {
-		if (!e.dataTransfer?.types.includes('Files')) return;
+		if (!e.dataTransfer) return;
+		const { types } = e.dataTransfer;
+		// 'Files' = Chromium-based browsers; 'text/uri-list' = WebKitGTK (Tauri on Linux/macOS)
+		if (!types.includes('Files') && !types.includes('text/uri-list')) return;
 		e.preventDefault();
 		pageDragOver = true;
 	}

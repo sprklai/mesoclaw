@@ -976,12 +976,6 @@ References [[another-page]] for related info.
         mgr.write_page(page_type, slug, content).unwrap();
     }
 
-    /// Save a source file to wiki/sources/, then run the ingest fallback (creates a topic page).
-    fn seed_via_ingest(mgr: &WikiManager, filename: &str, content: &str) -> WikiPage {
-        mgr.save_source(filename, content).unwrap();
-        mgr.ingest(filename, content).unwrap()
-    }
-
     // W1: WikiManager::new creates required subdirectory structure
     #[test]
     fn new_creates_pages_subdirs() {

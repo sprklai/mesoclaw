@@ -63,9 +63,20 @@ cp ~/Downloads/paper.pdf wiki/sources/
 ```
 
 **2. Ingest it**
+
+Markdown or text:
+```bash
+zenii wiki ingest wiki/sources/notes.md
 ```
-ingest wiki/sources/paper.pdf
+
+Binary files (PDF, DOCX, PPTX, XLSX, images, etc.):
+```bash
+zenii wiki ingest ~/Downloads/report.pdf
+zenii wiki ingest ~/Documents/slides.pptx
+zenii wiki ingest ~/Downloads/data.xlsx
 ```
+
+All formats use the same command — the daemon detects the extension and converts automatically.
 
 Claude Code will read the document, create/update wiki pages, update `index.md`, and append to
 `log.md`.
@@ -147,12 +158,45 @@ Content here.
 
 ## Supported Source Formats
 
-Anything the LLM agent can read:
-- **Markdown** (`.md`) — best format, no conversion needed
-- **Plain text** (`.txt`)
-- **Code files** (`.rs`, `.ts`, etc.) — useful for technical wikis
-- **PDF** (`.pdf`) — Claude Code can read these natively
-- **HTML** — paste as `.html` or convert to markdown first
+### Text formats (no conversion needed)
+
+| Extension | Notes |
+|-----------|-------|
+| `.md` | Best format — no conversion |
+| `.txt` | Plain text |
+| `.rs`, `.ts`, `.py`, `.go`, etc. | Code files — useful for technical wikis |
+
+### Binary formats (auto-converted via MarkItDown)
+
+| Extension(s) | Format |
+|---|---|
+| `.pdf` | PDF documents |
+| `.docx`, `.doc` | Word documents |
+| `.pptx`, `.ppt` | PowerPoint presentations |
+| `.xlsx`, `.xls` | Excel spreadsheets |
+| `.html`, `.htm` | Web pages |
+| `.epub` | E-books |
+| `.zip` | Archives (contents extracted) |
+| `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.tiff`, `.webp` | Images (requires OpenAI key for descriptions) |
+
+Binary formats are automatically converted to markdown before ingestion.
+No extra flags needed — just pass the file.
+
+### Setup: MarkItDown
+
+Install the conversion tool once:
+
+```bash
+pip install markitdown[all]
+```
+
+For image descriptions and OCR, set `OPENAI_API_KEY` in your environment.
+
+To use a different binary or custom path, set in `config.toml`:
+
+```toml
+doc_converter_bin = "markitdown"  # default; override with full path if needed
+```
 
 Tip: [Obsidian Web Clipper](https://obsidian.md/clipper) converts web articles to clean markdown.
 

@@ -1247,7 +1247,7 @@ mod tests {
     use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
-    use axum::routing::{get, post};
+    use axum::routing::{delete, get, post};
     use tempfile::TempDir;
     use tower::ServiceExt;
 
@@ -1264,6 +1264,21 @@ mod tests {
             .route("/wiki/graph", get(get_wiki_graph))
             .route("/wiki/query", post(query_wiki))
             .route("/wiki/lint", post(lint_wiki))
+            .route(
+                "/wiki/sources",
+                get(list_wiki_sources).delete(delete_all_wiki_sources),
+            )
+            .route(
+                "/wiki/sources/{filename}",
+                delete(delete_wiki_source),
+            )
+            .route("/wiki/dir", get(get_wiki_dir))
+            .route(
+                "/wiki/prompt",
+                get(get_wiki_prompt).put(set_wiki_prompt),
+            )
+            .route("/wiki/pages", delete(delete_wiki_pages))
+            .route("/wiki/regenerate", post(regenerate_wiki))
             .route("/wiki/{slug}", get(get_wiki_page))
             .with_state(state)
     }
@@ -1634,5 +1649,314 @@ mod tests {
             val.get("pages_written").is_some(),
             "error body must include 'pages_written' so caller knows what was created"
         );
+    }
+
+    /// H15: GET /wiki/sources with no sources → 200 and a JSON array.
+    #[tokio::test]
+    async fn wiki_list_sources_empty_returns_200() {
+        let (_dir, state) = test_state().await;
+
+        let req = Request::builder()
+            .uri("/wiki/sources")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app(state).oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert!(val.is_array(), "response must be a JSON array");
+    }
+
+    /// H16: After ingesting a source, GET /wiki/sources must contain the filename.
+    #[tokio::test]
+    async fn wiki_list_sources_after_ingest_contains_filename() {
+        let (_dir, state) = test_state().await;
+
+        let ingest_body = serde_json::json!({
+            "filename": "my-source.md",
+            "content": "# Hello\nSome content."
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/wiki/ingest")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&ingest_body).unwrap()))
+            .unwrap();
+        let resp = app(state.clone()).oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK, "ingest must succeed");
+
+        let list_req = Request::builder()
+            .uri("/wiki/sources")
+            .body(Body::empty())
+            .unwrap();
+        let list_resp = app(state).oneshot(list_req).await.unwrap();
+        assert_eq!(list_resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(list_resp.into_body(), 16 * 1024)
+            .await
+            .unwrap();
+        let sources: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
+        let found = sources
+            .iter()
+            .any(|s| s["filename"].as_str() == Some("my-source.md"));
+        assert!(found, "sources list must contain 'my-source.md'");
+    }
+
+    /// H17: GET /wiki/dir → 200 with a `path` key that is a non-empty string.
+    #[tokio::test]
+    async fn wiki_dir_returns_200_with_path() {
+        let (_dir, state) = test_state().await;
+
+        let req = Request::builder()
+            .uri("/wiki/dir")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app(state).oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let path = val["path"].as_str().unwrap_or("");
+        assert!(!path.is_empty(), "path must be a non-empty string");
+    }
+
+    /// H18: GET /wiki/prompt → 200 with a `content` key.
+    #[tokio::test]
+    async fn wiki_get_prompt_returns_200_with_content() {
+        let (_dir, state) = test_state().await;
+
+        let req = Request::builder()
+            .uri("/wiki/prompt")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app(state).oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), 16 * 1024)
+            .await
+            .unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert!(
+            val.get("content").is_some(),
+            "response must contain 'content' key"
+        );
+    }
+
+    /// H19: PUT /wiki/prompt with valid content → 200.
+    #[tokio::test]
+    async fn wiki_set_prompt_returns_200() {
+        let (_dir, state) = test_state().await;
+
+        let body = serde_json::json!({"content": "You are a wiki LLM. Extract key concepts."});
+        let req = Request::builder()
+            .method("PUT")
+            .uri("/wiki/prompt")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&body).unwrap()))
+            .unwrap();
+
+        let resp = app(state).oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    /// H20: PUT /wiki/prompt with empty content → 400.
+    #[tokio::test]
+    async fn wiki_set_prompt_empty_returns_400() {
+        let (_dir, state) = test_state().await;
+
+        let body = serde_json::json!({"content": ""});
+        let req = Request::builder()
+            .method("PUT")
+            .uri("/wiki/prompt")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&body).unwrap()))
+            .unwrap();
+
+        let resp = app(state).oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    /// H21: PUT then GET /wiki/prompt → GET returns the content that was PUT.
+    #[tokio::test]
+    async fn wiki_set_prompt_roundtrip() {
+        let (_dir, state) = test_state().await;
+
+        let new_prompt = "Custom wiki extraction instructions for roundtrip test.";
+        let put_body = serde_json::json!({"content": new_prompt});
+        let put_req = Request::builder()
+            .method("PUT")
+            .uri("/wiki/prompt")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&put_body).unwrap()))
+            .unwrap();
+        let put_resp = app(state.clone()).oneshot(put_req).await.unwrap();
+        assert_eq!(put_resp.status(), StatusCode::OK, "PUT must succeed");
+
+        let get_req = Request::builder()
+            .uri("/wiki/prompt")
+            .body(Body::empty())
+            .unwrap();
+        let get_resp = app(state).oneshot(get_req).await.unwrap();
+        assert_eq!(get_resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(get_resp.into_body(), 16 * 1024)
+            .await
+            .unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let returned = val["content"].as_str().unwrap_or("");
+        assert!(
+            returned.contains(new_prompt),
+            "GET must return the content set by PUT, got: {returned}"
+        );
+    }
+
+    /// H22: DELETE /wiki/sources → 200 with a `deleted` key.
+    #[tokio::test]
+    async fn wiki_delete_all_sources_returns_200() {
+        let (_dir, state) = test_state().await;
+
+        let req = Request::builder()
+            .method("DELETE")
+            .uri("/wiki/sources")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app(state).oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert!(
+            val.get("deleted").is_some(),
+            "response must contain 'deleted' key"
+        );
+    }
+
+    /// H23: DELETE /wiki/pages → 200 with a `deleted` key.
+    #[tokio::test]
+    async fn wiki_delete_all_pages_returns_200() {
+        let (_dir, state) = test_state().await;
+
+        let req = Request::builder()
+            .method("DELETE")
+            .uri("/wiki/pages")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app(state).oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert!(
+            val.get("deleted").is_some(),
+            "response must contain 'deleted' key"
+        );
+    }
+
+    /// H24: POST ingest then DELETE /wiki/sources/{filename} → 200.
+    #[tokio::test]
+    async fn wiki_delete_source_after_ingest_returns_200() {
+        let (_dir, state) = test_state().await;
+
+        // Ingest a source so it exists
+        let ingest_body = serde_json::json!({
+            "filename": "deleteme.md",
+            "content": "# Delete Me\nThis source will be deleted."
+        });
+        let ingest_req = Request::builder()
+            .method("POST")
+            .uri("/wiki/ingest")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&ingest_body).unwrap()))
+            .unwrap();
+        let ingest_resp = app(state.clone()).oneshot(ingest_req).await.unwrap();
+        assert_eq!(ingest_resp.status(), StatusCode::OK, "ingest must succeed");
+
+        // Now delete the source
+        let del_req = Request::builder()
+            .method("DELETE")
+            .uri("/wiki/sources/deleteme.md")
+            .body(Body::empty())
+            .unwrap();
+        let del_resp = app(state).oneshot(del_req).await.unwrap();
+        assert_eq!(del_resp.status(), StatusCode::OK);
+    }
+
+    /// H25: DELETE /wiki/sources/{filename} for a non-existent file → 404.
+    #[tokio::test]
+    async fn wiki_delete_source_missing_returns_404() {
+        let (_dir, state) = test_state().await;
+
+        let req = Request::builder()
+            .method("DELETE")
+            .uri("/wiki/sources/ghost.md")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app(state).oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    /// H26: POST /wiki/regenerate with empty wiki → 200 with `sources_processed` = 0.
+    #[tokio::test]
+    async fn wiki_regenerate_empty_returns_200() {
+        let (_dir, state) = test_state().await;
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/wiki/regenerate")
+            .header("content-type", "application/json")
+            .body(Body::from("{}"))
+            .unwrap();
+
+        let resp = app(state).oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            val["sources_processed"].as_u64(),
+            Some(0),
+            "empty wiki must report sources_processed = 0"
+        );
+    }
+
+    /// H27: After ingesting a source, GET /wiki/search?q=<keyword> returns a non-empty array.
+    #[tokio::test]
+    async fn wiki_search_after_ingest_finds_page() {
+        let (_dir, state) = test_state().await;
+
+        // Ingest a page containing the keyword "foxglove"
+        let ingest_body = serde_json::json!({
+            "filename": "foxglove.md",
+            "content": "# Foxglove\nFoxglove is a plant with bell-shaped flowers used in medicine."
+        });
+        let ingest_req = Request::builder()
+            .method("POST")
+            .uri("/wiki/ingest")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&ingest_body).unwrap()))
+            .unwrap();
+        let ingest_resp = app(state.clone()).oneshot(ingest_req).await.unwrap();
+        assert_eq!(ingest_resp.status(), StatusCode::OK, "ingest must succeed");
+
+        // Search for the keyword
+        let search_req = Request::builder()
+            .uri("/wiki/search?q=foxglove")
+            .body(Body::empty())
+            .unwrap();
+        let search_resp = app(state).oneshot(search_req).await.unwrap();
+        assert_eq!(search_resp.status(), StatusCode::OK);
+
+        let bytes = axum::body::to_bytes(search_resp.into_body(), 16 * 1024)
+            .await
+            .unwrap();
+        let results: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
+        assert!(!results.is_empty(), "search for 'foxglove' must return at least one result");
     }
 }

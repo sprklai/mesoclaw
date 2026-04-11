@@ -76,6 +76,24 @@ Knowledge is compiled once at ingest time, not re-derived on every query. This i
 difference from RAG.
 :::
 
+## Quick Start: CLI
+
+```bash
+# Markdown or plain text
+zenii wiki ingest notes.md
+
+# Binary documents — auto-converted via MarkItDown
+zenii wiki ingest report.pdf
+zenii wiki ingest slides.pptx
+zenii wiki ingest data.xlsx
+zenii wiki ingest spec.docx
+
+# With a specific model
+zenii wiki ingest research.pdf --model anthropic:claude-opus-4
+```
+
+All formats use the same command — no flags needed to indicate file type.
+
 ## Quick Start: Claude Code
 
 Claude Code reads `CLAUDE.md` which points to `wiki/SCHEMA.md`, so it already knows how to
@@ -167,6 +185,40 @@ updated: 2026-04-09
 Content here.
 ```
 
+## REST API
+
+### Upload a file (binary or text)
+
+```http
+POST /wiki/upload
+Content-Type: multipart/form-data
+
+Fields:
+  file   (required)  Raw file bytes — any format listed above
+  model  (optional)  AI model override, e.g. "anthropic:claude-opus-4"
+```
+
+```bash
+# curl example
+curl -X POST http://localhost:18981/wiki/upload \
+  -H "Authorization: Bearer $ZENII_TOKEN" \
+  -F "file=@/path/to/report.pdf" \
+  -F "model=anthropic:claude-opus-4"
+```
+
+Response: same as `/wiki/ingest` — `{ primary_slug, pages[], message }`.
+
+### Ingest text directly
+
+```http
+POST /wiki/ingest
+Content-Type: application/json
+
+{ "content": "...", "filename": "notes.md", "model": "..." }
+```
+
+Use `/wiki/upload` for file uploads (binary or text). Use `/wiki/ingest` when you already have the text content in memory.
+
 ## Operations
 
 | Operation | Trigger | What happens |
@@ -177,13 +229,44 @@ Content here.
 
 ## Supported Source Formats
 
-Anything the LLM agent can read:
+### Text formats (no conversion needed)
 
-- **Markdown** (`.md`) — best format, no conversion needed
-- **Plain text** (`.txt`)
-- **Code files** (`.rs`, `.ts`, etc.) — useful for technical wikis
-- **PDF** (`.pdf`) — Claude Code reads these natively
-- **HTML** — paste as `.html` or convert to markdown first
+| Extension | Notes |
+|-----------|-------|
+| `.md` | Best format — ingested directly |
+| `.txt` | Plain text |
+| `.rs`, `.ts`, `.py`, `.go`, etc. | Code files — great for technical wikis |
+
+### Binary formats (auto-converted via MarkItDown)
+
+| Extension(s) | Format |
+|---|---|
+| `.pdf` | PDF documents |
+| `.docx`, `.doc` | Word documents |
+| `.pptx`, `.ppt` | PowerPoint presentations |
+| `.xlsx`, `.xls` | Excel spreadsheets |
+| `.html`, `.htm` | Web pages |
+| `.epub` | E-books |
+| `.zip` | Archives (contents extracted) |
+| `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.tiff`, `.webp` | Images (requires OpenAI key for descriptions) |
+
+Binary files are automatically converted to markdown before ingestion — no extra flags needed.
+
+### Setup: MarkItDown
+
+Install the conversion tool once:
+
+```bash
+pip install markitdown[all]
+```
+
+For image descriptions and OCR, set `OPENAI_API_KEY` in your environment.
+
+To use a different binary or custom path, add to `config.toml`:
+
+```toml
+doc_converter_bin = "markitdown"  # default; override with full path if needed
+```
 
 :::tip
 [Obsidian Web Clipper](https://obsidian.md/clipper) converts web articles to clean markdown with
