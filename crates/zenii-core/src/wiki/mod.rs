@@ -97,6 +97,14 @@ pub struct DeleteSourceResult {
     pub rebuilt_pages: Vec<String>,
 }
 
+/// One auto-fixed lint issue, returned by `lint_fix()`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FixedIssue {
+    pub kind: String,
+    pub slug: String,
+    pub action: String, // e.g. "Created stub page", "Updated index entry", "Set updated date"
+}
+
 // ── Subdirectories created on init ──────────────────────────────────────────
 
 const PAGE_SUBDIRS: &[&str] = &["concepts", "entities", "topics", "comparisons", "queries"];
@@ -428,6 +436,111 @@ impl WikiManager {
         Ok(issues)
     }
 
+    /// Auto-fix deterministic lint issues where possible.
+    ///
+    /// Fixes applied:
+    /// - `missing_updated` → patches the page file's YAML frontmatter `updated:` field to today
+    /// - `broken_wikilink` → creates a minimal stub concept page for the broken slug
+    /// - `missing_index_entry` → calls `update_index()` once to rebuild the full index
+    /// - `orphan_page` → not auto-fixable; returned as a remaining issue
+    ///
+    /// Returns `(fixed, remaining)`.
+    pub fn lint_fix(
+        &self,
+        issues: &[LintIssue],
+    ) -> Result<(Vec<FixedIssue>, Vec<LintIssue>), ZeniiError> {
+        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let mut fixed: Vec<FixedIssue> = Vec::new();
+        let mut remaining: Vec<LintIssue> = Vec::new();
+        let mut needs_index_rebuild = false;
+
+        // Read manifest once for path lookups
+        let (_, page_records) = self.read_manifest()?;
+
+        for issue in issues {
+            match issue.kind.as_str() {
+                "missing_updated" => {
+                    // Find page path from manifest
+                    let record = page_records.iter().find(|r| r.slug == issue.page_slug);
+                    if let Some(record) = record {
+                        let path = self.wiki_dir.join(&record.path);
+                        if path.exists() {
+                            let content = std::fs::read_to_string(&path)?;
+                            let patched = set_updated_in_frontmatter(&content, &today);
+                            std::fs::write(&path, patched)?;
+                            fixed.push(FixedIssue {
+                                kind: issue.kind.clone(),
+                                slug: issue.page_slug.clone(),
+                                action: format!("Set updated: {today}"),
+                            });
+                        } else {
+                            remaining.push(issue.clone());
+                        }
+                    } else {
+                        remaining.push(issue.clone());
+                    }
+                }
+                "broken_wikilink" => {
+                    // The issue's `detail` contains the broken slug target.
+                    // Extract from detail: "[[{target}]] has no matching page file"
+                    let broken_slug = extract_broken_slug(&issue.detail)
+                        .unwrap_or_else(|| issue.page_slug.clone());
+                    // Only create stub if it doesn't already exist
+                    if self.get_page(&broken_slug)?.is_none() {
+                        let title = broken_slug
+                            .replace('-', " ")
+                            .split_whitespace()
+                            .map(|w| {
+                                let mut c = w.chars();
+                                match c.next() {
+                                    None => String::new(),
+                                    Some(f) => f.to_uppercase().to_string() + c.as_str(),
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        let stub = format!(
+                            "---\ntitle: {title}\ntype: concept\ntags: []\nsources: []\nupdated: {today}\n---\n\n# {title}\n\n_Stub page — fill in details._\n\n## TLDR\nStub.\n"
+                        );
+                        self.write_page("concepts", &broken_slug, &stub)?;
+                        needs_index_rebuild = true;
+                        fixed.push(FixedIssue {
+                            kind: issue.kind.clone(),
+                            slug: issue.page_slug.clone(),
+                            action: format!("Created stub page for [[{broken_slug}]]"),
+                        });
+                    } else {
+                        // Page already exists (maybe just created); mark fixed
+                        fixed.push(FixedIssue {
+                            kind: issue.kind.clone(),
+                            slug: issue.page_slug.clone(),
+                            action: format!("Stub for [[{broken_slug}]] already exists"),
+                        });
+                    }
+                }
+                "missing_index_entry" => {
+                    // Batch: rebuild index once at the end
+                    needs_index_rebuild = true;
+                    fixed.push(FixedIssue {
+                        kind: issue.kind.clone(),
+                        slug: issue.page_slug.clone(),
+                        action: "Rebuilt index.md".to_string(),
+                    });
+                }
+                _ => {
+                    // orphan_page and unknown kinds are not auto-fixable
+                    remaining.push(issue.clone());
+                }
+            }
+        }
+
+        if needs_index_rebuild {
+            self.update_index()?;
+        }
+
+        Ok((fixed, remaining))
+    }
+
     // ── Manifest I/O ─────────────────────────────────────────────────────────
 
     /// Read the manifest from `.meta/sources.json` and `.meta/pages.json`.
@@ -576,8 +689,10 @@ impl WikiManager {
     }
 
     /// Delete every file in `wiki/sources/` and clear source records from the manifest.
-    /// Does NOT delete wiki pages. Returns count of deleted source files.
-    pub fn delete_all_sources(&self) -> Result<usize, ZeniiError> {
+    /// Also deletes pages managed by "source_ingest". Returns `(count, ingest_pages)` where
+    /// `count` is the number of source files deleted and `ingest_pages` is the list of page
+    /// records that were removed so the caller can sync memory.
+    pub fn delete_all_sources(&self) -> Result<(usize, Vec<PageRecord>), ZeniiError> {
         let sources_dir = self.wiki_dir.join("sources");
         let mut count = 0usize;
         if sources_dir.exists() {
@@ -590,10 +705,13 @@ impl WikiManager {
                 }
             }
         }
-        // Clear source records from manifest; preserve page records
+        // Partition pages: remove source_ingest pages, keep query pages
         let (_, pages) = self.read_manifest()?;
-        self.write_manifest(&[], &pages)?;
-        Ok(count)
+        let (ingest_pages, query_pages): (Vec<PageRecord>, Vec<PageRecord>) =
+            pages.into_iter().partition(|p| p.managed_by == "source_ingest");
+        self.delete_page_files(&ingest_pages)?;
+        self.write_manifest(&[], &query_pages)?;
+        Ok((count, ingest_pages))
     }
 
     /// Compute SHA-256 hex of content.
@@ -948,6 +1066,44 @@ fn extract_wikilinks(body: &str) -> Vec<String> {
         }
     }
     links
+}
+
+/// Extract the broken slug from a lint detail string like "[[broken-slug]] has no matching page file".
+fn extract_broken_slug(detail: &str) -> Option<String> {
+    let start = detail.find("[[")? + 2;
+    let end = detail.find("]]")?;
+    if start < end { Some(detail[start..end].to_string()) } else { None }
+}
+
+/// Patch or insert the `updated:` field in a page's YAML frontmatter.
+fn set_updated_in_frontmatter(content: &str, date: &str) -> String {
+    let Some(rest) = content.strip_prefix("---") else {
+        return content.to_string();
+    };
+    let Some(end_idx) = rest.find("\n---") else {
+        return content.to_string();
+    };
+    let fm_str = &rest[..end_idx];
+    let body_and_closing = &rest[end_idx..]; // starts with "\n---"
+
+    // Replace existing "updated: ..." line or append the field
+    let new_fm = if fm_str.lines().any(|l| l.trim_start().starts_with("updated:")) {
+        fm_str
+            .lines()
+            .map(|l| {
+                if l.trim_start().starts_with("updated:") {
+                    format!("updated: {date}")
+                } else {
+                    l.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    } else {
+        format!("{fm_str}\nupdated: {date}")
+    };
+
+    format!("---{new_fm}{body_and_closing}")
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -1541,8 +1697,9 @@ No outbound links here.
             &[],
         )
         .unwrap();
-        let count = wm.delete_all_sources().unwrap();
+        let (count, deleted_pages) = wm.delete_all_sources().unwrap();
         assert_eq!(count, 2);
+        assert!(deleted_pages.is_empty());
         assert!(!dir.path().join("sources/a.md").exists());
         assert!(!dir.path().join("sources/b.txt").exists());
         let (sources, _) = wm.read_manifest().unwrap();

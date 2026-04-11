@@ -8,13 +8,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ZeniiError;
 use crate::gateway::state::AppState;
-use crate::wiki::WikiPage;
+use crate::wiki::{FixedIssue, WikiPage};
 
 // ── Request / query types ────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
 pub struct SearchQuery {
     pub q: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+pub struct LintRequest {
+    pub auto_fix: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -58,6 +63,7 @@ struct QueryResponse {
 #[derive(Serialize)]
 struct LintResponse {
     issues: Vec<crate::wiki::LintIssue>,
+    fixed: Vec<FixedIssue>,
     summary: String,
 }
 
@@ -86,6 +92,15 @@ struct DeletePagesResponse {
 struct DeleteSourcesResponse {
     deleted: usize,
     message: String,
+}
+
+#[derive(Serialize)]
+struct SourceListItem {
+    filename: String,
+    hash: String,
+    active: bool,
+    last_run_id: Option<String>,
+    pages: Vec<String>, // slugs of pages derived from this source
 }
 
 #[derive(Serialize)]
@@ -365,14 +380,32 @@ pub async fn ingest_wiki_source(
 
 /// GET /wiki/sources — list all ingested source files with manifest metadata.
 pub async fn list_wiki_sources(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    match state.wiki.list_sources() {
-        Ok(sources) => (StatusCode::OK, Json(serde_json::json!(sources))).into_response(),
-        Err(e) => (
+    let sources = match state.wiki.list_sources() {
+        Ok(s) => s,
+        Err(e) => return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
-        )
-            .into_response(),
-    }
+        ).into_response(),
+    };
+    let (_, page_records) = state.wiki.read_manifest().unwrap_or_default();
+    let items: Vec<SourceListItem> = sources
+        .into_iter()
+        .map(|s| {
+            let pages = page_records
+                .iter()
+                .filter(|p| p.sources.contains(&s.filename))
+                .map(|p| p.slug.clone())
+                .collect();
+            SourceListItem {
+                filename: s.filename,
+                hash: s.hash,
+                active: s.active,
+                last_run_id: s.last_run_id,
+                pages,
+            }
+        })
+        .collect();
+    (StatusCode::OK, Json(serde_json::json!(items))).into_response()
 }
 
 /// GET /wiki/dir — return the absolute path to the wiki sources directory (for the Open Folder button).
@@ -560,6 +593,193 @@ pub async fn regenerate_wiki(
                 sources_list.len(),
                 written_pages.len()
             ),
+        })),
+    )
+        .into_response()
+}
+
+/// POST /wiki/sources/:filename/regenerate — re-run the LLM compiler over a single source.
+///
+/// Deletes pages exclusively or partially derived from this source, then recompiles
+/// from just this one source. Shared pages (those that list multiple contributing sources)
+/// are deleted and rebuilt from this source only — run a full regeneration to restore
+/// multi-source synthesis.
+pub async fn regenerate_wiki_source(
+    Path(filename): Path<String>,
+    State(state): State<Arc<AppState>>,
+    body: Option<Json<RegenerateRequest>>,
+) -> impl IntoResponse {
+    use crate::wiki::{PageRecord, RunRecord, SourceRecord, WikiManager};
+
+    // Verify source exists
+    let source_content = match state.wiki.read_source(&filename) {
+        Ok(c) => c,
+        Err(crate::error::ZeniiError::Validation(_)) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": format!("source '{}' not found", filename)})),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response();
+        }
+    };
+
+    let model = body.as_ref().and_then(|b| b.model.as_deref().map(String::from));
+
+    // Find pages derived from this source
+    let (manifest_sources, manifest_pages) = state.wiki.read_manifest().unwrap_or_default();
+    let source_pages: Vec<PageRecord> = manifest_pages
+        .iter()
+        .filter(|p| p.sources.contains(&filename) && p.managed_by == "source_ingest")
+        .cloned()
+        .collect();
+
+    // Remove them from memory
+    for page in &source_pages {
+        let key = format!("wiki:{}", page.slug);
+        if let Err(e) = state.memory.forget(&key).await {
+            tracing::warn!("failed to forget wiki page '{}' from memory: {e}", page.slug);
+        }
+    }
+
+    // Delete page files
+    if let Err(e) = state.wiki.delete_page_files(&source_pages) {
+        tracing::warn!("failed to delete pages before per-source regenerate: {e}");
+    }
+
+    // Run compiler on just this one source
+    let sources_list = vec![(filename.clone(), source_content)];
+    let llm_result = run_compiler(&state, &sources_list, model.as_deref()).await;
+    let llm_pages = match llm_result {
+        Ok(p) if !p.is_empty() => p,
+        _ => {
+            let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+            let _ = state.wiki.append_log(&format!(
+                "## [{date}] regenerate-source | {filename} — failed: LLM unavailable"
+            ));
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "LLM unavailable or returned no pages"})),
+            )
+                .into_response();
+        }
+    };
+
+    // Staged write
+    let rebuild_dir = match state.wiki.begin_staged_build() {
+        Ok(d) => d,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("staged build init failed: {e}")})),
+            )
+                .into_response();
+        }
+    };
+    for p in &llm_pages {
+        if let Err(e) = state.wiki.write_staged_page(&rebuild_dir, &p.page_type, &p.slug, &p.content) {
+            tracing::warn!("skipping page '{}': {e}", p.slug);
+        }
+    }
+    let committed = match state.wiki.commit_staged_build(&rebuild_dir) {
+        Ok(c) => c,
+        Err(e) => {
+            state.wiki.abort_staged_build(&rebuild_dir);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": format!("staged build commit failed: {e}")})),
+            )
+                .into_response();
+        }
+    };
+
+    // Write final pages and build page records
+    let run_id = WikiManager::new_run_id();
+    let prompt_hash = WikiManager::hash_content(&state.wiki.read_ingest_prompt().unwrap_or_default());
+    let schema_hash = WikiManager::hash_content(
+        &std::fs::read_to_string(state.wiki.wiki_dir().join("SCHEMA.md")).unwrap_or_default(),
+    );
+    let mut written_pages = Vec::new();
+    let mut new_page_records: Vec<PageRecord> = Vec::new();
+    for (ptype, slug) in &committed {
+        if let Some(lp) = llm_pages.iter().find(|p| &p.slug == slug)
+            && let Ok(page) = state.wiki.write_page(ptype, slug, &lp.content)
+        {
+            written_pages.push(page);
+            new_page_records.push(PageRecord {
+                slug: slug.clone(),
+                page_type: ptype.clone(),
+                path: format!("pages/{ptype}/{slug}.md"),
+                sources: vec![filename.clone()],
+                last_run_id: run_id.clone(),
+                managed_by: "source_ingest".to_string(),
+            });
+        }
+    }
+
+    // Update manifest: keep existing records for other sources, replace records for this source
+    let other_page_records: Vec<PageRecord> = manifest_pages
+        .into_iter()
+        .filter(|p| !p.sources.contains(&filename) || p.managed_by != "source_ingest")
+        .collect();
+    let all_page_records: Vec<PageRecord> =
+        new_page_records.into_iter().chain(other_page_records).collect();
+
+    // Update source record's last_run_id and hash
+    let new_source_records: Vec<SourceRecord> = manifest_sources
+        .into_iter()
+        .map(|s| {
+            if s.filename == filename {
+                SourceRecord {
+                    filename: s.filename,
+                    hash: WikiManager::hash_content(&sources_list[0].1),
+                    active: s.active,
+                    last_run_id: Some(run_id.clone()),
+                }
+            } else {
+                s
+            }
+        })
+        .collect();
+
+    if let Err(e) = state.wiki.write_manifest(&new_source_records, &all_page_records) {
+        tracing::warn!("manifest write failed after per-source regenerate: {e}");
+    }
+    let _ = state.wiki.append_run(&RunRecord {
+        run_id,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        model: model.clone(),
+        prompt_hash,
+        schema_hash,
+        sources: vec![filename.clone()],
+        status: "success".to_string(),
+        pages_written: written_pages.iter().map(|p| p.slug.clone()).collect(),
+    });
+
+    let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    if let Err(e) = state.wiki.update_index() {
+        tracing::warn!("wiki index update failed after per-source regenerate: {e}");
+    }
+    let _ = state.wiki.append_log(&format!(
+        "## [{date}] regenerate-source | {filename} → {} page(s)",
+        written_pages.len()
+    ));
+    if let Err(e) = state.wiki.sync_to_memory(state.memory.as_ref()).await {
+        tracing::warn!("wiki memory sync failed: {e}");
+    }
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!(RegenerateResponse {
+            sources_processed: 1,
+            pages_generated: written_pages.len(),
+            message: format!("Regenerated from '{}'; {} pages written.", filename, written_pages.len()),
         })),
     )
         .into_response()
@@ -1048,7 +1268,13 @@ pub async fn query_wiki(
 ///
 /// Checks for: broken wikilinks, orphan pages, missing index entries, and pages
 /// without an `updated` frontmatter field. Appends a log entry with the summary.
-pub async fn lint_wiki(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+/// Accepts optional JSON body `{ "auto_fix": true }` to auto-fix deterministic issues.
+pub async fn lint_wiki(
+    State(state): State<Arc<AppState>>,
+    body: Option<Json<LintRequest>>,
+) -> impl IntoResponse {
+    let auto_fix = body.as_ref().and_then(|b| b.auto_fix).unwrap_or(false);
+
     let issues = match state.wiki.lint() {
         Ok(i) => i,
         Err(e) => {
@@ -1058,6 +1284,18 @@ pub async fn lint_wiki(State(state): State<Arc<AppState>>) -> impl IntoResponse 
             )
                 .into_response()
         }
+    };
+
+    let (issues, fixed) = if auto_fix && !issues.is_empty() {
+        match state.wiki.lint_fix(&issues) {
+            Ok((f, r)) => (r, f),
+            Err(e) => {
+                tracing::warn!("lint_fix failed: {e}");
+                (issues, Vec::new())
+            }
+        }
+    } else {
+        (issues, Vec::new())
     };
 
     let n = issues.len();
@@ -1078,14 +1316,19 @@ pub async fn lint_wiki(State(state): State<Arc<AppState>>) -> impl IntoResponse 
     };
 
     let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    let log_entry = format!("## [{date}] lint | {summary}");
+    let fixed_summary = if fixed.is_empty() {
+        String::new()
+    } else {
+        format!(" | auto-fixed {} issue(s)", fixed.len())
+    };
+    let log_entry = format!("## [{date}] lint | {summary}{fixed_summary}");
     if let Err(e) = state.wiki.append_log(&log_entry) {
         tracing::warn!("wiki log append failed after lint: {e}");
     }
 
     (
         StatusCode::OK,
-        Json(serde_json::json!(LintResponse { issues, summary })),
+        Json(serde_json::json!(LintResponse { issues, fixed, summary })),
     )
         .into_response()
 }
@@ -1125,23 +1368,43 @@ pub async fn set_wiki_prompt(
     }
 }
 
-/// DELETE /wiki/sources — delete all source files and clear manifest source records.
+/// DELETE /wiki/sources — delete all source files, clear manifest source records, and remove ingest pages.
 pub async fn delete_all_wiki_sources(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    match state.wiki.delete_all_sources() {
-        Ok(deleted) => (
-            StatusCode::OK,
-            Json(DeleteSourcesResponse {
-                message: format!("Deleted {deleted} source files"),
-                deleted,
-            }),
-        )
-            .into_response(),
-        Err(e) => (
+    let (deleted, ingest_pages) = match state.wiki.delete_all_sources() {
+        Ok(r) => r,
+        Err(e) => return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
-        )
-            .into_response(),
+        ).into_response(),
+    };
+
+    // Remove deleted pages from the memory store
+    for page in &ingest_pages {
+        let key = format!("wiki:{}", page.slug);
+        if let Err(e) = state.memory.forget(&key).await {
+            tracing::warn!("failed to forget wiki page '{}' from memory: {e}", page.slug);
+        }
     }
+
+    // Update index.md to reflect only remaining (user_query) pages
+    if let Err(e) = state.wiki.update_index() {
+        tracing::warn!("wiki index update failed after delete-all-sources: {e}");
+    }
+
+    let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let _ = state.wiki.append_log(&format!(
+        "## [{date}] delete-all-sources | {deleted} source(s) deleted, {} pages removed",
+        ingest_pages.len()
+    ));
+
+    (
+        StatusCode::OK,
+        Json(DeleteSourcesResponse {
+            message: format!("Deleted {deleted} source files and {} pages", ingest_pages.len()),
+            deleted,
+        }),
+    )
+        .into_response()
 }
 
 /// DELETE /wiki/pages — delete all wiki pages and reset index.md.

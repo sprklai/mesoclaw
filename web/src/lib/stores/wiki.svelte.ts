@@ -46,6 +46,13 @@ export interface SourceRecord {
   hash: string;
   active: boolean;
   last_run_id: string | null;
+  pages: string[];   // slugs of pages generated from this source
+}
+
+export interface FixedIssue {
+  kind: string;
+  slug: string;
+  action: string;
 }
 
 export interface DeleteSourceResult {
@@ -73,6 +80,7 @@ function createWikiStore() {
   let sources = $state<SourceRecord[]>([]);
   let sourcesLoading = $state(false);
   let regenerating = $state(false);
+  let lintFixed = $state<FixedIssue[]>([]);
 
   return {
     get pages() {
@@ -107,6 +115,9 @@ function createWikiStore() {
     },
     get regenerating() {
       return regenerating;
+    },
+    get lintFixed() {
+      return lintFixed;
     },
 
     async load() {
@@ -190,10 +201,12 @@ function createWikiStore() {
     async lint(): Promise<LintIssue[]> {
       linting = true;
       try {
-        const res = await apiPost<{ issues: LintIssue[]; summary: string }>(
+        const res = await apiPost<{ issues: LintIssue[]; fixed: FixedIssue[]; summary: string }>(
           "/wiki/lint",
+          { auto_fix: true },
         );
         lintIssues = res.issues;
+        lintFixed = res.fixed ?? [];
         return res.issues;
       } finally {
         linting = false;
@@ -232,6 +245,21 @@ function createWikiStore() {
         await this.load();
         await this.fetchSources();
         return result;
+      } finally {
+        regenerating = false;
+      }
+    },
+
+    async regenerateSource(filename: string, model?: string): Promise<void> {
+      regenerating = true;
+      try {
+        await apiPost(
+          `/wiki/sources/${encodeURIComponent(filename)}/regenerate`,
+          model ? { model } : {},
+          { timeout: 300_000 },
+        );
+        await this.load();
+        await this.fetchSources();
       } finally {
         regenerating = false;
       }
