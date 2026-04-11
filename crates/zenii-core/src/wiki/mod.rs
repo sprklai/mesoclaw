@@ -649,8 +649,9 @@ impl WikiManager {
                 let entry = entry?;
                 let path = entry.path();
                 if path.extension().is_some_and(|e| e == "md") {
+                    let Some(fname) = path.file_name() else { continue; };
                     let slug = path.file_stem().unwrap_or_default().to_string_lossy().into_owned();
-                    std::fs::copy(&path, dst_dir.join(path.file_name().unwrap()))?;
+                    std::fs::copy(&path, dst_dir.join(fname))?;
                     committed.push((subdir.to_string(), slug));
                 }
             }
@@ -734,10 +735,8 @@ fn remove_source_from_frontmatter(content: &str, filename: &str) -> Result<Strin
 
     if let serde_yaml::Value::Mapping(map) = &mut fm {
         let key = serde_yaml::Value::String("sources".to_string());
-        if let Some(val) = map.get_mut(&key) {
-            if let serde_yaml::Value::Sequence(seq) = val {
-                seq.retain(|v| v.as_str() != Some(filename));
-            }
+        if let Some(serde_yaml::Value::Sequence(seq)) = map.get_mut(&key) {
+            seq.retain(|v| v.as_str() != Some(filename));
         }
     }
 

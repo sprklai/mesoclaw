@@ -477,18 +477,18 @@ pub async fn regenerate_wiki(
     let mut written_pages = Vec::new();
     let mut new_page_records: Vec<PageRecord> = Vec::new();
     for (ptype, slug) in &committed {
-        if let Some(lp) = llm_pages.iter().find(|p| &p.slug == slug) {
-            if let Ok(page) = state.wiki.write_page(ptype, slug, &lp.content) {
-                written_pages.push(page);
-                new_page_records.push(PageRecord {
-                    slug: slug.clone(),
-                    page_type: ptype.clone(),
-                    path: format!("pages/{ptype}/{slug}.md"),
-                    sources: sources_list.iter().map(|(f, _)| f.clone()).collect(),
-                    last_run_id: run_id.clone(),
-                    managed_by: "source_ingest".to_string(),
-                });
-            }
+        if let Some(lp) = llm_pages.iter().find(|p| &p.slug == slug)
+            && let Ok(page) = state.wiki.write_page(ptype, slug, &lp.content)
+        {
+            written_pages.push(page);
+            new_page_records.push(PageRecord {
+                slug: slug.clone(),
+                page_type: ptype.clone(),
+                path: format!("pages/{ptype}/{slug}.md"),
+                sources: sources_list.iter().map(|(f, _)| f.clone()).collect(),
+                last_run_id: run_id.clone(),
+                managed_by: "source_ingest".to_string(),
+            });
         }
     }
 
@@ -627,29 +627,28 @@ pub async fn delete_wiki_source(
             .filter_map(|f| state.wiki.read_source(f).ok().map(|c| (f.clone(), c)))
             .collect();
 
-        if !remaining_sources.is_empty() {
-            if let Ok(llm_pages) =
+        if !remaining_sources.is_empty()
+            && let Ok(llm_pages) =
                 run_compiler(&state, &remaining_sources, params.model.as_deref()).await
-            {
-                let rebuild_dir = state.wiki.begin_staged_build().unwrap_or_else(|_| {
-                    state.wiki.wiki_dir().join(".rebuild")
-                });
+        {
+            let rebuild_dir = state.wiki.begin_staged_build().unwrap_or_else(|_| {
+                state.wiki.wiki_dir().join(".rebuild")
+            });
+            for p in &llm_pages {
+                if rebuilt_slugs.contains(&p.slug) {
+                    let _ = state.wiki.write_staged_page(&rebuild_dir, &p.page_type, &p.slug, &p.content);
+                }
+            }
+            if state.wiki.commit_staged_build(&rebuild_dir).is_ok() {
                 for p in &llm_pages {
-                    if rebuilt_slugs.contains(&p.slug) {
-                        let _ = state.wiki.write_staged_page(&rebuild_dir, &p.page_type, &p.slug, &p.content);
+                    if rebuilt_slugs.contains(&p.slug)
+                        && let Ok(page) = state.wiki.write_page(&p.page_type, &p.slug, &p.content)
+                    {
+                        rebuilt_pages.push(page);
                     }
                 }
-                if let Ok(_) = state.wiki.commit_staged_build(&rebuild_dir) {
-                    for p in &llm_pages {
-                        if rebuilt_slugs.contains(&p.slug) {
-                            if let Ok(page) = state.wiki.write_page(&p.page_type, &p.slug, &p.content) {
-                                rebuilt_pages.push(page);
-                            }
-                        }
-                    }
-                } else {
-                    state.wiki.abort_staged_build(&rebuild_dir);
-                }
+            } else {
+                state.wiki.abort_staged_build(&rebuild_dir);
             }
         }
     }
