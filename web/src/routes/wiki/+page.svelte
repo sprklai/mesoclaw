@@ -13,6 +13,7 @@
 	import { themeStore } from '$lib/stores/theme.svelte';
 	import { shikiThemes } from '$lib/components/ai-elements/code/shiki';
 	import { isTauri, openPath, openConfigFile } from '$lib/tauri';
+	import { configStore } from '$lib/stores/config.svelte';
 	import * as m from '$lib/paraglide/messages';
 	import Search from '@lucide/svelte/icons/search';
 	import BookOpen from '@lucide/svelte/icons/book-open';
@@ -72,10 +73,15 @@
 
 	let currentTheme = $derived(themeStore.isDark ? 'github-dark-default' : 'github-light-default');
 
-	onMount(() => {
+	onMount(async () => {
 		wikiStore.load();
 		wikiStore.loadGraph();
+		if (!configStore.config || Object.keys(configStore.config).length === 0) {
+			await configStore.load();
+		}
 	});
+
+
 
 	onDestroy(() => {
 		clearTimeout(searchTimeout);
@@ -115,6 +121,8 @@
 	}
 
 	async function handleToggleGraph() {
+		// M10: guard against multiple rapid clicks enqueueing concurrent loadGraph() calls
+		if (wikiStore.graphLoading) return;
 		showGraph = !showGraph;
 		if (showGraph && !wikiStore.graph) {
 			await wikiStore.loadGraph();
@@ -179,6 +187,9 @@
 		}
 	}
 
+	// H4: max file size before calling file.text() to prevent OOM/hang on large binaries
+	const MAX_TEXT_SIZE = 10 * 1024 * 1024; // 10MB
+
 	async function handleIngest() {
 		if (ingestFiles.length === 0) return;
 		ingesting = true;
@@ -186,6 +197,11 @@
 		for (let i = 0; i < ingestFiles.length; i++) {
 			ingestProgress = { current: i + 1, total: ingestFiles.length };
 			const file = ingestFiles[i];
+			// H4: reject files over 10MB before reading to avoid OOM/hang
+			if (file.size > MAX_TEXT_SIZE) {
+				toast.error(`${file.name}: file too large (max 10MB)`);
+				continue;
+			}
 			try {
 				const content = await file.text();
 				const res = await wikiStore.ingest(file.name, content);
@@ -260,9 +276,14 @@
 
 	// ── Popovers / modals ────────────────────────────────────────────────────────
 
-	let lintPopOpen = $state(false);
-	let sourcesPopOpen = $state(false);
-	let gearOpen = $state(false);
+	// M7: single source of truth for which inline popover is open — only one can be open at a time.
+	// Modal dialogs (promptOpen, deleteWikiOpen, etc.) are separate because they use Dialog.Root.
+	let openPopover = $state<'lint' | 'sources' | 'gear' | null>(null);
+	function closeAllPopovers() { openPopover = null; }
+	let lintPopOpen = $derived(openPopover === 'lint');
+	let sourcesPopOpen = $derived(openPopover === 'sources');
+	let gearOpen = $derived(openPopover === 'gear');
+
 	let promptOpen = $state(false);
 	let promptContent = $state('');
 	let promptLoading = $state(false);
@@ -276,9 +297,7 @@
 	function handleDocumentClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
 		if (!target.closest('[data-popover-anchor]') && !target.closest('[role="dialog"]')) {
-			lintPopOpen = false;
-			sourcesPopOpen = false;
-			gearOpen = false;
+			closeAllPopovers();
 		}
 	}
 
@@ -326,12 +345,10 @@
 
 	async function handleToggleSources() {
 		if (sourcesPopOpen) {
-			sourcesPopOpen = false;
+			closeAllPopovers();
 			return;
 		}
-		sourcesPopOpen = true;
-		lintPopOpen = false;
-		gearOpen = false;
+		openPopover = 'sources';
 		if (wikiStore.sources.length === 0) {
 			await wikiStore.fetchSources();
 		}
@@ -357,7 +374,7 @@
 	}
 
 	async function handleOpenConfig() {
-		gearOpen = false;
+		closeAllPopovers();
 		try {
 			await openConfigFile();
 		} catch (e) {
@@ -367,7 +384,7 @@
 
 	async function handleOpenPrompt() {
 		if (promptLoading) return;
-		gearOpen = false;
+		closeAllPopovers();
 		promptLoading = true;
 		try {
 			promptContent = await wikiStore.fetchPrompt();
@@ -439,12 +456,10 @@
 
 	async function handleLint() {
 		if (lintPopOpen) {
-			lintPopOpen = false;
+			closeAllPopovers();
 			return;
 		}
-		lintPopOpen = true;
-		sourcesPopOpen = false;
-		gearOpen = false;
+		openPopover = 'lint';
 		if (!wikiStore.lintIssues) {
 			try {
 				await wikiStore.lint();
@@ -608,7 +623,7 @@
 										{wikiStore.lintIssues.length === 0 ? m.wiki_lint_no_issues() : m.wiki_lint_issue_count({ count: wikiStore.lintIssues.length.toString(), suffix: wikiStore.lintIssues.length === 1 ? '' : 's' })}
 									</span>
 								{/if}
-								<button class="rounded p-0.5 text-muted-foreground hover:bg-muted" onclick={() => (lintPopOpen = false)}><X class="h-3.5 w-3.5" /></button>
+								<button class="rounded p-0.5 text-muted-foreground hover:bg-muted" onclick={() => closeAllPopovers()}><X class="h-3.5 w-3.5" /></button>
 							</div>
 						</div>
 						<!-- Auto-fix summary -->
@@ -711,7 +726,7 @@
 					<div class="absolute right-0 top-full z-50 mt-1.5 w-[22rem] rounded-lg border bg-popover shadow-lg" onclick={(e) => e.stopPropagation()}>
 						<div class="flex items-center justify-between border-b px-3 py-2">
 							<span class="text-sm font-semibold">{m.wiki_sources_button()}</span>
-							<button class="rounded p-0.5 text-muted-foreground hover:bg-muted" onclick={() => (sourcesPopOpen = false)}><X class="h-3.5 w-3.5" /></button>
+							<button class="rounded p-0.5 text-muted-foreground hover:bg-muted" onclick={() => closeAllPopovers()}><X class="h-3.5 w-3.5" /></button>
 						</div>
 						<!-- Search + filter bar -->
 						<div class="border-b px-2 py-2 space-y-1.5">
@@ -785,7 +800,7 @@
 								variant="outline"
 								size="sm"
 								class="h-7 w-full gap-1 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
-								onclick={() => { deleteAllSourcesOpen = true; sourcesPopOpen = false; }}
+								onclick={() => { deleteAllSourcesOpen = true; closeAllPopovers(); }}
 								disabled={wikiStore.sources.length === 0}
 							>
 								<Trash2 class="h-3 w-3" />
@@ -808,7 +823,7 @@
 					variant={gearOpen ? 'default' : 'outline'}
 					size="sm"
 					class="px-2"
-					onclick={(e) => { e.stopPropagation(); gearOpen = !gearOpen; lintPopOpen = false; sourcesPopOpen = false; }}
+					onclick={(e) => { e.stopPropagation(); openPopover = gearOpen ? null : 'gear'; }}
 					aria-label="Wiki settings"
 				>
 					<Settings class="h-3.5 w-3.5" />
@@ -817,7 +832,7 @@
 					<div class="absolute right-0 top-full z-50 mt-1.5 w-52 rounded-lg border bg-popover py-1 shadow-lg" onclick={(e) => e.stopPropagation()}>
 						<button
 							class="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted"
-							onclick={() => { gearOpen = false; handleSync(); }}
+							onclick={() => { closeAllPopovers(); handleSync(); }}
 							disabled={wikiStore.syncing}
 						>
 							<RefreshCw class="h-3.5 w-3.5 text-muted-foreground {wikiStore.syncing ? 'animate-spin' : ''}" />
@@ -845,7 +860,7 @@
 						<p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Danger zone</p>
 						<button
 							class="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
-							onclick={() => { gearOpen = false; deleteWikiOpen = true; deleteConfirmText = ''; }}
+							onclick={() => { closeAllPopovers(); deleteWikiOpen = true; deleteConfirmText = ''; }}
 						>
 							<Trash2 class="h-3.5 w-3.5" />
 							{m.wiki_gear_delete_all()}

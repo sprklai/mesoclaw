@@ -266,10 +266,19 @@ function createWikiStore() {
       const path = model
         ? `/wiki/sources/${encodeURIComponent(filename)}?model=${encodeURIComponent(model)}`
         : `/wiki/sources/${encodeURIComponent(filename)}`;
+      // M9: snapshot before mutation so we can revert if the reload fails
+      const prevSources = sources;
       const result = await apiDelete<DeleteSourceResult>(path);
-      // Refresh sources and pages after deletion
+      // M8: optimistic filter after delete — callers do NOT need to call load() again;
+      // this.load() below overwrites pages with authoritative server state.
       sources = sources.filter((s) => s.filename !== filename);
-      await this.load();
+      try {
+        await this.load();
+      } catch (e) {
+        // M9: reload failed — revert optimistic filter so UI stays in sync with last known state
+        sources = prevSources;
+        throw e;
+      }
       return result;
     },
 
@@ -284,7 +293,7 @@ function createWikiStore() {
           signal: regenerateController.signal,
           timeout: 300_000,
         });
-        // Refresh everything after regeneration
+        // M8: self-refreshes pages and sources — callers must NOT call load()/fetchSources() again
         await this.load();
         await this.fetchSources();
         return result;
@@ -304,6 +313,7 @@ function createWikiStore() {
           model ? { model } : {},
           { timeout: 300_000 },
         );
+        // M8: self-refreshes pages and sources — callers must NOT call load()/fetchSources() again
         await this.load();
         await this.fetchSources();
       } finally {
