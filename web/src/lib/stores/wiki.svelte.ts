@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost } from "$lib/api/client";
+import { apiDelete, apiGet, apiPost, apiPut } from "$lib/api/client";
 
 export interface WikiPage {
   slug: string;
@@ -235,6 +235,28 @@ function createWikiStore() {
       } finally {
         regenerating = false;
       }
+    },
+
+    async fetchPrompt(): Promise<string> {
+      const res = await apiGet<{ content: string }>('/wiki/prompt');
+      return res.content;
+    },
+
+    async savePrompt(content: string): Promise<void> {
+      await apiPut('/wiki/prompt', { content });
+    },
+
+    async deleteAllSources(): Promise<number> {
+      const res = await apiDelete<{ deleted: number }>('/wiki/sources');
+      sources = [];
+      return res.deleted;
+    },
+
+    async deleteAllPages(): Promise<number> {
+      const res = await apiDelete<{ deleted: number }>('/wiki/pages');
+      pages = [];
+      graph = null;
+      return res.deleted;
     },
 
     async fetchWikiDir(): Promise<string> {
