@@ -6,6 +6,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 
+use crate::error::ZeniiError;
 use crate::gateway::state::AppState;
 use crate::wiki::WikiPage;
 
@@ -63,6 +64,28 @@ struct LintResponse {
 #[derive(Deserialize)]
 pub struct RegenerateRequest {
     pub model: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct SetPromptRequest {
+    pub content: String,
+}
+
+#[derive(Serialize)]
+struct PromptResponse {
+    content: String,
+}
+
+#[derive(Serialize)]
+struct DeletePagesResponse {
+    deleted: usize,
+    message: String,
+}
+
+#[derive(Serialize)]
+struct DeleteSourcesResponse {
+    deleted: usize,
+    message: String,
 }
 
 #[derive(Serialize)]
@@ -958,6 +981,79 @@ pub async fn lint_wiki(State(state): State<Arc<AppState>>) -> impl IntoResponse 
         Json(serde_json::json!(LintResponse { issues, summary })),
     )
         .into_response()
+}
+
+/// GET /wiki/prompt — read current INGEST_PROMPT.md content.
+pub async fn get_wiki_prompt(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match state.wiki.read_ingest_prompt() {
+        Ok(content) => (StatusCode::OK, Json(PromptResponse { content })).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+/// PUT /wiki/prompt — write new content to INGEST_PROMPT.md.
+pub async fn set_wiki_prompt(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<SetPromptRequest>,
+) -> impl IntoResponse {
+    match state.wiki.set_prompt(&body.content) {
+        Ok(()) => (StatusCode::OK, Json(serde_json::json!({"ok": true}))).into_response(),
+        Err(ZeniiError::Validation(msg)) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error_code": "ZENII_VALIDATION",
+                "message": msg
+            })),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+/// DELETE /wiki/sources — delete all source files and clear manifest source records.
+pub async fn delete_all_wiki_sources(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match state.wiki.delete_all_sources() {
+        Ok(deleted) => (
+            StatusCode::OK,
+            Json(DeleteSourcesResponse {
+                message: format!("Deleted {deleted} source files"),
+                deleted,
+            }),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+/// DELETE /wiki/pages — delete all wiki pages and reset index.md.
+pub async fn delete_wiki_pages(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match state.wiki.delete_all_pages() {
+        Ok(deleted) => (
+            StatusCode::OK,
+            Json(DeletePagesResponse {
+                message: format!("Deleted {deleted} wiki pages"),
+                deleted,
+            }),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────

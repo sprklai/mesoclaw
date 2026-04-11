@@ -66,11 +66,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/wiki/graph", get(handlers::wiki::get_wiki_graph))
         .route("/wiki/query", post(handlers::wiki::query_wiki))
         .route("/wiki/lint", post(handlers::wiki::lint_wiki))
-        .route("/wiki/sources", get(handlers::wiki::list_wiki_sources))
+        .route(
+            "/wiki/prompt",
+            get(handlers::wiki::get_wiki_prompt).put(handlers::wiki::set_wiki_prompt),
+        )
+        .route(
+            "/wiki/sources",
+            get(handlers::wiki::list_wiki_sources).delete(handlers::wiki::delete_all_wiki_sources),
+        )
         .route(
             "/wiki/sources/{filename}",
             delete(handlers::wiki::delete_wiki_source),
         )
+        .route("/wiki/pages", delete(handlers::wiki::delete_wiki_pages))
         .route("/wiki/regenerate", post(handlers::wiki::regenerate_wiki))
         .route("/wiki/dir", get(handlers::wiki::get_wiki_dir))
         .route("/wiki/{slug}", get(handlers::wiki::get_wiki_page))
