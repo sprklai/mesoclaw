@@ -1592,6 +1592,7 @@ async fn run_compiler(
     let system_prompt = format!("{ingest_prompt}\n\n{schema}");
 
     let mut all_pages: Vec<(LlmPage, String)> = Vec::new();
+    let mut last_parse_error: Option<String> = None;
 
     for (filename, content) in sources {
         // Provide existing wiki context so LLM can update/merge pages (blocking, holds mutex).
@@ -1636,34 +1637,116 @@ async fn run_compiler(
             .await
             .map_err(|e| e.to_string())?;
 
-        // Strip optional markdown code fences
-        let raw = response
-            .output
-            .trim()
-            .trim_start_matches("```json")
-            .trim_start_matches("```")
-            .trim_end_matches("```")
-            .trim();
-
-        match serde_json::from_str::<Vec<LlmPage>>(raw) {
+        match extract_llm_pages(&response.output) {
+            Ok(pages) if pages.is_empty() => {
+                tracing::warn!("LLM returned empty page array for source '{filename}'");
+                last_parse_error
+                    .get_or_insert_with(|| format!("Source '{filename}': LLM returned empty array"));
+            }
             Ok(pages) => {
                 // Tag each page with the source filename that produced it
                 all_pages.extend(pages.into_iter().map(|p| (p, filename.clone())));
             }
-            Err(e) => {
-                tracing::warn!(
-                    "LLM JSON parse failed: {e}\nRaw response (first 500 chars): {}",
-                    &raw[..500.min(raw.len())]
-                );
+            Err(preview) => {
+                tracing::warn!("LLM page extraction failed for source '{filename}': {preview}");
+                last_parse_error = Some(format!("Source '{filename}': {preview}"));
             }
         }
     }
 
     if all_pages.is_empty() {
-        Err("LLM returned no parseable pages.".to_string())
+        let detail = last_parse_error
+            .unwrap_or_else(|| "LLM returned empty arrays for all sources".to_string());
+        Err(format!("LLM returned no parseable pages. {detail}"))
     } else {
         Ok(all_pages)
     }
+}
+
+/// Find the outermost JSON array `[...]` span within `text`, correctly handling
+/// nested arrays/objects and JSON string literals (including escaped quotes).
+/// Returns a string slice into `text` covering the array, or `None` if not found.
+fn find_json_array(text: &str) -> Option<&str> {
+    let start = text.find('[')?;
+    let bytes = text.as_bytes();
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escape = false;
+    for (i, &b) in bytes[start..].iter().enumerate() {
+        if escape {
+            escape = false;
+            continue;
+        }
+        match b {
+            b'\\' if in_string => escape = true,
+            b'"' => in_string = !in_string,
+            b'[' if !in_string => depth += 1,
+            b']' if !in_string => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(&text[start..start + i + 1]);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Attempt to extract a list of [`LlmPage`] objects from a raw LLM response string.
+///
+/// Tries multiple strategies in order, returning on the first success. New strategies
+/// can be added to the `strategies` vec below without changing any other code.
+///
+/// On complete failure, returns an `Err` containing a response preview for diagnostics.
+fn extract_llm_pages(raw: &str) -> Result<Vec<LlmPage>, String> {
+    // Strip code fences once; reused by most strategies.
+    let stripped = raw
+        .trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim();
+
+    // Ordered list of (name, extractor) pairs tried in sequence.
+    // To add a new strategy, append one entry here — no other changes needed.
+    type Extractor = dyn Fn(&str) -> Option<Vec<LlmPage>>;
+    let strategies: &[(&str, &Extractor)] = &[
+        // Strategy 1: LLM followed instructions — bare JSON array
+        ("direct-parse", &|s| serde_json::from_str(s).ok()),
+        // Strategy 2: LLM added preamble/postamble — locate first [...] bracket span
+        ("bracket-scan", &|s| {
+            find_json_array(s).and_then(|span| serde_json::from_str(span).ok())
+        }),
+        // Strategy 3: LLM wrapped output in an object — {"pages":[...]}, etc.
+        ("object-unwrap", &|s| {
+            let val: serde_json::Value = serde_json::from_str(s).ok()?;
+            for key in &["pages", "wiki_pages", "results", "data", "output"] {
+                if let Some(arr) = val.get(key)
+                    && let Ok(pages) = serde_json::from_value::<Vec<LlmPage>>(arr.clone())
+                {
+                    return Some(pages);
+                }
+            }
+            None
+        }),
+        // ↑ Add new strategies here.
+    ];
+
+    for (name, extractor) in strategies {
+        if let Some(pages) = extractor(stripped)
+            && !pages.is_empty()
+        {
+            tracing::debug!("LLM page extraction succeeded via strategy '{name}'");
+            return Ok(pages);
+        }
+    }
+
+    Err(format!(
+        "all {} extraction strategies failed. Response preview (400 chars): {}",
+        strategies.len(),
+        &raw[..400.min(raw.len())]
+    ))
 }
 
 /// POST /wiki/sync — sync compiled wiki pages into the memory store.
@@ -2192,6 +2275,70 @@ fn slugify_question(question: &str) -> String {
         .chars()
         .take(64)
         .collect()
+}
+
+/// GET /wiki/converter/status — probe whether the configured document converter is available.
+///
+/// Tries to spawn `{doc_converter_bin} --help` with a 3-second timeout.
+/// - Binary not found in PATH → `available: false`
+/// - Binary spawns (any exit code) → `available: true`
+///
+/// Also probes for an available Python package manager to build a user-friendly install hint.
+/// Checked in order: pipx → pip3 → pip → uv. Falls back to `pip install markitdown[all]`.
+pub async fn get_converter_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let cfg = state.config.load();
+    let bin = cfg.doc_converter_bin.clone();
+    drop(cfg);
+
+    // ── Probe converter binary ───────────────────────────────────────────────
+    let available = probe_binary(&bin, &["--help"], 3).await;
+
+    // ── Probe Python package manager ─────────────────────────────────────────
+    let pm = detect_python_pm().await;
+    let install_hint = format!("{pm} install markitdown[all]");
+
+    Json(serde_json::json!({
+        "available": available,
+        "bin": bin,
+        "install_hint": install_hint,
+    }))
+    .into_response()
+}
+
+/// Returns true if `bin` can be spawned (binary exists in PATH), false otherwise.
+///
+/// Uses a short timeout to avoid blocking on slow PATH lookups. Any exit code is treated
+/// as success — we only care whether the binary exists, not whether the args are valid.
+async fn probe_binary(bin: &str, args: &[&str], timeout_secs: u64) -> bool {
+    let mut cmd = tokio::process::Command::new(bin);
+    for arg in args {
+        cmd.arg(arg);
+    }
+    // Suppress stdout/stderr — we only care about launch success.
+    cmd.stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(timeout_secs),
+        cmd.output(),
+    )
+    .await
+    {
+        Ok(Ok(_)) => true,
+        Ok(Err(e)) if e.kind() == std::io::ErrorKind::NotFound => false,
+        // Other IO errors (permissions, etc.) or timeout — treat as unavailable.
+        _ => false,
+    }
+}
+
+/// Detect the first available Python package manager in preference order.
+async fn detect_python_pm() -> &'static str {
+    for pm in ["pipx", "pip3", "pip", "uv"] {
+        if probe_binary(pm, &["--version"], 2).await {
+            return pm;
+        }
+    }
+    "pip"
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
