@@ -152,9 +152,9 @@ export async function api<T>(
     let details = response.statusText;
     let hint: string | undefined;
     try {
-      const body: ApiError = await response.json();
-      errorCode = body.error_code;
-      details = body.message;
+      const body = await response.json();
+      errorCode = body.error_code ?? "ZENII_ERROR";
+      details = body.message ?? body.error ?? response.statusText;
       hint = body.hint;
     } catch {
       // response wasn't JSON

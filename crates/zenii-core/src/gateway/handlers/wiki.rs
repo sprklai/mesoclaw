@@ -635,18 +635,20 @@ pub async fn regenerate_wiki(
     let llm_result = run_compiler(&state, &prep.sources_list, body.model.as_deref(), &schema_text).await;
     let llm_pages_with_source = match llm_result {
         Ok(p) if !p.is_empty() => p,
-        _ => {
+        result => {
+            let reason = result.err().unwrap_or_else(|| "LLM returned no pages.".to_string());
             let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
             let wiki = Arc::clone(&state.wiki).lock_owned().await;
+            let reason_c = reason.clone();
             let _ = tokio::task::spawn_blocking(move || {
                 wiki.append_log_with_limit(&format!(
-                    "## [{date}] regenerate | failed — LLM unavailable, no pages written"
+                    "## [{date}] regenerate | failed — {reason_c}"
                 ), log_max_lines)
             })
             .await;
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "LLM unavailable or returned no pages. Live pages were not modified."})),
+                Json(serde_json::json!({"error": reason})),
             )
                 .into_response();
         }
@@ -899,19 +901,21 @@ pub async fn regenerate_wiki_source(
     let llm_result = run_compiler(&state, &sources_list, model.as_deref(), &schema_text).await;
     let llm_pages_with_source = match llm_result {
         Ok(p) if !p.is_empty() => p,
-        _ => {
+        result => {
+            let reason = result.err().unwrap_or_else(|| "LLM returned no pages.".to_string());
             let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
             let wiki = Arc::clone(&state.wiki).lock_owned().await;
             let filename_c = filename.clone();
+            let reason_c = reason.clone();
             let _ = tokio::task::spawn_blocking(move || {
                 wiki.append_log_with_limit(&format!(
-                    "## [{date}] regenerate-source | {filename_c} — failed: LLM unavailable, live pages unchanged"
+                    "## [{date}] regenerate-source | {filename_c} — failed: {reason_c}"
                 ), log_max_lines)
             })
             .await;
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "LLM unavailable or returned no pages. Live pages were not modified."})),
+                Json(serde_json::json!({"error": reason})),
             )
                 .into_response();
         }
@@ -1474,7 +1478,7 @@ async fn run_compiler(
     sources: &[(String, String)],
     model: Option<&str>,
     schema: &str,
-) -> Result<Vec<(LlmPage, String)>, ()> {
+) -> Result<Vec<(LlmPage, String)>, String> {
     use crate::ai::resolve_agent;
 
     if sources.is_empty() {
@@ -1530,9 +1534,9 @@ async fn run_compiler(
 
         let agent = resolve_agent(model, state, None, Some(&system_prompt), "wiki")
             .await
-            .map_err(|_| ())?;
+            .map_err(|e| e.to_string())?;
 
-        let response = agent.prompt(&user_prompt).await.map_err(|_| ())?;
+        let response = agent.prompt(&user_prompt).await.map_err(|e| e.to_string())?;
 
         // Strip optional markdown code fences
         let raw = response
@@ -1557,7 +1561,7 @@ async fn run_compiler(
         }
     }
 
-    if all_pages.is_empty() { Err(()) } else { Ok(all_pages) }
+    if all_pages.is_empty() { Err("LLM returned no parseable pages.".to_string()) } else { Ok(all_pages) }
 }
 
 /// POST /wiki/sync — sync compiled wiki pages into the memory store.
