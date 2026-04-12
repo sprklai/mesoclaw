@@ -469,7 +469,9 @@ function createWikiStore() {
     async checkConverter(): Promise<void> {
       converterChecking = true;
       try {
-        converterStatus = await apiGet<ConverterStatus>("/wiki/converter/status");
+        converterStatus = await apiGet<ConverterStatus>(
+          "/wiki/converter/status",
+        );
       } finally {
         converterChecking = false;
       }

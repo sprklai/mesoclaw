@@ -1640,8 +1640,9 @@ async fn run_compiler(
         match extract_llm_pages(&response.output) {
             Ok(pages) if pages.is_empty() => {
                 tracing::warn!("LLM returned empty page array for source '{filename}'");
-                last_parse_error
-                    .get_or_insert_with(|| format!("Source '{filename}': LLM returned empty array"));
+                last_parse_error.get_or_insert_with(|| {
+                    format!("Source '{filename}': LLM returned empty array")
+                });
             }
             Ok(pages) => {
                 // Tag each page with the source filename that produced it
@@ -2318,12 +2319,7 @@ async fn probe_binary(bin: &str, args: &[&str], timeout_secs: u64) -> bool {
     cmd.stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
 
-    match tokio::time::timeout(
-        std::time::Duration::from_secs(timeout_secs),
-        cmd.output(),
-    )
-    .await
-    {
+    match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), cmd.output()).await {
         Ok(Ok(_)) => true,
         Ok(Err(e)) if e.kind() == std::io::ErrorKind::NotFound => false,
         // Other IO errors (permissions, etc.) or timeout — treat as unavailable.

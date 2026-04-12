@@ -256,8 +256,7 @@ impl WikiManager {
         // concept > comparison > topic > entity > query
         pages.sort_by_key(|p| type_priority(&p.page_type));
 
-        let mut seen: std::collections::HashMap<String, String> =
-            std::collections::HashMap::new();
+        let mut seen: std::collections::HashMap<String, String> = std::collections::HashMap::new();
         pages.retain(|p| {
             match seen.get(&p.slug) {
                 None => {
@@ -268,8 +267,7 @@ impl WikiManager {
                     // Auto-delete the lower-priority duplicate from disk so the
                     // warning never fires again on subsequent calls.
                     let subdir = singular_to_subdir(&p.page_type);
-                    let dup_path =
-                        pages_dir.join(subdir).join(format!("{}.md", p.slug));
+                    let dup_path = pages_dir.join(subdir).join(format!("{}.md", p.slug));
                     match std::fs::remove_file(&dup_path) {
                         Ok(()) => tracing::info!(
                             slug = %p.slug,
