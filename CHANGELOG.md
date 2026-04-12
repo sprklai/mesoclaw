@@ -354,7 +354,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shiki themes: wrapped in arrow functions for lazy loading
 
 ### Docs
-- Updated route/tool/provider counts across all documentation surfaces (114 routes, 14 tools, 6 providers)
+- Updated route/tool/provider counts across all documentation surfaces (133 routes, 14 tools, 6 providers)
 - CLI reference: workflow command section with 8 subcommands and recipe
 - API reference: added missing `/workflows/{id}/raw` and `/workflows/{id}/cancel` endpoints
 - Architecture: added Approvals section, updated Workflows/Plugins/Sessions route tables

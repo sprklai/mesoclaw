@@ -42,7 +42,14 @@ Review the staged and unstaged changes (use `git diff` and `git diff --cached`) 
 
 1. **`README.md`** — Update if there are new features, removed features, changed commands, new dependencies, or altered project structure.
 2. **`CHANGELOG.md`** — Add entries for any user-facing changes (features, fixes, breaking changes). Follow the existing format and group under the current unreleased version section. Create a new section if needed.
-3. **`docs/` directory** — Update relevant docs if the changes affect:
+3. **`website-data.json`** — Sync derived metrics with the current codebase state:
+   - `version`: read from `grep -m1 '^version = "' Cargo.toml | sed 's/.*"\(.*\)".*/\1/'`
+   - `gatewayEndpoints`: count via `grep -c '\.route(' crates/zenii-core/src/gateway/routes.rs`
+   - `agentTools`: count via `grep -c 'registry\.register\b' crates/zenii-core/src/boot.rs`
+   - `backendTests`: count via `cargo test --workspace 2>&1 | awk '/test result/{sum+=$4} END{print sum}'`
+   - Other fields (`binarySize`, `debRpmSize`, `startupSeconds`, `llmProviders`, `messagingChannels`, `crates`, `securityLayers`, `platformTargets`, `compileFlags`) — update manually only if the code changes warrant it.
+   - Read the current `website-data.json`, apply only the fields that changed, write back.
+4. **`docs/` directory** — Update relevant docs if the changes affect:
    - `docs/architecture.md` — new modules, traits, data flows, or structural changes
    - `docs/phases.md` — phase status changes or deliverable updates
    - `docs/processes.md` — process flow changes
@@ -139,7 +146,7 @@ Ship complete:
 - Formatted: cargo fmt + prettier
 - i18n check: PASSED
 - Linted: cargo clippy
-- Docs updated: <list files updated, or "none needed">
+- Docs updated: <list files updated, or "none needed"> (including website-data.json if metrics changed)
 - Secret scan: PASSED
 - Committed: <commit hash> <commit message>
 - Pushed to: origin/main

@@ -7,7 +7,7 @@
   "binarySize": 20,
   "debRpmSize": 16,
   "startupSeconds": 3,
-  "gatewayEndpoints": 114,
+  "gatewayEndpoints": 133,
   "crates": 6,
   "securityLayers": 6,
   "platformTargets": 10,

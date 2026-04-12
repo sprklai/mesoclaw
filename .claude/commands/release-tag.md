@@ -84,6 +84,18 @@ This updates 8 files (Cargo.toml, tauri.conf.json, package.json, environment.ts,
 
 If the script exits with a non-zero code, STOP and report the error.
 
+### Step 3b: Sync website-data.json
+
+After the version bump, update `website-data.json` to reflect current codebase metrics:
+
+- `version`: the new version just bumped (read from Cargo.toml)
+- `gatewayEndpoints`: count via `grep -c '\.route(' crates/zenii-core/src/gateway/routes.rs`
+- `agentTools`: count via `grep -c 'registry\.register\b' crates/zenii-core/src/boot.rs`
+- `backendTests`: count via `cargo test --workspace 2>&1 | awk '/test result/{sum+=$4} END{print sum}'`
+- Other fields (`binarySize`, `debRpmSize`, `startupSeconds`, `llmProviders`, `messagingChannels`, `crates`, `securityLayers`, `platformTargets`, `compileFlags`) — update only if you have reason to believe they changed.
+
+Read the current `website-data.json`, update only the fields above, write back. Do NOT ask the user — just update and proceed.
+
 ### Step 4: Update CHANGELOG body
 
 Read the new version that was set (from Cargo.toml after the bump).

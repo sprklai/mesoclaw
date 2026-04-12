@@ -65,6 +65,7 @@ docs/superpowers/
 .superpowers/
 go2market
 go2market/*
+go2market/pidog/video_content.md
 docs/phases.md
 docs/assets/PLACEHOLDER_demo.md
 
