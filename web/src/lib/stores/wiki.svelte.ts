@@ -138,7 +138,7 @@ function createWikiStore() {
         // L4: GET /wiki now returns paginated response { pages, total, limit, offset }
         const data = await apiGet<{ pages: WikiPage[]; total: number; limit: number; offset: number }>("/wiki?limit=200&offset=0");
         if (seq !== loadSeq) return;
-        pages = data.pages;
+        pages = [...new Map(data.pages.map(p => [p.slug, p])).values()];
       } finally {
         if (seq === loadSeq) loading = false;
       }
@@ -152,7 +152,7 @@ function createWikiStore() {
           `/wiki/search?q=${encodeURIComponent(q)}`,
         );
         if (seq !== searchSeq) return;
-        pages = data;
+        pages = [...new Map(data.map(p => [p.slug, p])).values()];
       } finally {
         if (seq === searchSeq) loading = false;
       }

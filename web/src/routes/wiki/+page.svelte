@@ -12,7 +12,7 @@
 	import { wikiStore, type WikiPage, type LintIssue, type FixedIssue, type QueryResult } from '$lib/stores/wiki.svelte';
 	import { themeStore } from '$lib/stores/theme.svelte';
 	import { shikiThemes } from '$lib/components/ai-elements/code/shiki';
-	import { isTauri, openPath, openConfigFile, openWikiDir } from '$lib/tauri';
+	import { isTauri, openPath, openConfigFile, openWikiDir, openInBrowser } from '$lib/tauri';
 	import { configStore } from '$lib/stores/config.svelte';
 	import * as m from '$lib/paraglide/messages';
 	import Search from '@lucide/svelte/icons/search';
@@ -1077,6 +1077,9 @@
 									if (href.startsWith('#wiki-')) {
 										e.preventDefault();
 										handleWikilinkClick(href.slice(6));
+									} else if (href.startsWith('http://') || href.startsWith('https://')) {
+										e.preventDefault();
+										openInBrowser(href);
 									}
 								}
 							}}

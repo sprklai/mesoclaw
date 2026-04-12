@@ -247,6 +247,9 @@ impl WikiManager {
         let pages_dir = self.wiki_dir.join("pages");
         let mut pages = Vec::new();
         walk_pages_dir(&pages_dir, &mut pages)?;
+        // Deduplicate by slug: keep the last occurrence (most specific category dir wins)
+        let mut seen = std::collections::HashSet::new();
+        pages.retain(|p| seen.insert(p.slug.clone()));
         // L14: deterministic ordering regardless of OS read_dir order
         pages.sort_by(|a, b| {
             a.page_type.cmp(&b.page_type).then_with(|| a.slug.cmp(&b.slug))
