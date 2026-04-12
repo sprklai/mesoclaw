@@ -200,7 +200,7 @@ zenii/
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter, context engine, delegation
 │   │   │   │   └── delegation/ # Coordinator, SubAgent, DelegationTask, dependency-wave execution
 │   │   │   ├── workflows/  # WorkflowRegistry, WorkflowExecutor, StepRuntime, templates (feature-gated)
-│   │   │   ├── gateway/    # axum HTTP+WS gateway (86 base + 28 feature-gated = 114 routes, auth middleware, error mapping, ZENII_VALIDATION)
+│   │   │   ├── gateway/    # axum HTTP+WS gateway (105 base + 28 feature-gated = 133 routes, auth middleware, error mapping, ZENII_VALIDATION)
 │   │   │   ├── identity/   # SoulLoader + PromptComposer + defaults (SOUL/IDENTITY/USER.md)
 │   │   │   ├── skills/     # SkillRegistry + bundled/user skills (markdown + YAML frontmatter)
 │   │   │   ├── user/       # UserLearner + SQLite observations + privacy controls
@@ -796,7 +796,7 @@ graph TB
 
 ## Gateway Routes
 
-All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Routes are grouped by subsystem (86 base + 28 feature-gated = 114 total).
+All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Routes are grouped by subsystem (105 base + 28 feature-gated = 133 total).
 
 ### Health (1 route, no auth)
 
@@ -1286,7 +1286,7 @@ Four new agent-callable tools give the AI agent direct control over system funct
 
 ```mermaid
 graph TD
-    subgraph ToolRegistry["ToolRegistry - 17 tools"]
+    subgraph ToolRegistry["ToolRegistry - 18 tools"]
         subgraph Base["Built-in Tools - 15"]
             SysInfo[system_info]
             WebSearch[web_search]
@@ -2211,6 +2211,35 @@ graph LR
 - `crates/zenii-core/src/mcp/convert.rs` — type conversions
 - `crates/zenii-mcp-server/src/main.rs` — thin binary (~75 lines)
 
+### MCP Client Architecture
+
+```mermaid
+graph LR
+    subgraph Zenii["zenii-core"]
+        MCM[McpClientManager]
+        Agent[ZeniiAgent]
+    end
+
+    subgraph External["External MCP Servers"]
+        GH[GitHub MCP]
+        PG[Postgres MCP]
+        FS[Filesystem MCP]
+    end
+
+    MCM -->|stdio| GH
+    MCM -->|stdio| PG
+    MCM -->|stdio| FS
+    MCM -->|tools + sinks| Agent
+```
+
+**Key components:**
+- `McpClientManager` — spawns external MCP servers as child processes, connects via stdio transport
+- `list_tools()` returns `Vec<(McpTool, ServerSink)>` ready for rig-core's `AgentBuilder::rmcp_tools()`
+- Configuration via `mcp_client_servers` array in `config.toml`
+
+**Files:**
+- `crates/zenii-core/src/mcp/client.rs` — `McpClientManager`
+
 ### A2A Agent Card
 
 The `GET /.well-known/agent.json` endpoint serves an A2A Agent Card for agent-to-agent discovery. This is a public endpoint (no auth required), served before the auth middleware layer alongside `/health`.
@@ -2222,8 +2251,9 @@ The `GET /.well-known/agent.json` endpoint serves an A2A Agent Card for agent-to
 | Feature | What It Enables | New Deps |
 |---------|----------------|----------|
 | `mcp-server` | `ZeniiMcpServer`, convert module | rmcp, schemars |
+| `mcp-client` | `McpClientManager`, rig-core rmcp integration | rmcp (+ rig-core/rmcp) |
 
-This feature is not in the default set — zero size impact on existing binaries.
+Neither feature is in the default set — zero size impact on existing binaries.
 
 ---
 

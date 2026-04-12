@@ -35,6 +35,8 @@
 	import Settings from '@lucide/svelte/icons/settings';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
+	import Copy from '@lucide/svelte/icons/copy';
+	import CheckCheck from '@lucide/svelte/icons/check-check';
 
 	const CATEGORIES = ['all', 'concepts', 'entities', 'topics', 'comparisons', 'queries'] as const;
 	// Add new accepted types here — drives both the file input and the drop zone hint.
@@ -160,9 +162,21 @@
 	// updated prop; debouncing would add complexity without meaningful gain here.
 	let currentTheme = $derived(themeStore.isDark ? 'github-dark-default' : 'github-light-default');
 
+	let converterBannerDismissed = $state(false);
+	let converterHintCopied = $state(false);
+
+	async function handleCopyInstallHint() {
+		const hint = wikiStore.converterStatus?.install_hint;
+		if (!hint) return;
+		await navigator.clipboard.writeText(hint);
+		converterHintCopied = true;
+		setTimeout(() => { converterHintCopied = false; }, 2000);
+	}
+
 	onMount(async () => {
 		wikiStore.load();
 		wikiStore.loadGraph();
+		wikiStore.checkConverter();
 		if (!configStore.config || Object.keys(configStore.config).length === 0) {
 			await configStore.load();
 		}
@@ -1010,6 +1024,52 @@
 		</div>
 	</div>
 
+	<!-- markitdown install banner -->
+	{#if wikiStore.converterStatus?.available === false && !converterBannerDismissed}
+		<div class="flex shrink-0 items-center gap-2 border-b bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
+			<AlertTriangle class="h-4 w-4 shrink-0" />
+			<span class="flex-1">
+				Binary file conversion (PDF, DOCX, PPTX, images) requires
+				<code class="rounded bg-amber-500/20 px-1 font-mono text-xs">{wikiStore.converterStatus.bin}</code>.
+				Install:
+				<code class="rounded bg-amber-500/20 px-1 font-mono text-xs">{wikiStore.converterStatus.install_hint}</code>
+			</span>
+			<button
+				class="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium hover:bg-amber-500/20"
+				onclick={handleCopyInstallHint}
+				title="Copy install command"
+			>
+				{#if converterHintCopied}
+					<CheckCheck class="h-3.5 w-3.5" />
+					Copied
+				{:else}
+					<Copy class="h-3.5 w-3.5" />
+					Copy
+				{/if}
+			</button>
+			<button
+				class="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium hover:bg-amber-500/20"
+				onclick={() => wikiStore.checkConverter()}
+				disabled={wikiStore.converterChecking}
+				title="Re-check converter"
+			>
+				{#if wikiStore.converterChecking}
+					<Loader2 class="h-3.5 w-3.5 animate-spin" />
+				{:else}
+					<RotateCw class="h-3.5 w-3.5" />
+				{/if}
+				Recheck
+			</button>
+			<button
+				class="rounded p-0.5 text-amber-600/70 hover:bg-amber-500/20 hover:text-amber-700 dark:text-amber-400/70 dark:hover:text-amber-400"
+				onclick={() => { converterBannerDismissed = true; }}
+				aria-label="Dismiss"
+			>
+				<X class="h-3.5 w-3.5" />
+			</button>
+		</div>
+	{/if}
+
 	<!-- Main content -->
 	<div class="flex min-h-0 flex-1">
 		<!-- Left panel: search + category tabs + page list -->
@@ -1345,6 +1405,18 @@
 					onchange={handleFileSelect}
 				/>
 			</div>
+
+			<!-- Converter unavailable hint when binary files are queued -->
+			{#if wikiStore.converterStatus?.available === false && ingestFiles.some(isBinaryFile)}
+				<div class="flex items-start gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+					<AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+					<span>
+						<code class="font-mono">{wikiStore.converterStatus.bin}</code> is not installed —
+						binary files will fail. Install with:
+						<code class="font-mono">{wikiStore.converterStatus.install_hint}</code>
+					</span>
+				</div>
+			{/if}
 
 			<!-- Selected file list -->
 			{#if ingestFiles.length > 0}

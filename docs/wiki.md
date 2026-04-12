@@ -236,6 +236,17 @@ See also: [[self-attention]], [[multi-head-attention]]
 
 ---
 
+## Knowledge Graph API
+
+The gateway exposes a machine-readable graph of all wiki pages and their relationships:
+
+```http
+GET /wiki/graph
+Authorization: Bearer $ZENII_TOKEN
+```
+
+Response: `{ nodes: [{ id, title, tags }], edges: [{ source, target, label }] }` — one node per wiki page, edges from `[[wikilinks]]` in page content. Use this to power custom graph visualisations or to analyse page connectivity programmatically.
+
 ## Tips
 
 - **Commit after each ingest**: `git add wiki/ && git commit -m "wiki: ingest <source-name>"`

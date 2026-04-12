@@ -86,6 +86,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/wiki/pages", delete(handlers::wiki::delete_wiki_pages))
         .route("/wiki/regenerate", post(handlers::wiki::regenerate_wiki))
         .route("/wiki/dir", get(handlers::wiki::get_wiki_dir))
+        .route(
+            "/wiki/converter/status",
+            get(handlers::wiki::get_converter_status),
+        )
         .route("/wiki/{slug}", get(handlers::wiki::get_wiki_page))
         // Config
         .route(

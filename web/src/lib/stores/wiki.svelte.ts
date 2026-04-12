@@ -77,6 +77,12 @@ export interface RegenerateResult {
   message: string;
 }
 
+export interface ConverterStatus {
+  available: boolean;
+  bin: string;
+  install_hint: string;
+}
+
 // M13: sequence counters — one per operation that overwrites shared state
 let loadSeq = 0;
 let searchSeq = 0;
@@ -101,6 +107,8 @@ function createWikiStore() {
   let sourcesLoading = $state(false);
   let regenerating = $state(false);
   let lintFixed = $state<FixedIssue[]>([]);
+  let converterStatus = $state<ConverterStatus | null>(null);
+  let converterChecking = $state(false);
 
   return {
     get pages() {
@@ -138,6 +146,12 @@ function createWikiStore() {
     },
     get lintFixed() {
       return lintFixed;
+    },
+    get converterStatus() {
+      return converterStatus;
+    },
+    get converterChecking() {
+      return converterChecking;
     },
 
     async load() {
@@ -450,6 +464,15 @@ function createWikiStore() {
     async fetchWikiDir(): Promise<string> {
       const res = await apiGet<{ path: string }>("/wiki/dir");
       return res.path;
+    },
+
+    async checkConverter(): Promise<void> {
+      converterChecking = true;
+      try {
+        converterStatus = await apiGet<ConverterStatus>("/wiki/converter/status");
+      } finally {
+        converterChecking = false;
+      }
     },
 
     clear() {

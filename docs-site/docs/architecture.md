@@ -200,7 +200,7 @@ zenii/
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter, context engine, delegation
 │   │   │   │   └── delegation/ # Coordinator, SubAgent, DelegationTask, dependency-wave execution
 │   │   │   ├── workflows/  # WorkflowRegistry, WorkflowExecutor, StepRuntime, templates (feature-gated)
-│   │   │   ├── gateway/    # axum HTTP+WS gateway (86 base + 28 feature-gated = 114 routes, auth middleware, error mapping, ZENII_VALIDATION)
+│   │   │   ├── gateway/    # axum HTTP+WS gateway (105 base + 28 feature-gated = 133 routes, auth middleware, error mapping, ZENII_VALIDATION)
 │   │   │   ├── identity/   # SoulLoader + PromptComposer + defaults (SOUL/IDENTITY/USER.md)
 │   │   │   ├── skills/     # SkillRegistry + bundled/user skills (markdown + YAML frontmatter)
 │   │   │   ├── user/       # UserLearner + SQLite observations + privacy controls
@@ -796,7 +796,7 @@ graph TB
 
 ## Gateway Routes
 
-All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Routes are grouped by subsystem (86 base + 28 feature-gated = 114 total).
+All clients communicate via the HTTP+WebSocket gateway at `localhost:18981`. Routes are grouped by subsystem (105 base + 28 feature-gated = 133 total).
 
 ### Health (1 route, no auth)
 
@@ -1286,7 +1286,7 @@ Four new agent-callable tools give the AI agent direct control over system funct
 
 ```mermaid
 graph TD
-    subgraph ToolRegistry["ToolRegistry - 17 tools"]
+    subgraph ToolRegistry["ToolRegistry - 18 tools"]
         subgraph Base["Built-in Tools - 15"]
             SysInfo[system_info]
             WebSearch[web_search]

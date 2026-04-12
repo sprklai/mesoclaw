@@ -11,6 +11,7 @@
 		type SimulationNodeDatum,
 		type SimulationLinkDatum
 	} from 'd3-force';
+	import { Loader2 } from '@lucide/svelte';
 	import type { WikiNode, WikiEdge, WikiPage } from '$lib/stores/wiki.svelte';
 	import { configStore } from '$lib/stores/config.svelte';
 
@@ -202,6 +203,26 @@
 		}
 	}
 
+	// ── position persistence ──────────────────────────────────────────────────
+	// Node positions are saved to localStorage so the layout is stable across
+	// sessions. Keyed by node ID (not topology hash) so adding a single new page
+	// only displaces that one node — all existing nodes keep their saved positions.
+
+	const POSITIONS_KEY = 'wiki-graph-node-positions';
+
+	function savePositions(ns: SimNode[]) {
+		const map: Record<string, { x: number; y: number }> = {};
+		for (const n of ns) map[n.id] = { x: n.x ?? 0, y: n.y ?? 0 };
+		try { localStorage.setItem(POSITIONS_KEY, JSON.stringify(map)); } catch {}
+	}
+
+	function loadSavedPositions(): Record<string, { x: number; y: number }> | null {
+		try {
+			const raw = localStorage.getItem(POSITIONS_KEY);
+			return raw ? JSON.parse(raw) : null;
+		} catch { return null; }
+	}
+
 	// ── simulation ────────────────────────────────────────────────────────────
 
 	// Cluster centers: each page_type gets a fixed position on a pentagon
@@ -225,8 +246,12 @@
 		graphReady = false;
 		// Guard: deduplicate by id in case backend returns duplicate slugs
 		const uniqueNodes = [...new Map(nodes.map((n) => [n.id, n])).values()];
-		// Initialize nodes near their type's cluster center (not all at canvas center)
+		// Restore saved positions when available so layout is stable across sessions.
+		// Nodes without a saved position (newly added pages) fall back to cluster center.
+		const savedPositions = loadSavedPositions();
 		const sNodes: SimNode[] = uniqueNodes.map((n) => {
+			const saved = savedPositions?.[n.id];
+			if (saved) return { ...n, x: saved.x, y: saved.y };
 			const center = clusterCenter(w, h, n.page_type);
 			return {
 				...n,
@@ -234,6 +259,7 @@
 				y: center.y + (Math.random() - 0.5) * GC.clusterScatter,
 			};
 		});
+		const allRestored = !!savedPositions && uniqueNodes.every((n) => savedPositions[n.id] != null);
 
 		const idToNode = new Map(sNodes.map((n) => [n.id, n]));
 		const sLinks: SimLink[] = edges
@@ -268,13 +294,21 @@
 				// Auto-center once the simulation has converged to its final layout.
 				// fitView() called right after buildSimulation() only sees pre-tick
 				// positions; this ensures the final bounding box is used.
+				savePositions(sNodes);
 				fitView();
 				graphReady = true;
 			});
 
-		// More pre-ticks for better initial cluster separation before user sees layout
-		for (let i = 0; i < GC.preTicks; i++) sim.tick();
-		sim.alpha(GC.initialAlpha).restart();
+		if (allRestored) {
+			// All nodes have saved positions — skip simulation for instant display.
+			sim.stop();
+			fitView();
+			graphReady = true;
+		} else {
+			// More pre-ticks for better initial cluster separation before user sees layout
+			for (let i = 0; i < GC.preTicks; i++) sim.tick();
+			sim.alpha(GC.initialAlpha).restart();
+		}
 
 		simNodes = sNodes;
 		simLinks = sLinks as SimLink[];
@@ -405,6 +439,9 @@
 			simulation?.alphaTarget(0).restart();
 			dragNode = null;
 			hoveredNode = null;
+
+			// Persist manual layout so dragged positions survive a page reload.
+			if (dragMoved) savePositions(simNodes);
 
 			if (!dragMoved) {
 				tooltipNode = tooltipNode?.id === node.id ? null : node;
@@ -612,6 +649,14 @@
 			</svg>
 		</button>
 	</div>
+
+	<!-- simulation loading overlay — visible while d3 is still running -->
+	{#if !graphReady}
+		<div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2">
+			<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+			<p class="text-xs text-muted-foreground">Laying out graph…</p>
+		</div>
+	{/if}
 
 	<!-- legend -->
 	<div class="pointer-events-none absolute right-3 top-3 flex flex-col gap-1 rounded-lg border bg-popover/80 px-2.5 py-2 backdrop-blur-sm">
