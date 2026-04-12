@@ -229,7 +229,13 @@
 					const content = await file.text();
 					res = await wikiStore.ingest(file.name, content);
 				}
-				toast.success(m.wiki_ingest_success({ slug: res.slug }));
+				// Show meaningful feedback: extraction status or fallback notice
+				const isLlmFallback = res.page_count <= 1 && res.message.includes('LLM unavailable');
+				if (isLlmFallback) {
+					toast.warning(`${file.name}: ${res.message}`);
+				} else {
+					toast.success(res.message);
+				}
 				succeeded++;
 			} catch (e) {
 				const msg = e instanceof Error ? e.message : m.wiki_ingest_error();
@@ -243,6 +249,8 @@
 			ingestOpen = false;
 			ingestFiles = [];
 			await wikiStore.load();
+			wikiStore.loadGraph();
+			wikiStore.fetchSources();
 		}
 	}
 
