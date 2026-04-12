@@ -252,15 +252,39 @@ impl WikiManager {
         let pages_dir = self.wiki_dir.join("pages");
         let mut pages = Vec::new();
         walk_pages_dir(&pages_dir, &mut pages)?;
-        // Deduplicate by slug: first occurrence wins. Warn on duplicates so the
-        // user knows they have conflicting files in different subdirectories.
-        let mut seen = std::collections::HashSet::new();
+        // Sort by type priority so the highest-quality type wins any slug collision.
+        // concept > comparison > topic > entity > query
+        pages.sort_by_key(|p| type_priority(&p.page_type));
+
+        let mut seen: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
         pages.retain(|p| {
-            if seen.insert(p.slug.clone()) {
-                true
-            } else {
-                tracing::warn!(slug = %p.slug, "duplicate wiki page slug detected — skipping extra copy");
-                false
+            match seen.get(&p.slug) {
+                None => {
+                    seen.insert(p.slug.clone(), p.page_type.clone());
+                    true
+                }
+                Some(winner_type) => {
+                    // Auto-delete the lower-priority duplicate from disk so the
+                    // warning never fires again on subsequent calls.
+                    let subdir = singular_to_subdir(&p.page_type);
+                    let dup_path =
+                        pages_dir.join(subdir).join(format!("{}.md", p.slug));
+                    match std::fs::remove_file(&dup_path) {
+                        Ok(()) => tracing::info!(
+                            slug = %p.slug,
+                            kept_type = %winner_type,
+                            removed_type = %p.page_type,
+                            "auto-removed duplicate wiki page",
+                        ),
+                        Err(e) => tracing::warn!(
+                            slug = %p.slug,
+                            path = ?dup_path,
+                            "duplicate slug — failed to auto-remove: {e}",
+                        ),
+                    }
+                    false
+                }
             }
         });
         // L14: deterministic ordering regardless of OS read_dir order
@@ -1184,6 +1208,31 @@ fn delete_md_files_in_dir(dir: &Path) -> Result<usize, ZeniiError> {
         }
     }
     Ok(count)
+}
+
+/// Maps singular page_type ("concept") to its plural on-disk subdirectory ("concepts").
+fn singular_to_subdir(page_type: &str) -> &'static str {
+    match page_type {
+        "concept" => "concepts",
+        "entity" => "entities",
+        "topic" => "topics",
+        "comparison" => "comparisons",
+        "query" => "queries",
+        _ => "topics",
+    }
+}
+
+/// Lower number = higher priority when resolving slug collisions.
+/// concept > comparison > topic > entity > query
+fn type_priority(page_type: &str) -> u8 {
+    match page_type {
+        "concept" => 0,
+        "comparison" => 1,
+        "topic" => 2,
+        "entity" => 3,
+        "query" => 4,
+        _ => 5,
+    }
 }
 
 fn walk_pages_dir(dir: &Path, pages: &mut Vec<WikiPage>) -> Result<(), ZeniiError> {
