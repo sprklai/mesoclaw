@@ -152,12 +152,16 @@ pub async fn list_wiki_pages(
         Ok(Ok(pages)) => {
             let total = pages.len();
             let page_slice: Vec<_> = pages.into_iter().skip(offset).take(limit).collect();
-            (StatusCode::OK, Json(serde_json::json!({
-                "pages": page_slice,
-                "total": total,
-                "limit": limit,
-                "offset": offset,
-            }))).into_response()
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "pages": page_slice,
+                    "total": total,
+                    "limit": limit,
+                    "offset": offset,
+                })),
+            )
+                .into_response()
         }
         Ok(Err(e)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -257,10 +261,9 @@ pub async fn ingest_wiki_source(
         let wiki = Arc::clone(&state.wiki).lock_owned().await;
         let filename = body.filename.clone();
         let content = body.content.clone();
-        if let Err(e) =
-            tokio::task::spawn_blocking(move || wiki.save_source(&filename, &content))
-                .await
-                .unwrap_or_else(|e| Err(crate::error::ZeniiError::Gateway(e.to_string())))
+        if let Err(e) = tokio::task::spawn_blocking(move || wiki.save_source(&filename, &content))
+            .await
+            .unwrap_or_else(|e| Err(crate::error::ZeniiError::Gateway(e.to_string())))
         {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -279,8 +282,8 @@ pub async fn ingest_wiki_source(
         let wiki = Arc::clone(&state.wiki).lock_owned().await;
         tokio::task::spawn_blocking(move || {
             let prompt = wiki.read_ingest_prompt().unwrap_or_default();
-            let schema = std::fs::read_to_string(wiki.wiki_dir().join("SCHEMA.md"))
-                .unwrap_or_default();
+            let schema =
+                std::fs::read_to_string(wiki.wiki_dir().join("SCHEMA.md")).unwrap_or_default();
             (
                 WikiManager::hash_content(&prompt),
                 WikiManager::hash_content(&schema),
@@ -306,39 +309,35 @@ pub async fn ingest_wiki_source(
     let (pages, used_llm) = if let Ok(llm_pages_with_source) = llm_result {
         let wiki = Arc::clone(&state.wiki).lock_owned().await;
         let llm_pages_c: Vec<LlmPage> = llm_pages_with_source.into_iter().map(|(p, _)| p).collect();
-        tokio::task::spawn_blocking(move || {
-            match wiki.begin_staged_build() {
-                Ok(rebuild_dir) => {
-                    let mut staged = Vec::new();
-                    for p in &llm_pages_c {
-                        if wiki
-                            .write_staged_page(&rebuild_dir, &p.page_type, &p.slug, &p.content)
-                            .is_ok()
-                        {
-                            staged.push(p.clone());
-                        }
-                    }
-                    match wiki.commit_staged_build(&rebuild_dir) {
-                        Ok(_) => {
-                            let mut written = Vec::new();
-                            for p in staged {
-                                if let Ok(page) =
-                                    wiki.write_page(&p.page_type, &p.slug, &p.content)
-                                {
-                                    written.push(page);
-                                }
-                            }
-                            (written, true)
-                        }
-                        Err(e) => {
-                            tracing::warn!("staged build commit failed: {e}");
-                            wiki.abort_staged_build(&rebuild_dir);
-                            (Vec::new(), false)
-                        }
+        tokio::task::spawn_blocking(move || match wiki.begin_staged_build() {
+            Ok(rebuild_dir) => {
+                let mut staged = Vec::new();
+                for p in &llm_pages_c {
+                    if wiki
+                        .write_staged_page(&rebuild_dir, &p.page_type, &p.slug, &p.content)
+                        .is_ok()
+                    {
+                        staged.push(p.clone());
                     }
                 }
-                Err(_) => (Vec::new(), false),
+                match wiki.commit_staged_build(&rebuild_dir) {
+                    Ok(_) => {
+                        let mut written = Vec::new();
+                        for p in staged {
+                            if let Ok(page) = wiki.write_page(&p.page_type, &p.slug, &p.content) {
+                                written.push(page);
+                            }
+                        }
+                        (written, true)
+                    }
+                    Err(e) => {
+                        tracing::warn!("staged build commit failed: {e}");
+                        wiki.abort_staged_build(&rebuild_dir);
+                        (Vec::new(), false)
+                    }
+                }
             }
+            Err(_) => (Vec::new(), false),
         })
         .await
         .unwrap_or((Vec::new(), false))
@@ -361,7 +360,9 @@ pub async fn ingest_wiki_source(
             let (mut sources, mut page_records) = match manifest {
                 Ok(v) => v,
                 Err(e) => {
-                    tracing::warn!("manifest read failed after ingest, skipping manifest update: {e}");
+                    tracing::warn!(
+                        "manifest read failed after ingest, skipping manifest update: {e}"
+                    );
                     return;
                 }
             };
@@ -401,17 +402,26 @@ pub async fn ingest_wiki_source(
             if let Err(e) = wiki.update_index() {
                 tracing::error!("wiki index update failed after ingest: {e}");
             }
-            if let Err(e) = wiki.append_log_with_limit(&format!(
-                "## [{date}] ingest | {filename} — {} page(s) generated",
-                pages_c.len()
-            ), log_max_lines) {
+            if let Err(e) = wiki.append_log_with_limit(
+                &format!(
+                    "## [{date}] ingest | {filename} — {} page(s) generated",
+                    pages_c.len()
+                ),
+                log_max_lines,
+            ) {
                 tracing::warn!("wiki log append failed: {e}");
             }
         })
         .await
         .ok();
 
-        if let Err(e) = state.wiki.lock().await.sync_to_memory(state.memory.as_ref()).await {
+        if let Err(e) = state
+            .wiki
+            .lock()
+            .await
+            .sync_to_memory(state.memory.as_ref())
+            .await
+        {
             tracing::warn!("wiki memory sync failed: {e}");
         }
         let primary_slug = pages.first().map(|p| p.slug.clone()).unwrap_or_default();
@@ -448,9 +458,10 @@ pub async fn ingest_wiki_source(
             tracing::warn!("manifest write failed after fallback ingest: {e}");
         }
         let index_err = wiki.update_index().err();
-        if let Err(e) = wiki.append_log_with_limit(&format!(
-            "## [{date}] ingest | {filename} — fallback single-page (no LLM)"
-        ), log_max_lines) {
+        if let Err(e) = wiki.append_log_with_limit(
+            &format!("## [{date}] ingest | {filename} — fallback single-page (no LLM)"),
+            log_max_lines,
+        ) {
             tracing::warn!("wiki log append failed: {e}");
         }
         Ok::<_, crate::error::ZeniiError>((page, index_err))
@@ -459,7 +470,13 @@ pub async fn ingest_wiki_source(
 
     match fallback_result {
         Ok(Ok((page, None))) => {
-            if let Err(e) = state.wiki.lock().await.sync_to_memory(state.memory.as_ref()).await {
+            if let Err(e) = state
+                .wiki
+                .lock()
+                .await
+                .sync_to_memory(state.memory.as_ref())
+                .await
+            {
                 tracing::warn!("wiki memory sync failed: {e}");
             }
             let primary_slug = page.slug.clone();
@@ -545,7 +562,10 @@ pub async fn list_wiki_sources(State(state): State<Arc<AppState>>) -> impl IntoR
 pub async fn get_wiki_dir(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let wiki = Arc::clone(&state.wiki).lock_owned().await;
     let path = tokio::task::spawn_blocking(move || {
-        wiki.wiki_dir().join("sources").to_string_lossy().into_owned()
+        wiki.wiki_dir()
+            .join("sources")
+            .to_string_lossy()
+            .into_owned()
     })
     .await
     .unwrap_or_default();
@@ -560,8 +580,8 @@ pub async fn regenerate_wiki(
     State(state): State<Arc<AppState>>,
     Json(body): Json<RegenerateRequest>,
 ) -> impl IntoResponse {
-    use std::collections::HashMap;
     use crate::wiki::{PageRecord, RunRecord, SourceRecord, WikiManager};
+    use std::collections::HashMap;
 
     let log_max_lines = state.config.load().wiki_log_max_lines;
 
@@ -593,16 +613,24 @@ pub async fn regenerate_wiki(
                     })
                     .collect()
             };
-            Ok(PrepResult { sources_list, manifest_pages })
+            Ok(PrepResult {
+                sources_list,
+                manifest_pages,
+            })
         })
         .await
         .unwrap_or_else(|e| {
             tracing::warn!("wiki regenerate prep task panicked: {e}");
-            Err(crate::error::ZeniiError::Gateway("prep task panicked".into()))
+            Err(crate::error::ZeniiError::Gateway(
+                "prep task panicked".into(),
+            ))
         })
         .unwrap_or_else(|e| {
             tracing::warn!("wiki regenerate manifest read failed: {e}");
-            PrepResult { sources_list: Vec::new(), manifest_pages: Vec::new() }
+            PrepResult {
+                sources_list: Vec::new(),
+                manifest_pages: Vec::new(),
+            }
         })
     };
 
@@ -632,18 +660,27 @@ pub async fn regenerate_wiki(
 
     // ── Step 2: LLM compiler (async, no mutex held) ──────────────────────────
     // Returns (LlmPage, source_filename) pairs for correct provenance tracking (C6 fix).
-    let llm_result = run_compiler(&state, &prep.sources_list, body.model.as_deref(), &schema_text).await;
+    let llm_result = run_compiler(
+        &state,
+        &prep.sources_list,
+        body.model.as_deref(),
+        &schema_text,
+    )
+    .await;
     let llm_pages_with_source = match llm_result {
         Ok(p) if !p.is_empty() => p,
         result => {
-            let reason = result.err().unwrap_or_else(|| "LLM returned no pages.".to_string());
+            let reason = result
+                .err()
+                .unwrap_or_else(|| "LLM returned no pages.".to_string());
             let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
             let wiki = Arc::clone(&state.wiki).lock_owned().await;
             let reason_c = reason.clone();
             let _ = tokio::task::spawn_blocking(move || {
-                wiki.append_log_with_limit(&format!(
-                    "## [{date}] regenerate | failed — {reason_c}"
-                ), log_max_lines)
+                wiki.append_log_with_limit(
+                    &format!("## [{date}] regenerate | failed — {reason_c}"),
+                    log_max_lines,
+                )
             })
             .await;
             return (
@@ -792,7 +829,13 @@ pub async fn regenerate_wiki(
         }
     };
 
-    if let Err(e) = state.wiki.lock().await.sync_to_memory(state.memory.as_ref()).await {
+    if let Err(e) = state
+        .wiki
+        .lock()
+        .await
+        .sync_to_memory(state.memory.as_ref())
+        .await
+    {
         tracing::warn!("wiki memory sync failed: {e}");
     }
 
@@ -826,7 +869,9 @@ pub async fn regenerate_wiki_source(
     use crate::wiki::{PageRecord, RunRecord, SourceRecord, WikiManager};
 
     let log_max_lines = state.config.load().wiki_log_max_lines;
-    let model = body.as_ref().and_then(|b| b.model.as_deref().map(String::from));
+    let model = body
+        .as_ref()
+        .and_then(|b| b.model.as_deref().map(String::from));
 
     // ── Step 1: Verify source, read manifest (blocking) ─────────────────────────
     // NOTE: live pages are NOT deleted here — deletion happens inside Step 3 only
@@ -902,15 +947,18 @@ pub async fn regenerate_wiki_source(
     let llm_pages_with_source = match llm_result {
         Ok(p) if !p.is_empty() => p,
         result => {
-            let reason = result.err().unwrap_or_else(|| "LLM returned no pages.".to_string());
+            let reason = result
+                .err()
+                .unwrap_or_else(|| "LLM returned no pages.".to_string());
             let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
             let wiki = Arc::clone(&state.wiki).lock_owned().await;
             let filename_c = filename.clone();
             let reason_c = reason.clone();
             let _ = tokio::task::spawn_blocking(move || {
-                wiki.append_log_with_limit(&format!(
-                    "## [{date}] regenerate-source | {filename_c} — failed: {reason_c}"
-                ), log_max_lines)
+                wiki.append_log_with_limit(
+                    &format!("## [{date}] regenerate-source | {filename_c} — failed: {reason_c}"),
+                    log_max_lines,
+                )
             })
             .await;
             return (
@@ -936,7 +984,9 @@ pub async fn regenerate_wiki_source(
         tokio::task::spawn_blocking(move || {
             let rebuild_dir = wiki.begin_staged_build()?;
             for (p, _src) in &llm_pages_with_source_c {
-                if let Err(e) = wiki.write_staged_page(&rebuild_dir, &p.page_type, &p.slug, &p.content) {
+                if let Err(e) =
+                    wiki.write_staged_page(&rebuild_dir, &p.page_type, &p.slug, &p.content)
+                {
                     tracing::warn!("skipping page '{}': {e}", p.slug);
                 }
             }
@@ -950,18 +1000,23 @@ pub async fn regenerate_wiki_source(
 
             // Delete old pages derived from this source only AFTER successful commit (H3 fix)
             if let Err(e) = wiki.delete_page_files(&source_pages_c) {
-                tracing::warn!("failed to delete old pages after per-source regenerate commit: {e}");
+                tracing::warn!(
+                    "failed to delete old pages after per-source regenerate commit: {e}"
+                );
             }
 
             let run_id = WikiManager::new_run_id();
-            let prompt_hash = WikiManager::hash_content(&wiki.read_ingest_prompt().unwrap_or_default());
+            let prompt_hash =
+                WikiManager::hash_content(&wiki.read_ingest_prompt().unwrap_or_default());
             // Use the schema already read before the compiler call (M4 fix: no extra disk read).
             let schema_hash = WikiManager::hash_content(&schema_text_c);
 
             let mut written_pages = Vec::new();
             let mut new_page_records: Vec<PageRecord> = Vec::new();
             for (ptype, slug) in &committed {
-                if let Some((lp, _src)) = llm_pages_with_source_c.iter().find(|(p, _)| &p.slug == slug)
+                if let Some((lp, _src)) = llm_pages_with_source_c
+                    .iter()
+                    .find(|(p, _)| &p.slug == slug)
                     && let Ok(page) = wiki.write_page(ptype, slug, &lp.content)
                 {
                     written_pages.push(page);
@@ -980,8 +1035,10 @@ pub async fn regenerate_wiki_source(
                 .into_iter()
                 .filter(|p| !p.sources.contains(&filename_c) || p.managed_by != "source_ingest")
                 .collect();
-            let all_page_records: Vec<PageRecord> =
-                new_page_records.into_iter().chain(other_page_records).collect();
+            let all_page_records: Vec<PageRecord> = new_page_records
+                .into_iter()
+                .chain(other_page_records)
+                .collect();
 
             let new_source_records: Vec<SourceRecord> = manifest_sources_c
                 .into_iter()
@@ -1017,10 +1074,13 @@ pub async fn regenerate_wiki_source(
             if let Err(e) = wiki.update_index() {
                 tracing::warn!("wiki index update failed after per-source regenerate: {e}");
             }
-            let _ = wiki.append_log_with_limit(&format!(
-                "## [{date}] regenerate-source | {filename_c} → {} page(s)",
-                written_pages.len()
-            ), log_max_lines);
+            let _ = wiki.append_log_with_limit(
+                &format!(
+                    "## [{date}] regenerate-source | {filename_c} → {} page(s)",
+                    written_pages.len()
+                ),
+                log_max_lines,
+            );
             Ok::<_, crate::error::ZeniiError>(written_pages)
         })
         .await
@@ -1044,7 +1104,13 @@ pub async fn regenerate_wiki_source(
         }
     };
 
-    if let Err(e) = state.wiki.lock().await.sync_to_memory(state.memory.as_ref()).await {
+    if let Err(e) = state
+        .wiki
+        .lock()
+        .await
+        .sync_to_memory(state.memory.as_ref())
+        .await
+    {
         tracing::warn!("wiki memory sync failed: {e}");
     }
 
@@ -1053,7 +1119,11 @@ pub async fn regenerate_wiki_source(
         Json(serde_json::json!(RegenerateResponse {
             sources_processed: 1,
             pages_generated: written_pages.len(),
-            message: format!("Regenerated from '{}'; {} pages written.", filename, written_pages.len()),
+            message: format!(
+                "Regenerated from '{}'; {} pages written.",
+                filename,
+                written_pages.len()
+            ),
         })),
     )
         .into_response()
@@ -1349,11 +1419,19 @@ pub async fn delete_wiki_source(
         String::new()
     };
     let rebuilt_pages = if !prep.remaining_sources.is_empty() {
-        match run_compiler(&state, &prep.remaining_sources, params.model.as_deref(), &delete_schema_text).await {
+        match run_compiler(
+            &state,
+            &prep.remaining_sources,
+            params.model.as_deref(),
+            &delete_schema_text,
+        )
+        .await
+        {
             Ok(llm_pages_with_source) if !llm_pages_with_source.is_empty() => {
                 let rebuilt_slugs_c = prep.rebuilt_slugs.clone();
                 // Discard source tag — delete_wiki_source manages provenance separately
-                let llm_pages_c: Vec<LlmPage> = llm_pages_with_source.into_iter().map(|(p, _)| p).collect();
+                let llm_pages_c: Vec<LlmPage> =
+                    llm_pages_with_source.into_iter().map(|(p, _)| p).collect();
                 let wiki = Arc::clone(&state.wiki).lock_owned().await;
                 tokio::task::spawn_blocking(move || {
                     let rebuild_dir = match wiki.begin_staged_build() {
@@ -1362,7 +1440,12 @@ pub async fn delete_wiki_source(
                     };
                     for p in &llm_pages_c {
                         if rebuilt_slugs_c.contains(&p.slug) {
-                            let _ = wiki.write_staged_page(&rebuild_dir, &p.page_type, &p.slug, &p.content);
+                            let _ = wiki.write_staged_page(
+                                &rebuild_dir,
+                                &p.page_type,
+                                &p.slug,
+                                &p.content,
+                            );
                         }
                     }
                     if wiki.commit_staged_build(&rebuild_dir).is_ok() {
@@ -1427,7 +1510,9 @@ pub async fn delete_wiki_source(
                 run_id,
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 model: model_c,
-                prompt_hash: WikiManager::hash_content(&wiki.read_ingest_prompt().unwrap_or_default()),
+                prompt_hash: WikiManager::hash_content(
+                    &wiki.read_ingest_prompt().unwrap_or_default(),
+                ),
                 schema_hash: WikiManager::hash_content(
                     &std::fs::read_to_string(wiki.wiki_dir().join("SCHEMA.md")).unwrap_or_default(),
                 ),
@@ -1439,11 +1524,14 @@ pub async fn delete_wiki_source(
             if let Err(e) = wiki.update_index() {
                 tracing::warn!("wiki index update failed after delete-source: {e}");
             }
-            if let Err(e) = wiki.append_log_with_limit(&format!(
-                "## [{date}] delete-source | {filename_c} — {} deleted, {} rebuilt",
-                deleted_slugs_c.len(),
-                rebuilt_pages_c.len()
-            ), log_max_lines) {
+            if let Err(e) = wiki.append_log_with_limit(
+                &format!(
+                    "## [{date}] delete-source | {filename_c} — {} deleted, {} rebuilt",
+                    deleted_slugs_c.len(),
+                    rebuilt_pages_c.len()
+                ),
+                log_max_lines,
+            ) {
                 tracing::warn!("wiki log append failed: {e}");
             }
         })
@@ -1451,7 +1539,13 @@ pub async fn delete_wiki_source(
         .ok();
     }
 
-    if let Err(e) = state.wiki.lock().await.sync_to_memory(state.memory.as_ref()).await {
+    if let Err(e) = state
+        .wiki
+        .lock()
+        .await
+        .sync_to_memory(state.memory.as_ref())
+        .await
+    {
         tracing::warn!("wiki memory sync failed: {e}");
     }
 
@@ -1535,9 +1629,12 @@ async fn run_compiler(
 
         let agent = resolve_agent(model, state, None, Some(&system_prompt), "wiki")
             .await
-        .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?;
 
-        let response = agent.prompt(&user_prompt).await.map_err(|e| e.to_string())?;
+        let response = agent
+            .prompt(&user_prompt)
+            .await
+            .map_err(|e| e.to_string())?;
 
         // Strip optional markdown code fences
         let raw = response
@@ -1562,12 +1659,22 @@ async fn run_compiler(
         }
     }
 
-    if all_pages.is_empty() { Err("LLM returned no parseable pages.".to_string()) } else { Ok(all_pages) }
+    if all_pages.is_empty() {
+        Err("LLM returned no parseable pages.".to_string())
+    } else {
+        Ok(all_pages)
+    }
 }
 
 /// POST /wiki/sync — sync compiled wiki pages into the memory store.
 pub async fn sync_wiki_to_memory(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    match state.wiki.lock().await.sync_to_memory(state.memory.as_ref()).await {
+    match state
+        .wiki
+        .lock()
+        .await
+        .sync_to_memory(state.memory.as_ref())
+        .await
+    {
         Ok(count) => (StatusCode::OK, Json(serde_json::json!({"synced": count}))).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -1614,8 +1721,8 @@ pub async fn query_wiki(
         match tokio::task::spawn_blocking(move || {
             let index = wiki.read_index()?;
             let pages = wiki.list_pages()?;
-            let schema = std::fs::read_to_string(wiki.wiki_dir().join("SCHEMA.md"))
-                .unwrap_or_default();
+            let schema =
+                std::fs::read_to_string(wiki.wiki_dir().join("SCHEMA.md")).unwrap_or_default();
             Ok::<_, crate::error::ZeniiError>((index, pages, schema))
         })
         .await
@@ -1626,14 +1733,14 @@ pub async fn query_wiki(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({"error": e.to_string()})),
                 )
-                    .into_response()
+                    .into_response();
             }
             Err(e) => {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({"error": format!("task panic: {e}")})),
                 )
-                    .into_response()
+                    .into_response();
             }
         }
     };
@@ -1673,7 +1780,7 @@ pub async fn query_wiki(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({"error": format!("no agent configured: {e}")})),
             )
-                .into_response()
+                .into_response();
         }
     };
 
@@ -1684,7 +1791,7 @@ pub async fn query_wiki(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({"error": e.to_string()})),
             )
-                .into_response()
+                .into_response();
         }
     };
 
@@ -1829,7 +1936,11 @@ pub async fn lint_wiki(
     match lint_result {
         Ok(Ok((issues, fixed, summary))) => (
             StatusCode::OK,
-            Json(serde_json::json!(LintResponse { issues, fixed, summary })),
+            Json(serde_json::json!(LintResponse {
+                issues,
+                fixed,
+                summary
+            })),
         )
             .into_response(),
         Ok(Err(e)) => (
@@ -1899,19 +2010,20 @@ pub async fn set_wiki_prompt(
 pub async fn delete_all_wiki_sources(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let log_max_lines = state.config.load().wiki_log_max_lines;
     let wiki = Arc::clone(&state.wiki).lock_owned().await;
-    let delete_result = tokio::task::spawn_blocking(move || {
-        let (deleted, ingest_pages) = wiki.delete_all_sources()?;
-        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-        if let Err(e) = wiki.update_index() {
-            tracing::warn!("wiki index update failed after delete-all-sources: {e}");
-        }
-        let _ = wiki.append_log_with_limit(&format!(
+    let delete_result =
+        tokio::task::spawn_blocking(move || {
+            let (deleted, ingest_pages) = wiki.delete_all_sources()?;
+            let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+            if let Err(e) = wiki.update_index() {
+                tracing::warn!("wiki index update failed after delete-all-sources: {e}");
+            }
+            let _ = wiki.append_log_with_limit(&format!(
             "## [{date}] delete-all-sources | {deleted} source(s) deleted, {} pages removed",
             ingest_pages.len()
         ), log_max_lines);
-        Ok::<_, crate::error::ZeniiError>((deleted, ingest_pages))
-    })
-    .await;
+            Ok::<_, crate::error::ZeniiError>((deleted, ingest_pages))
+        })
+        .await;
 
     let (deleted, ingest_pages) = match delete_result {
         Ok(Ok(r)) => r,
@@ -1935,14 +2047,20 @@ pub async fn delete_all_wiki_sources(State(state): State<Arc<AppState>>) -> impl
     for page in &ingest_pages {
         let key = format!("wiki:{}", page.slug);
         if let Err(e) = state.memory.forget(&key).await {
-            tracing::warn!("failed to forget wiki page '{}' from memory: {e}", page.slug);
+            tracing::warn!(
+                "failed to forget wiki page '{}' from memory: {e}",
+                page.slug
+            );
         }
     }
 
     (
         StatusCode::OK,
         Json(DeleteSourcesResponse {
-            message: format!("Deleted {deleted} source files and {} pages", ingest_pages.len()),
+            message: format!(
+                "Deleted {deleted} source files and {} pages",
+                ingest_pages.len()
+            ),
             deleted,
         }),
     )
@@ -1956,7 +2074,13 @@ pub async fn delete_wiki_pages(State(state): State<Arc<AppState>>) -> impl IntoR
     match result {
         Ok(Ok(deleted)) => {
             // Sync memory to remove stale wiki:* keys (I7 fix)
-            if let Err(e) = state.wiki.lock().await.sync_to_memory(state.memory.as_ref()).await {
+            if let Err(e) = state
+                .wiki
+                .lock()
+                .await
+                .sync_to_memory(state.memory.as_ref())
+                .await
+            {
                 tracing::warn!("wiki memory sync failed after delete-pages: {e}");
             }
             (
@@ -1992,11 +2116,11 @@ pub async fn delete_wiki_pages(State(state): State<Arc<AppState>>) -> impl IntoR
 /// the limit.
 fn score_pages_for_query<'a>(pages: &'a [WikiPage], question: &str) -> Vec<&'a WikiPage> {
     const STOP_WORDS: &[&str] = &[
-        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has",
-        "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "shall",
-        "can", "what", "how", "why", "when", "where", "who", "which", "that", "this", "these",
-        "those", "in", "on", "at", "to", "for", "of", "with", "by", "from", "and", "or", "not",
-        "it", "its", "i", "my", "me", "you", "your", "we", "our", "they", "their",
+        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should", "may", "might", "shall", "can",
+        "what", "how", "why", "when", "where", "who", "which", "that", "this", "these", "those",
+        "in", "on", "at", "to", "for", "of", "with", "by", "from", "and", "or", "not", "it", "its",
+        "i", "my", "me", "you", "your", "we", "our", "they", "their",
     ];
 
     let keywords: Vec<String> = question
@@ -2099,15 +2223,9 @@ mod tests {
                 "/wiki/sources",
                 get(list_wiki_sources).delete(delete_all_wiki_sources),
             )
-            .route(
-                "/wiki/sources/{filename}",
-                delete(delete_wiki_source),
-            )
+            .route("/wiki/sources/{filename}", delete(delete_wiki_source))
             .route("/wiki/dir", get(get_wiki_dir))
-            .route(
-                "/wiki/prompt",
-                get(get_wiki_prompt).put(set_wiki_prompt),
-            )
+            .route("/wiki/prompt", get(get_wiki_prompt).put(set_wiki_prompt))
             .route("/wiki/pages", delete(delete_wiki_pages))
             .route("/wiki/regenerate", post(regenerate_wiki))
             .route("/wiki/{slug}", get(get_wiki_page))
@@ -2143,8 +2261,14 @@ mod tests {
         let body = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
         // Body must be a valid paginated response object with pages, total, limit, offset fields
         let resp_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert!(resp_json["pages"].is_array(), "expected pages array in response");
-        assert!(resp_json["total"].is_number(), "expected total count in response");
+        assert!(
+            resp_json["pages"].is_array(),
+            "expected pages array in response"
+        );
+        assert!(
+            resp_json["total"].is_number(),
+            "expected total count in response"
+        );
     }
 
     /// H3: GET /wiki/{slug} for a page that exists → 200
@@ -2414,9 +2538,14 @@ mod tests {
             .unwrap();
         let resp1 = app(state.clone()).oneshot(req1).await.unwrap();
         assert_eq!(resp1.status(), StatusCode::OK, "first ingest must succeed");
-        let bytes1 = axum::body::to_bytes(resp1.into_body(), 16 * 1024).await.unwrap();
+        let bytes1 = axum::body::to_bytes(resp1.into_body(), 16 * 1024)
+            .await
+            .unwrap();
         let val1: serde_json::Value = serde_json::from_slice(&bytes1).unwrap();
-        let slug = val1["primary_slug"].as_str().unwrap_or("my-doc").to_string();
+        let slug = val1["primary_slug"]
+            .as_str()
+            .unwrap_or("my-doc")
+            .to_string();
 
         // Second ingest — same slug, updated content (LLM unavailable, falls back to single page)
         let body2 = serde_json::to_string(&serde_json::json!({
@@ -2436,11 +2565,19 @@ mod tests {
         // List all pages and count occurrences of the slug
         let list_req = Request::builder().uri("/wiki").body(Body::empty()).unwrap();
         let list_resp = app(state).oneshot(list_req).await.unwrap();
-        let list_bytes = axum::body::to_bytes(list_resp.into_body(), 64 * 1024).await.unwrap();
+        let list_bytes = axum::body::to_bytes(list_resp.into_body(), 64 * 1024)
+            .await
+            .unwrap();
         let resp_json: serde_json::Value = serde_json::from_slice(&list_bytes).unwrap();
         let pages = resp_json["pages"].as_array().expect("expected pages array");
-        let count = pages.iter().filter(|p| p["slug"].as_str() == Some(&slug)).count();
-        assert_eq!(count, 1, "slug '{slug}' must appear exactly once after two ingests");
+        let count = pages
+            .iter()
+            .filter(|p| p["slug"].as_str() == Some(&slug))
+            .count();
+        assert_eq!(
+            count, 1,
+            "slug '{slug}' must appear exactly once after two ingests"
+        );
     }
 
     /// H14: When index.md is read-only, update_index() fails and ingest must return
@@ -2478,7 +2615,9 @@ mod tests {
             "ingest must return 500 when index.md is read-only"
         );
 
-        let bytes = axum::body::to_bytes(resp.into_body(), 16 * 1024).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), 16 * 1024)
+            .await
+            .unwrap();
         let val: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert!(
             val.get("pages_written").is_some(),
@@ -2792,6 +2931,9 @@ mod tests {
             .await
             .unwrap();
         let results: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
-        assert!(!results.is_empty(), "search for 'foxglove' must return at least one result");
+        assert!(
+            !results.is_empty(),
+            "search for 'foxglove' must return at least one result"
+        );
     }
 }

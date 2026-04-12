@@ -88,10 +88,10 @@ fn default_source_type() -> String {
 pub struct PageRecord {
     pub slug: String,
     pub page_type: String,
-    pub path: String,              // relative to wiki_dir: "pages/concepts/foo.md"
-    pub sources: Vec<String>,      // contributing source filenames
+    pub path: String,         // relative to wiki_dir: "pages/concepts/foo.md"
+    pub sources: Vec<String>, // contributing source filenames
     pub last_run_id: String,
-    pub managed_by: String,        // "source_ingest" | "user_query"
+    pub managed_by: String, // "source_ingest" | "user_query"
 }
 
 /// One record per compiler run appended to wiki/.meta/runs.jsonl.
@@ -132,10 +132,7 @@ const PAGE_SUBDIRS: &[&str] = &["concepts", "entities", "topics", "comparisons",
 /// Reject filenames that could escape the sources/ directory via path traversal.
 /// Blocks path separators and the literal ".." component; mid-name dots (e.g. "foo..bar") are fine.
 fn validate_filename(filename: &str) -> Result<(), ZeniiError> {
-    if filename.is_empty()
-        || filename == ".."
-        || filename.contains('/')
-        || filename.contains('\\')
+    if filename.is_empty() || filename == ".." || filename.contains('/') || filename.contains('\\')
     {
         return Err(ZeniiError::Validation("invalid filename".into()));
     }
@@ -151,7 +148,13 @@ fn sanitize_to_slug(input: &str) -> String {
     // Replace any char that isn't alphanumeric, hyphen, or underscore with a dash
     let replaced: String = lower
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect();
     // Collapse consecutive dashes, then trim
     let mut slug = String::with_capacity(replaced.len());
@@ -181,7 +184,9 @@ fn validate_slug(slug: &str) -> Result<(), ZeniiError> {
     if slug.is_empty()
         || slug == "."
         || slug == ".."
-        || !slug.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        || !slug
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
         || slug.len() > 64
     {
         return Err(ZeniiError::Validation(format!("invalid slug: {slug}")));
@@ -260,7 +265,9 @@ impl WikiManager {
         });
         // L14: deterministic ordering regardless of OS read_dir order
         pages.sort_by(|a, b| {
-            a.page_type.cmp(&b.page_type).then_with(|| a.slug.cmp(&b.slug))
+            a.page_type
+                .cmp(&b.page_type)
+                .then_with(|| a.slug.cmp(&b.slug))
         });
         Ok(pages)
     }
@@ -504,8 +511,7 @@ impl WikiManager {
 
         // Extract slugs listed in index.md
         let index_content = self.read_index()?;
-        let mut indexed_slugs: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
+        let mut indexed_slugs: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut rest = index_content.as_str();
         while let Some(open) = rest.find("[[") {
             rest = &rest[open + 2..];
@@ -734,8 +740,14 @@ impl WikiManager {
     ) -> Result<(), ZeniiError> {
         let meta_dir = self.wiki_dir.join(".meta");
         std::fs::create_dir_all(&meta_dir)?;
-        std::fs::write(meta_dir.join("sources.json"), serde_json::to_string_pretty(sources)?)?;
-        std::fs::write(meta_dir.join("pages.json"), serde_json::to_string_pretty(pages)?)?;
+        std::fs::write(
+            meta_dir.join("sources.json"),
+            serde_json::to_string_pretty(sources)?,
+        )?;
+        std::fs::write(
+            meta_dir.join("pages.json"),
+            serde_json::to_string_pretty(pages)?,
+        )?;
         Ok(())
     }
 
@@ -769,7 +781,9 @@ impl WikiManager {
     /// Validates: non-empty, max 4000 chars.
     pub fn set_prompt(&self, content: &str) -> Result<(), ZeniiError> {
         if content.is_empty() {
-            return Err(ZeniiError::Validation("prompt content cannot be empty".into()));
+            return Err(ZeniiError::Validation(
+                "prompt content cannot be empty".into(),
+            ));
         }
         if content.chars().count() > 4000 {
             return Err(ZeniiError::Validation(
@@ -814,8 +828,10 @@ impl WikiManager {
         }
 
         // Build lookup: filename → manifest record
-        let mut known: std::collections::HashMap<String, SourceRecord> =
-            manifest_sources.into_iter().map(|r| (r.filename.clone(), r)).collect();
+        let mut known: std::collections::HashMap<String, SourceRecord> = manifest_sources
+            .into_iter()
+            .map(|r| (r.filename.clone(), r))
+            .collect();
 
         // Scan filesystem; add untracked files as inactive records
         for entry in std::fs::read_dir(&sources_dir)? {
@@ -824,7 +840,11 @@ impl WikiManager {
             if !path.is_file() {
                 continue;
             }
-            let filename = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+            let filename = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned();
             if filename.starts_with('.') {
                 continue; // skip .gitkeep and other dotfiles
             }
@@ -854,7 +874,9 @@ impl WikiManager {
         validate_filename(filename)?;
         let path = self.wiki_dir.join("sources").join(filename);
         if !path.exists() {
-            return Err(ZeniiError::Validation(format!("source '{filename}' not found")));
+            return Err(ZeniiError::Validation(format!(
+                "source '{filename}' not found"
+            )));
         }
         Ok(std::fs::read_to_string(&path)?)
     }
@@ -867,17 +889,31 @@ impl WikiManager {
             std::fs::remove_file(&path)?;
         }
         // Also clean up binary copies if present (I4 fix)
-        let original = self.wiki_dir.join("sources").join("original").join(filename);
-        if original.exists() {
-            if let Err(e) = std::fs::remove_file(&original) {
-                tracing::warn!("wiki: failed to remove original source copy '{}': {e}", original.display());
-            }
+        let original = self
+            .wiki_dir
+            .join("sources")
+            .join("original")
+            .join(filename);
+        if original.exists()
+            && let Err(e) = std::fs::remove_file(&original)
+        {
+            tracing::warn!(
+                "wiki: failed to remove original source copy '{}': {e}",
+                original.display()
+            );
         }
-        let converted = self.wiki_dir.join("sources").join("converted").join(filename);
-        if converted.exists() {
-            if let Err(e) = std::fs::remove_file(&converted) {
-                tracing::warn!("wiki: failed to remove converted source copy '{}': {e}", converted.display());
-            }
+        let converted = self
+            .wiki_dir
+            .join("sources")
+            .join("converted")
+            .join(filename);
+        if converted.exists()
+            && let Err(e) = std::fs::remove_file(&converted)
+        {
+            tracing::warn!(
+                "wiki: failed to remove converted source copy '{}': {e}",
+                converted.display()
+            );
         }
         Ok(())
     }
@@ -913,8 +949,9 @@ impl WikiManager {
         }
         // Partition pages: remove source_ingest pages, keep query pages
         let (_, pages) = self.read_manifest()?;
-        let (ingest_pages, query_pages): (Vec<PageRecord>, Vec<PageRecord>) =
-            pages.into_iter().partition(|p| p.managed_by == "source_ingest");
+        let (ingest_pages, query_pages): (Vec<PageRecord>, Vec<PageRecord>) = pages
+            .into_iter()
+            .partition(|p| p.managed_by == "source_ingest");
         self.delete_page_files(&ingest_pages)?;
         self.write_manifest(&[], &query_pages)?;
         Ok((count, ingest_pages))
@@ -931,7 +968,11 @@ impl WikiManager {
     pub fn new_run_id() -> String {
         let now = chrono::Utc::now();
         let nanos = now.timestamp_nanos_opt().unwrap_or(now.timestamp_millis());
-        format!("run-{}-{}", now.format("%Y%m%d"), &format!("{nanos:016x}")[10..])
+        format!(
+            "run-{}-{}",
+            now.format("%Y%m%d"),
+            &format!("{nanos:016x}")[10..]
+        )
     }
 
     // ── Staged build ─────────────────────────────────────────────────────────
@@ -988,8 +1029,14 @@ impl WikiManager {
                 let entry = entry?;
                 let path = entry.path();
                 if path.extension().is_some_and(|e| e == "md") {
-                    let Some(fname) = path.file_name() else { continue; };
-                    let slug = path.file_stem().unwrap_or_default().to_string_lossy().into_owned();
+                    let Some(fname) = path.file_name() else {
+                        continue;
+                    };
+                    let slug = path
+                        .file_stem()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .into_owned();
                     std::fs::copy(&path, dst_dir.join(fname))?;
                     committed.push((subdir.to_string(), slug));
                 }
@@ -1076,7 +1123,9 @@ impl WikiManager {
                     .position(|l| !l.starts_with('#') && !l.is_empty())
                     .unwrap_or(2)
                     .min(2);
-                let keep_from = lines.len().saturating_sub(max_lines.saturating_sub(header_end));
+                let keep_from = lines
+                    .len()
+                    .saturating_sub(max_lines.saturating_sub(header_end));
                 let mut kept: Vec<&str> = lines[..header_end].to_vec();
                 kept.extend_from_slice(&lines[keep_from..]);
                 std::fs::write(&log_path, kept.join("\n") + "\n")?;
@@ -1110,9 +1159,8 @@ fn remove_source_from_frontmatter(content: &str, filename: &str) -> Result<Strin
         }
     }
 
-    let new_fm = serde_yaml::to_string(&fm).map_err(|e| {
-        ZeniiError::Validation(format!("failed to serialize frontmatter: {e}"))
-    })?;
+    let new_fm = serde_yaml::to_string(&fm)
+        .map_err(|e| ZeniiError::Validation(format!("failed to serialize frontmatter: {e}")))?;
     // serde_yaml serializes with a leading "---\n" prefix — strip it to avoid double delimiter
     let new_fm = new_fm.strip_prefix("---\n").unwrap_or(&new_fm);
     Ok(format!("---\n{new_fm}---{body}"))
@@ -1322,7 +1370,11 @@ fn extract_wikilinks(body: &str) -> Vec<String> {
 fn extract_broken_slug(detail: &str) -> Option<String> {
     let start = detail.find("[[")? + 2;
     let end = detail.find("]]")?;
-    if start < end { Some(detail[start..end].to_string()) } else { None }
+    if start < end {
+        Some(detail[start..end].to_string())
+    } else {
+        None
+    }
 }
 
 /// Patch or insert the `updated:` field in a page's YAML frontmatter.
@@ -1337,7 +1389,10 @@ fn set_updated_in_frontmatter(content: &str, date: &str) -> String {
     let body_and_closing = &rest[end_idx..]; // starts with "\n---"
 
     // Replace existing "updated: ..." line or append the field
-    let new_fm = if fm_str.lines().any(|l| l.trim_start().starts_with("updated:")) {
+    let new_fm = if fm_str
+        .lines()
+        .any(|l| l.trim_start().starts_with("updated:"))
+    {
         fm_str
             .lines()
             .map(|l| {
@@ -1613,7 +1668,8 @@ No outbound links here.
         let dir = TempDir::new().unwrap();
         let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
         let content = "No frontmatter here.\n";
-        mgr.save_source("GitHub Stars Growth Tips.md", content).unwrap();
+        mgr.save_source("GitHub Stars Growth Tips.md", content)
+            .unwrap();
         let page = mgr.ingest("GitHub Stars Growth Tips.md", content).unwrap();
         assert_eq!(page.title, "GitHub Stars Growth Tips");
     }
@@ -1645,7 +1701,12 @@ No outbound links here.
     fn parse_page_title_falls_back_to_humanized_slug() {
         let dir = TempDir::new().unwrap();
         let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
-        seed_page(&mgr, "topics", "my-doc-slug", "No frontmatter, no heading.\n");
+        seed_page(
+            &mgr,
+            "topics",
+            "my-doc-slug",
+            "No frontmatter, no heading.\n",
+        );
         let page = mgr.get_page("my-doc-slug").unwrap().unwrap();
         assert_eq!(page.title, "My Doc Slug");
     }
@@ -1692,10 +1753,15 @@ No outbound links here.
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("log.md"), "# Wiki Log\n").unwrap();
         let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
-        mgr.append_log("## [2026-04-09] ingest | first-entry").unwrap();
-        mgr.append_log("## [2026-04-09] ingest | second-entry").unwrap();
+        mgr.append_log("## [2026-04-09] ingest | first-entry")
+            .unwrap();
+        mgr.append_log("## [2026-04-09] ingest | second-entry")
+            .unwrap();
         let log = fs::read_to_string(dir.path().join("log.md")).unwrap();
-        assert!(log.contains("# Wiki Log"), "initial content must be preserved");
+        assert!(
+            log.contains("# Wiki Log"),
+            "initial content must be preserved"
+        );
         assert!(log.contains("first-entry"), "first entry must be present");
         assert!(log.contains("second-entry"), "second entry must be present");
     }
@@ -1715,7 +1781,10 @@ No outbound links here.
     fn new_creates_sources_dir() {
         let dir = TempDir::new().unwrap();
         let _mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
-        assert!(dir.path().join("sources").is_dir(), "sources/ must be created");
+        assert!(
+            dir.path().join("sources").is_dir(),
+            "sources/ must be created"
+        );
     }
 
     // W25: new() seeds SCHEMA.md from embedded template
@@ -1734,7 +1803,10 @@ No outbound links here.
         fs::write(dir.path().join("SCHEMA.md"), "custom content").unwrap();
         let _mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
         let schema = fs::read_to_string(dir.path().join("SCHEMA.md")).unwrap();
-        assert_eq!(schema, "custom content", "existing SCHEMA.md must not be overwritten");
+        assert_eq!(
+            schema, "custom content",
+            "existing SCHEMA.md must not be overwritten"
+        );
     }
 
     // W27: new() creates stub index.md on first boot
@@ -1742,7 +1814,10 @@ No outbound links here.
     fn new_creates_stub_index_md() {
         let dir = TempDir::new().unwrap();
         let _mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
-        assert!(dir.path().join("index.md").exists(), "index.md must be created");
+        assert!(
+            dir.path().join("index.md").exists(),
+            "index.md must be created"
+        );
     }
 
     // W28: new() creates stub log.md on first boot
@@ -1762,11 +1837,20 @@ No outbound links here.
         seed_page(&mgr, "entities", "some-entity", entity_page_content());
         mgr.update_index().unwrap();
         let index = fs::read_to_string(dir.path().join("index.md")).unwrap();
-        assert!(index.contains("## Concepts"), "must have ## Concepts section");
-        assert!(index.contains("## Entities"), "must have ## Entities section");
+        assert!(
+            index.contains("## Concepts"),
+            "must have ## Concepts section"
+        );
+        assert!(
+            index.contains("## Entities"),
+            "must have ## Entities section"
+        );
         let concept_pos = index.find("## Concepts").unwrap();
         let entity_pos = index.find("## Entities").unwrap();
-        assert!(concept_pos < entity_pos, "Concepts section must precede Entities");
+        assert!(
+            concept_pos < entity_pos,
+            "Concepts section must precede Entities"
+        );
     }
 
     // W30: update_index() omits sections that have no pages
@@ -1777,8 +1861,14 @@ No outbound links here.
         seed_page(&mgr, "concepts", "only-concept", sample_page_content());
         mgr.update_index().unwrap();
         let index = fs::read_to_string(dir.path().join("index.md")).unwrap();
-        assert!(index.contains("## Concepts"), "Concepts section must be present");
-        assert!(!index.contains("## Entities"), "empty Entities section must be omitted");
+        assert!(
+            index.contains("## Concepts"),
+            "Concepts section must be present"
+        );
+        assert!(
+            !index.contains("## Entities"),
+            "empty Entities section must be omitted"
+        );
     }
 
     // W31: update_index() entries do not have trailing (type) annotation
@@ -2147,7 +2237,10 @@ No outbound links here.
     #[test]
     fn new_run_id_starts_with_run_prefix() {
         let id = WikiManager::new_run_id();
-        assert!(id.starts_with("run-"), "run ID must start with 'run-': {id}");
+        assert!(
+            id.starts_with("run-"),
+            "run ID must start with 'run-': {id}"
+        );
     }
 
     // W50: new_run_id embeds today's date in YYYYMMDD format
@@ -2165,7 +2258,10 @@ No outbound links here.
         let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
         fs::remove_file(dir.path().join("index.md")).unwrap();
         let content = mgr.read_index().unwrap();
-        assert!(content.is_empty(), "must return empty string when index.md absent");
+        assert!(
+            content.is_empty(),
+            "must return empty string when index.md absent"
+        );
     }
 
     // W52: read_index returns the current index.md content after update_index()
@@ -2176,7 +2272,10 @@ No outbound links here.
         seed_page(&mgr, "concepts", "alpha", sample_page_content());
         mgr.update_index().unwrap();
         let content = mgr.read_index().unwrap();
-        assert!(content.contains("[[alpha]]"), "index must reference seeded page");
+        assert!(
+            content.contains("[[alpha]]"),
+            "index must reference seeded page"
+        );
     }
 
     // W53: begin_staged_build creates .rebuild/ with all PAGE_SUBDIRS
@@ -2230,14 +2329,22 @@ No outbound links here.
         let dir = TempDir::new().unwrap();
         let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
         let rebuild_dir = mgr.begin_staged_build().unwrap();
-        mgr.write_staged_page(&rebuild_dir, "concepts", "committed-page", sample_page_content())
-            .unwrap();
+        mgr.write_staged_page(
+            &rebuild_dir,
+            "concepts",
+            "committed-page",
+            sample_page_content(),
+        )
+        .unwrap();
         mgr.commit_staged_build(&rebuild_dir).unwrap();
         assert!(
             dir.path().join("pages/concepts/committed-page.md").exists(),
             "committed page must appear in live pages/"
         );
-        assert!(!rebuild_dir.exists(), ".rebuild/ must be removed after commit");
+        assert!(
+            !rebuild_dir.exists(),
+            ".rebuild/ must be removed after commit"
+        );
     }
 
     // W57: commit_staged_build returns the (page_type, slug) pairs that were committed
@@ -2260,9 +2367,13 @@ No outbound links here.
         let dir = TempDir::new().unwrap();
         let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
         let rebuild_dir = mgr.begin_staged_build().unwrap();
-        mgr.write_staged_page(&rebuild_dir, "topics", "staged-only", "content").unwrap();
+        mgr.write_staged_page(&rebuild_dir, "topics", "staged-only", "content")
+            .unwrap();
         mgr.abort_staged_build(&rebuild_dir);
-        assert!(!rebuild_dir.exists(), ".rebuild/ must be cleaned up after abort");
+        assert!(
+            !rebuild_dir.exists(),
+            ".rebuild/ must be cleaned up after abort"
+        );
         assert!(
             !dir.path().join("pages/topics/staged-only.md").exists(),
             "aborted pages must NOT appear in live pages/"
@@ -2323,9 +2434,11 @@ No outbound links here.
             managed_by: "source_ingest".into(),
         };
         mgr.remove_source_from_page(&record, "a.md").unwrap();
-        let updated =
-            fs::read_to_string(dir.path().join("pages/concepts/shared-page.md")).unwrap();
-        assert!(!updated.contains("a.md"), "a.md must be removed from frontmatter");
+        let updated = fs::read_to_string(dir.path().join("pages/concepts/shared-page.md")).unwrap();
+        assert!(
+            !updated.contains("a.md"),
+            "a.md must be removed from frontmatter"
+        );
         assert!(updated.contains("b.md"), "b.md must remain in frontmatter");
     }
 
@@ -2456,7 +2569,9 @@ No outbound links here.
     fn write_page_rejects_invalid_slug() {
         let dir = TempDir::new().unwrap();
         let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
-        let err = mgr.write_page("concepts", "../escape", "content").unwrap_err();
+        let err = mgr
+            .write_page("concepts", "../escape", "content")
+            .unwrap_err();
         assert!(matches!(err, ZeniiError::Validation(_)));
     }
 

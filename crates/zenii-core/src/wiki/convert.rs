@@ -8,9 +8,8 @@ use crate::error::ZeniiError;
 /// File extensions that require external binary conversion (non-UTF-8 or structured binary formats).
 /// Everything else is read directly as UTF-8 text.
 const BINARY_EXTENSIONS: &[&str] = &[
-    "pdf", "docx", "doc", "pptx", "ppt", "xlsx", "xls",
-    "jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp",
-    "zip", "epub", "html", "htm",
+    "pdf", "docx", "doc", "pptx", "ppt", "xlsx", "xls", "jpg", "jpeg", "png", "gif", "bmp", "tiff",
+    "webp", "zip", "epub", "html", "htm",
 ];
 
 /// Converts a file at a given path to a markdown string.
@@ -69,9 +68,7 @@ impl DocumentConverter for MarkItDownConverter {
     async fn convert(&self, path: &Path) -> Result<String, ZeniiError> {
         // tokio::process::Command is epoll/kqueue-backed — does NOT block the tokio runtime.
         // Wrap with tokio::time::timeout to kill hanging subprocesses (L9 fix).
-        let output_future = tokio::process::Command::new(&self.bin)
-            .arg(path)
-            .output();
+        let output_future = tokio::process::Command::new(&self.bin).arg(path).output();
 
         let output = tokio::time::timeout(self.timeout, output_future)
             .await
@@ -116,7 +113,9 @@ pub async fn convert_file(
     if converter.supports(&ext) {
         converter.convert(path).await
     } else {
-        tokio::fs::read_to_string(path).await.map_err(ZeniiError::Io)
+        tokio::fs::read_to_string(path)
+            .await
+            .map_err(ZeniiError::Io)
     }
 }
 

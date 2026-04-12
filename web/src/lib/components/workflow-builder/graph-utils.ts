@@ -1,6 +1,6 @@
-import type { Node, Edge } from '@xyflow/svelte';
+import type { Node, Edge } from "@xyflow/svelte";
 
-import { nodeRegistry } from './node-registry';
+import { nodeRegistry } from "./node-registry";
 
 export interface WorkflowMeta {
   id?: string;
@@ -55,22 +55,29 @@ export interface Workflow {
 /**
  * Convert a backend Workflow to @xyflow/svelte nodes and edges.
  */
-export function workflowToGraph(workflow: Workflow): { nodes: Node[]; edges: Edge[] } {
+export function workflowToGraph(workflow: Workflow): {
+  nodes: Node[];
+  edges: Edge[];
+} {
   const nodes: Node[] = workflow.steps.map((step) => {
-    const defType = step.type === 'tool' ? (step.tool ?? step.type) : step.type;
+    const defType = step.type === "tool" ? (step.tool ?? step.type) : step.type;
     const def = nodeRegistry.get(defType);
-    const nodeData = def?.fromStep ? def.fromStep(step as unknown as Record<string, unknown>) : { ...step };
+    const nodeData = def?.fromStep
+      ? def.fromStep(step as unknown as Record<string, unknown>)
+      : { ...step };
 
     nodeData.definitionType = defType;
     nodeData.stepName = step.name;
 
-    if (step.timeout_secs !== undefined) nodeData.timeout_secs = step.timeout_secs;
+    if (step.timeout_secs !== undefined)
+      nodeData.timeout_secs = step.timeout_secs;
     if (step.retry !== undefined) nodeData.retry = step.retry;
-    if (step.failure_policy !== undefined) nodeData.failure_policy = step.failure_policy;
+    if (step.failure_policy !== undefined)
+      nodeData.failure_policy = step.failure_policy;
 
     return {
       id: step.name,
-      type: def?.visual ?? 'standard',
+      type: def?.visual ?? "standard",
       position: workflow.layout?.[step.name] ?? { x: 0, y: 0 },
       data: nodeData,
     } satisfies Node;
@@ -99,7 +106,10 @@ export function graphToWorkflow(
   // Build a set of condition node IDs so we can filter their handle edges from depends_on
   const conditionNodeIds = new Set(
     nodes
-      .filter((n) => (n.data as Record<string, unknown>).definitionType === 'condition')
+      .filter(
+        (n) =>
+          (n.data as Record<string, unknown>).definitionType === "condition",
+      )
       .map((n) => n.id),
   );
 
@@ -107,7 +117,10 @@ export function graphToWorkflow(
   const incomingEdges = new Map<string, string[]>();
   for (const edge of edges) {
     // Skip edges from condition node's true/false handles — those are represented by if_true/if_false fields
-    if (conditionNodeIds.has(edge.source) && (edge.sourceHandle === 'true' || edge.sourceHandle === 'false')) {
+    if (
+      conditionNodeIds.has(edge.source) &&
+      (edge.sourceHandle === "true" || edge.sourceHandle === "false")
+    ) {
       continue;
     }
     const existing = incomingEdges.get(edge.target) ?? [];
@@ -119,8 +132,10 @@ export function graphToWorkflow(
   const triggerNodeIds = new Set(
     nodes
       .filter((n) => {
-        const dt = (n.data as Record<string, unknown>).definitionType as string | undefined;
-        return dt === 'trigger_manual' || dt === 'trigger_cron';
+        const dt = (n.data as Record<string, unknown>).definitionType as
+          | string
+          | undefined;
+        return dt === "trigger_manual" || dt === "trigger_cron";
       })
       .map((n) => n.id),
   );
@@ -131,30 +146,39 @@ export function graphToWorkflow(
       const data = node.data as Record<string, unknown>;
       const defType = data.definitionType as string | undefined;
       const def = defType ? nodeRegistry.get(defType) : undefined;
-      const stepFields: Record<string, unknown> = def?.toStep ? def.toStep(data) : { ...data };
+      const stepFields: Record<string, unknown> = def?.toStep
+        ? def.toStep(data)
+        : { ...data };
 
       const step: WorkflowStep = {
         ...(stepFields as Partial<WorkflowStep>),
-        type: (stepFields as Record<string, unknown>).type as string ?? 'tool',
+        type:
+          ((stepFields as Record<string, unknown>).type as string) ?? "tool",
         name: (data.stepName as string) || node.id,
-        depends_on: (incomingEdges.get(node.id) ?? []).filter((id) => !triggerNodeIds.has(id)),
+        depends_on: (incomingEdges.get(node.id) ?? []).filter(
+          (id) => !triggerNodeIds.has(id),
+        ),
       };
 
-      if (data.timeout_secs !== undefined) step.timeout_secs = data.timeout_secs as number;
+      if (data.timeout_secs !== undefined)
+        step.timeout_secs = data.timeout_secs as number;
 
       // Retry: accept RetryConfig object from node data
       if (data.retry !== undefined && data.retry !== null) {
         const r = data.retry as Record<string, unknown>;
-        if (typeof r === 'object' && r.max_retries !== undefined) {
-          step.retry = { max_retries: Number(r.max_retries), retry_delay_ms: Number(r.retry_delay_ms ?? 1000) };
+        if (typeof r === "object" && r.max_retries !== undefined) {
+          step.retry = {
+            max_retries: Number(r.max_retries),
+            retry_delay_ms: Number(r.retry_delay_ms ?? 1000),
+          };
         }
       }
 
       // Failure policy: accept string or Fallback object
       if (data.failure_policy !== undefined) {
         const fp = data.failure_policy;
-        if (typeof fp === 'string') {
-          step.failure_policy = fp === 'stop' ? undefined : fp;
+        if (typeof fp === "string") {
+          step.failure_policy = fp === "stop" ? undefined : fp;
         } else {
           step.failure_policy = fp as { Fallback: { step: string } };
         }
@@ -165,7 +189,8 @@ export function graphToWorkflow(
 
   const layout: WorkflowLayout = {};
   for (const node of nodes) {
-    const stepName = (node.data as Record<string, unknown>).stepName as string || node.id;
+    const stepName =
+      ((node.data as Record<string, unknown>).stepName as string) || node.id;
     layout[stepName] = { x: node.position.x, y: node.position.y };
   }
 
@@ -289,20 +314,20 @@ export function deriveEdges(steps: WorkflowStep[]): Edge[] {
         source: dep,
         target: step.name,
         animated: false,
-        type: 'default',
+        type: "default",
       });
     }
 
     // Condition branch edges — reconstruct from if_true/if_false fields
-    if (step.type === 'condition') {
+    if (step.type === "condition") {
       if (step.if_true) {
         edges.push({
           id: `e-${step.name}-true-${step.if_true}`,
           source: step.name,
           target: step.if_true,
-          sourceHandle: 'true',
+          sourceHandle: "true",
           animated: false,
-          type: 'default',
+          type: "default",
         });
       }
       if (step.if_false) {
@@ -310,9 +335,9 @@ export function deriveEdges(steps: WorkflowStep[]): Edge[] {
           id: `e-${step.name}-false-${step.if_false}`,
           source: step.name,
           target: step.if_false,
-          sourceHandle: 'false',
+          sourceHandle: "false",
           animated: false,
-          type: 'default',
+          type: "default",
         });
       }
     }
@@ -324,7 +349,10 @@ export function deriveEdges(steps: WorkflowStep[]): Edge[] {
 /**
  * Generate a unique step name, appending _1, _2, etc. if the base name is taken.
  */
-export function generateStepName(baseName: string, existingNames: string[]): string {
+export function generateStepName(
+  baseName: string,
+  existingNames: string[],
+): string {
   const nameSet = new Set(existingNames);
 
   if (!nameSet.has(baseName)) {
@@ -348,10 +376,10 @@ export function workflowToToml(wf: Workflow): string {
   lines.push(`name = ${tomlStr(wf.name)}`);
   lines.push(`description = ${tomlStr(wf.description)}`);
   if (wf.schedule) lines.push(`schedule = ${tomlStr(wf.schedule)}`);
-  lines.push('');
+  lines.push("");
 
   for (const step of wf.steps) {
-    lines.push('[[steps]]');
+    lines.push("[[steps]]");
     lines.push(`name = ${tomlStr(step.name)}`);
     lines.push(`type = ${tomlStr(step.type)}`);
     if (step.tool) lines.push(`tool = ${tomlStr(step.tool)}`);
@@ -362,62 +390,73 @@ export function workflowToToml(wf: Workflow): string {
     if (step.if_true) lines.push(`if_true = ${tomlStr(step.if_true)}`);
     if (step.if_false) lines.push(`if_false = ${tomlStr(step.if_false)}`);
     if (step.steps && step.steps.length > 0) {
-      lines.push(`steps = [${step.steps.map(tomlStr).join(', ')}]`);
+      lines.push(`steps = [${step.steps.map(tomlStr).join(", ")}]`);
     }
     if (step.depends_on.length > 0) {
-      lines.push(`depends_on = [${step.depends_on.map(tomlStr).join(', ')}]`);
+      lines.push(`depends_on = [${step.depends_on.map(tomlStr).join(", ")}]`);
     }
     if (step.timeout_secs) lines.push(`timeout_secs = ${step.timeout_secs}`);
     if (step.retry) {
-      lines.push(`retry = { max_retries = ${step.retry.max_retries}, retry_delay_ms = ${step.retry.retry_delay_ms} }`);
+      lines.push(
+        `retry = { max_retries = ${step.retry.max_retries}, retry_delay_ms = ${step.retry.retry_delay_ms} }`,
+      );
     }
     if (step.failure_policy !== undefined) {
-      if (typeof step.failure_policy === 'string') {
+      if (typeof step.failure_policy === "string") {
         lines.push(`failure_policy = ${tomlStr(step.failure_policy)}`);
       } else if (step.failure_policy.Fallback) {
-        lines.push(`failure_policy = { Fallback = { step = ${tomlStr(step.failure_policy.Fallback.step)} } }`);
+        lines.push(
+          `failure_policy = { Fallback = { step = ${tomlStr(step.failure_policy.Fallback.step)} } }`,
+        );
       }
     }
     if (step.args && Object.keys(step.args).length > 0) {
       lines.push(`args = ${tomlInlineTable(step.args)}`);
     }
-    lines.push('');
+    lines.push("");
   }
 
   if (wf.layout && Object.keys(wf.layout).length > 0) {
-    lines.push('[layout]');
+    lines.push("[layout]");
     for (const [name, pos] of Object.entries(wf.layout)) {
-      lines.push(`${name} = { x = ${pos.x.toFixed(1)}, y = ${pos.y.toFixed(1)} }`);
+      lines.push(
+        `${name} = { x = ${pos.x.toFixed(1)}, y = ${pos.y.toFixed(1)} }`,
+      );
     }
-    lines.push('');
+    lines.push("");
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /** Escape a string for TOML (double-quoted). */
 function tomlStr(s: string): string {
-  return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}"`;
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`;
 }
 
 /** Serialize a flat object as a TOML inline table: { key = "val", num = 5 } */
 function tomlInlineTable(obj: Record<string, unknown>): string {
   const pairs: string[] = [];
   for (const [k, v] of Object.entries(obj)) {
-    if (typeof v === 'string') pairs.push(`${k} = ${tomlStr(v)}`);
-    else if (typeof v === 'number' || typeof v === 'boolean') pairs.push(`${k} = ${v}`);
-    else if (Array.isArray(v)) pairs.push(`${k} = [${v.map(item => typeof item === 'string' ? tomlStr(item) : String(item)).join(', ')}]`);
+    if (typeof v === "string") pairs.push(`${k} = ${tomlStr(v)}`);
+    else if (typeof v === "number" || typeof v === "boolean")
+      pairs.push(`${k} = ${v}`);
+    else if (Array.isArray(v))
+      pairs.push(
+        `${k} = [${v.map((item) => (typeof item === "string" ? tomlStr(item) : String(item))).join(", ")}]`,
+      );
   }
-  return `{ ${pairs.join(', ')} }`;
+  return `{ ${pairs.join(", ")} }`;
 }
 
 /**
  * Create a URL-friendly slug from a workflow name.
  */
 function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    || 'workflow';
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "workflow"
+  );
 }

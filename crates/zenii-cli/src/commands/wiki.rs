@@ -164,8 +164,9 @@ pub async fn ingest(client: &ZeniiClient, file: &str, model: Option<&str>) -> Re
 
     println!("Ingesting '{filename}'… (this may take 30–120s with LLM)");
 
-    let result: serde_json::Value =
-        client.upload_file("/wiki/upload", bytes, filename, model).await?;
+    let result: serde_json::Value = client
+        .upload_file("/wiki/upload", bytes, filename, model)
+        .await?;
 
     let primary_slug = result
         .get("primary_slug")
@@ -227,8 +228,7 @@ pub async fn query(
 
 pub async fn lint(client: &ZeniiClient) -> Result<(), String> {
     println!("Running wiki lint…");
-    let result: serde_json::Value =
-        client.post("/wiki/lint", &serde_json::json!({})).await?;
+    let result: serde_json::Value = client.post("/wiki/lint", &serde_json::json!({})).await?;
 
     let summary = result.get("summary").and_then(|v| v.as_str()).unwrap_or("");
     let issues = result
@@ -269,7 +269,10 @@ pub async fn sources(client: &ZeniiClient) -> Result<(), String> {
                 .and_then(|v| v.as_str())
                 .unwrap_or("—");
             let status = if active { "active" } else { "inactive" };
-            println!("{filename}  [{status}]  run={run_id}  sha256={}", &hash[..12.min(hash.len())]);
+            println!(
+                "{filename}  [{status}]  run={run_id}  sha256={}",
+                &hash[..12.min(hash.len())]
+            );
         }
         println!("\n{} source(s)", records.len());
     }
@@ -316,7 +319,10 @@ pub async fn regenerate(client: &ZeniiClient, model: Option<&str>) -> Result<(),
     }
     println!("Regenerating wiki from all sources… (this may take several minutes)");
     let result: serde_json::Value = client.post("/wiki/regenerate", &body).await?;
-    let message = result.get("message").and_then(|v| v.as_str()).unwrap_or("done");
+    let message = result
+        .get("message")
+        .and_then(|v| v.as_str())
+        .unwrap_or("done");
     println!("{message}");
     Ok(())
 }
@@ -342,7 +348,9 @@ pub async fn prompt(client: &ZeniiClient, action: &PromptAction) -> Result<(), S
                 .or_else(|_| std::env::var("EDITOR"))
                 .unwrap_or_else(|_| "nano".to_string());
             let mut parts = editor_str.split_whitespace();
-            let program = parts.next().ok_or_else(|| "EDITOR variable is empty".to_string())?;
+            let program = parts
+                .next()
+                .ok_or_else(|| "EDITOR variable is empty".to_string())?;
             let editor_args: Vec<&str> = parts.collect();
             let status = tokio::process::Command::new(program)
                 .args(&editor_args)

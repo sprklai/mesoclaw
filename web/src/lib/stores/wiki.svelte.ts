@@ -1,4 +1,13 @@
-import { api, apiDelete, apiGet, apiPost, apiPut, getToken, getBaseUrl, ZeniiApiError } from "$lib/api/client";
+import {
+  api,
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiPut,
+  getToken,
+  getBaseUrl,
+  ZeniiApiError,
+} from "$lib/api/client";
 
 export interface WikiPage {
   slug: string;
@@ -46,7 +55,7 @@ export interface SourceRecord {
   hash: string;
   active: boolean;
   last_run_id: string | null;
-  pages: string[];   // slugs of pages generated from this source
+  pages: string[]; // slugs of pages generated from this source
 }
 
 export interface FixedIssue {
@@ -136,9 +145,14 @@ function createWikiStore() {
       loading = true;
       try {
         // L4: GET /wiki now returns paginated response { pages, total, limit, offset }
-        const data = await apiGet<{ pages: WikiPage[]; total: number; limit: number; offset: number }>("/wiki?limit=200&offset=0");
+        const data = await apiGet<{
+          pages: WikiPage[];
+          total: number;
+          limit: number;
+          offset: number;
+        }>("/wiki?limit=200&offset=0");
         if (seq !== loadSeq) return;
-        pages = [...new Map(data.pages.map(p => [p.slug, p])).values()];
+        pages = [...new Map(data.pages.map((p) => [p.slug, p])).values()];
       } finally {
         if (seq === loadSeq) loading = false;
       }
@@ -152,7 +166,7 @@ function createWikiStore() {
           `/wiki/search?q=${encodeURIComponent(q)}`,
         );
         if (seq !== searchSeq) return;
-        pages = [...new Map(data.map(p => [p.slug, p])).values()];
+        pages = [...new Map(data.map((p) => [p.slug, p])).values()];
       } finally {
         if (seq === searchSeq) loading = false;
       }
@@ -161,7 +175,9 @@ function createWikiStore() {
     async getPage(slug: string): Promise<WikiPage | null> {
       const seq = ++getPageSeq;
       try {
-        const data = await apiGet<WikiPage>(`/wiki/${encodeURIComponent(slug)}`);
+        const data = await apiGet<WikiPage>(
+          `/wiki/${encodeURIComponent(slug)}`,
+        );
         if (seq !== getPageSeq) return null;
         return data;
       } catch {
@@ -209,7 +225,11 @@ function createWikiStore() {
           signal: ingestController.signal,
           timeout: 120_000,
         });
-        return { slug: res.primary_slug, page_count: res.pages.length, message: res.message };
+        return {
+          slug: res.primary_slug,
+          page_count: res.pages.length,
+          message: res.message,
+        };
       } catch (e) {
         if (e instanceof Error && e.name === "AbortError") throw e;
         throw e;
@@ -248,12 +268,24 @@ function createWikiStore() {
           const body = await response.json();
           errorCode = body.error_code ?? errorCode;
           details = body.message ?? body.error ?? details;
-        } catch { /* not JSON */ }
+        } catch {
+          /* not JSON */
+        }
         throw new ZeniiApiError(response.status, errorCode, details);
       }
       const text = await response.text();
-      const res = text ? JSON.parse(text) as { pages: WikiPage[]; primary_slug: string; message: string } : { pages: [], primary_slug: "", message: "" };
-      return { slug: res.primary_slug, page_count: res.pages.length, message: res.message };
+      const res = text
+        ? (JSON.parse(text) as {
+            pages: WikiPage[];
+            primary_slug: string;
+            message: string;
+          })
+        : { pages: [], primary_slug: "", message: "" };
+      return {
+        slug: res.primary_slug,
+        page_count: res.pages.length,
+        message: res.message,
+      };
     },
 
     async query(
@@ -282,10 +314,11 @@ function createWikiStore() {
     async lint(): Promise<LintIssue[]> {
       linting = true;
       try {
-        const res = await apiPost<{ issues: LintIssue[]; fixed: FixedIssue[]; summary: string }>(
-          "/wiki/lint",
-          { auto_fix: true },
-        );
+        const res = await apiPost<{
+          issues: LintIssue[];
+          fixed: FixedIssue[];
+          summary: string;
+        }>("/wiki/lint", { auto_fix: true });
         lintIssues = res.issues;
         lintFixed = res.fixed ?? [];
         return res.issues;
@@ -303,7 +336,10 @@ function createWikiStore() {
       }
     },
 
-    async deleteSource(filename: string, model?: string): Promise<DeleteSourceResult> {
+    async deleteSource(
+      filename: string,
+      model?: string,
+    ): Promise<DeleteSourceResult> {
       const path = model
         ? `/wiki/sources/${encodeURIComponent(filename)}?model=${encodeURIComponent(model)}`
         : `/wiki/sources/${encodeURIComponent(filename)}`;
@@ -322,7 +358,11 @@ function createWikiStore() {
       }
       // Refresh graph if it was previously loaded (I6 fix)
       if (graph !== null) {
-        try { await this.loadGraph(); } catch { /* non-fatal */ }
+        try {
+          await this.loadGraph();
+        } catch {
+          /* non-fatal */
+        }
       }
       return result;
     },
@@ -343,7 +383,11 @@ function createWikiStore() {
         await this.fetchSources();
         // Refresh graph if it was previously loaded (I6 fix)
         if (graph !== null) {
-          try { await this.loadGraph(); } catch { /* non-fatal */ }
+          try {
+            await this.loadGraph();
+          } catch {
+            /* non-fatal */
+          }
         }
         return result;
       } catch (e) {
@@ -367,7 +411,11 @@ function createWikiStore() {
         await this.fetchSources();
         // Refresh graph if it was previously loaded (I6 fix)
         if (graph !== null) {
-          try { await this.loadGraph(); } catch { /* non-fatal */ }
+          try {
+            await this.loadGraph();
+          } catch {
+            /* non-fatal */
+          }
         }
       } finally {
         regenerating = false;
@@ -375,16 +423,16 @@ function createWikiStore() {
     },
 
     async fetchPrompt(): Promise<string> {
-      const res = await apiGet<{ content: string }>('/wiki/prompt');
+      const res = await apiGet<{ content: string }>("/wiki/prompt");
       return res.content;
     },
 
     async savePrompt(content: string): Promise<void> {
-      await apiPut('/wiki/prompt', { content });
+      await apiPut("/wiki/prompt", { content });
     },
 
     async deleteAllSources(): Promise<number> {
-      const res = await apiDelete<{ deleted: number }>('/wiki/sources');
+      const res = await apiDelete<{ deleted: number }>("/wiki/sources");
       sources = [];
       pages = [];
       graph = null;
@@ -393,7 +441,7 @@ function createWikiStore() {
     },
 
     async deleteAllPages(): Promise<number> {
-      const res = await apiDelete<{ deleted: number }>('/wiki/pages');
+      const res = await apiDelete<{ deleted: number }>("/wiki/pages");
       pages = [];
       graph = null;
       return res.deleted;

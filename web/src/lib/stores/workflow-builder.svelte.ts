@@ -103,9 +103,7 @@ function createWorkflowBuilderStore() {
     // Remove a node and its connected edges
     removeNode(nodeId: string) {
       nodes = nodes.filter((n) => n.id !== nodeId);
-      edges = edges.filter(
-        (e) => e.source !== nodeId && e.target !== nodeId,
-      );
+      edges = edges.filter((e) => e.source !== nodeId && e.target !== nodeId);
       if (selectedNodeId === nodeId) selectedNodeId = null;
       isDirty = true;
     },
@@ -148,16 +146,21 @@ function createWorkflowBuilderStore() {
           return { ...n, id: newId, data: { ...n.data, stepName: newId } };
         }
         // Rewrite step-ref/step-refs fields in other nodes that reference the old name
-        const defType = (n.data as Record<string, unknown>).definitionType as string | undefined;
+        const defType = (n.data as Record<string, unknown>).definitionType as
+          | string
+          | undefined;
         const def = defType ? nodeRegistry.get(defType) : undefined;
         if (!def) return n;
         let changed = false;
         const newData = { ...n.data } as Record<string, unknown>;
         for (const field of def.fields) {
-          if (field.type === 'step-ref' && newData[field.key] === oldId) {
+          if (field.type === "step-ref" && newData[field.key] === oldId) {
             newData[field.key] = newId;
             changed = true;
-          } else if (field.type === 'step-refs' && Array.isArray(newData[field.key])) {
+          } else if (
+            field.type === "step-refs" &&
+            Array.isArray(newData[field.key])
+          ) {
             const arr = newData[field.key] as string[];
             if (arr.includes(oldId)) {
               newData[field.key] = arr.map((s) => (s === oldId ? newId : s));
@@ -171,9 +174,10 @@ function createWorkflowBuilderStore() {
         ...e,
         source: e.source === oldId ? newId : e.source,
         target: e.target === oldId ? newId : e.target,
-        id: e.source === oldId || e.target === oldId
-          ? `e-${e.source === oldId ? newId : e.source}-${e.target === oldId ? newId : e.target}`
-          : e.id,
+        id:
+          e.source === oldId || e.target === oldId
+            ? `e-${e.source === oldId ? newId : e.source}-${e.target === oldId ? newId : e.target}`
+            : e.id,
       }));
       if (selectedNodeId === oldId) selectedNodeId = newId;
       isDirty = true;
@@ -202,7 +206,9 @@ function createWorkflowBuilderStore() {
       viewMode = "visual";
       isRunning = false;
       // Release after SvelteFlow fully processes bind:nodes/bind:edges + fitView
-      setTimeout(() => { suppressDirty = false; }, 150);
+      setTimeout(() => {
+        suppressDirty = false;
+      }, 150);
     },
 
     // Reset for a new workflow
@@ -218,7 +224,9 @@ function createWorkflowBuilderStore() {
       isDirty = false;
       viewMode = "visual";
       isRunning = false;
-      setTimeout(() => { suppressDirty = false; }, 150);
+      setTimeout(() => {
+        suppressDirty = false;
+      }, 150);
     },
 
     // Mark as saved (clears dirty flag)
@@ -228,7 +236,9 @@ function createWorkflowBuilderStore() {
       suppressDirty = true;
       if (id) workflowId = id;
       isDirty = false;
-      setTimeout(() => { suppressDirty = false; }, 150);
+      setTimeout(() => {
+        suppressDirty = false;
+      }, 150);
     },
   };
 }

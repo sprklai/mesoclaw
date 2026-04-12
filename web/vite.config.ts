@@ -26,7 +26,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          if (id.includes("/node_modules/d3") || id.includes("/node_modules/d3-")) {
+          if (
+            id.includes("/node_modules/d3") ||
+            id.includes("/node_modules/d3-")
+          ) {
             return "d3";
           }
           if (id.includes("/node_modules/shiki")) {

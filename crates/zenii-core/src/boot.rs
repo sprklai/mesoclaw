@@ -402,16 +402,15 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         .as_ref()
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| data_dir.join("wiki"));
-    let wiki = Arc::new(tokio::sync::Mutex::new(
-        crate::wiki::WikiManager::new(wiki_dir.clone())?,
-    ));
+    let wiki = Arc::new(tokio::sync::Mutex::new(crate::wiki::WikiManager::new(
+        wiki_dir.clone(),
+    )?));
     info!("Wiki initialized at {}", wiki_dir.display());
-    let converter: Arc<dyn crate::wiki::convert::DocumentConverter> = Arc::new(
-        crate::wiki::convert::MarkItDownConverter::with_timeout(
+    let converter: Arc<dyn crate::wiki::convert::DocumentConverter> =
+        Arc::new(crate::wiki::convert::MarkItDownConverter::with_timeout(
             &config.doc_converter_bin,
             config.wiki_convert_timeout_secs,
-        ),
-    );
+        ));
 
     info!("User learner initialized");
 
