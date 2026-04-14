@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-04-13
+
+### Changed
+- chore: correct route count from 114 to 133 across all surfaces
+
+### Dependencies
+- chore(deps): bump rustls from 0.23.37 to 0.23.38
+- chore(deps): bump openssl from 0.10.76 to 0.10.77
+- chore(deps): bump softprops/action-gh-release from 2 to 3
+
 ## [0.1.10] - 2026-04-12
 
 ### Added

@@ -1,9 +1,9 @@
 {
-  "version": "0.1.10",
-  "agentTools": 18,
+  "version": "0.1.11",
+  "agentTools": 15,
   "llmProviders": 6,
   "messagingChannels": 3,
-  "backendTests": 1524,
+  "backendTests": 1671,
   "binarySize": 20,
   "debRpmSize": 16,
   "startupSeconds": 3,
