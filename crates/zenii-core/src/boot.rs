@@ -738,6 +738,16 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
                 .await;
         }
 
+        // Wiki context injection (always-on when wiki_context_injection_enabled)
+        if config.wiki_context_injection_enabled {
+            registry
+                .register_plugin(Arc::new(crate::ai::WikiContextPlugin::new(
+                    wiki.clone(),
+                    config.wiki_context_max_pages,
+                )))
+                .await;
+        }
+
         Arc::new(registry)
     } else {
         Arc::new(prompt::LegacyStrategy::new(

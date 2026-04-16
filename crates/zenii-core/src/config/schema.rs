@@ -270,6 +270,10 @@ pub struct AppConfig {
     /// When the line count exceeds this limit after an append, the oldest lines are removed.
     /// Default: 10000 lines.
     pub wiki_log_max_lines: usize,
+    /// Enable automatic wiki context injection into agent prompts. Default: true.
+    pub wiki_context_injection_enabled: bool,
+    /// Maximum number of wiki pages to include in context injection. Default: 3.
+    pub wiki_context_max_pages: usize,
 
     // MCP (Model Context Protocol)
     /// Prefix prepended to tool names when exposed via MCP (e.g., "zenii_")
@@ -518,6 +522,8 @@ impl Default for AppConfig {
             wiki_graph_label_y_offset: 14.0,
             wiki_graph_wheel_zoom_step: 1.1,
             wiki_log_max_lines: 10000,
+            wiki_context_injection_enabled: true,
+            wiki_context_max_pages: 3,
 
             // MCP
             mcp_server_tool_prefix: "zenii_".into(),
@@ -1088,5 +1094,31 @@ mod tests {
         assert_eq!(config.workflow_max_steps, 100);
         assert_eq!(config.workflow_step_timeout_secs, 600);
         assert_eq!(config.workflow_step_max_retries, 5);
+    }
+
+    // WCP.1 — default wiki_context_injection_enabled is true
+    #[test]
+    fn wiki_context_injection_enabled_default() {
+        let config = AppConfig::default();
+        assert!(config.wiki_context_injection_enabled);
+    }
+
+    // WCP.2 — wiki_context_max_pages default is 3
+    #[test]
+    fn wiki_context_max_pages_default() {
+        let config = AppConfig::default();
+        assert_eq!(config.wiki_context_max_pages, 3);
+    }
+
+    // WCP.3 — wiki context fields from TOML
+    #[test]
+    fn wiki_context_fields_from_toml() {
+        let toml_str = r#"
+            wiki_context_injection_enabled = false
+            wiki_context_max_pages = 5
+        "#;
+        let config: AppConfig = toml::from_str(toml_str).unwrap();
+        assert!(!config.wiki_context_injection_enabled);
+        assert_eq!(config.wiki_context_max_pages, 5);
     }
 }
