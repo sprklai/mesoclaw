@@ -5,4 +5,9 @@ ignore = [
     # rustls-webpki CRL matching bug — 0.101.7 (websearch→reqwest 0.11) and 0.102.8 (serenity→rustls 0.22)
     # are stuck on older semver branches; 0.103.9→0.103.10 fixed via cargo update
     "RUSTSEC-2026-0049",
+    # rustls-webpki URI name constraints bug — 0.101.7 (websearch→reqwest 0.11) and 0.102.8 (serenity→rustls 0.22)
+    # are stuck on older semver branches with no fix available; 0.103.11→0.103.12 fixed via cargo update
+    "RUSTSEC-2026-0098",
+    # rustls-webpki wildcard name constraints bug — same stuck branches as above
+    "RUSTSEC-2026-0099",
 ]
