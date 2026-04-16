@@ -40,11 +40,33 @@
 				language: "json",
 			};
 		} else if (typeof output === "string") {
-			return {
-				type: "code",
-				content: output,
-				language: "json",
-			};
+			// Tool results arrive as serialized ToolResult: {"output":"...","success":bool}
+			// Try to unwrap the outer envelope first.
+			let inner: string = output;
+			try {
+				const parsed = JSON.parse(output);
+				if (parsed && typeof parsed.output === "string") {
+					inner = parsed.output;
+				} else {
+					// Outer object has no .output field — pretty-print it as JSON
+					return { type: "code", content: JSON.stringify(parsed, null, 2), language: "json" };
+				}
+			} catch {
+				// Not JSON at all — fall through with inner = output
+			}
+
+			// Try to parse inner content as JSON (e.g. wiki search results)
+			try {
+				const innerParsed = JSON.parse(inner);
+				return {
+					type: "code",
+					content: JSON.stringify(innerParsed, null, 2),
+					language: "json",
+				};
+			} catch {
+				// Inner content is plain text (markdown, prose, etc.)
+				return { type: "text", content: inner, language: "text" };
+			}
 		} else {
 			return {
 				type: "text",
@@ -64,12 +86,13 @@
 		</h4>
 		<div
 			class={cn(
-				"overflow-x-auto rounded-md text-xs [&_table]:w-full",
+				"rounded-md text-xs [&_table]:w-full",
+				outputComponent?.type === "text" ? "overflow-hidden" : "overflow-x-auto",
 				errorText ? "bg-destructive/10 text-destructive" : "bg-muted/50 text-foreground"
 			)}
 		>
 			{#if errorText}
-				<div class="p-3">{errorText}</div>
+				<div class="p-3 whitespace-pre-wrap break-words">{errorText}</div>
 			{:else if outputComponent}
 				{#if outputComponent.type === "code"}
 					<Code.Root
@@ -80,7 +103,7 @@
 						<Code.CopyButton />
 					</Code.Root>
 				{:else}
-					<div class="p-3">{outputComponent.content}</div>
+					<div class="p-3 whitespace-pre-wrap break-words">{outputComponent.content}</div>
 				{/if}
 			{/if}
 		</div>
