@@ -380,9 +380,9 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         info!("Wiki initialized at {}", wiki_dir.display());
         w
     };
-    tool_registry.register(Arc::new(
-        crate::tools::wiki_tool::WikiSearchTool::new(wiki.clone()),
-    ))?;
+    tool_registry.register(Arc::new(crate::tools::wiki_tool::WikiSearchTool::new(
+        wiki.clone(),
+    )))?;
 
     let tools = Arc::new(tool_registry);
     info!("Registered {} tools", tools.len());

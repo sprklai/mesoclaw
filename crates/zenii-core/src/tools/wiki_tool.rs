@@ -320,9 +320,7 @@ Used in transformer models.
     #[tokio::test]
     async fn wiki_tool_get_missing_slug() {
         let (_dir, tool) = setup();
-        let result = tool
-            .execute(serde_json::json!({ "action": "get" }))
-            .await;
+        let result = tool.execute(serde_json::json!({ "action": "get" })).await;
         assert!(matches!(result, Err(crate::ZeniiError::Validation(_))));
     }
 

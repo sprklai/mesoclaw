@@ -1,6 +1,6 @@
 {
   "version": "0.1.11",
-  "agentTools": 15,
+  "agentTools": 16,
   "llmProviders": 6,
   "messagingChannels": 3,
   "backendTests": 1671,

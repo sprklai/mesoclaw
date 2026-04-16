@@ -40,7 +40,11 @@ impl PromptPlugin for WikiContextPlugin {
         let words: Vec<String> = raw_query
             .split_whitespace()
             .filter(|w| w.len() > 3)
-            .map(|w| w.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .map(|w| {
+                w.to_lowercase()
+                    .trim_matches(|c: char| !c.is_alphanumeric())
+                    .to_string()
+            })
             .filter(|w| !w.is_empty())
             .collect();
 
@@ -220,11 +224,11 @@ Used in transformer models alongside self-attention.
         assert!(fragments.is_empty(), "Empty message should return empty");
 
         // Whitespace only
-        let fragments = plugin
-            .contribute(&make_request(Some("   ")))
-            .await
-            .unwrap();
-        assert!(fragments.is_empty(), "Whitespace-only message should return empty");
+        let fragments = plugin.contribute(&make_request(Some("   "))).await.unwrap();
+        assert!(
+            fragments.is_empty(),
+            "Whitespace-only message should return empty"
+        );
     }
 
     // WCP.2 — query with no wiki match returns empty fragments
@@ -238,7 +242,10 @@ Used in transformer models alongside self-attention.
             .contribute(&make_request(Some("quantum-computing-xyz-zzzz")))
             .await
             .unwrap();
-        assert!(fragments.is_empty(), "No-match query should return empty fragments");
+        assert!(
+            fragments.is_empty(),
+            "No-match query should return empty fragments"
+        );
     }
 
     // WCP.3 — matching query returns fragment with header and page info
@@ -297,7 +304,10 @@ Used in transformer models alongside self-attention.
             .lines()
             .filter(|l| l.starts_with("- ["))
             .count();
-        assert_eq!(item_count, 1, "Should only include 1 page due to max_pages=1");
+        assert_eq!(
+            item_count, 1,
+            "Should only include 1 page due to max_pages=1"
+        );
     }
 
     // WCP.5 — id() returns "wiki-context"

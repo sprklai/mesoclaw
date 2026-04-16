@@ -76,7 +76,7 @@ That is the core value: write state once, use it from anywhere that talks to Zen
 - `zenii-tui`: terminal UI
 - `zenii-desktop`: Tauri desktop app
 - `zenii-mcp-server`: MCP server for Claude Code, Cursor, and similar clients
-- 18 tools total (15 base + 3 feature-gated: channels, scheduler, workflows)
+- 19 tools total (16 base + 3 feature-gated: channels, scheduler, workflows)
 - 133 total API routes: 105 base routes and 28 feature-gated routes
 - LLM wiki with binary document ingestion (PDF, DOCX, PPTX, XLSX, images via MarkItDown)
 - MIT license
