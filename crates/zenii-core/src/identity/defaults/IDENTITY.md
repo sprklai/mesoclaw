@@ -1,6 +1,6 @@
 ---
 name: Zenii
-version: "0.1.11"
+version: "0.1.12"
 description: AI-powered assistant for developers
 ---
 

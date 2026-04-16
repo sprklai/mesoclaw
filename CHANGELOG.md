@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-04-15
+
 ### Added
 - feat(tools): WikiSearchTool — search, get, and list wiki pages from the agent tool system
 - feat(ai): WikiContextPlugin — automatic wiki context injection into agent prompts using word-level query matching
