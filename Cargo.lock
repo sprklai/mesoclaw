@@ -10677,11 +10677,11 @@ dependencies = [
 
 [[package]]
 name = "zenii"
-version = "0.1.13"
+version = "0.1.14"
 
 [[package]]
 name = "zenii-cli"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "clap",
  "clap_complete",
@@ -10703,7 +10703,7 @@ dependencies = [
 
 [[package]]
 name = "zenii-core"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "aes-gcm",
  "arc-swap",
@@ -10764,7 +10764,7 @@ dependencies = [
 
 [[package]]
 name = "zenii-daemon"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "clap",
  "tokio",
@@ -10775,7 +10775,7 @@ dependencies = [
 
 [[package]]
 name = "zenii-desktop"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "opener",
  "serde",
@@ -10800,7 +10800,7 @@ dependencies = [
 
 [[package]]
 name = "zenii-mcp-server"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "arc-swap",
  "clap",
@@ -10813,7 +10813,7 @@ dependencies = [
 
 [[package]]
 name = "zenii-tui"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "clap",
  "crossterm",

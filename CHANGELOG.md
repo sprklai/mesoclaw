@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-04-25
+
+### Changed
+- chore(deps): bump fastembed 4.9.1 → 5.13.3 (ONNX Runtime 2.0, `&mut self` embed API wrapped in `Arc<Mutex<T>>`)
+- chore(deps): bump rig-core 0.33.0 → 0.35.0 (new `with_history` API, added `cache_creation_input_tokens` field)
+
+### Fixed
+- fix(ci): upgrade CI runners from ubuntu-22.04 to ubuntu-24.04 (glibc 2.39) to resolve `ort-sys` linker errors (`__isoc23_strtol` undefined)
+- fix(ci): add RUSTSEC-2026-0104 to audit ignore list (rustls-webpki CRL parsing panic in stuck transitive branches)
+- fix(clippy): use `sort_by_key` + `Reverse` instead of `sort_by` in wiki search scoring
+- fix(clippy): collapse 12 `collapsible_match` patterns in TUI handler into match guards
+
 ## [0.1.13] - 2026-04-25
 
 ### Added
