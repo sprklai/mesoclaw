@@ -255,6 +255,52 @@ pub async fn update_config(
                 }
             }
         }
+        // MCP Server tool visibility
+        if let Some(v) = obj.get("mcp_server_tool_prefix").and_then(|v| v.as_str()) {
+            config.mcp_server_tool_prefix = v.to_string();
+        }
+        if let Some(v) = obj.get("mcp_server_exposed_tools").and_then(|v| v.as_array()) {
+            config.mcp_server_exposed_tools = v
+                .iter()
+                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                .collect();
+        }
+        if let Some(v) = obj.get("mcp_server_hidden_tools").and_then(|v| v.as_array()) {
+            config.mcp_server_hidden_tools = v
+                .iter()
+                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                .collect();
+        }
+        // MCP Client servers
+        if let Some(v) = obj.get("mcp_client_servers") {
+            match serde_json::from_value::<Vec<crate::config::McpServerConfig>>(v.clone()) {
+                Ok(servers) => {
+                    // Validate: no empty IDs and no duplicate IDs
+                    for s in &servers {
+                        if s.id.trim().is_empty() {
+                            return Err(crate::ZeniiError::Validation(
+                                "mcp_client_servers: server ID must not be empty".into(),
+                            ));
+                        }
+                    }
+                    let mut seen = std::collections::HashSet::new();
+                    for s in &servers {
+                        if !seen.insert(s.id.as_str()) {
+                            return Err(crate::ZeniiError::Validation(format!(
+                                "mcp_client_servers: duplicate server ID '{}'",
+                                s.id
+                            )));
+                        }
+                    }
+                    config.mcp_client_servers = servers;
+                }
+                Err(e) => {
+                    return Err(crate::ZeniiError::Validation(format!(
+                        "invalid mcp_client_servers: {e}"
+                    )));
+                }
+            }
+        }
     }
 
     // Validate before saving
@@ -513,6 +559,119 @@ mod tests {
         assert!(routing.get("scheduler_notification").is_some());
         assert!(routing.get("scheduler_job_completed").is_some());
         assert!(routing.get("channel_message").is_some());
+    }
+
+    #[tokio::test]
+    async fn update_mcp_client_servers_persists() {
+        let (_dir, state) = test_state().await;
+
+        let put_req = Request::builder()
+            .method("PUT")
+            .uri("/config")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({
+                    "mcp_client_servers": [{
+                        "id": "github",
+                        "transport": { "type": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": {} },
+                        "tools_prefix": null,
+                        "enabled": true
+                    }]
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+
+        let put_resp = app(state.clone()).oneshot(put_req).await.unwrap();
+        assert_eq!(put_resp.status(), StatusCode::OK);
+
+        let get_req = Request::builder()
+            .uri("/config")
+            .body(Body::empty())
+            .unwrap();
+        let get_resp = app(state).oneshot(get_req).await.unwrap();
+        let body = axum::body::to_bytes(get_resp.into_body(), 16384).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let servers = json["mcp_client_servers"].as_array().unwrap();
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0]["id"], "github");
+    }
+
+    #[tokio::test]
+    async fn update_mcp_client_servers_duplicate_id_rejected() {
+        let (_dir, state) = test_state().await;
+
+        let put_req = Request::builder()
+            .method("PUT")
+            .uri("/config")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({
+                    "mcp_client_servers": [
+                        { "id": "dup", "transport": { "type": "stdio", "command": "npx", "args": [], "env": {} }, "tools_prefix": null, "enabled": true },
+                        { "id": "dup", "transport": { "type": "stdio", "command": "npx", "args": [], "env": {} }, "tools_prefix": null, "enabled": true }
+                    ]
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+
+        let resp = app(state).oneshot(put_req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn update_mcp_client_servers_invalid_rejected() {
+        let (_dir, state) = test_state().await;
+        let app = app(state);
+
+        let req = Request::builder()
+            .method("PUT")
+            .uri("/config")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({
+                    "mcp_client_servers": [{ "id": "bad" }]
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn update_mcp_server_fields_persists() {
+        let (_dir, state) = test_state().await;
+
+        let put_req = Request::builder()
+            .method("PUT")
+            .uri("/config")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({
+                    "mcp_server_tool_prefix": "zenii_",
+                    "mcp_server_exposed_tools": ["web_search"],
+                    "mcp_server_hidden_tools": ["shell"]
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+
+        let put_resp = app(state.clone()).oneshot(put_req).await.unwrap();
+        assert_eq!(put_resp.status(), StatusCode::OK);
+
+        let get_req = Request::builder()
+            .uri("/config")
+            .body(Body::empty())
+            .unwrap();
+        let get_resp = app(state).oneshot(get_req).await.unwrap();
+        let body = axum::body::to_bytes(get_resp.into_body(), 16384).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["mcp_server_tool_prefix"], "zenii_");
+        assert_eq!(json["mcp_server_exposed_tools"], serde_json::json!(["web_search"]));
+        assert_eq!(json["mcp_server_hidden_tools"], serde_json::json!(["shell"]));
     }
 
     #[tokio::test]

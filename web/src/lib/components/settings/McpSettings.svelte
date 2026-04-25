@@ -51,6 +51,7 @@
 	let servers = $state<McpServerConfig[]>([]);
 	let showForm = $state(false);
 	let editId = $state<string | null>(null);
+	let clientsSaving = $state(false);
 
 	let formId = $state('');
 	let formTransport = $state<'stdio' | 'http'>('stdio');
@@ -233,6 +234,7 @@
 	}
 
 	async function saveServer() {
+		if (clientsSaving) return;
 		formError = '';
 
 		if (!formId.trim()) {
@@ -285,27 +287,48 @@
 			updated = [...servers, newServer];
 		}
 
+		clientsSaving = true;
 		try {
 			await configStore.update({ mcp_client_servers: updated });
-			servers = updated;
+			await configStore.load();
+			const raw = configStore.get('mcp_client_servers');
+			servers = Array.isArray(raw) ? (raw as McpServerConfig[]) : [];
 			resetForm();
 		} catch (e) {
 			formError = e instanceof Error ? e.message : String(e);
+		} finally {
+			clientsSaving = false;
 		}
 	}
 
 	async function deleteServer(id: string) {
-		const updated = servers.filter((s) => s.id !== id);
-		await configStore.update({ mcp_client_servers: updated });
-		servers = updated;
+		if (clientsSaving) return;
+		clientsSaving = true;
+		try {
+			const updated = servers.filter((s) => s.id !== id);
+			await configStore.update({ mcp_client_servers: updated });
+			await configStore.load();
+			const raw = configStore.get('mcp_client_servers');
+			servers = Array.isArray(raw) ? (raw as McpServerConfig[]) : [];
+		} finally {
+			clientsSaving = false;
+		}
 	}
 
 	async function toggleServer(id: string) {
-		const updated = servers.map((s) =>
-			s.id === id ? { ...s, enabled: !s.enabled } : s
-		);
-		await configStore.update({ mcp_client_servers: updated });
-		servers = updated;
+		if (clientsSaving) return;
+		clientsSaving = true;
+		try {
+			const updated = servers.map((s) =>
+				s.id === id ? { ...s, enabled: !s.enabled } : s
+			);
+			await configStore.update({ mcp_client_servers: updated });
+			await configStore.load();
+			const raw = configStore.get('mcp_client_servers');
+			servers = Array.isArray(raw) ? (raw as McpServerConfig[]) : [];
+		} finally {
+			clientsSaving = false;
+		}
 	}
 
 	// ── Derived ───────────────────────────────────────────────────────────────────
@@ -528,8 +551,8 @@
 				{/if}
 
 				<div class="flex gap-2 pt-1">
-					<Button onclick={saveServer}>Save</Button>
-					<Button variant="outline" onclick={resetForm}>Cancel</Button>
+					<Button onclick={saveServer} disabled={clientsSaving}>{clientsSaving ? 'Saving…' : 'Save'}</Button>
+					<Button variant="outline" onclick={resetForm} disabled={clientsSaving}>Cancel</Button>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -548,6 +571,7 @@
 						<div class="flex items-center gap-3">
 							<Switch
 								checked={server.enabled}
+								disabled={clientsSaving}
 								onCheckedChange={() => toggleServer(server.id)}
 							/>
 							<div class="flex-1 min-w-0">
@@ -563,6 +587,7 @@
 								<Button
 									size="sm"
 									variant="ghost"
+									disabled={clientsSaving}
 									onclick={() => startEdit(server)}
 								>
 									Edit
@@ -571,9 +596,10 @@
 									size="sm"
 									variant="ghost"
 									class="text-destructive hover:text-destructive"
+									disabled={clientsSaving}
 									onclick={() => deleteServer(server.id)}
 								>
-									Delete
+									{clientsSaving ? '…' : 'Delete'}
 								</Button>
 							</div>
 						</div>
