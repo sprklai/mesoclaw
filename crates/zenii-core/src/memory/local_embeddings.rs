@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell};
 
 use crate::{Result, ZeniiError};
 
@@ -12,7 +12,7 @@ use super::embeddings::EmbeddingProvider;
 /// Local embedding provider using fastembed (ONNX Runtime).
 /// Feature-gated behind `local-embeddings`.
 pub struct FastEmbedProvider {
-    model: OnceCell<Arc<fastembed::TextEmbedding>>,
+    model: OnceCell<Arc<Mutex<fastembed::TextEmbedding>>>,
     model_name: fastembed::EmbeddingModel,
     cache_dir: Option<std::path::PathBuf>,
 }
@@ -38,7 +38,7 @@ impl FastEmbedProvider {
         })
     }
 
-    async fn get_model(&self) -> Result<Arc<fastembed::TextEmbedding>> {
+    async fn get_model(&self) -> Result<Arc<Mutex<fastembed::TextEmbedding>>> {
         self.model
             .get_or_try_init(|| async {
                 let model_name = self.model_name.clone();
@@ -59,7 +59,7 @@ impl FastEmbedProvider {
                 .map_err(|e| ZeniiError::Embedding(format!("spawn_blocking failed: {e}")))??;
 
                 tracing::info!("Fastembed model ready");
-                Ok(Arc::new(model))
+                Ok(Arc::new(Mutex::new(model)))
             })
             .await
             .cloned()
@@ -77,7 +77,8 @@ impl EmbeddingProvider for FastEmbedProvider {
         let text = text.to_string();
 
         tokio::task::spawn_blocking(move || {
-            let embeddings = model
+            let mut guard = model.blocking_lock();
+            let embeddings = guard
                 .embed(vec![text], None)
                 .map_err(|e| ZeniiError::Embedding(format!("embed failed: {e}")))?;
             embeddings
