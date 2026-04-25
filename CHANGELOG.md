@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-04-25
+
 ### Fixed
 - MCP client/server settings no longer vanish after page navigation — `PUT /config` now persists `mcp_client_servers`, `mcp_server_tool_prefix`, `mcp_server_exposed_tools`, and `mcp_server_hidden_tools`
 - Backend validates `mcp_client_servers` for empty and duplicate IDs (returns 400)
