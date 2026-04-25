@@ -10,4 +10,6 @@ ignore = [
     "RUSTSEC-2026-0098",
     # rustls-webpki wildcard name constraints bug — same stuck branches as above
     "RUSTSEC-2026-0099",
+    # rustls-webpki CRL parsing panic — same stuck branches (0.101.7 via websearch→reqwest 0.11, 0.102.8 via serenity→rustls 0.22)
+    "RUSTSEC-2026-0104",
 ]

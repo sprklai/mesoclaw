@@ -2233,7 +2233,7 @@ fn score_pages_for_query<'a>(pages: &'a [WikiPage], question: &str) -> Vec<&'a W
         })
         .collect();
 
-    scored.sort_by(|a, b| b.1.cmp(&a.1));
+    scored.sort_by_key(|a| std::cmp::Reverse(a.1));
 
     scored
         .into_iter()
