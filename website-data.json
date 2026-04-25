@@ -3,7 +3,7 @@
   "agentTools": 16,
   "llmProviders": 6,
   "messagingChannels": 3,
-  "backendTests": 1671,
+  "backendTests": 1696,
   "binarySize": 20,
   "debRpmSize": 16,
   "startupSeconds": 3,

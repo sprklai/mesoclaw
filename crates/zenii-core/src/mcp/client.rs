@@ -105,9 +105,7 @@ mod inner {
             args: Value,
         ) -> Result<Value> {
             match &config.transport {
-                McpTransport::Stdio { .. } => {
-                    self.call_stdio_tool(config, tool_name, args).await
-                }
+                McpTransport::Stdio { .. } => self.call_stdio_tool(config, tool_name, args).await,
                 McpTransport::Http { url, .. } => Err(ZeniiError::Mcp(format!(
                     "HTTP MCP transport not yet supported (server: {}, url: {})",
                     config.id, url
@@ -129,7 +127,9 @@ mod inner {
             }
         }
 
-        async fn connect_stdio(cfg: &McpServerConfig) -> Result<(Vec<McpToolInfo>, Peer<RoleClient>)> {
+        async fn connect_stdio(
+            cfg: &McpServerConfig,
+        ) -> Result<(Vec<McpToolInfo>, Peer<RoleClient>)> {
             use rmcp::transport::{ConfigureCommandExt, TokioChildProcess};
             use tokio::process::Command;
 
@@ -140,17 +140,16 @@ mod inner {
             let env_clone = env.clone();
             let args_clone = args.clone();
             let command_clone = command.clone();
-            let transport = TokioChildProcess::new(Command::new(&command_clone).configure(
-                move |cmd| {
+            let transport =
+                TokioChildProcess::new(Command::new(&command_clone).configure(move |cmd| {
                     cmd.args(&args_clone);
                     for (k, v) in &env_clone {
                         cmd.env(k, v);
                     }
-                },
-            ))
-            .map_err(|e| {
-                ZeniiError::Mcp(format!("failed to spawn MCP server '{}': {e}", cfg.id))
-            })?;
+                }))
+                .map_err(|e| {
+                    ZeniiError::Mcp(format!("failed to spawn MCP server '{}': {e}", cfg.id))
+                })?;
 
             let session = tokio::time::timeout(
                 std::time::Duration::from_secs(CONNECT_TIMEOUT_SECS),
@@ -180,12 +179,7 @@ mod inner {
                     cfg.id, DISCOVER_TIMEOUT_SECS
                 ))
             })?
-            .map_err(|e| {
-                ZeniiError::Mcp(format!(
-                    "failed to list tools from '{}': {e}",
-                    cfg.id
-                ))
-            })?;
+            .map_err(|e| ZeniiError::Mcp(format!("failed to list tools from '{}': {e}", cfg.id)))?;
 
             let tool_infos: Vec<McpToolInfo> = tool_list
                 .iter()

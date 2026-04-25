@@ -259,13 +259,19 @@ pub async fn update_config(
         if let Some(v) = obj.get("mcp_server_tool_prefix").and_then(|v| v.as_str()) {
             config.mcp_server_tool_prefix = v.to_string();
         }
-        if let Some(v) = obj.get("mcp_server_exposed_tools").and_then(|v| v.as_array()) {
+        if let Some(v) = obj
+            .get("mcp_server_exposed_tools")
+            .and_then(|v| v.as_array())
+        {
             config.mcp_server_exposed_tools = v
                 .iter()
                 .filter_map(|x| x.as_str().map(|s| s.to_string()))
                 .collect();
         }
-        if let Some(v) = obj.get("mcp_server_hidden_tools").and_then(|v| v.as_array()) {
+        if let Some(v) = obj
+            .get("mcp_server_hidden_tools")
+            .and_then(|v| v.as_array())
+        {
             config.mcp_server_hidden_tools = v
                 .iter()
                 .filter_map(|x| x.as_str().map(|s| s.to_string()))
@@ -590,7 +596,9 @@ mod tests {
             .body(Body::empty())
             .unwrap();
         let get_resp = app(state).oneshot(get_req).await.unwrap();
-        let body = axum::body::to_bytes(get_resp.into_body(), 16384).await.unwrap();
+        let body = axum::body::to_bytes(get_resp.into_body(), 16384)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         let servers = json["mcp_client_servers"].as_array().unwrap();
         assert_eq!(servers.len(), 1);
@@ -667,11 +675,19 @@ mod tests {
             .body(Body::empty())
             .unwrap();
         let get_resp = app(state).oneshot(get_req).await.unwrap();
-        let body = axum::body::to_bytes(get_resp.into_body(), 16384).await.unwrap();
+        let body = axum::body::to_bytes(get_resp.into_body(), 16384)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["mcp_server_tool_prefix"], "zenii_");
-        assert_eq!(json["mcp_server_exposed_tools"], serde_json::json!(["web_search"]));
-        assert_eq!(json["mcp_server_hidden_tools"], serde_json::json!(["shell"]));
+        assert_eq!(
+            json["mcp_server_exposed_tools"],
+            serde_json::json!(["web_search"])
+        );
+        assert_eq!(
+            json["mcp_server_hidden_tools"],
+            serde_json::json!(["shell"])
+        );
     }
 
     #[tokio::test]

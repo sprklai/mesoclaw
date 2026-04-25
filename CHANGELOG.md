@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- MCP client/server settings no longer vanish after page navigation — `PUT /config` now persists `mcp_client_servers`, `mcp_server_tool_prefix`, `mcp_server_exposed_tools`, and `mcp_server_hidden_tools`
+- Backend validates `mcp_client_servers` for empty and duplicate IDs (returns 400)
+- MCP settings UI reloads from server after every save/delete/toggle; buttons disabled while in-flight to prevent races
+
+### Changed
+- MCP stdio transport wired: `McpClientManager` spawns real child-process sessions via rmcp with persistent `Peer<RoleClient>` per server; timeouts 15s connect / 10s discover / 60s call
+
 ## [0.1.14] - 2026-04-25
 
 ### Changed
