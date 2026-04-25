@@ -47,20 +47,14 @@ fn handle_session_list(app: &mut App, key: KeyEvent) {
         KeyCode::Char('k') | KeyCode::Up => app.select_prev_session(),
         KeyCode::Char('g') => app.select_first_session(),
         KeyCode::Char('G') => app.select_last_session(),
-        KeyCode::Enter => {
-            if app.selected_session.is_some() {
-                app.enter_chat_mode();
-            }
-        }
+        KeyCode::Enter if app.selected_session.is_some() => app.enter_chat_mode(),
         KeyCode::Char('n') => {
             // New session — handled by caller
             app.notification_text = Some("__create_session__".into());
         }
-        KeyCode::Char('d') => {
-            if app.selected_session.is_some() {
-                app.confirm_delete = true;
-                app.notification_text = Some("Delete session? (y/n)".into());
-            }
+        KeyCode::Char('d') if app.selected_session.is_some() => {
+            app.confirm_delete = true;
+            app.notification_text = Some("Delete session? (y/n)".into());
         }
         KeyCode::Char('p') => {
             app.notification_text = Some("__plugin_load__".into());
@@ -68,16 +62,10 @@ fn handle_session_list(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Char('q') => app.should_quit = true,
         KeyCode::Char('?') => app.toggle_help(),
-        KeyCode::Tab => {
-            if app.current_session_id.is_some() {
-                app.enter_chat_mode();
-            }
-        }
-        KeyCode::Char('i') => {
-            if app.current_session_id.is_some() {
-                app.enter_chat_mode();
-                app.enter_input_mode();
-            }
+        KeyCode::Tab if app.current_session_id.is_some() => app.enter_chat_mode(),
+        KeyCode::Char('i') if app.current_session_id.is_some() => {
+            app.enter_chat_mode();
+            app.enter_input_mode();
         }
         _ => {}
     }
@@ -102,12 +90,12 @@ fn handle_chat(app: &mut App, key: KeyEvent) {
 fn handle_input(app: &mut App, key: KeyEvent) {
     match (key.code, key.modifiers) {
         (KeyCode::Esc, _) => app.exit_input_mode(),
-        (KeyCode::Enter, _) => {
-            if !app.input.content.trim().is_empty() && app.chat_status != ChatStatus::Streaming {
-                // Signal send — handled by caller checking chat_status transition
-                app.chat_status = ChatStatus::Streaming;
-                app.notification_text = Some("__send_message__".into());
-            }
+        (KeyCode::Enter, _)
+            if !app.input.content.trim().is_empty()
+                && app.chat_status != ChatStatus::Streaming =>
+        {
+            app.chat_status = ChatStatus::Streaming;
+            app.notification_text = Some("__send_message__".into());
         }
         (KeyCode::Char('u'), KeyModifiers::CONTROL) => app.input.clear(),
         (KeyCode::Char('w'), KeyModifiers::CONTROL) => app.input.delete_word_backward(),
@@ -129,15 +117,11 @@ fn handle_plugin_list(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Char('j') | KeyCode::Down => app.select_next_plugin(),
         KeyCode::Char('k') | KeyCode::Up => app.select_prev_plugin(),
-        KeyCode::Char('e') => {
-            if app.selected_plugin.is_some() {
-                app.notification_text = Some("__plugin_toggle__".into());
-            }
+        KeyCode::Char('e') if app.selected_plugin.is_some() => {
+            app.notification_text = Some("__plugin_toggle__".into());
         }
-        KeyCode::Char('d') => {
-            if app.selected_plugin.is_some() {
-                app.notification_text = Some("__plugin_remove__".into());
-            }
+        KeyCode::Char('d') if app.selected_plugin.is_some() => {
+            app.notification_text = Some("__plugin_remove__".into());
         }
         KeyCode::Char('i') => {
             app.notification_text = Some("__plugin_install_mode__".into());
@@ -164,11 +148,9 @@ fn handle_onboard(app: &mut App, key: KeyEvent) {
 
     match app.onboard_step {
         OnboardStep::ProviderSelect => match key.code {
-            KeyCode::Char('j') | KeyCode::Down => {
-                if !app.onboard_providers.is_empty() {
-                    app.onboard_selected_provider =
-                        (app.onboard_selected_provider + 1).min(app.onboard_providers.len() - 1);
-                }
+            KeyCode::Char('j') | KeyCode::Down if !app.onboard_providers.is_empty() => {
+                app.onboard_selected_provider =
+                    (app.onboard_selected_provider + 1).min(app.onboard_providers.len() - 1);
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 app.onboard_selected_provider = app.onboard_selected_provider.saturating_sub(1);
@@ -196,11 +178,8 @@ fn handle_onboard(app: &mut App, key: KeyEvent) {
                 app.onboard_api_key.clear();
                 app.onboard_error = None;
             }
-            (KeyCode::Enter, _) => {
-                if !app.onboard_api_key.content.trim().is_empty() {
-                    // Signal to save API key — handled by main loop
-                    app.notification_text = Some("__onboard_save_key__".into());
-                }
+            (KeyCode::Enter, _) if !app.onboard_api_key.content.trim().is_empty() => {
+                app.notification_text = Some("__onboard_save_key__".into());
             }
             (KeyCode::Backspace, _) => app.onboard_api_key.delete_back(),
             (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
@@ -216,11 +195,9 @@ fn handle_onboard(app: &mut App, key: KeyEvent) {
                     app.onboard_step = OnboardStep::ProviderSelect;
                 }
             }
-            KeyCode::Char('j') | KeyCode::Down => {
-                if !app.onboard_models.is_empty() {
-                    app.onboard_selected_model =
-                        (app.onboard_selected_model + 1).min(app.onboard_models.len() - 1);
-                }
+            KeyCode::Char('j') | KeyCode::Down if !app.onboard_models.is_empty() => {
+                app.onboard_selected_model =
+                    (app.onboard_selected_model + 1).min(app.onboard_models.len() - 1);
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 app.onboard_selected_model = app.onboard_selected_model.saturating_sub(1);
@@ -237,19 +214,19 @@ fn handle_onboard(app: &mut App, key: KeyEvent) {
                 app.onboard_step = OnboardStep::Profile;
                 app.onboard_error = None;
             }
-            (KeyCode::Char('j'), _) | (KeyCode::Down, _) => {
-                let channels = crate::app::ONBOARD_CHANNELS;
-                let channel = &channels[app.onboard_selected_channel];
-                if app.onboard_channel_cred_idx < channel.credentials.len() - 1 {
-                    app.onboard_channel_cred_idx += 1;
-                    app.onboard_channel_input.clear();
-                }
+            (KeyCode::Char('j'), _) | (KeyCode::Down, _)
+                if app.onboard_channel_cred_idx
+                    < crate::app::ONBOARD_CHANNELS[app.onboard_selected_channel]
+                        .credentials
+                        .len()
+                        - 1 =>
+            {
+                app.onboard_channel_cred_idx += 1;
+                app.onboard_channel_input.clear();
             }
-            (KeyCode::Char('k'), _) | (KeyCode::Up, _) => {
-                if app.onboard_channel_cred_idx > 0 {
-                    app.onboard_channel_cred_idx -= 1;
-                    app.onboard_channel_input.clear();
-                }
+            (KeyCode::Char('k'), _) | (KeyCode::Up, _) if app.onboard_channel_cred_idx > 0 => {
+                app.onboard_channel_cred_idx -= 1;
+                app.onboard_channel_input.clear();
             }
             (KeyCode::Tab, _) => {
                 let channels = crate::app::ONBOARD_CHANNELS;
@@ -258,10 +235,8 @@ fn handle_onboard(app: &mut App, key: KeyEvent) {
                 app.onboard_channel_input.clear();
                 app.onboard_error = None;
             }
-            (KeyCode::Enter, _) => {
-                if !app.onboard_channel_input.content.trim().is_empty() {
-                    app.notification_text = Some("__onboard_save_channel_cred__".into());
-                }
+            (KeyCode::Enter, _) if !app.onboard_channel_input.content.trim().is_empty() => {
+                app.notification_text = Some("__onboard_save_channel_cred__".into());
             }
             (KeyCode::Backspace, _) => app.onboard_channel_input.delete_back(),
             (KeyCode::Char('n'), KeyModifiers::CONTROL) => {
