@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-04-25
+
 ### Added
 - feat(memory): BM25 field weighting — configurable per-field weights (key/content/category) for ranked recall scoring
 - feat(memory): temporal decay scoring — exponential decay (exp(-λ × days)) de-ranks stale memories; configurable lambda and enable/disable flag
