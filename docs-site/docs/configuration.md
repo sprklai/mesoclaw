@@ -31,6 +31,7 @@ slug: /configuration
   - [Scheduler](#scheduler)
   - [Credentials](#credentials)
   - [Self-Evolution](#self-evolution)
+  - [MCP Client](#mcp-client)
   - [Logging](#logging)
 - [Environment Variable Overrides](#environment-variable-overrides)
 - [Feature Flag Impact](#feature-flag-impact)
@@ -109,6 +110,13 @@ session_max_age_days = 90
 | `memory_default_limit` | usize | `10` | Default number of results for memory recall queries |
 | `embedding_dim` | usize | `384` | Dimensionality of embedding vectors |
 | `embedding_cache_size` | usize | `1000` | Number of embeddings to cache in memory |
+| `memory_bm25_key_weight` | f64 | `2.0` | BM25 field weight for the `key` column in FTS scoring |
+| `memory_bm25_content_weight` | f64 | `1.0` | BM25 field weight for the `content` column in FTS scoring |
+| `memory_bm25_category_weight` | f64 | `0.5` | BM25 field weight for the `category` column in FTS scoring |
+| `memory_decay_enabled` | bool | `true` | Apply temporal decay to recall scores |
+| `memory_decay_lambda` | f32 | `0.01` | Decay rate λ in `exp(-λ × days_since_update)`; default ≈ 70-day half-life |
+| `memory_dedup_enabled` | bool | `true` | Check for near-duplicate memories before storing (requires embedding provider) |
+| `memory_dedup_threshold` | f32 | `0.92` | Cosine similarity threshold above which an incoming store is treated as a duplicate |
 
 ```toml
 memory_fts_weight = 0.4
@@ -116,6 +124,19 @@ memory_vector_weight = 0.6
 memory_default_limit = 10
 embedding_dim = 384
 embedding_cache_size = 1000
+
+# BM25 field weighting (key outranks content, content outranks category)
+memory_bm25_key_weight = 2.0
+memory_bm25_content_weight = 1.0
+memory_bm25_category_weight = 0.5
+
+# Temporal decay: score × exp(-λ × days_since_update)
+memory_decay_enabled = true
+memory_decay_lambda = 0.01
+
+# Semantic deduplication (requires embedding provider)
+memory_dedup_enabled = true
+memory_dedup_threshold = 0.92
 ```
 
 ### Security
@@ -456,6 +477,56 @@ user_timezone = "America/New_York"
 user_location = "New York, US"
 ```
 
+### MCP Client
+
+Configure external MCP servers whose tools are automatically registered into the agent's `ToolRegistry` at startup. Requires `--features mcp-client`.
+
+Each entry in `mcp_client_servers` uses an array-of-tables (`[[mcp_client_servers]]`) and supports two transport types: `stdio` (launch a local subprocess) and `http` (connect to a remote HTTP/SSE endpoint).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `id` | String | — | Unique identifier for this MCP server |
+| `transport` | McpTransport | — | How to connect: `stdio` or `http` (see below) |
+| `tools_prefix` | Option\<String\> | `null` | Optional prefix prepended to every tool name (e.g. `"github/"`) |
+| `enabled` | bool | `true` | Whether this server is connected at startup |
+
+**Stdio transport fields** (`type = "stdio"`):
+
+| Field | Type | Description |
+|---|---|---|
+| `command` | String | Executable to launch |
+| `args` | Vec\<String\> | Arguments passed to the command |
+| `env` | HashMap\<String, String\> | Additional environment variables |
+
+**HTTP transport fields** (`type = "http"`):
+
+| Field | Type | Description |
+|---|---|---|
+| `url` | String | URL of the remote MCP server |
+| `headers` | HashMap\<String, String\> | Additional HTTP headers (e.g. auth) |
+
+```toml
+# Stdio example — GitHub MCP server via npx
+[[mcp_client_servers]]
+id = "github"
+tools_prefix = "github/"
+enabled = true
+
+[mcp_client_servers.transport]
+type = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+
+# HTTP example — remote MCP server
+[[mcp_client_servers]]
+id = "my-remote"
+enabled = true
+
+[mcp_client_servers.transport]
+type = "http"
+url = "https://example.com/mcp"
+```
+
 ### Logging
 
 | Field | Type | Default | Description |
@@ -548,6 +619,13 @@ memory_fts_weight = 0.4
 memory_vector_weight = 0.6
 memory_default_limit = 10
 embedding_dim = 384
+memory_bm25_key_weight = 2.0
+memory_bm25_content_weight = 1.0
+memory_bm25_category_weight = 0.5
+memory_decay_enabled = true
+memory_decay_lambda = 0.01
+memory_dedup_enabled = true
+memory_dedup_threshold = 0.92
 
 # Security
 security_autonomy_level = "supervised"

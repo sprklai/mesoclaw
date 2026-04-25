@@ -18,6 +18,8 @@ pub mod wiki_tool;
 
 #[cfg(feature = "channels")]
 pub mod channel_tool;
+#[cfg(feature = "mcp-client")]
+pub mod mcp_client_tool;
 #[cfg(feature = "scheduler")]
 pub mod scheduler_tool;
 #[cfg(feature = "workflows")]

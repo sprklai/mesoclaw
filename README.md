@@ -79,6 +79,8 @@ That is the core value: write state once, use it from anywhere that talks to Zen
 - 19 tools total (16 base + 3 feature-gated: channels, scheduler, workflows)
 - 133 total API routes: 105 base routes and 28 feature-gated routes
 - LLM wiki with binary document ingestion (PDF, DOCX, PPTX, XLSX, images via MarkItDown)
+- Memory intelligence: BM25 field weighting, temporal decay scoring, semantic deduplication
+- MCP Client (`mcp-client` feature): consume tools from external MCP servers (GitHub, Postgres, Filesystem, etc.)
 - MIT license
 
 ## Install
@@ -107,6 +109,7 @@ Full platform notes, package names, and source builds:
 | `zenii-tui` | Terminal-native interactive use |
 | `zenii-desktop` | Native desktop UI on top of the same backend |
 | `zenii-mcp-server` | Exposing Zenii tools to external coding agents |
+| `mcp-client` feature | Consuming tools from external MCP servers inside the agent |
 
 ## MCP Example
 

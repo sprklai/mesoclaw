@@ -63,6 +63,9 @@ pub enum ZeniiError {
     #[error("memory error: {0}")]
     Memory(String),
 
+    #[error("memory duplicate: {0}")]
+    MemoryDuplicate(String),
+
     #[error("embedding error: {0}")]
     Embedding(String),
 

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use tokio::sync::Mutex;
 
 use crate::db::DbPool;
 use crate::{Result, ZeniiError};
@@ -15,6 +16,14 @@ pub struct SqliteMemoryStore {
     embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
     fts_weight: f32,
     vector_weight: f32,
+    bm25_key_weight: f64,
+    bm25_content_weight: f64,
+    bm25_category_weight: f64,
+    decay_enabled: bool,
+    decay_lambda: f32,
+    dedup_enabled: bool,
+    dedup_threshold: f32,
+    dedup_lock: Arc<Mutex<()>>,
 }
 
 impl SqliteMemoryStore {
@@ -25,6 +34,14 @@ impl SqliteMemoryStore {
             embedding_provider: None,
             fts_weight,
             vector_weight,
+            bm25_key_weight: 2.0,
+            bm25_content_weight: 1.0,
+            bm25_category_weight: 0.5,
+            decay_enabled: true,
+            decay_lambda: 0.01,
+            dedup_enabled: true,
+            dedup_threshold: 0.92,
+            dedup_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -35,6 +52,40 @@ impl SqliteMemoryStore {
     ) -> Self {
         self.vector_index = Some(vector_index);
         self.embedding_provider = Some(embedding_provider);
+        self
+    }
+
+    pub fn with_bm25_weights(mut self, key: f64, content: f64, category: f64) -> Self {
+        if [key, content, category]
+            .iter()
+            .all(|v| v.is_finite() && *v >= 0.0)
+        {
+            self.bm25_key_weight = key;
+            self.bm25_content_weight = content;
+            self.bm25_category_weight = category;
+        } else {
+            tracing::warn!("BM25 weights must be finite and non-negative; keeping current values");
+        }
+        self
+    }
+
+    pub fn with_decay(mut self, enabled: bool, lambda: f32) -> Self {
+        if lambda.is_finite() && lambda >= 0.0 {
+            self.decay_enabled = enabled;
+            self.decay_lambda = lambda;
+        } else {
+            tracing::warn!("decay lambda must be finite and non-negative; keeping current values");
+        }
+        self
+    }
+
+    pub fn with_dedup(mut self, enabled: bool, threshold: f32) -> Self {
+        if threshold.is_finite() && (0.0..=1.0).contains(&threshold) {
+            self.dedup_enabled = enabled;
+            self.dedup_threshold = threshold;
+        } else {
+            tracing::warn!("dedup threshold must be in [0.0, 1.0]; keeping current values");
+        }
         self
     }
 
@@ -76,20 +127,19 @@ impl SqliteMemoryStore {
         .map_err(|e| ZeniiError::Database(format!("memory migration failed: {e}")))?;
         Ok(())
     }
-}
 
-#[async_trait]
-impl Memory for SqliteMemoryStore {
-    async fn store(&self, key: &str, content: &str, category: MemoryCategory) -> Result<()> {
-        if content.trim().is_empty() {
-            return Err(ZeniiError::Validation("content cannot be empty".into()));
-        }
+    async fn store_inner(
+        &self,
+        key: &str,
+        content: &str,
+        category: MemoryCategory,
+        precomputed_embedding: Option<Vec<f32>>,
+    ) -> Result<()> {
         let pool = self.pool.clone();
         let key = key.to_string();
         let content_str = content.to_string();
         let cat = category.to_string();
         let id = uuid::Uuid::new_v4().to_string();
-
         let key_clone = key.clone();
         crate::db::with_db(&pool, move |conn| {
             conn.execute(
@@ -102,13 +152,64 @@ impl Memory for SqliteMemoryStore {
         })
         .await?;
 
-        // Store vector embedding if provider available
         if let (Some(provider), Some(vi)) = (&self.embedding_provider, &self.vector_index) {
-            let embedding = provider.embed(content).await?;
+            let embedding = match precomputed_embedding {
+                Some(e) => e,
+                None => provider.embed(content).await?,
+            };
             vi.store(&key, &embedding).await?;
         }
-
         Ok(())
+    }
+}
+
+fn days_since_update(updated_at: &str) -> f32 {
+    use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+    let dt = if let Ok(dt) = updated_at.parse::<DateTime<Utc>>() {
+        dt
+    } else if let Ok(naive) = NaiveDateTime::parse_from_str(updated_at, "%Y-%m-%d %H:%M:%S") {
+        Utc.from_utc_datetime(&naive)
+    } else {
+        tracing::warn!(raw = %updated_at, "memory: unparseable updated_at timestamp; decay skipped for this entry");
+        return 0.0;
+    };
+    let duration = Utc::now().signed_duration_since(dt);
+    duration.num_seconds().max(0) as f32 / 86400.0
+}
+
+#[async_trait]
+impl Memory for SqliteMemoryStore {
+    async fn store(&self, key: &str, content: &str, category: MemoryCategory) -> Result<()> {
+        if content.trim().is_empty() {
+            return Err(ZeniiError::Validation("content cannot be empty".into()));
+        }
+
+        if self.dedup_enabled
+            && let (Some(provider), Some(vi)) = (&self.embedding_provider, &self.vector_index)
+        {
+            // Generate embedding before acquiring lock — this is the expensive async call.
+            let embedding = provider.embed(content).await?;
+            // Hold lock through final check + write to prevent concurrent duplicates.
+            let _guard = self.dedup_lock.lock().await;
+            let candidates = vi.search(&embedding, 3).await?;
+            for (existing_key, similarity) in &candidates {
+                if *similarity >= self.dedup_threshold && existing_key != key {
+                    tracing::debug!(
+                        key = %key,
+                        existing = %existing_key,
+                        similarity = %similarity,
+                        "dedup: skipping duplicate write"
+                    );
+                    return Err(ZeniiError::MemoryDuplicate(key.to_string()));
+                }
+            }
+            // No duplicate — pass embedding to avoid re-computing it in store_inner
+            return self
+                .store_inner(key, content, category, Some(embedding))
+                .await;
+        }
+
+        self.store_inner(key, content, category, None).await
     }
 
     async fn recall(&self, query: &str, limit: usize, offset: usize) -> Result<Vec<MemoryEntry>> {
@@ -116,6 +217,9 @@ impl Memory for SqliteMemoryStore {
         let query_trimmed = query.trim().to_string();
         let fts_weight = self.fts_weight;
         let vector_weight = self.vector_weight;
+        let bm25_key_weight = self.bm25_key_weight;
+        let bm25_content_weight = self.bm25_content_weight;
+        let bm25_category_weight = self.bm25_category_weight;
 
         // Empty query: return all memories ordered by recency (no FTS5 MATCH)
         if query_trimmed.is_empty() {
@@ -155,23 +259,37 @@ impl Memory for SqliteMemoryStore {
         // Wrap query in double quotes to escape FTS5 special characters (AND, OR, *, ", etc.)
         let query_str = format!("\"{}\"", query_trimmed.replace('"', "\"\""));
 
-        // FTS5 search
+        // Over-fetch when decay is enabled so decay scoring can reorder across the full candidate
+        // set before truncating. Without this, items outside the initial LIMIT can never win.
+        let fetch_limit = if self.decay_enabled {
+            limit.saturating_mul(3)
+        } else {
+            limit
+        };
+        let fetch_offset = if self.decay_enabled { 0 } else { offset };
+
+        // FTS5 search with BM25 field weighting
+        let bm25_sql = format!(
+            "bm25(memories_fts, {}, {}, {})",
+            bm25_key_weight, bm25_content_weight, bm25_category_weight
+        );
+        let fts_sql = format!(
+            "SELECT m.id, m.key, m.content, m.category, m.created_at, m.updated_at,
+                {bm25_sql} as rank
+             FROM memories_fts f
+             JOIN memories m ON m.rowid = f.rowid
+             WHERE memories_fts MATCH ?1
+             ORDER BY rank
+             LIMIT ?2 OFFSET ?3",
+            bm25_sql = bm25_sql
+        );
+
         let fts_results = crate::db::with_db(&pool, move |conn| {
-            let mut stmt = conn
-                .prepare(
-                    "SELECT m.id, m.key, m.content, m.category, m.created_at, m.updated_at,
-                        bm25(memories_fts) as rank
-                 FROM memories_fts f
-                 JOIN memories m ON m.rowid = f.rowid
-                 WHERE memories_fts MATCH ?1
-                 ORDER BY rank
-                 LIMIT ?2 OFFSET ?3",
-                )
-                .map_err(ZeniiError::from)?;
+            let mut stmt = conn.prepare(&fts_sql).map_err(ZeniiError::from)?;
 
             let entries = stmt
                 .query_map(
-                    rusqlite::params![query_str, limit as i64, offset as i64],
+                    rusqlite::params![query_str, fetch_limit as i64, fetch_offset as i64],
                     |row| {
                         Ok(MemoryEntry {
                             id: row.get(0)?,
@@ -195,7 +313,7 @@ impl Memory for SqliteMemoryStore {
         // If we have vector search, blend scores
         if let (Some(provider), Some(vi)) = (&self.embedding_provider, &self.vector_index) {
             let query_embedding = provider.embed(query).await?;
-            let vec_results = vi.search(&query_embedding, limit).await?;
+            let vec_results = vi.search(&query_embedding, fetch_limit).await?;
 
             // Merge: combine FTS and vector scores
             let mut merged: std::collections::HashMap<String, MemoryEntry> =
@@ -277,12 +395,48 @@ impl Memory for SqliteMemoryStore {
             }
 
             let mut results: Vec<MemoryEntry> = merged.into_values().collect();
+
+            if self.decay_enabled {
+                let lambda = self.decay_lambda;
+                for entry in &mut results {
+                    let days = days_since_update(&entry.updated_at);
+                    entry.score *= (-lambda * days).exp();
+                }
+            }
+
             results.sort_by(|a, b| {
                 b.score
                     .partial_cmp(&a.score)
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
             let results: Vec<MemoryEntry> = results.into_iter().skip(offset).take(limit).collect();
+            return Ok(results);
+        }
+
+        if self.decay_enabled {
+            let lambda = self.decay_lambda;
+            let mut fts_results = fts_results;
+            let max_score = fts_results
+                .iter()
+                .map(|e| e.score.abs())
+                .fold(0.0f32, f32::max);
+            for entry in &mut fts_results {
+                let norm = if max_score > 0.0 {
+                    entry.score.abs() / max_score
+                } else {
+                    0.0
+                };
+                let days = days_since_update(&entry.updated_at);
+                let decay = (-lambda * days).exp();
+                entry.score = fts_weight * norm * decay;
+            }
+            fts_results.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            let results: Vec<MemoryEntry> =
+                fts_results.into_iter().skip(offset).take(limit).collect();
             return Ok(results);
         }
 
@@ -623,5 +777,146 @@ mod tests {
         assert!(!r1.is_empty());
         assert!(!r2.is_empty());
         assert_ne!(r1[0].id, r2[0].id);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn bm25_key_field_outweighs_content_field() {
+        let (_dir, store) = setup().await;
+        store
+            .store(
+                "apple-fruit",
+                "a common round food item",
+                MemoryCategory::Core,
+            )
+            .await
+            .unwrap();
+        store
+            .store(
+                "round-food",
+                "apple is a popular fruit",
+                MemoryCategory::Core,
+            )
+            .await
+            .unwrap();
+        let weighted_store = store.with_bm25_weights(2.0, 1.0, 0.5);
+        let results = weighted_store.recall("apple", 10, 0).await.unwrap();
+        assert!(!results.is_empty(), "expected recall results");
+        assert_eq!(
+            results[0].key, "apple-fruit",
+            "key-field match should rank first"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn temporal_decay_reduces_score_for_stale_memory() {
+        let (_dir, store) = setup().await;
+        let store = store.with_decay(true, 0.1);
+        store
+            .store("fresh", "rust programming language", MemoryCategory::Core)
+            .await
+            .unwrap();
+        store
+            .store("stale", "rust programming language", MemoryCategory::Core)
+            .await
+            .unwrap();
+        {
+            let pool = store.pool.clone();
+            crate::db::with_db(&pool, |conn| {
+                conn.execute(
+                    "UPDATE memories SET updated_at = datetime('now', '-180 days') WHERE key = 'stale'",
+                    [],
+                ).map_err(ZeniiError::from)?;
+                Ok(())
+            }).await.unwrap();
+        }
+        let results = store.recall("rust programming", 10, 0).await.unwrap();
+        assert_eq!(results.len(), 2);
+        let fresh = results.iter().find(|e| e.key == "fresh").unwrap();
+        let stale = results.iter().find(|e| e.key == "stale").unwrap();
+        assert!(
+            fresh.score > stale.score,
+            "fresh score {} should be > stale score {}",
+            fresh.score,
+            stale.score
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn temporal_decay_disabled_leaves_scores_equal() {
+        let (_dir, store) = setup().await;
+        let store = store.with_decay(false, 0.1);
+        store
+            .store("fresh", "rust programming language", MemoryCategory::Core)
+            .await
+            .unwrap();
+        store
+            .store("stale", "rust programming language", MemoryCategory::Core)
+            .await
+            .unwrap();
+        {
+            let pool = store.pool.clone();
+            crate::db::with_db(&pool, |conn| {
+                conn.execute(
+                    "UPDATE memories SET updated_at = datetime('now', '-180 days') WHERE key = 'stale'",
+                    [],
+                ).map_err(ZeniiError::from)?;
+                Ok(())
+            }).await.unwrap();
+        }
+        let results = store.recall("rust programming", 10, 0).await.unwrap();
+        assert_eq!(results.len(), 2);
+        let fresh = results.iter().find(|e| e.key == "fresh").unwrap();
+        let stale = results.iter().find(|e| e.key == "stale").unwrap();
+        let diff = (fresh.score - stale.score).abs();
+        assert!(
+            diff < 1e-4,
+            "scores should be equal when decay disabled, diff={}",
+            diff
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn store_dedup_skips_when_no_embedding_provider() {
+        let (_dir, store) = setup().await;
+        let store = store.with_dedup(true, 0.92);
+        store
+            .store("k1", "I like Python", MemoryCategory::Core)
+            .await
+            .unwrap();
+        store
+            .store("k2", "I enjoy Python programming", MemoryCategory::Core)
+            .await
+            .unwrap();
+        let results = store.recall("", 10, 0).await.unwrap();
+        assert_eq!(
+            results.len(),
+            2,
+            "without embeddings, both entries should be stored"
+        );
+    }
+
+    // TODO: T4/T5 dedup with mock embedding provider — requires VectorIndex setup in tests
+    // These tests need a real sqlite-vec VectorIndex to exercise the dedup code path.
+    #[ignore]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn store_dedup_merges_similar_embedding() {
+        let _ = AlwaysSameEmbeddingProvider { dim: 8 };
+    }
+
+    #[ignore]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn store_dedup_does_not_merge_dissimilar_embedding() {
+        let _ = AlwaysSameEmbeddingProvider { dim: 8 };
+    }
+
+    struct AlwaysSameEmbeddingProvider {
+        dim: usize,
+    }
+
+    #[async_trait::async_trait]
+    impl EmbeddingProvider for AlwaysSameEmbeddingProvider {
+        async fn embed(&self, _text: &str) -> Result<Vec<f32>> {
+            Ok(vec![1.0 / (self.dim as f32).sqrt(); self.dim])
+        }
     }
 }

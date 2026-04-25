@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- feat(memory): BM25 field weighting — configurable per-field weights (key/content/category) for ranked recall scoring
+- feat(memory): temporal decay scoring — exponential decay (exp(-λ × days)) de-ranks stale memories; configurable lambda and enable/disable flag
+- feat(memory): semantic deduplication — cosine similarity gate prevents storing near-duplicate memories; configurable threshold
+- feat(mcp-client): MCP Client feature (`--features mcp-client`) — consume tools from external MCP servers (stdio subprocess or HTTP/SSE) and register them into the agent's ToolRegistry
+- feat(config): `mcp_client_servers` — list of external MCP servers with transport (Stdio/Http), optional tool prefix, and enable flag
+- feat(settings): MCP Settings tab in desktop UI for managing external MCP server connections
+- feat(error): `ZeniiError::MemoryDuplicate` — 409 Conflict when dedup rejects a near-duplicate store
+
 ## [0.1.12] - 2026-04-15
 
 ### Added

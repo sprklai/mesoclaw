@@ -275,13 +275,68 @@ pub struct AppConfig {
     /// Maximum number of wiki pages to include in context injection. Default: 3.
     pub wiki_context_max_pages: usize,
 
-    // MCP (Model Context Protocol)
+    // MCP (Model Context Protocol) — Server
     /// Prefix prepended to tool names when exposed via MCP (e.g., "zenii_")
     pub mcp_server_tool_prefix: String,
     /// Allowlist of tool names to expose via MCP. Empty = expose all.
     pub mcp_server_exposed_tools: Vec<String>,
     /// Denylist of tool names to hide from MCP. Applied after allowlist.
     pub mcp_server_hidden_tools: Vec<String>,
+
+    // MCP Client — consume external MCP servers
+    /// List of external MCP servers whose tools are registered into the agent's ToolRegistry.
+    pub mcp_client_servers: Vec<McpServerConfig>,
+
+    // Memory: BM25 Field Weighting
+    pub memory_bm25_key_weight: f64,
+    pub memory_bm25_content_weight: f64,
+    pub memory_bm25_category_weight: f64,
+
+    // Memory: Temporal Decay
+    pub memory_decay_enabled: bool,
+    /// Decay rate λ in exp(-λ × days). Default 0.01 ≈ 70-day half-life.
+    pub memory_decay_lambda: f32,
+
+    // Memory: Semantic Deduplication
+    pub memory_dedup_enabled: bool,
+    /// Cosine similarity threshold above which an incoming store() is treated as a duplicate.
+    pub memory_dedup_threshold: f32,
+}
+
+/// Transport configuration for a single external MCP server.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum McpTransport {
+    /// Launch a local subprocess and communicate over its stdin/stdout.
+    Stdio {
+        command: String,
+        #[serde(default)]
+        args: Vec<String>,
+        #[serde(default)]
+        env: HashMap<String, String>,
+    },
+    /// Connect to a remote MCP server over HTTP/SSE.
+    Http {
+        url: String,
+        #[serde(default)]
+        headers: HashMap<String, String>,
+    },
+}
+
+/// Configuration for a single external MCP server to connect to as a client.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct McpServerConfig {
+    pub id: String,
+    pub transport: McpTransport,
+    /// Optional prefix prepended to each tool name: "github/" → "github/list_repos".
+    #[serde(default)]
+    pub tools_prefix: Option<String>,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for AppConfig {
@@ -525,10 +580,26 @@ impl Default for AppConfig {
             wiki_context_injection_enabled: true,
             wiki_context_max_pages: 3,
 
-            // MCP
+            // MCP Server
             mcp_server_tool_prefix: "zenii_".into(),
             mcp_server_exposed_tools: vec![],
             mcp_server_hidden_tools: vec![],
+
+            // MCP Client
+            mcp_client_servers: vec![],
+
+            // Memory: BM25 field weights
+            memory_bm25_key_weight: 2.0,
+            memory_bm25_content_weight: 1.0,
+            memory_bm25_category_weight: 0.5,
+
+            // Memory: Temporal decay
+            memory_decay_enabled: true,
+            memory_decay_lambda: 0.01,
+
+            // Memory: Deduplication
+            memory_dedup_enabled: true,
+            memory_dedup_threshold: 0.92,
         }
     }
 }

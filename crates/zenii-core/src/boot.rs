@@ -154,7 +154,14 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
             memory_pool.clone(),
             config.memory_fts_weight,
             config.memory_vector_weight,
-        );
+        )
+        .with_bm25_weights(
+            config.memory_bm25_key_weight,
+            config.memory_bm25_content_weight,
+            config.memory_bm25_category_weight,
+        )
+        .with_decay(config.memory_decay_enabled, config.memory_decay_lambda)
+        .with_dedup(config.memory_dedup_enabled, config.memory_dedup_threshold);
 
         match config.embedding_provider.as_str() {
             "openai" => {

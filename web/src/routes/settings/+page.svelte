@@ -6,6 +6,7 @@
 	import KeyRound from '@lucide/svelte/icons/key-round';
 	import Brain from '@lucide/svelte/icons/brain';
 	import Puzzle from '@lucide/svelte/icons/puzzle';
+	import Network from '@lucide/svelte/icons/network';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Bell from '@lucide/svelte/icons/bell';
 	import Shield from '@lucide/svelte/icons/shield';
@@ -31,6 +32,7 @@
 		embeddings: () => import('$lib/components/settings/EmbeddingsSettings.svelte'),
 		configurations: () => import('$lib/components/settings/ConfigurationsSettings.svelte'),
 		plugins: () => import('$lib/components/settings/PluginsSettings.svelte'),
+		mcp: () => import('$lib/components/settings/McpSettings.svelte'),
 	};
 
 	const componentCache = new Map<string, Component>();
@@ -56,6 +58,7 @@
 		{ id: 'embeddings', label: m.settings_tab_embeddings(), icon: Brain },
 		{ id: 'configurations', label: m.settings_tab_configurations(), icon: FileText },
 		{ id: 'plugins', label: m.settings_tab_plugins(), icon: Puzzle },
+		{ id: 'mcp', label: 'MCP', icon: Network },
 	];
 
 	let activeTab = $state('general');

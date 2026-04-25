@@ -32,6 +32,7 @@ slug: /architecture
 - [Agent Action Tools](#agent-action-tools-phase-810)
 - [Autonomous Reasoning Engine](#autonomous-reasoning-engine-phase-811)
 - [Semantic Memory and Embeddings](#semantic-memory-and-embeddings-phase-811)
+  - [Memory Quality Improvements](#memory-quality-improvements)
 - [Phase 18 Hardening](#phase-18-hardening)
 - [Workflow Audit Hardening](#workflow-audit-hardening)
 - [Plugin Architecture](#plugin-architecture-phase-9)
@@ -1386,6 +1387,35 @@ Gateway embedding routes (5):
 - `POST /embeddings/download` -- download local model
 - `POST /embeddings/reindex` -- re-embed all stored memories
 
+### Memory Quality Improvements
+
+Three quality enhancements applied at the `SqliteMemoryStore` layer:
+
+**BM25 Field Weighting (M5)**
+
+FTS5 query uses per-field BM25 weights so `key` matches rank higher than `content` or `category`:
+
+```sql
+bm25(memories_fts, 2.0, 1.0, 0.5)
+-- key=2.0, content=1.0, category=0.5
+```
+
+Configurable via `memory_bm25_key_weight`, `memory_bm25_content_weight`, `memory_bm25_category_weight`.
+
+**Temporal Decay (M1)**
+
+Recall scores are multiplied by an exponential decay factor based on how many days have passed since the memory was last updated:
+
+```
+final_score = raw_score × exp(-λ × days_since_update)
+```
+
+Default λ=0.01 gives approximately a 70-day half-life. Configurable via `memory_decay_enabled` (default `true`) and `memory_decay_lambda` (default `0.01`).
+
+**Semantic Deduplication (M4)**
+
+Before inserting a new memory, `store()` checks whether any existing entry has a vector cosine similarity ≥ threshold. If so, the existing entry's content is updated in-place instead of creating a duplicate. Configurable via `memory_dedup_enabled` (default `true`) and `memory_dedup_threshold` (default `0.92`). Only active when an embedding provider is configured.
+
 ## Phase 18 Hardening
 
 Phase 18 addressed 51 issues from two code audits across 8 parallel work streams:
@@ -2233,12 +2263,37 @@ graph LR
 ```
 
 **Key components:**
-- `McpClientManager` — spawns external MCP servers as child processes, connects via stdio transport
+- `McpClientManager` — spawns external MCP servers as child processes, connects via stdio or HTTP/SSE transport
 - `list_tools()` returns `Vec<(McpTool, ServerSink)>` ready for rig-core's `AgentBuilder::rmcp_tools()`
+- `McpClientTool` — wraps a remote MCP tool as a Zenii `Tool` instance, bridging rmcp `CallToolResult` to `ToolResult`
 - Configuration via `mcp_client_servers` array in `config.toml`
+
+**Config schema:**
+```toml
+[[mcp_client_servers]]
+id = "github"
+tools_prefix = "github/"
+enabled = true
+
+[mcp_client_servers.transport]
+type = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+
+# HTTP transport variant:
+[[mcp_client_servers]]
+id = "my-remote"
+[mcp_client_servers.transport]
+type = "http"
+url = "https://example.com/mcp"
+```
 
 **Files:**
 - `crates/zenii-core/src/mcp/client.rs` — `McpClientManager`
+- `crates/zenii-core/src/tools/mcp_client_tool.rs` — `McpClientTool`
+
+**Settings UI:**
+- `web/src/lib/components/settings/McpSettings.svelte` — MCP tab in Settings with server sub-tab (connection snippets + tool visibility) and clients sub-tab (add/edit/delete/toggle servers with 5 quick-add presets)
 
 ### A2A Agent Card
 

@@ -1,6 +1,6 @@
 mod schema;
 
-pub use schema::AppConfig;
+pub use schema::{AppConfig, McpServerConfig, McpTransport};
 
 use crate::Result;
 use directories::ProjectDirs;

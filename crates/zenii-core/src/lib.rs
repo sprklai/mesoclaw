@@ -22,7 +22,7 @@ pub mod boot;
 pub mod channels;
 #[cfg(feature = "gateway")]
 pub mod gateway;
-#[cfg(feature = "mcp-server")]
+#[cfg(any(feature = "mcp-server", feature = "mcp-client"))]
 pub mod mcp;
 #[cfg(feature = "scheduler")]
 pub mod scheduler;

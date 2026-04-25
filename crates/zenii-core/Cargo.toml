@@ -111,6 +111,7 @@ workflows = ["dep:petgraph", "dep:minijinja"]
 keyring = ["dep:keyring"]
 api-docs = ["gateway", "dep:utoipa", "dep:utoipa-scalar"]
 mcp-server = ["dep:rmcp", "dep:schemars"]
+mcp-client = ["dep:rmcp"]
 vendored-openssl = ["dep:openssl"]
 
 [lints]

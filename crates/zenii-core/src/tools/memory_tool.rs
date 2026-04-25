@@ -86,6 +86,9 @@ impl Tool for MemoryTool {
 
                 match self.memory.store(key, content, category).await {
                     Ok(()) => Ok(ToolResult::ok(format!("Memory stored with key '{key}'"))),
+                    Err(ZeniiError::MemoryDuplicate(_)) => {
+                        Ok(ToolResult::ok("Memory already indexed (deduplicated)"))
+                    }
                     Err(e) => Ok(ToolResult::err(format!("Failed to store memory: {e}"))),
                 }
             }
