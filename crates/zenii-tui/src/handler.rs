@@ -91,8 +91,7 @@ fn handle_input(app: &mut App, key: KeyEvent) {
     match (key.code, key.modifiers) {
         (KeyCode::Esc, _) => app.exit_input_mode(),
         (KeyCode::Enter, _)
-            if !app.input.content.trim().is_empty()
-                && app.chat_status != ChatStatus::Streaming =>
+            if !app.input.content.trim().is_empty() && app.chat_status != ChatStatus::Streaming =>
         {
             app.chat_status = ChatStatus::Streaming;
             app.notification_text = Some("__send_message__".into());
