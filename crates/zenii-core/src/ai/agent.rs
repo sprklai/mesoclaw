@@ -316,17 +316,17 @@ impl ZeniiAgent {
     }
 
     /// Send a prompt with chat history and get a response with token usage.
-    pub async fn chat(&self, input: &str, mut history: Vec<Message>) -> Result<AgentResponse> {
+    pub async fn chat(&self, input: &str, history: Vec<Message>) -> Result<AgentResponse> {
         let resp = match &self.inner {
             AgentInner::OpenAI(agent) => agent
                 .prompt(input)
-                .with_history(&mut history)
+                .with_history(history)
                 .extended_details()
                 .await
                 .map_err(enrich_agent_error("chat"))?,
             AgentInner::Anthropic(agent) => agent
                 .prompt(input)
-                .with_history(&mut history)
+                .with_history(history)
                 .extended_details()
                 .await
                 .map_err(enrich_agent_error("chat"))?,
@@ -919,6 +919,7 @@ mod tests {
             output_tokens: 50,
             total_tokens: 150,
             cached_input_tokens: 20,
+            cache_creation_input_tokens: 0,
         };
         let usage = TokenUsage::from_rig(rig_usage);
         assert_eq!(usage.input_tokens, 100);
