@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-04-26
+
+### Added
+- i18n support for MCP Settings page — 47 message keys added across all 8 languages (EN, ES, FR, HI, JA, KO, PT-BR, ZH-CN)
+- `zenii-mcp-server` binary added to CI pipelines (Linux, macOS, Windows) and Docker image
+
+### Changed
+- Wiki knowledge graph now shows node labels by default (was auto-hidden above 200 nodes)
+- Docker image default entrypoint switched to `zenii-mcp-server` (stdio); use `--entrypoint zenii-daemon` for HTTP API
+- Re-enabled Docker build-and-push job in release workflow
+
 ## [0.1.15] - 2026-04-25
 
 ### Fixed
