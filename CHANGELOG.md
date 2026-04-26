@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-04-26
+
+### Fixed
+- Docker build: strip `zenii-desktop` and `zenii-mobile` from workspace before `cargo chef prepare` to prevent GTK/webkit2gtk deps from entering the recipe and failing the headless cacher stage
+
 ## [0.1.19] - 2026-04-26
 
 ### Performance

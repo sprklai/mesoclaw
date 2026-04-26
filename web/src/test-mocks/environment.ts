@@ -1,4 +1,4 @@
 export const browser = true;
 export const building = false;
 export const dev = true;
-export const version = "0.1.19";
+export const version = "0.1.20";
