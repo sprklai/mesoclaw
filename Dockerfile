@@ -10,8 +10,9 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 COPY wiki/ wiki/
 
-# Build daemon and MCP server
-RUN cargo build --profile ci-release -p zenii-daemon --all-features && \
+# Build daemon and MCP server (local-embeddings excluded: ort-sys requires glibc 2.38+, bookworm has 2.36)
+RUN cargo build --profile ci-release -p zenii-daemon \
+      --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,workflows,web-dashboard,api-docs && \
     cargo build --profile ci-release -p zenii-mcp-server
 
 # Stage 2: Runtime
