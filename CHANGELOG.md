@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-04-26
+
+### Performance
+- Docker build: add cargo-chef multi-stage caching (planner/cacher/builder stages) to decouple dependency compilation from source changes, significantly reducing rebuild times
+
 ## [0.1.18] - 2026-04-26
 
 ### Fixed
