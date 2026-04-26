@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-04-26
+
+### Fixed
+- Docker build: replace `--all-features` with explicit feature list to exclude `local-embeddings` — `ort-sys` (ONNX Runtime) pre-built binaries require glibc 2.38+ but `debian:bookworm` only ships glibc 2.36, causing `__isoc23_strtol` undefined reference linker errors
+
 ## [0.1.17] - 2026-04-26
 
 ### Fixed
