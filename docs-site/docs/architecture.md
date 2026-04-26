@@ -114,7 +114,7 @@ graph TB
     end
 
     subgraph GW["Gateway :18981"]
-        REST["REST<br>86 core + 28 feature-gated"]
+        REST["REST<br>105 core + 28 feature-gated"]
         WS["WebSocket<br>/ws/chat"]
     end
 
@@ -197,7 +197,7 @@ zenii/
 │   │   │   ├── memory/     # Memory trait + SqliteMemoryStore (FTS5 + vectors) + InMemoryStore
 │   │   │   ├── credential/ # CredentialStore trait + KeyringStore + FileCredentialStore + InMemoryCredentialStore
 │   │   │   ├── security/   # SecurityPolicy + AutonomyLevel + rate limiter + audit log
-│   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 18 built-in tools (15 base + 3 feature-gated)
+│   │   │   ├── tools/      # Tool trait + ToolRegistry (DashMap) + 19 built-in tools (16 base + 3 feature-gated)
 │   │   │   ├── ai/         # AI agent (rig-core), providers, session manager, tool adapter, context engine, delegation
 │   │   │   │   └── delegation/ # Coordinator, SubAgent, DelegationTask, dependency-wave execution
 │   │   │   ├── workflows/  # WorkflowRegistry, WorkflowExecutor, StepRuntime, templates (feature-gated)
@@ -419,7 +419,7 @@ All credential values are wrapped with `zeroize` for secure memory cleanup.
 
 ## Provider Registry
 
-The `ProviderRegistry` manages AI provider configurations (OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Ollama, and custom providers). It is DB-backed with 6 built-in providers seeded on first boot.
+The `ProviderRegistry` manages AI provider configurations (OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Ollama, and custom providers). It is DB-backed with 6 built-in providers seeded on first boot. Any OpenAI-compatible API endpoint can be added as a custom provider — just supply a `base_url` and API key.
 
 ```mermaid
 graph TB
@@ -2263,9 +2263,12 @@ graph LR
 ```
 
 **Key components:**
-- `McpClientManager` — spawns external MCP servers as child processes, connects via stdio or HTTP/SSE transport
-- `list_tools()` returns `Vec<(McpTool, ServerSink)>` ready for rig-core's `AgentBuilder::rmcp_tools()`
-- `McpClientTool` — wraps a remote MCP tool as a Zenii `Tool` instance, bridging rmcp `CallToolResult` to `ToolResult`
+- `McpClientManager` — spawns external MCP servers as child processes and connects via **stdio** (HTTP transport is planned but not yet implemented)
+- Persistent sessions — each server's `Peer<RoleClient>` is stored and reused; sessions are kept alive in background tasks (no per-call respawn)
+- Timeouts: 15 s connect, 10 s tool discovery, 60 s per tool call
+- `McpClientTool` — wraps a remote MCP tool as a Zenii `Tool` (`RiskLevel::Medium`), forwarding `call_tool` via the live session and returning `ToolResult`
+- Tool prefixing — optional `tools_prefix` per server (e.g., `"github/"` → `"github/list_repos"`)
+- Resilient startup — servers that fail to connect are skipped with a warning; the agent still starts
 - Configuration via `mcp_client_servers` array in `config.toml`
 
 **Config schema:**
@@ -2279,13 +2282,21 @@ enabled = true
 type = "stdio"
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-github"]
+```
 
-# HTTP transport variant:
-[[mcp_client_servers]]
-id = "my-remote"
-[mcp_client_servers.transport]
-type = "http"
-url = "https://example.com/mcp"
+> **Note:** HTTP/SSE transport is defined in the schema but not yet implemented. Attempts to use it return an error.
+
+**Session lifecycle:**
+
+```
+boot → McpClientManager::connect_all()
+         ├─ spawn child process (stdio)
+         ├─ rmcp handshake (15s timeout)
+         ├─ list_all_tools() (10s timeout)
+         ├─ store Peer<RoleClient> in HashMap
+         └─ background task keeps session alive indefinitely
+call → peer.call_tool() via stored Peer (60s timeout)
+shutdown → tokio aborts background tasks → child process exits
 ```
 
 **Files:**

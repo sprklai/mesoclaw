@@ -79,14 +79,15 @@ jobs:
           prerelease: false
           args: --bundles deb,rpm,appimage -- --profile ci-release
 
-      - name: Build standalone CLI and daemon
-        run: cargo build --profile ci-release -p zenii-cli -p zenii-daemon -p zenii-tui --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard
+      - name: Build standalone CLI, daemon, TUI, and MCP server
+        run: cargo build --profile ci-release -p zenii-cli -p zenii-daemon -p zenii-tui -p zenii-mcp-server --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard
 
       - name: Rename standalone binaries with platform label
         run: |
           cp target/ci-release/zenii target/ci-release/zenii-linux
           cp target/ci-release/zenii-daemon target/ci-release/zenii-daemon-linux
           cp target/ci-release/zenii-tui target/ci-release/zenii-tui-linux
+          cp target/ci-release/zenii-mcp-server target/ci-release/zenii-mcp-server-linux
 
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v7
@@ -105,6 +106,7 @@ jobs:
             target/ci-release/zenii-linux
             target/ci-release/zenii-daemon-linux
             target/ci-release/zenii-tui-linux
+            target/ci-release/zenii-mcp-server-linux
 
   build-windows:
     name: Build Windows
@@ -145,8 +147,11 @@ jobs:
           prerelease: false
           args: --bundles msi,nsis -- --profile ci-release
 
-      - name: Build standalone CLI and daemon
-        run: cargo build --profile ci-release -p zenii-cli -p zenii-daemon -p zenii-tui --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard
+      - name: Build standalone CLI, daemon, TUI, and MCP server
+        run: cargo build --profile ci-release -p zenii-cli -p zenii-daemon -p zenii-tui -p zenii-mcp-server --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard
+
+      - name: Rename MCP server with platform label
+        run: copy target\ci-release\zenii-mcp-server.exe target\ci-release\zenii-mcp-server-windows.exe
 
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v7
@@ -164,6 +169,7 @@ jobs:
             target/ci-release/zenii.exe
             target/ci-release/zenii-daemon.exe
             target/ci-release/zenii-tui.exe
+            target/ci-release/zenii-mcp-server-windows.exe
 
   build-macos:
     name: Build macOS
@@ -250,11 +256,11 @@ jobs:
           prerelease: false
           args: --target x86_64-apple-darwin --bundles app,dmg -- --profile ci-release
 
-      - name: Build standalone CLI, daemon, TUI (arm64)
-        run: cargo build --profile ci-release -p zenii-cli -p zenii-daemon -p zenii-tui --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard --target aarch64-apple-darwin
+      - name: Build standalone CLI, daemon, TUI, and MCP server (arm64)
+        run: cargo build --profile ci-release -p zenii-cli -p zenii-daemon -p zenii-tui -p zenii-mcp-server --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard --target aarch64-apple-darwin
 
-      - name: Build standalone CLI, daemon, TUI (x86_64)
-        run: cargo build --profile ci-release -p zenii-cli -p zenii-daemon -p zenii-tui --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard --target x86_64-apple-darwin
+      - name: Build standalone CLI, daemon, TUI, and MCP server (x86_64)
+        run: cargo build --profile ci-release -p zenii-cli -p zenii-daemon -p zenii-tui -p zenii-mcp-server --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,web-dashboard --target x86_64-apple-darwin
 
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v7
@@ -269,9 +275,11 @@ jobs:
           cp target/aarch64-apple-darwin/ci-release/zenii target/aarch64-apple-darwin/ci-release/zenii-macos-arm64
           cp target/aarch64-apple-darwin/ci-release/zenii-daemon target/aarch64-apple-darwin/ci-release/zenii-daemon-macos-arm64
           cp target/aarch64-apple-darwin/ci-release/zenii-tui target/aarch64-apple-darwin/ci-release/zenii-tui-macos-arm64
+          cp target/aarch64-apple-darwin/ci-release/zenii-mcp-server target/aarch64-apple-darwin/ci-release/zenii-mcp-server-macos-arm64
           cp target/x86_64-apple-darwin/ci-release/zenii target/x86_64-apple-darwin/ci-release/zenii-macos-x86_64
           cp target/x86_64-apple-darwin/ci-release/zenii-daemon target/x86_64-apple-darwin/ci-release/zenii-daemon-macos-x86_64
           cp target/x86_64-apple-darwin/ci-release/zenii-tui target/x86_64-apple-darwin/ci-release/zenii-tui-macos-x86_64
+          cp target/x86_64-apple-darwin/ci-release/zenii-mcp-server target/x86_64-apple-darwin/ci-release/zenii-mcp-server-macos-x86_64
 
       - name: Upload standalone binaries
         uses: actions/upload-artifact@v7
@@ -281,9 +289,11 @@ jobs:
             target/aarch64-apple-darwin/ci-release/zenii-macos-arm64
             target/aarch64-apple-darwin/ci-release/zenii-daemon-macos-arm64
             target/aarch64-apple-darwin/ci-release/zenii-tui-macos-arm64
+            target/aarch64-apple-darwin/ci-release/zenii-mcp-server-macos-arm64
             target/x86_64-apple-darwin/ci-release/zenii-macos-x86_64
             target/x86_64-apple-darwin/ci-release/zenii-daemon-macos-x86_64
             target/x86_64-apple-darwin/ci-release/zenii-tui-macos-x86_64
+            target/x86_64-apple-darwin/ci-release/zenii-mcp-server-macos-x86_64
 
       - name: Cleanup keychain
         if: always()
@@ -347,49 +357,49 @@ jobs:
             target/${{ matrix.target }}/ci-release/labeled/zenii-daemon-${{ matrix.label }}
             target/${{ matrix.target }}/ci-release/labeled/zenii-tui-${{ matrix.label }}
 
-  # build-docker:
-  #   name: Build & Push Docker Image
-  #   runs-on: ubuntu-22.04
-  #   needs: [build-linux]
-  #   if: >-
-  #     always() &&
-  #     needs.build-linux.result == 'success' &&
-  #     (startsWith(github.ref, 'refs/tags/app-v') ||
-  #     (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true'))
-  #   permissions:
-  #     packages: write
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #
-  #     - name: Set up Docker Buildx
-  #       uses: docker/setup-buildx-action@v3
-  #
-  #     - name: Log in to GitHub Container Registry
-  #       uses: docker/login-action@v3
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ github.actor }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
-  #
-  #     - name: Extract metadata (tags, labels)
-  #       id: meta
-  #       uses: docker/metadata-action@v5
-  #       with:
-  #         images: ghcr.io/sprklai/zenii
-  #         tags: |
-  #           type=semver,pattern={{version}},prefix=,value=${{ github.ref_name }}
-  #           type=raw,value=latest
-  #
-  #     - name: Build and push multi-arch image
-  #       uses: docker/build-push-action@v6
-  #       with:
-  #         context: .
-  #         platforms: linux/amd64,linux/arm64
-  #         push: true
-  #         tags: ${{ steps.meta.outputs.tags }}
-  #         labels: ${{ steps.meta.outputs.labels }}
-  #         cache-from: type=gha
-  #         cache-to: type=gha,mode=max
+  build-docker:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-22.04
+    needs: [build-linux]
+    if: >-
+      always() &&
+      needs.build-linux.result == 'success' &&
+      (startsWith(github.ref, 'refs/tags/app-v') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true'))
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/sprklai/zenii
+          tags: |
+            type=semver,pattern={{version}},prefix=,value=${{ github.ref_name }}
+            type=raw,value=latest
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   release:
     name: Create Release
@@ -413,10 +423,11 @@ jobs:
           cd artifacts
           find . -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \
             -o -name "*.dmg" -o -name "*.msi" -o -name "*.exe" \
-            -o -name "zenii-linux" -o -name "zenii-daemon-linux" -o -name "zenii-tui-linux" \
+            -o -name "zenii-linux" -o -name "zenii-daemon-linux" -o -name "zenii-tui-linux" -o -name "zenii-mcp-server-linux" \
             -o -name "zenii-macos-arm64" -o -name "zenii-macos-x86_64" \
             -o -name "zenii-daemon-macos-arm64" -o -name "zenii-daemon-macos-x86_64" \
             -o -name "zenii-tui-macos-arm64" -o -name "zenii-tui-macos-x86_64" \
+            -o -name "zenii-mcp-server-macos-arm64" -o -name "zenii-mcp-server-macos-x86_64" \
             -o -name "zenii-arm64" -o -name "zenii-daemon-arm64" \
             -o -name "zenii-armv7" -o -name "zenii-daemon-armv7" \
             -o -name "zenii.exe" -o -name "zenii-daemon.exe" -o -name "zenii-tui.exe" \) \
@@ -450,12 +461,16 @@ jobs:
             artifacts/**/zenii-linux
             artifacts/**/zenii-daemon-linux
             artifacts/**/zenii-tui-linux
+            artifacts/**/zenii-mcp-server-linux
             artifacts/**/zenii-macos-arm64
             artifacts/**/zenii-macos-x86_64
             artifacts/**/zenii-daemon-macos-arm64
             artifacts/**/zenii-daemon-macos-x86_64
             artifacts/**/zenii-tui-macos-arm64
             artifacts/**/zenii-tui-macos-x86_64
+            artifacts/**/zenii-mcp-server-windows.exe
+            artifacts/**/zenii-mcp-server-macos-arm64
+            artifacts/**/zenii-mcp-server-macos-x86_64
             artifacts/**/zenii-arm64
             artifacts/**/zenii-daemon-arm64
             artifacts/**/zenii-armv7

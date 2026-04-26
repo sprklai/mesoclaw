@@ -23,7 +23,7 @@ Zenii is a local AI backend for developers who want one service behind their scr
 - **Daemon API** — Local REST and WebSocket service at `http://localhost:18981`
 - **Shipped interfaces** — Desktop app, CLI, TUI, and MCP server
 - **Persistent memory** — Shared local state across interfaces and automations
-- **Built-in tools** — 18 tools total (15 base + 3 feature-gated: channels, scheduler, workflows)
+- **Built-in tools** — 19 tools total (16 base + 3 feature-gated: channels, scheduler, workflows)
 - **Local-first deployment** — Self-hosted, MIT licensed, zero telemetry in the product surface
 
 ## Good Fit

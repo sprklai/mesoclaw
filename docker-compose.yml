@@ -1,6 +1,8 @@
 services:
   zenii:
     build: .
+    entrypoint: ["zenii-daemon"]
+    command: []
     ports:
       - "18981:18981"
     volumes:

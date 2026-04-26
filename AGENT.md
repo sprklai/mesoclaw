@@ -1,6 +1,6 @@
 # Zenii — AI Backend for Agents
 
-> **20 MB binary. 114 API routes. 18 tools. Persistent memory. One shared brain.**
+> **20 MB binary. 133 API routes. 19 tools. Persistent memory. One shared brain.**
 >
 > Zenii is a local AI backend running at `localhost:18981`. Any tool on your machine — scripts, cron jobs, bots, other AI agents — can use it for persistent memory, AI chat, tool execution, scheduling, and more via simple HTTP calls.
 
@@ -186,7 +186,7 @@ Zenii can advertise its capabilities via an **Agent Card** — a JSON document s
 ```json
 {
   "name": "Zenii",
-  "description": "Local AI backend with persistent memory, 18 tools, and 114 API routes. Every tool on your machine shares one AI brain. Store facts, recall them semantically, execute tools, schedule tasks, and chat with AI — all via localhost:18981.",
+  "description": "Local AI backend with persistent memory, 19 tools, and 133 API routes. Every tool on your machine shares one AI brain. Store facts, recall them semantically, execute tools, schedule tasks, and chat with AI — all via localhost:18981.",
   "url": "http://localhost:18981",
   "version": "0.1.8",
   "provider": {
@@ -222,7 +222,7 @@ Zenii can advertise its capabilities via an **Agent Card** — a JSON document s
     {
       "id": "chat",
       "name": "AI Chat with Tools",
-      "description": "Send a prompt to Zenii's AI agent. The agent has access to all 18 tools, persistent memory, and 6+ AI providers (OpenAI, Anthropic, Google Gemini, OpenRouter, Vercel AI Gateway, Ollama). Supports multi-step tool use via delegation.",
+      "description": "Send a prompt to Zenii's AI agent. The agent has access to all 19 tools, persistent memory, and 6+ AI providers (OpenAI, Anthropic, Google Gemini, OpenRouter, Vercel AI Gateway, Ollama). Supports multi-step tool use via delegation.",
       "tags": ["chat", "reasoning", "delegation", "multi-provider"],
       "examples": ["Search the web for Rust async patterns and summarize", "What files changed in the last git commit?"]
     },
@@ -322,7 +322,7 @@ All tools are exposed with a configurable `zenii_` prefix. Security policy enfor
   },
   {
     "name": "zenii_chat",
-    "description": "Send a prompt to Zenii's AI agent. Has access to 18 tools, persistent memory, and 6+ AI providers.",
+    "description": "Send a prompt to Zenii's AI agent. Has access to 19 tools, persistent memory, and 6+ AI providers.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -405,7 +405,7 @@ When you need to store information for later recall, use Zenii's memory API:
 - Tools: curl http://localhost:18981/tools | jq '.[].name'
 - Chat: curl -X POST http://localhost:18981/chat -H "Content-Type: application/json" -d '{"prompt": "..."}'
 
-Zenii runs locally at localhost:18981 with 18 tools, persistent memory, and 6+ AI providers.
+Zenii runs locally at localhost:18981 with 19 tools, persistent memory, and 6+ AI providers.
 ```
 
 ---
@@ -458,7 +458,7 @@ curl "http://localhost:18981/memory?q=performance+issues&limit=5"
 - **Documentation site**: [docs.zenii.sprklai.com](https://docs.zenii.sprklai.com)
 - **GitHub**: [github.com/sprklai/zenii](https://github.com/sprklai/zenii)
 
-### All 114 Routes (Summary)
+### All 133 Routes (Summary)
 
 | Group | Routes | Key Endpoints |
 |-------|--------|---------------|

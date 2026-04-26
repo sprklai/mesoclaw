@@ -9,8 +9,9 @@ RUN apt-get update && apt-get install -y libsqlite3-dev libdbus-1-dev pkg-config
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 
-# Build daemon with all features
-RUN cargo build --profile ci-release -p zenii-daemon --all-features
+# Build daemon and MCP server
+RUN cargo build --profile ci-release -p zenii-daemon --all-features && \
+    cargo build --profile ci-release -p zenii-mcp-server
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim
@@ -25,6 +26,7 @@ RUN useradd --system --no-create-home --shell /usr/sbin/nologin zenii && \
     chown zenii:zenii /data /config
 
 COPY --from=builder /app/target/ci-release/zenii-daemon /usr/local/bin/zenii-daemon
+COPY --from=builder /app/target/ci-release/zenii-mcp-server /usr/local/bin/zenii-mcp-server
 
 USER zenii
 
@@ -32,7 +34,7 @@ EXPOSE 18981
 
 ENV RUST_LOG=info
 
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD curl -f http://localhost:18981/health || exit 1
-
-ENTRYPOINT ["zenii-daemon"]
+# Default: MCP server (stdio transport for MCP clients).
+# Override with --entrypoint zenii-daemon for the HTTP API server.
+ENTRYPOINT ["zenii-mcp-server"]
+CMD ["--transport", "stdio"]

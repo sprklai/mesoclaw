@@ -20,10 +20,12 @@ Zenii is a local AI backend for developers who want one service behind their scr
 
 ## What Ships Today
 
-- **Daemon API** — Local REST and WebSocket service at `http://localhost:18981`
+- **Daemon API** — Local REST and WebSocket service at `http://localhost:18981` (133 routes)
 - **Shipped interfaces** — Desktop app, CLI, TUI, and MCP server
 - **Persistent memory** — Shared local state across interfaces and automations
 - **Built-in tools** — 16 base tools, with channels, scheduler, and workflows behind feature flags
+- **AI providers** — 6+ built-in (OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Ollama) plus any OpenAI-compatible endpoint as a custom provider
+- **MCP** — Acts as an MCP server (expose tools to Claude Code, Cursor, VS Code) and MCP client (consume tools from GitHub, Postgres, Filesystem MCP servers)
 - **Local-first deployment** — Self-hosted, MIT licensed, zero telemetry in the product surface
 
 ## Good Fit

@@ -100,7 +100,7 @@ sequenceDiagram
     DB->>DB: Run pending migrations
     App->>Cred: Initialize credential store (KeyringStore / InMemoryStore)
     App->>AI: Register providers + load API keys
-    App->>AI: Register 15 base + 3 feature-gated agent tools into ToolRegistry (DashMap)
+    App->>AI: Register 16 base + 3 feature-gated agent tools into ToolRegistry (DashMap)
     App->>App: Load identity (SoulLoader from data_dir/identity/)
     App->>App: Load skills (SkillRegistry from data_dir/skills/)
     App->>App: Init user learner (UserLearner from DB pool)

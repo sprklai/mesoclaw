@@ -24,6 +24,9 @@
   <a href="https://github.com/sprklai/zenii/pulls">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs welcome" />
   </a>
+  <a href="https://github.com/sprklai/zenii/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/badge/tests-1696-blue?style=flat-square" alt="1696 tests" />
+  </a>
 </p>
 
 Zenii is for developers who want AI to behave like infrastructure instead of a browser tab.
@@ -56,6 +59,14 @@ That is the core value: write state once, use it from anywhere that talks to Zen
 - Persistent memory, provider routing, and tool execution in one local service
 - A native Rust/Tauri stack instead of an Electron wrapper
 
+## Architecture
+
+<p align="center">
+  <img src="docs/assets/zenii_architecture.png" alt="Zenii system architecture" width="720" />
+</p>
+
+One Rust library crate (`zenii-core`) contains all business logic. Thin binary crates (daemon, CLI, TUI, desktop) are shell wrappers. All share the same axum gateway, SQLite database, agent loop, and tool registry.
+
 ## Good Fit
 
 - Local automations that need shared memory across scripts, bots, and tools
@@ -78,9 +89,11 @@ That is the core value: write state once, use it from anywhere that talks to Zen
 - `zenii-mcp-server`: MCP server for Claude Code, Cursor, and similar clients
 - 19 tools total (16 base + 3 feature-gated: channels, scheduler, workflows)
 - 133 total API routes: 105 base routes and 28 feature-gated routes
+- 6+ AI providers (OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Ollama) — any OpenAI-compatible API endpoint can be added as a custom provider
 - LLM wiki with binary document ingestion (PDF, DOCX, PPTX, XLSX, images via MarkItDown)
 - Memory intelligence: BM25 field weighting, temporal decay scoring, semantic deduplication
-- MCP Client (`mcp-client` feature): consume tools from external MCP servers (GitHub, Postgres, Filesystem, etc.)
+- MCP Server (`zenii-mcp-server`): expose all 19 tools to Claude Code, Cursor, VS Code, and other MCP clients
+- MCP Client (`mcp-client` feature): consume tools from external MCP servers (GitHub, Postgres, Filesystem, etc.) via stdio — HTTP transport planned
 - MIT license
 
 ## Install
@@ -99,6 +112,20 @@ Full platform notes, package names, and source builds:
 
 - [Installation & Usage](https://docs.zenii.sprklai.com/installation-and-usage)
 - [Deployment Guide](https://docs.zenii.sprklai.com/deployment)
+
+## Build from Source
+
+Prerequisites: Rust 1.85+, Bun, SQLite development libraries.
+
+```bash
+git clone https://github.com/sprklai/zenii.git
+cd zenii
+cargo build --release -p zenii-daemon       # headless server
+cargo build --release -p zenii-cli          # CLI client
+cd crates/zenii-desktop && cargo tauri build # desktop app
+```
+
+Full setup and cross-compilation instructions: [docs/development.md](docs/development.md)
 
 ## Interfaces
 
