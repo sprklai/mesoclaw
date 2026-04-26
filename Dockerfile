@@ -1,10 +1,13 @@
 # Stage 1: Planner — generates recipe.json from manifests only
+# zenii-desktop and zenii-mobile are stripped from the workspace before prepare
+# to avoid pulling in GTK/webkit2gtk deps that are not needed for the daemon.
 FROM rust:1.88-bookworm AS planner
 WORKDIR /app
 RUN cargo install cargo-chef --locked
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 COPY wiki/ wiki/
+RUN sed -i '/"crates\/zenii-desktop"/d; /"crates\/zenii-mobile"/d' Cargo.toml
 RUN cargo chef prepare --recipe-path recipe.json
 
 # Stage 2: Cacher — compile deps (cached unless Cargo.toml/Cargo.lock change)
@@ -23,6 +26,7 @@ RUN apt-get update && apt-get install -y libsqlite3-dev libdbus-1-dev pkg-config
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 COPY wiki/ wiki/
+RUN sed -i '/"crates\/zenii-desktop"/d; /"crates\/zenii-mobile"/d' Cargo.toml
 COPY --from=cacher /app/target target
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
 RUN cargo build --profile ci-release -p zenii-daemon \
