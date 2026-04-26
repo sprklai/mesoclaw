@@ -1,21 +1,35 @@
-# Stage 1: Build
-FROM rust:1.88-bookworm AS builder
+# Stage 1: Planner — generates recipe.json from manifests only
+FROM rust:1.88-bookworm AS planner
 WORKDIR /app
-
-# Install SQLite dev libs
-RUN apt-get update && apt-get install -y libsqlite3-dev libdbus-1-dev pkg-config && rm -rf /var/lib/apt/lists/*
-
-# Copy workspace manifests first for layer caching
+RUN cargo install cargo-chef --locked
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 COPY wiki/ wiki/
+RUN cargo chef prepare --recipe-path recipe.json
 
-# Build daemon and MCP server (local-embeddings excluded: ort-sys requires glibc 2.38+, bookworm has 2.36)
+# Stage 2: Cacher — compile deps (cached unless Cargo.toml/Cargo.lock change)
+FROM rust:1.88-bookworm AS cacher
+WORKDIR /app
+RUN apt-get update && apt-get install -y libsqlite3-dev libdbus-1-dev pkg-config && rm -rf /var/lib/apt/lists/*
+RUN cargo install cargo-chef --locked
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --profile ci-release --recipe-path recipe.json \
+      --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,workflows,web-dashboard,api-docs
+
+# Stage 3: Builder — compile only source (deps already cached above)
+FROM rust:1.88-bookworm AS builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y libsqlite3-dev libdbus-1-dev pkg-config && rm -rf /var/lib/apt/lists/*
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+COPY wiki/ wiki/
+COPY --from=cacher /app/target target
+COPY --from=cacher /usr/local/cargo /usr/local/cargo
 RUN cargo build --profile ci-release -p zenii-daemon \
       --features keyring,channels,channels-telegram,channels-slack,channels-discord,scheduler,workflows,web-dashboard,api-docs && \
     cargo build --profile ci-release -p zenii-mcp-server
 
-# Stage 2: Runtime
+# Stage 4: Runtime
 FROM debian:bookworm-slim
 
 RUN apt-get update && \
