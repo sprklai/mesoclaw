@@ -6,3 +6,4 @@ plans/
 tests/
 no_commit/
 *.md
+!wiki/*.md

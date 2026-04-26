@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y libsqlite3-dev libdbus-1-dev pkg-config
 # Copy workspace manifests first for layer caching
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
+COPY wiki/ wiki/
 
 # Build daemon and MCP server
 RUN cargo build --profile ci-release -p zenii-daemon --all-features && \
