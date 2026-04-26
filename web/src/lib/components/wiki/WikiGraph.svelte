@@ -96,15 +96,7 @@
 	// controls
 	let locked = $state(false);
 	let showLabels = $state(true);
-	let labelsManuallySet = false;
 	let hoveredNode = $state<SimNode | null>(null);
-
-	// Auto-hide labels when node count exceeds 200; respect manual user override.
-	$effect(() => {
-		if (!labelsManuallySet && nodes.length > 0) {
-			showLabels = nodes.length <= GC.labelThreshold;
-		}
-	});
 
 	// Reactive tick counter — incremented by d3 simulation each tick so that
 	// inner template effects re-run and pick up d3's in-place x/y mutations.
@@ -598,7 +590,7 @@
 		<!-- Labels toggle — text-lines icon, above zoom buttons -->
 		<button
 			class="flex items-center justify-center border-b p-1.5 transition-colors {showLabels ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
-			onclick={() => { labelsManuallySet = true; showLabels = !showLabels; }}
+			onclick={() => { showLabels = !showLabels; }}
 			title={showLabels ? 'Hide labels' : 'Show labels'}
 		>
 			<!-- text/label icon: three horizontal lines of varying width -->

@@ -616,10 +616,8 @@
   "wb_toolbar_view_code": "कोड",
   "wb_toolbar_unsaved": "अहस्ताक्षरित परिवर्तन",
   "wb_toolbar_schedule_placeholder": "Cron शेड्यूल",
-
   "wb_palette_title": "नोड्स",
   "wb_palette_search": "नोड्स खोजें...",
-
   "wb_config_title": "कॉन्फ़िगरेशन",
   "wb_config_no_selection": "कॉन्फ़िगर करने के लिए एक नोड चुनें",
   "wb_config_name_label": "चरण का नाम",
@@ -633,10 +631,8 @@
   "wb_config_failure_policy_stop": "रोकें",
   "wb_config_failure_policy_continue": "जारी रखें",
   "wb_config_failure_policy_fallback": "फ़ॉलबैक",
-
   "wb_code_readonly_notice": "केवल पढ़ने योग्य। विज़ुअल बिल्डर में नोड्स संपादित करें।",
   "wb_code_validation_error": "TOML सत्यापन त्रुटि",
-
   "wb_import_button": "आयात करें",
   "wb_import_dialog_title": "वर्कफ़्लो आयात करें",
   "wb_import_dialog_description": "आयात करने के लिए एक .toml वर्कफ़्लो फ़ाइल चुनें।",
@@ -647,10 +643,8 @@
   "wb_import_error_no_steps": "वर्कफ़्लो steps अनुपस्थित हैं",
   "wb_import_error_parse": "वर्कफ़्लो फ़ाइल पार्स करने में विफल",
   "wb_export_button": "निर्यात करें",
-
   "wb_open_builder": "बिल्डर खोलें",
   "wb_running_indicator": "चल रहा है...",
-
   "wb_cat_triggers": "ट्रिगर",
   "wb_cat_ai": "AI",
   "wb_cat_search": "खोज",
@@ -661,7 +655,6 @@
   "wb_cat_config": "कॉन्फ़िग",
   "wb_cat_schedule": "शेड्यूल",
   "wb_cat_flow": "प्रवाह नियंत्रण",
-
   "wb_node_trigger_cron_label": "Cron ट्रिगर",
   "wb_node_trigger_cron_desc": "शेड्यूल-आधारित ट्रिगर",
   "wb_node_trigger_manual_label": "मैन्युअल ट्रिगर",
@@ -712,7 +705,6 @@
   "wb_node_condition_desc": "If/else शाखा",
   "wb_node_parallel_label": "समानांतर",
   "wb_node_parallel_desc": "चरण एक साथ चलाएँ",
-
   "wb_field_cron_expr": "Cron एक्सप्रेशन",
   "wb_field_prompt": "प्रॉम्प्ट",
   "wb_field_prompt_placeholder": "प्रॉम्प्ट दर्ज करें ({{steps.X.output}} समर्थित है)",
@@ -759,10 +751,8 @@
   "wb_unsaved_confirm": "असहेजे परिवर्तन",
   "wb_unsaved_confirm_desc": "आपके पास असहेजे परिवर्तन हैं। क्या आप वाकई छोड़ना चाहते हैं?",
   "wb_unsaved_leave": "छोड़ें",
-
   "wb_handle_true": "सत्य",
   "wb_handle_false": "असत्य",
-
   "wb_node_trigger_cron_description": "Cron शेड्यूल पर इस वर्कफ़्लो को ट्रिगर करें",
   "wb_node_trigger_manual_description": "माँग पर इस वर्कफ़्लो को मैन्युअल रूप से ट्रिगर करें",
   "wb_node_llm_description": "भाषा मॉडल को प्रॉम्प्ट भेजें और प्रतिक्रिया कैप्चर करें",
@@ -788,35 +778,27 @@
   "wb_node_delay_description": "कुछ सेकंड के लिए वर्कफ़्लो निष्पादन रोकें",
   "wb_node_condition_description": "एक्सप्रेशन के आधार पर वर्कफ़्लो निष्पादन शाखित करें",
   "wb_node_parallel_description": "एक साथ कई चरण निष्पादित करें",
-
   "wb_field_cron_expr_label": "Cron एक्सप्रेशन",
   "wb_field_cron_expr_placeholder": "e.g. 0 9 * * 1-5",
   "wb_field_cron_expr_description": "मानक Cron एक्सप्रेशन (5 या 6 फ़ील्ड)",
-
   "wb_field_prompt_label": "प्रॉम्प्ट",
   "wb_field_prompt_description": "मॉडल को भेजा गया प्रॉम्प्ट टेक्स्ट। चरण संदर्भों के लिए {{steps.X.output}} उपयोग करें।",
   "wb_field_agent_prompt_placeholder": "एजेंट प्रॉम्प्ट दर्ज करें ({{steps.X.output}} समर्थित है)",
   "wb_field_agent_prompt_description": "एजेंट टर्न के लिए प्रॉम्प्ट। एजेंट के पास सभी पंजीकृत टूल तक पहुँच है।",
-
   "wb_field_model_label": "मॉडल",
-  "wb_field_model_placeholder": "वैकल्पिक मॉडल ओवरराइड",
   "wb_field_model_description": "केवल इस चरण के लिए डिफ़ॉल्ट मॉडल ओवरराइड करें",
-
   "wb_field_session_target_label": "सत्र लक्ष्य",
   "wb_field_session_target_description": "मुख्य सत्र या अलग सत्र का उपयोग करना है या नहीं",
   "wb_option_session_main": "मुख्य",
   "wb_option_session_isolated": "अलग",
-
   "wb_field_query_label": "क्वेरी",
   "wb_field_search_query_placeholder": "खोज क्वेरी",
   "wb_field_search_query_description": "खोज क्वेरी स्ट्रिंग",
   "wb_field_recall_query_placeholder": "रिकॉल क्वेरी",
   "wb_field_recall_query_description": "एजेंट मेमोरी खोजने के लिए टेक्स्ट या सीमेंटिक क्वेरी",
-
   "wb_field_max_results_label": "अधिकतम परिणाम",
   "wb_field_max_results_description": "लौटाए जाने वाले अधिकतम खोज परिणाम",
   "wb_field_file_search_max_results_description": "लौटाए जाने वाले अधिकतम फ़ाइल खोज परिणाम",
-
   "wb_field_action_label": "क्रिया",
   "wb_field_sysinfo_action_description": "प्राप्त करने के लिए सिस्टम जानकारी श्रेणी",
   "wb_field_process_action_description": "प्रक्रियाओं पर की जाने वाली क्रिया",
@@ -830,19 +812,15 @@
   "wb_option_process_list": "सूचीबद्ध करें",
   "wb_option_process_find": "खोजें",
   "wb_option_process_kill": "बंद करें",
-
   "wb_field_command_label": "कमांड",
   "wb_field_command_placeholder": "निष्पादित करने के लिए Shell कमांड",
   "wb_field_command_description": "चलाने के लिए Shell कमांड",
-
   "wb_field_timeout_secs_label": "टाइमआउट (सेकंड)",
   "wb_field_timeout_secs_placeholder": "वैकल्पिक टाइमआउट सेकंड में",
   "wb_field_timeout_secs_description": "कमांड पूर्ण होने की प्रतीक्षा का अधिकतम समय",
-
   "wb_field_target_label": "लक्ष्य",
   "wb_field_process_target_placeholder": "प्रक्रिया नाम या PID",
   "wb_field_process_target_description": "find/kill क्रियाओं के लिए प्रक्रिया नाम या PID",
-
   "wb_field_path_label": "पथ",
   "wb_field_file_path_placeholder": "निरपेक्ष या सापेक्ष फ़ाइल पथ",
   "wb_field_dir_path_placeholder": "डायरेक्टरी पथ",
@@ -852,81 +830,63 @@
   "wb_field_file_list_path_description": "सूचीबद्ध की जाने वाली डायरेक्टरी का पथ",
   "wb_field_search_path_placeholder": "खोज की डायरेक्टरी (वैकल्पिक)",
   "wb_field_search_path_description": "फ़ाइल खोज के लिए बेस डायरेक्टरी",
-
   "wb_field_content_label": "सामग्री",
   "wb_field_file_content_placeholder": "फ़ाइल सामग्री",
   "wb_field_file_content_description": "फ़ाइल में लिखी जाने वाली सामग्री",
   "wb_field_memory_content_placeholder": "मेमोरी में संग्रहीत करने के लिए जानकारी",
   "wb_field_memory_store_content_description": "एजेंट मेमोरी में सहेजी जाने वाली सामग्री",
-
   "wb_field_pattern_label": "पैटर्न",
   "wb_field_search_pattern_placeholder": "glob या regex पैटर्न",
   "wb_field_search_pattern_description": "फ़ाइल खोज पैटर्न (glob और regex समर्थित)",
-
   "wb_field_recursive_label": "पुनरावर्ती",
   "wb_field_recursive_description": "उपडायरेक्टरी में पुनरावर्ती रूप से जाना है या नहीं",
-
   "wb_field_original_label": "मूल टेक्स्ट",
   "wb_field_original_placeholder": "प्रतिस्थापित किया जाने वाला सटीक टेक्स्ट",
   "wb_field_original_description": "वह सटीक टेक्स्ट जो प्रतिस्थापित किया जाएगा",
-
   "wb_field_replacement_label": "प्रतिस्थापन टेक्स्ट",
   "wb_field_replacement_placeholder": "प्रतिस्थापन टेक्स्ट",
   "wb_field_replacement_description": "मूल टेक्स्ट के स्थान पर डाला जाने वाला टेक्स्ट",
-
   "wb_field_tags_label": "टैग",
   "wb_field_tags_placeholder": "अल्पविराम-पृथक टैग (वैकल्पिक)",
   "wb_field_tags_description": "मेमोरी प्रविष्टि वर्गीकृत करने के लिए वैकल्पिक टैग",
-
   "wb_field_limit_label": "सीमा",
   "wb_field_recall_limit_description": "लौटाई जाने वाली अधिकतम मेमोरी प्रविष्टियाँ",
-
   "wb_field_memory_id_label": "मेमोरी ID",
   "wb_field_memory_id_placeholder": "मेमोरी प्रविष्टि ID",
   "wb_field_memory_id_description": "हटाई जाने वाली मेमोरी प्रविष्टि की अद्वितीय ID",
-
   "wb_field_channel_label": "चैनल",
   "wb_field_channel_placeholder": "चैनल नाम (जैसे telegram)",
   "wb_field_channel_description": "भेजने के लिए मैसेजिंग चैनल का नाम",
-
   "wb_field_message_label": "संदेश",
   "wb_field_channel_message_placeholder": "संदेश मुख्य भाग",
   "wb_field_channel_message_description": "भेजी जाने वाली संदेश सामग्री",
-
   "wb_field_title_label": "शीर्षक",
   "wb_field_notify_title_placeholder": "सूचना शीर्षक",
   "wb_field_notify_title_description": "सूचना के लिए शीर्षक",
-
   "wb_field_body_label": "मुख्य भाग",
   "wb_field_notify_body_placeholder": "सूचना मुख्य भाग (वैकल्पिक)",
   "wb_field_notify_body_description": "सूचना के लिए वैकल्पिक मुख्य भाग टेक्स्ट",
-
   "wb_field_level_label": "स्तर",
   "wb_field_notify_level_description": "सूचना के लिए गंभीरता स्तर",
   "wb_option_level_info": "जानकारी",
   "wb_option_level_warn": "चेतावनी",
   "wb_option_level_error": "त्रुटि",
-
   "wb_field_config_key_label": "कॉन्फ़िग कुंजी",
   "wb_field_config_key_description": "पढ़ने या अपडेट करने के लिए व्हाइटलिस्टेड कॉन्फ़िगरेशन कुंजी",
   "wb_option_context_injection_enabled": "संदर्भ इंजेक्शन",
   "wb_option_self_evolution_enabled": "स्व-विकास",
   "wb_option_learning_enabled": "सीखना",
   "wb_option_agent_system_prompt": "Agent System Prompt",
-
   "wb_field_value_label": "मान",
   "wb_field_config_value_placeholder": "नया मान",
   "wb_field_config_value_description": "कॉन्फ़िगरेशन कुंजी के लिए सेट किया जाने वाला नया मान",
-
   "wb_field_job_name_label": "जॉब नाम",
   "wb_field_job_name_placeholder": "जैसे daily-report",
   "wb_field_job_name_description": "शेड्यूल्ड जॉब के लिए अद्वितीय नाम",
   "wb_field_toggle_job_name_description": "सक्षम या अक्षम करने के लिए जॉब का नाम",
-
   "wb_field_schedule_label": "शेड्यूल",
   "wb_field_schedule_placeholder": "Cron एक्सप्रेशन",
   "wb_field_schedule_description": "जॉब चलाने के लिए Cron शेड्यूल",
-
   "wb_field_payload_type_label": "पेलोड प्रकार",
   "wb_field_payload_type_description": "जॉब द्वारा निष्पादित की जाने वाली क्रिया का प्रकार",
   "wb_option_payload_heartbeat": "हार्टबीट",
@@ -934,27 +894,20 @@
   "wb_option_payload_notify": "सूचना",
   "wb_option_payload_send_via_channel": "चैनल द्वारा भेजें",
   "wb_option_payload_workflow": "वर्कफ़्लो",
-
   "wb_field_enabled_label": "सक्षम",
   "wb_field_enabled_description": "जॉब सक्षम (true) या अक्षम (false) होना चाहिए",
-
   "wb_field_seconds_label": "सेकंड",
   "wb_field_seconds_placeholder": "सेकंड में अवधि",
   "wb_field_delay_seconds_description": "जारी रखने से पहले रुकने के लिए सेकंड की संख्या",
-
   "wb_field_expression_label": "एक्सप्रेशन",
   "wb_field_expression_placeholder": "e.g. steps.check.output == \"ok\"",
   "wb_field_expression_description": "शाखा निर्धारित करने के लिए मूल्यांकित बूलियन एक्सप्रेशन",
-
   "wb_field_if_true_label": "यदि सत्य",
   "wb_field_if_true_description": "एक्सप्रेशन सत्य होने पर निष्पादित होने वाला चरण",
-
   "wb_field_if_false_label": "यदि असत्य",
   "wb_field_if_false_description": "एक्सप्रेशन असत्य होने पर निष्पादित होने वाला चरण",
-
   "wb_field_steps_label": "चरण",
   "wb_field_parallel_steps_description": "एक साथ निष्पादित किए जाने वाले चरण",
-
   "nav_wiki": "ज्ञान विकि",
   "wiki_page_title": "व्यक्तिगत ज्ञान विकि",
   "wiki_search_placeholder": "विकि खोजें...",
@@ -1051,5 +1004,52 @@
   "dashboard_wiki_entities": "इकाइयां",
   "dashboard_wiki_topics": "विषय",
   "dashboard_wiki_comparisons": "तुलनाएं",
-  "dashboard_wiki_sources": "दस्तावेज़"
+  "dashboard_wiki_sources": "दस्तावेज़",
+  "mcp_tab_server": "सर्वर",
+  "mcp_tab_clients": "क्लाइंट",
+  "mcp_server_connect_title": "अपने AI क्लाइंट कनेक्ट करें",
+  "mcp_server_connect_desc": "Claude Desktop, Cursor, Windsurf या किसी भी MCP-संगत क्लाइंट से Zenii के टूल का उपयोग करें।",
+  "mcp_server_config_hint": "अपने MCP क्लाइंट कॉन्फिगरेशन फाइल में निम्नलिखित जोड़ें:",
+  "mcp_copy": "कॉपी करें",
+  "mcp_copied": "कॉपी हो गया!",
+  "mcp_server_visibility_title": "टूल दृश्यता",
+  "mcp_server_visibility_desc": "नियंत्रित करें कि MCP क्लाइंट को कौन से टूल दिखाए जाएं और उन्हें कैसे नाम दिया जाए।",
+  "mcp_server_prefix_label": "टूल नाम उपसर्ग",
+  "mcp_server_prefix_hint": "सभी एक्सपोज़ किए गए टूल नामों में वैकल्पिक उपसर्ग जोड़ा जाता है।",
+  "mcp_server_exposed_label": "एक्सपोज़ किए गए टूल",
+  "mcp_server_exposed_empty_hint": "(खाली = सभी)",
+  "mcp_server_exposed_hint": "एक्सपोज़ करने वाले टूल नामों की अल्पविराम-अलग सूची। सभी टूल एक्सपोज़ करने के लिए खाली छोड़ें।",
+  "mcp_server_hidden_label": "छिपे टूल",
+  "mcp_server_hidden_hint": "MCP क्लाइंट से छिपाने वाले टूल नामों की अल्पविराम-अलग सूची।",
+  "mcp_server_saved": "सेटिंग सहेजी गई।",
+  "mcp_saving": "सहेजा जा रहा है…",
+  "mcp_save": "सहेजें",
+  "mcp_clients_quick_add_title": "त्वरित जोड़ें",
+  "mcp_clients_quick_add_desc": "एक क्लिक में लोकप्रिय MCP सर्वर जोड़ें।",
+  "mcp_clients_custom_button": "+ कस्टम",
+  "mcp_clients_form_add_title": "MCP सर्वर जोड़ें",
+  "mcp_clients_form_edit_title": "सर्वर संपादित करें",
+  "mcp_clients_form_id_label": "सर्वर ID",
+  "mcp_clients_form_transport_label": "ट्रांसपोर्ट",
+  "mcp_clients_transport_stdio": "Stdio",
+  "mcp_clients_transport_http": "HTTP",
+  "mcp_clients_form_command_label": "कमांड",
+  "mcp_clients_form_args_label": "तर्क",
+  "mcp_clients_form_args_hint": "(अल्पविराम-अलग)",
+  "mcp_clients_form_env_label": "पर्यावरण चर",
+  "mcp_clients_form_keyval_hint": "(कुंजी=मान, कुंजी2=मान2)",
+  "mcp_clients_form_url_label": "URL",
+  "mcp_clients_form_headers_label": "हेडर",
+  "mcp_clients_form_prefix_label": "टूल उपसर्ग",
+  "mcp_clients_form_optional": "(वैकल्पिक)",
+  "mcp_clients_form_enabled_label": "सक्षम",
+  "mcp_cancel": "रद्द करें",
+  "mcp_clients_empty": "कोई MCP क्लाइंट कॉन्फिगर नहीं है। शुरू करने के लिए ऊपर एक सर्वर जोड़ें।",
+  "mcp_clients_edit_button": "संपादित करें",
+  "mcp_clients_delete_button": "हटाएं",
+  "mcp_clients_error_id_required": "ID आवश्यक है",
+  "mcp_clients_error_id_spaces": "ID में रिक्त स्थान नहीं हो सकते",
+  "mcp_clients_error_id_exists": "ID पहले से मौजूद है",
+  "mcp_clients_error_cmd_required": "कमांड आवश्यक है",
+  "mcp_clients_error_url_invalid": "URL http:// या https:// से शुरू होना चाहिए"
 }

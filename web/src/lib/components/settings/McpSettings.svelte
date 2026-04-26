@@ -7,6 +7,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { configStore } from '$lib/stores/config.svelte';
+	import * as m from '$lib/paraglide/messages';
 	import { onMount } from 'svelte';
 
 	// ── Sub-tab state ────────────────────────────────────────────────────────────
@@ -121,7 +122,7 @@
 				mcp_server_exposed_tools: parseComma(exposed),
 				mcp_server_hidden_tools: parseComma(hidden),
 			});
-			serverSaveMsg = 'Settings saved.';
+			serverSaveMsg = m.mcp_server_saved();
 		} catch (e) {
 			serverSaveError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -238,24 +239,24 @@
 		formError = '';
 
 		if (!formId.trim()) {
-			formError = 'ID is required';
+			formError = m.mcp_clients_error_id_required();
 			return;
 		}
 		if (formId.includes(' ')) {
-			formError = 'ID cannot contain spaces';
+			formError = m.mcp_clients_error_id_spaces();
 			return;
 		}
 		const existing = servers.find((s) => s.id === formId.trim());
 		if (existing && editId !== formId.trim()) {
-			formError = 'ID already exists';
+			formError = m.mcp_clients_error_id_exists();
 			return;
 		}
 		if (formTransport === 'stdio' && !formCommand.trim()) {
-			formError = 'Command is required';
+			formError = m.mcp_clients_error_cmd_required();
 			return;
 		}
 		if (formTransport === 'http' && !formUrl.startsWith('http')) {
-			formError = 'URL must start with http:// or https://';
+			formError = m.mcp_clients_error_url_invalid();
 			return;
 		}
 
@@ -350,14 +351,14 @@
 			{activeTab === 'server' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 		onclick={() => { activeTab = 'server'; }}
 	>
-		Server
+		{m.mcp_tab_server()}
 	</button>
 	<button
 		class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors
 			{activeTab === 'clients' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 		onclick={() => { activeTab = 'clients'; }}
 	>
-		Clients
+		{m.mcp_tab_clients()}
 	</button>
 </div>
 
@@ -366,14 +367,14 @@
 	<!-- Card 1: Connect your AI clients -->
 	<Card.Root>
 		<Card.Header class="py-3">
-			<Card.Title class="text-base">Connect your AI clients</Card.Title>
+			<Card.Title class="text-base">{m.mcp_server_connect_title()}</Card.Title>
 			<Card.Description>
-				Use Zenii's tools from Claude Desktop, Cursor, Windsurf, or any MCP-compatible client.
+				{m.mcp_server_connect_desc()}
 			</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-3">
 			<p class="text-sm text-muted-foreground">
-				Add the following to your MCP client configuration file:
+				{m.mcp_server_config_hint()}
 			</p>
 			<div class="relative">
 				<pre class="rounded bg-muted px-3 py-3 text-xs overflow-x-auto font-mono">{snippetJson}</pre>
@@ -383,7 +384,7 @@
 					class="absolute top-2 right-2 text-xs"
 					onclick={copySnippet}
 				>
-					{copied ? 'Copied!' : 'Copy'}
+					{copied ? m.mcp_copied() : m.mcp_copy()}
 				</Button>
 			</div>
 		</Card.Content>
@@ -392,42 +393,42 @@
 	<!-- Card 2: Tool Visibility -->
 	<Card.Root>
 		<Card.Header class="py-3">
-			<Card.Title class="text-base">Tool Visibility</Card.Title>
+			<Card.Title class="text-base">{m.mcp_server_visibility_title()}</Card.Title>
 			<Card.Description>
-				Control which tools are exposed to MCP clients and how they are named.
+				{m.mcp_server_visibility_desc()}
 			</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-4">
 			<div class="space-y-1.5">
-				<Label for="mcp-prefix">Tool name prefix</Label>
+				<Label for="mcp-prefix">{m.mcp_server_prefix_label()}</Label>
 				<Input
 					id="mcp-prefix"
 					placeholder="e.g. zenii_"
 					bind:value={prefix}
 				/>
-				<p class="text-xs text-muted-foreground">Optional prefix added to all exposed tool names.</p>
+				<p class="text-xs text-muted-foreground">{m.mcp_server_prefix_hint()}</p>
 			</div>
 
 			<div class="space-y-1.5">
-				<Label for="mcp-exposed">Exposed tools <span class="font-normal text-muted-foreground">(empty = all)</span></Label>
+				<Label for="mcp-exposed">{m.mcp_server_exposed_label()} <span class="font-normal text-muted-foreground">{m.mcp_server_exposed_empty_hint()}</span></Label>
 				<Textarea
 					id="mcp-exposed"
 					placeholder="web_search, file_read, ..."
 					rows={3}
 					bind:value={exposed}
 				/>
-				<p class="text-xs text-muted-foreground">Comma-separated list of tool names to expose. Leave empty to expose all tools.</p>
+				<p class="text-xs text-muted-foreground">{m.mcp_server_exposed_hint()}</p>
 			</div>
 
 			<div class="space-y-1.5">
-				<Label for="mcp-hidden">Hidden tools</Label>
+				<Label for="mcp-hidden">{m.mcp_server_hidden_label()}</Label>
 				<Textarea
 					id="mcp-hidden"
 					placeholder="shell, process, ..."
 					rows={3}
 					bind:value={hidden}
 				/>
-				<p class="text-xs text-muted-foreground">Comma-separated list of tool names to hide from MCP clients.</p>
+				<p class="text-xs text-muted-foreground">{m.mcp_server_hidden_hint()}</p>
 			</div>
 
 			{#if serverSaveMsg}
@@ -438,7 +439,7 @@
 			{/if}
 
 			<Button onclick={saveServerSettings} disabled={serverSaving}>
-				{serverSaving ? 'Saving…' : 'Save'}
+				{serverSaving ? m.mcp_saving() : m.mcp_save()}
 			</Button>
 		</Card.Content>
 	</Card.Root>
@@ -449,8 +450,8 @@
 	<!-- Quick Add Presets -->
 	<Card.Root>
 		<Card.Header class="py-3">
-			<Card.Title class="text-base">Quick Add</Card.Title>
-			<Card.Description>Add a popular MCP server with one click.</Card.Description>
+			<Card.Title class="text-base">{m.mcp_clients_quick_add_title()}</Card.Title>
+			<Card.Description>{m.mcp_clients_quick_add_desc()}</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<div class="flex flex-wrap gap-2">
@@ -463,7 +464,7 @@
 						{preset.label}
 					</Button>
 				{/each}
-				<Button size="sm" onclick={startAdd}>+ Custom</Button>
+				<Button size="sm" onclick={startAdd}>{m.mcp_clients_custom_button()}</Button>
 			</div>
 		</Card.Content>
 	</Card.Root>
@@ -472,11 +473,11 @@
 	{#if showForm}
 		<Card.Root>
 			<Card.Header class="py-3">
-				<Card.Title class="text-base">{editId ? 'Edit Server' : 'Add MCP Server'}</Card.Title>
+				<Card.Title class="text-base">{editId ? m.mcp_clients_form_edit_title() : m.mcp_clients_form_add_title()}</Card.Title>
 			</Card.Header>
 			<Card.Content class="space-y-4">
 				<div class="space-y-1.5">
-					<Label for="form-id">Server ID</Label>
+					<Label for="form-id">{m.mcp_clients_form_id_label()}</Label>
 					<Input
 						id="form-id"
 						placeholder="e.g. github"
@@ -487,7 +488,7 @@
 
 				<!-- Transport radio -->
 				<div class="space-y-1.5">
-					<Label>Transport</Label>
+					<Label>{m.mcp_clients_form_transport_label()}</Label>
 					<div class="flex gap-4">
 						<label class="flex items-center gap-2 text-sm cursor-pointer">
 							<input
@@ -497,7 +498,7 @@
 								checked={formTransport === 'stdio'}
 								onchange={() => { formTransport = 'stdio'; }}
 							/>
-							Stdio
+							{m.mcp_clients_transport_stdio()}
 						</label>
 						<label class="flex items-center gap-2 text-sm cursor-pointer">
 							<input
@@ -507,43 +508,43 @@
 								checked={formTransport === 'http'}
 								onchange={() => { formTransport = 'http'; }}
 							/>
-							HTTP
+							{m.mcp_clients_transport_http()}
 						</label>
 					</div>
 				</div>
 
 				{#if formTransport === 'stdio'}
 					<div class="space-y-1.5">
-						<Label for="form-cmd">Command</Label>
+						<Label for="form-cmd">{m.mcp_clients_form_command_label()}</Label>
 						<Input id="form-cmd" placeholder="npx" bind:value={formCommand} />
 					</div>
 					<div class="space-y-1.5">
-						<Label for="form-args">Arguments <span class="font-normal text-muted-foreground">(comma-separated)</span></Label>
+						<Label for="form-args">{m.mcp_clients_form_args_label()} <span class="font-normal text-muted-foreground">{m.mcp_clients_form_args_hint()}</span></Label>
 						<Input id="form-args" placeholder="-y, @modelcontextprotocol/server-github" bind:value={formArgs} />
 					</div>
 					<div class="space-y-1.5">
-						<Label for="form-env">Environment variables <span class="font-normal text-muted-foreground">(KEY=VAL, KEY2=VAL2)</span></Label>
+						<Label for="form-env">{m.mcp_clients_form_env_label()} <span class="font-normal text-muted-foreground">{m.mcp_clients_form_keyval_hint()}</span></Label>
 						<Input id="form-env" placeholder="GITHUB_PERSONAL_ACCESS_TOKEN=" bind:value={formEnv} />
 					</div>
 				{:else}
 					<div class="space-y-1.5">
-						<Label for="form-url">URL</Label>
+						<Label for="form-url">{m.mcp_clients_form_url_label()}</Label>
 						<Input id="form-url" placeholder="https://my-mcp-server.example.com" bind:value={formUrl} />
 					</div>
 					<div class="space-y-1.5">
-						<Label for="form-headers">Headers <span class="font-normal text-muted-foreground">(KEY=VAL, KEY2=VAL2)</span></Label>
+						<Label for="form-headers">{m.mcp_clients_form_headers_label()} <span class="font-normal text-muted-foreground">{m.mcp_clients_form_keyval_hint()}</span></Label>
 						<Input id="form-headers" placeholder="Authorization=Bearer token123" bind:value={formHeaders} />
 					</div>
 				{/if}
 
 				<div class="space-y-1.5">
-					<Label for="form-tools-prefix">Tools prefix <span class="font-normal text-muted-foreground">(optional)</span></Label>
+					<Label for="form-tools-prefix">{m.mcp_clients_form_prefix_label()} <span class="font-normal text-muted-foreground">{m.mcp_clients_form_optional()}</span></Label>
 					<Input id="form-tools-prefix" placeholder="Leave empty to use global prefix" bind:value={formPrefix} />
 				</div>
 
 				<div class="flex items-center gap-2">
 					<Switch bind:checked={formEnabled} id="form-enabled" />
-					<Label for="form-enabled">Enabled</Label>
+					<Label for="form-enabled">{m.mcp_clients_form_enabled_label()}</Label>
 				</div>
 
 				{#if formError}
@@ -551,8 +552,8 @@
 				{/if}
 
 				<div class="flex gap-2 pt-1">
-					<Button onclick={saveServer} disabled={clientsSaving}>{clientsSaving ? 'Saving…' : 'Save'}</Button>
-					<Button variant="outline" onclick={resetForm} disabled={clientsSaving}>Cancel</Button>
+					<Button onclick={saveServer} disabled={clientsSaving}>{clientsSaving ? m.mcp_saving() : m.mcp_save()}</Button>
+					<Button variant="outline" onclick={resetForm} disabled={clientsSaving}>{m.mcp_cancel()}</Button>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -561,7 +562,7 @@
 	<!-- Server list -->
 	{#if servers.length === 0 && !showForm}
 		<p class="text-sm text-muted-foreground py-4">
-			No MCP clients configured. Add a server above to get started.
+			{m.mcp_clients_empty()}
 		</p>
 	{:else if servers.length > 0}
 		<div class="space-y-2">
@@ -590,7 +591,7 @@
 									disabled={clientsSaving}
 									onclick={() => startEdit(server)}
 								>
-									Edit
+									{m.mcp_clients_edit_button()}
 								</Button>
 								<Button
 									size="sm"
@@ -599,7 +600,7 @@
 									disabled={clientsSaving}
 									onclick={() => deleteServer(server.id)}
 								>
-									{clientsSaving ? '…' : 'Delete'}
+									{clientsSaving ? '…' : m.mcp_clients_delete_button()}
 								</Button>
 							</div>
 						</div>

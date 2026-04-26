@@ -616,10 +616,8 @@
   "wb_toolbar_view_code": "代码",
   "wb_toolbar_unsaved": "有未保存的更改",
   "wb_toolbar_schedule_placeholder": "Cron 计划",
-
   "wb_palette_title": "节点",
   "wb_palette_search": "搜索节点...",
-
   "wb_config_title": "配置",
   "wb_config_no_selection": "选择一个节点以进行配置",
   "wb_config_name_label": "步骤名称",
@@ -633,10 +631,8 @@
   "wb_config_failure_policy_stop": "停止",
   "wb_config_failure_policy_continue": "继续",
   "wb_config_failure_policy_fallback": "回退",
-
   "wb_code_readonly_notice": "只读。请在可视化构建器中编辑节点。",
   "wb_code_validation_error": "TOML 验证错误",
-
   "wb_import_button": "导入",
   "wb_import_dialog_title": "导入工作流",
   "wb_import_dialog_description": "选择一个 .toml 工作流文件进行导入。",
@@ -647,10 +643,8 @@
   "wb_import_error_no_steps": "缺少工作流步骤",
   "wb_import_error_parse": "解析工作流文件失败",
   "wb_export_button": "导出",
-
   "wb_open_builder": "打开构建器",
   "wb_running_indicator": "运行中...",
-
   "wb_cat_triggers": "触发器",
   "wb_cat_ai": "AI",
   "wb_cat_search": "搜索",
@@ -661,7 +655,6 @@
   "wb_cat_config": "配置",
   "wb_cat_schedule": "计划",
   "wb_cat_flow": "流程控制",
-
   "wb_node_trigger_cron_label": "Cron 触发器",
   "wb_node_trigger_cron_desc": "基于计划的触发器",
   "wb_node_trigger_manual_label": "手动触发器",
@@ -712,7 +705,6 @@
   "wb_node_condition_desc": "If/else 分支",
   "wb_node_parallel_label": "并行",
   "wb_node_parallel_desc": "并发执行步骤",
-
   "wb_field_cron_expr": "Cron 表达式",
   "wb_field_prompt": "提示",
   "wb_field_prompt_placeholder": "输入提示（支持 {{steps.X.output}}）",
@@ -759,10 +751,8 @@
   "wb_unsaved_confirm": "未保存的更改",
   "wb_unsaved_confirm_desc": "您有未保存的更改。确定要离开吗？",
   "wb_unsaved_leave": "离开",
-
   "wb_handle_true": "真",
   "wb_handle_false": "假",
-
   "wb_node_trigger_cron_description": "按 Cron 计划触发此工作流",
   "wb_node_trigger_manual_description": "按需手动触发此工作流",
   "wb_node_llm_description": "向语言模型发送提示并捕获响应",
@@ -788,35 +778,27 @@
   "wb_node_delay_description": "暂停工作流执行若干秒",
   "wb_node_condition_description": "根据表达式对工作流执行进行分支",
   "wb_node_parallel_description": "并发执行多个步骤",
-
   "wb_field_cron_expr_label": "Cron 表达式",
   "wb_field_cron_expr_placeholder": "e.g. 0 9 * * 1-5",
   "wb_field_cron_expr_description": "标准 Cron 表达式（5 或 6 个字段）",
-
   "wb_field_prompt_label": "提示",
   "wb_field_prompt_description": "发送给模型的提示文本。使用 {{steps.X.output}} 引用步骤结果。",
   "wb_field_agent_prompt_placeholder": "输入智能体提示（支持 {{steps.X.output}}）",
   "wb_field_agent_prompt_description": "智能体轮次的提示。智能体可访问所有已注册工具。",
-
   "wb_field_model_label": "模型",
-  "wb_field_model_placeholder": "可选模型覆盖",
   "wb_field_model_description": "仅覆盖此步骤的默认模型",
-
   "wb_field_session_target_label": "会话目标",
   "wb_field_session_target_description": "是否使用主会话或隔离会话",
   "wb_option_session_main": "主会话",
   "wb_option_session_isolated": "隔离会话",
-
   "wb_field_query_label": "查询",
   "wb_field_search_query_placeholder": "搜索查询",
   "wb_field_search_query_description": "搜索查询字符串",
   "wb_field_recall_query_placeholder": "召回查询",
   "wb_field_recall_query_description": "用于搜索智能体记忆的文本或语义查询",
-
   "wb_field_max_results_label": "最大结果数",
   "wb_field_max_results_description": "返回的最大搜索结果数",
   "wb_field_file_search_max_results_description": "返回的最大文件搜索结果数",
-
   "wb_field_action_label": "操作",
   "wb_field_sysinfo_action_description": "要获取的系统信息类别",
   "wb_field_process_action_description": "对进程执行的操作",
@@ -830,19 +812,15 @@
   "wb_option_process_list": "列出",
   "wb_option_process_find": "查找",
   "wb_option_process_kill": "终止",
-
   "wb_field_command_label": "命令",
   "wb_field_command_placeholder": "要执行的 Shell 命令",
   "wb_field_command_description": "要运行的 Shell 命令",
-
   "wb_field_timeout_secs_label": "超时（秒）",
   "wb_field_timeout_secs_placeholder": "可选超时秒数",
   "wb_field_timeout_secs_description": "等待命令完成的最长时间",
-
   "wb_field_target_label": "目标",
   "wb_field_process_target_placeholder": "进程名称或 PID",
   "wb_field_process_target_description": "用于 find/kill 操作的进程名称或 PID",
-
   "wb_field_path_label": "路径",
   "wb_field_file_path_placeholder": "绝对或相对文件路径",
   "wb_field_dir_path_placeholder": "目录路径",
@@ -852,81 +830,63 @@
   "wb_field_file_list_path_description": "要列出的目录路径",
   "wb_field_search_path_placeholder": "搜索目录（可选）",
   "wb_field_search_path_description": "文件搜索的基础目录",
-
   "wb_field_content_label": "内容",
   "wb_field_file_content_placeholder": "文件内容",
   "wb_field_file_content_description": "要写入文件的内容",
   "wb_field_memory_content_placeholder": "要存储到记忆的信息",
   "wb_field_memory_store_content_description": "要保存到智能体记忆的内容",
-
   "wb_field_pattern_label": "模式",
   "wb_field_search_pattern_placeholder": "glob 或 regex 模式",
   "wb_field_search_pattern_description": "文件搜索模式（支持 glob 和 regex）",
-
   "wb_field_recursive_label": "递归",
   "wb_field_recursive_description": "是否递归进入子目录",
-
   "wb_field_original_label": "原始文本",
   "wb_field_original_placeholder": "要替换的精确文本",
   "wb_field_original_description": "将被替换的精确文本",
-
   "wb_field_replacement_label": "替换文本",
   "wb_field_replacement_placeholder": "替换文本",
   "wb_field_replacement_description": "插入到原始文本位置的文本",
-
   "wb_field_tags_label": "标签",
   "wb_field_tags_placeholder": "逗号分隔的标签（可选）",
   "wb_field_tags_description": "用于分类记忆条目的可选标签",
-
   "wb_field_limit_label": "限制",
   "wb_field_recall_limit_description": "返回的最大记忆条目数",
-
   "wb_field_memory_id_label": "记忆 ID",
   "wb_field_memory_id_placeholder": "记忆条目 ID",
   "wb_field_memory_id_description": "要删除的记忆条目的唯一 ID",
-
   "wb_field_channel_label": "频道",
   "wb_field_channel_placeholder": "频道名称（如 telegram）",
   "wb_field_channel_description": "要发送消息的消息频道名称",
-
   "wb_field_message_label": "消息",
   "wb_field_channel_message_placeholder": "消息正文",
   "wb_field_channel_message_description": "要发送的消息内容",
-
   "wb_field_title_label": "标题",
   "wb_field_notify_title_placeholder": "通知标题",
   "wb_field_notify_title_description": "通知的标题",
-
   "wb_field_body_label": "正文",
   "wb_field_notify_body_placeholder": "通知正文（可选）",
   "wb_field_notify_body_description": "通知的可选正文文本",
-
   "wb_field_level_label": "级别",
   "wb_field_notify_level_description": "通知的严重级别",
   "wb_option_level_info": "信息",
   "wb_option_level_warn": "警告",
   "wb_option_level_error": "错误",
-
   "wb_field_config_key_label": "配置键",
   "wb_field_config_key_description": "要读取或更新的白名单配置键",
   "wb_option_context_injection_enabled": "上下文注入",
   "wb_option_self_evolution_enabled": "自我进化",
   "wb_option_learning_enabled": "学习",
   "wb_option_agent_system_prompt": "Agent System Prompt",
-
   "wb_field_value_label": "值",
   "wb_field_config_value_placeholder": "新值",
   "wb_field_config_value_description": "为配置键设置的新值",
-
   "wb_field_job_name_label": "任务名称",
   "wb_field_job_name_placeholder": "如 daily-report",
   "wb_field_job_name_description": "计划任务的唯一名称",
   "wb_field_toggle_job_name_description": "要启用或禁用的任务名称",
-
   "wb_field_schedule_label": "计划",
   "wb_field_schedule_placeholder": "Cron 表达式",
   "wb_field_schedule_description": "任务运行的 Cron 计划",
-
   "wb_field_payload_type_label": "负载类型",
   "wb_field_payload_type_description": "任务将执行的操作类型",
   "wb_option_payload_heartbeat": "心跳",
@@ -934,27 +894,20 @@
   "wb_option_payload_notify": "通知",
   "wb_option_payload_send_via_channel": "通过频道发送",
   "wb_option_payload_workflow": "工作流",
-
   "wb_field_enabled_label": "已启用",
   "wb_field_enabled_description": "任务是否应启用（true）或禁用（false）",
-
   "wb_field_seconds_label": "秒",
   "wb_field_seconds_placeholder": "持续时间（秒）",
   "wb_field_delay_seconds_description": "继续之前暂停的秒数",
-
   "wb_field_expression_label": "表达式",
   "wb_field_expression_placeholder": "e.g. steps.check.output == \"ok\"",
   "wb_field_expression_description": "用于确定分支的布尔表达式",
-
   "wb_field_if_true_label": "如果为真",
   "wb_field_if_true_description": "表达式为真时执行的步骤",
-
   "wb_field_if_false_label": "如果为假",
   "wb_field_if_false_description": "表达式为假时执行的步骤",
-
   "wb_field_steps_label": "步骤",
   "wb_field_parallel_steps_description": "并发执行的步骤",
-
   "nav_wiki": "知识维基",
   "wiki_page_title": "个性化知识维基",
   "wiki_search_placeholder": "搜索维基...",
@@ -1039,5 +992,52 @@
   "wiki_sources_delete_all_success": "Deleted {count} source files",
   "dashboard_card_wiki_title": "知识维基",
   "dashboard_wiki_pages_count": "{count} 页",
-  "dashboard_wiki_no_pages": "暂无维基页面"
+  "dashboard_wiki_no_pages": "暂无维基页面",
+  "mcp_tab_server": "服务器",
+  "mcp_tab_clients": "客户端",
+  "mcp_server_connect_title": "连接您的 AI 客户端",
+  "mcp_server_connect_desc": "从 Claude Desktop、Cursor、Windsurf 或任何 MCP 兼容客户端使用 Zenii 的工具。",
+  "mcp_server_config_hint": "将以下内容添加到您的 MCP 客户端配置文件中：",
+  "mcp_copy": "复制",
+  "mcp_copied": "已复制!",
+  "mcp_server_visibility_title": "工具可见性",
+  "mcp_server_visibility_desc": "控制哪些工具对 MCP 客户端公开及其命名方式。",
+  "mcp_server_prefix_label": "工具名称前缀",
+  "mcp_server_prefix_hint": "可选前缀，添加到所有公开工具名称。",
+  "mcp_server_exposed_label": "公开的工具",
+  "mcp_server_exposed_empty_hint": "(空 = 全部)",
+  "mcp_server_exposed_hint": "要公开的工具名称的逗号分隔列表。留空以公开所有工具。",
+  "mcp_server_hidden_label": "隐藏的工具",
+  "mcp_server_hidden_hint": "要对 MCP 客户端隐藏的工具名称的逗号分隔列表。",
+  "mcp_server_saved": "设置已保存。",
+  "mcp_saving": "保存中…",
+  "mcp_save": "保存",
+  "mcp_clients_quick_add_title": "快速添加",
+  "mcp_clients_quick_add_desc": "一键添加常用 MCP 服务器。",
+  "mcp_clients_custom_button": "+ 自定义",
+  "mcp_clients_form_add_title": "添加 MCP 服务器",
+  "mcp_clients_form_edit_title": "编辑服务器",
+  "mcp_clients_form_id_label": "服务器 ID",
+  "mcp_clients_form_transport_label": "传输方式",
+  "mcp_clients_transport_stdio": "Stdio",
+  "mcp_clients_transport_http": "HTTP",
+  "mcp_clients_form_command_label": "命令",
+  "mcp_clients_form_args_label": "参数",
+  "mcp_clients_form_args_hint": "(逗号分隔)",
+  "mcp_clients_form_env_label": "环境变量",
+  "mcp_clients_form_keyval_hint": "(键=值, 键2=值2)",
+  "mcp_clients_form_url_label": "URL",
+  "mcp_clients_form_headers_label": "请求头",
+  "mcp_clients_form_prefix_label": "工具前缀",
+  "mcp_clients_form_optional": "(可选)",
+  "mcp_clients_form_enabled_label": "已启用",
+  "mcp_cancel": "取消",
+  "mcp_clients_empty": "没有已配置的 MCP 客户端。请在上方添加服务器以开始使用。",
+  "mcp_clients_edit_button": "编辑",
+  "mcp_clients_delete_button": "删除",
+  "mcp_clients_error_id_required": "ID 是必填项",
+  "mcp_clients_error_id_spaces": "ID 不能包含空格",
+  "mcp_clients_error_id_exists": "ID 已存在",
+  "mcp_clients_error_cmd_required": "命令是必填项",
+  "mcp_clients_error_url_invalid": "URL 必须以 http:// 或 https:// 开头"
 }
