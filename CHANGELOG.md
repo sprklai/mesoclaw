@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-04-26
+
+### Fixed
+- Docker build: copy `wiki/` directory into build context so `include_str!` macros for `SCHEMA.md` and `INGEST_PROMPT.md` resolve at compile time
+- Docker build: un-exclude `wiki/*.md` from `.dockerignore` which was stripping the files even after copying the directory
+
 ## [0.1.16] - 2026-04-26
 
 ### Added
