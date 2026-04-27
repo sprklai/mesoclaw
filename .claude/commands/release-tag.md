@@ -14,15 +14,17 @@ Parse the arguments string for:
 - **Bump type** (REQUIRED): `patch`, `minor`, or `major`
 - **--message "..."** (optional): Custom CHANGELOG/release notes. If omitted, auto-generate from commits since last tag.
 - **--dry-run** (optional): Show what would happen without executing any changes.
+- **--docker** (optional): After pushing, trigger a separate Docker image build (~3 hours, multi-arch). Docker does NOT build on normal releases — only when this flag is passed.
 
 If no bump type is provided, STOP and print usage:
 ```
-Usage: /release-tag <patch|minor|major> [--message "Release notes"] [--dry-run]
+Usage: /release-tag <patch|minor|major> [--message "Release notes"] [--dry-run] [--docker]
 
 Examples:
   /release-tag patch
   /release-tag minor --message "Added channel integrations"
   /release-tag major --dry-run
+  /release-tag patch --docker
 ```
 
 ## Instructions
@@ -216,19 +218,32 @@ This triggers `.github/workflows/release.yml` which builds all platform targets 
 - Embedded: ARM64, ARMv7, musl standalone binaries
 - All: `SHA256SUMS.txt` checksums
 
+Docker is NOT built automatically. See Step 9b.
+
+### Step 9b: Trigger Docker build (only if --docker was passed)
+
+If `--docker` was NOT passed: skip this step entirely.
+
+If `--docker` WAS passed:
+```bash
+gh workflow run release.yml --ref main --field build_docker=true
+```
+Print: "Docker build triggered (~3 hours). Monitor: https://github.com/sprklai/zenii/actions"
+
 ### Step 10: Summary
 
 Print a summary:
 ```
 Release complete:
 
-  Version:    <old> -> <new>
-  Tag:        app-v<new>
-  Commit:     <short hash>
+  Version:     <old> -> <new>
+  Tag:         app-v<new>
+  Commit:      <short hash>
   Secret scan: PASSED
+  Docker:      <"triggered separately (~3 hours)" if --docker, else "skipped (use --docker to build)">
 
   GitHub Actions will now build release artifacts for all platforms.
-  Monitor: https://github.com/sprklai/zeniiv2/actions
+  Monitor: https://github.com/sprklai/zenii/actions
 
   Artifacts (when complete):
     Linux:    .deb, .rpm, .AppImage + zenii + zenii-daemon
