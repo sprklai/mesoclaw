@@ -79,7 +79,7 @@ ignore = "0.4.25"
 globset = "0.4"
 regex = "1"
 diffy = "0.4.2"
-lru = "0.16.3"
+lru = "0.17.0"
 sqlite-vec = "0.1.9"
 urlencoding = "2"
 
