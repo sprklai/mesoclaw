@@ -92,14 +92,97 @@ One Rust library crate (`zenii-core`) holds all business logic. Five thin binary
 
 **Capabilities**
 
-- **19 tools** (16 base + 3 feature-gated: channels, scheduler, workflows)
-- **133 API routes** (105 base + 28 feature-gated)
-- **6+ AI providers**: OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Ollama — or any OpenAI-compatible endpoint
-- **MCP server**: expose tools to external agents
-- **MCP client**: consume tools from external MCP servers (GitHub, Postgres, Filesystem, etc.)
-- **Persistent memory**: BM25 field weighting, temporal decay scoring, semantic deduplication
-- **LLM wiki**: ingest PDFs, DOCX, PPTX, XLSX, and images via MarkItDown
-- **Channels** (feature-gated): Telegram, Slack, Discord
+| Domain | What it does |
+|--------|-------------|
+| **Memory** | Persistent semantic recall — BM25 field weighting, temporal decay, vector deduplication |
+| **Karpathy LLM Wiki** | Ingest PDFs, DOCX, PPTX, XLSX, images — knowledge graph, AI query, auto-lint |
+| **AI Agent** | Multi-step reasoning, tool use, streaming, delegation with human approvals |
+| **Tools (19)** | Shell, file ops, web search, process control, patch, memory, wiki — one registry, every interface |
+| **Providers (6+)** | OpenAI · Anthropic · Gemini · OpenRouter · Vercel AI Gateway · Ollama · any OpenAI-compatible endpoint |
+| **Workflows** | TOML/YAML DAG chains — tools, conditionals, loops, parallel steps, run history, cancellation |
+| **Scheduler** | Cron + interval jobs, each run as a full agent turn with access to all tools |
+| **Channels** | Telegram · Discord · Slack — inbound routing, unified inbox, threaded conversations (feature-gated) |
+| **MCP** | Server: expose all tools to Claude Code, Cursor, Gemini CLI, Windsurf · Client: consume external MCP servers |
+| **Security** | OS keyring · AES-256-GCM encryption · surface-based permission model (CLI/desktop/TUI/MCP/API) |
+
+---
+
+## Karpathy LLM Wiki
+
+Knowledge compiled at ingestion time, not re-derived at every query. Drop in a document; Zenii extracts, indexes, and links the knowledge so your agent can answer questions against it instantly.
+
+```bash
+# Ingest a runbook, spec, or doc
+curl -s -X POST http://localhost:18981/wiki/ingest \
+  -H "Authorization: Bearer $ZENII_TOKEN" \
+  -d '{"url": "https://example.com/runbook.pdf"}'
+
+# Query it — answers come from the compiled knowledge base
+curl -s -X POST http://localhost:18981/wiki/query \
+  -H "Authorization: Bearer $ZENII_TOKEN" \
+  -d '{"query": "What does section 3 say about rollback?"}'
+```
+
+- Supports PDF, DOCX, PPTX, XLSX, and images via MarkItDown
+- Knowledge graph with force-directed visualization in the web UI
+- Queryable from any interface — CLI, desktop, or agent loop
+- Auto-lint detects inconsistency and gaps across pages
+
+Full guide: [docs.zenii.sprklai.com/wiki](https://docs.zenii.sprklai.com/wiki)
+
+---
+
+## MCP: Server and Client
+
+**As MCP server** — expose all 19 Zenii tools to any agent:
+
+```json
+// .mcp.json — works with Claude Code, Cursor, Gemini CLI, Windsurf, Codex
+{
+  "mcpServers": {
+    "zenii": {
+      "command": "zenii-mcp-server",
+      "args": ["--transport", "stdio"]
+    }
+  }
+}
+```
+
+**As MCP client** — Zenii can also consume external MCP servers. Add GitHub, Postgres, Filesystem, or any custom MCP server and its tools become available in your agent loop alongside Zenii's own 19.
+
+**[AGENT.md](AGENT.md)** — a machine-readable guide written for AI coding agents (Claude Code, Cursor, Gemini CLI, Windsurf, Codex). Drop it in your project or point your agent at it to give it a complete map of Zenii's API surface.
+
+Full guide: [docs.zenii.sprklai.com/mcp](https://docs.zenii.sprklai.com/mcp)
+
+---
+
+## Workflows and Scheduler
+
+**Workflows** — chain tools into DAGs with conditionals, loops, and parallel steps:
+
+```yaml
+# ~/.config/zenii/workflows/daily-digest.yml
+name: daily-digest
+steps:
+  - id: search
+    tool: web_search
+    args: { query: "Rust ecosystem news today" }
+  - id: store
+    tool: memory_store
+    args: { key: "digest/{{date}}", content: "{{steps.search.result}}" }
+```
+
+Run manually: `POST /workflows/daily-digest/run`
+
+**Scheduler** — trigger any prompt or workflow on a cron schedule, executed as a full agent turn with access to all tools:
+
+```bash
+curl -s -X POST http://localhost:18981/scheduler/jobs \
+  -H "Authorization: Bearer $ZENII_TOKEN" \
+  -d '{"name":"daily-digest","cron":"0 8 * * *","prompt":"Run the daily-digest workflow"}'
+```
+
+Full guide: [docs.zenii.sprklai.com/workflows](https://docs.zenii.sprklai.com/workflows) · [docs.zenii.sprklai.com/scheduler](https://docs.zenii.sprklai.com/scheduler)
 
 ---
 
@@ -146,35 +229,17 @@ Full setup guide: [docs/development.md](docs/development.md)
 
 ---
 
-## Use with Claude Code / Cursor (MCP)
-
-Add to `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "zenii": {
-      "command": "zenii-mcp-server",
-      "args": ["--transport", "stdio"]
-    }
-  }
-}
-```
-
-Full integration guide: [AGENT.md](AGENT.md)
-
----
-
 ## Good Fit
 
 - Local automations that need shared memory across scripts, bots, and scheduled jobs
 - Developer tooling that wants a single AI backend reachable via HTTP or MCP
 - Self-hosted workflows where privacy and local control matter
 - Projects that want a desktop UI and a scriptable backend without maintaining two stacks
+- Self-hosted on a VPS, Raspberry Pi, or Docker — runs as a systemd service or container behind nginx/Caddy ([Deployment guide](https://docs.zenii.sprklai.com/deployment))
 
 ## Not a Good Fit
 
-- Hosted SaaS or multi-user deployments (single-user local daemon only)
+- Multi-user or SaaS deployments (single-user daemon, no multi-tenant auth)
 - Drop-in OpenAI-compatible server (Zenii has its own API surface)
 - Mobile apps (planned, not yet shipped)
 
@@ -190,6 +255,7 @@ Full integration guide: [AGENT.md](AGENT.md)
 - [Configuration](https://docs.zenii.sprklai.com/configuration)
 - [LLM Wiki](https://docs.zenii.sprklai.com/wiki)
 - [Architecture](https://docs.zenii.sprklai.com/architecture)
+- [AGENT.md](AGENT.md) — guide for AI coding agents
 - [CHANGELOG.md](CHANGELOG.md)
 - [ROADMAP.md](ROADMAP.md)
 
