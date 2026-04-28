@@ -98,20 +98,29 @@ One Rust library crate (`zenii-core`) contains all business logic. Thin binary c
 
 ## Install
 
-Use the install script on Linux or macOS:
+### macOS / Linux
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | bash
-zenii-daemon &
+```sh
+curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | sh
 ```
 
-Or download platform binaries and desktop packages from
-[GitHub Releases](https://github.com/sprklai/zenii/releases/latest).
+Installs `zenii` (CLI) and `zenii-daemon` to `~/.local/bin`.
 
-Full platform notes, package names, and source builds:
+### Windows
 
-- [Installation & Usage](https://docs.zenii.sprklai.com/installation-and-usage)
-- [Deployment Guide](https://docs.zenii.sprklai.com/deployment)
+Download and run the desktop installer (`.msi` or `.exe`) from
+[GitHub Releases](https://github.com/sprklai/zenii/releases/latest) —
+it includes the daemon and full GUI.
+
+For headless / CLI-only, grab `zenii.exe` and `zenii-daemon.exe` from the same Releases page.
+
+### Any platform (Rust / Cargo)
+
+```sh
+cargo install --git https://github.com/sprklai/zenii zenii zenii-daemon
+```
+
+Full platform notes and source builds: [Installation & Usage](https://docs.zenii.sprklai.com/installation-and-usage)
 
 ## Build from Source
 

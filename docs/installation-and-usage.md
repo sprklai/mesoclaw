@@ -8,11 +8,28 @@ slug: /installation-and-usage
 
 A practical guide to installing Zenii, starting the local daemon, and verifying that the shared backend works before moving on to deeper integrations.
 
-## Fastest Path
+## Install
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | bash
-zenii-daemon &
+### macOS / Linux
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | sh
+```
+
+Installs `zenii` (CLI) and `zenii-daemon` to `~/.local/bin`.
+
+### Windows
+
+Download and run the desktop installer (`.msi` or `.exe`) from
+[GitHub Releases](https://github.com/sprklai/zenii/releases/latest) —
+it includes the daemon and full GUI.
+
+For headless / CLI-only, grab `zenii.exe` and `zenii-daemon.exe` from the same Releases page.
+
+### Any platform (Rust / Cargo)
+
+```sh
+cargo install --git https://github.com/sprklai/zenii zenii zenii-daemon
 ```
 
 ## Verify It Works
@@ -29,7 +46,7 @@ curl -s -X POST http://localhost:18981/chat \
 
 ## Table of Contents
 
-- [Fastest Path](#fastest-path)
+- [Install](#install)
 - [Verify It Works](#verify-it-works)
 - [Overview](#overview)
 - [Interfaces](#interfaces)
