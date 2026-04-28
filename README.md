@@ -4,11 +4,11 @@
   <img src="assets/zenii-master.gif" alt="Zenii demo" width="720" />
 </p>
 
-<h1 align="center">One local AI backend for your scripts, tools, and agents.</h1>
+<h2 align="center">One local AI backend. Every interface.</h2>
 
 <p align="center">
-  Zenii runs a daemon on <code>http://localhost:18981</code> so your desktop app, CLI, TUI,
-  scripts, and MCP clients all use the same memory, tools, model providers, and permissions.
+  Run a daemon at <code>localhost:18981</code>. Your desktop app, CLI, TUI, scripts,
+  and MCP clients share the same memory, tools, providers, and permissions — no sync, no duplication.
 </p>
 
 <p align="center">
@@ -21,43 +21,52 @@
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT license" />
   </a>
+  <a href="https://github.com/sprklai/zenii/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/badge/tests-1720-blue?style=flat-square" alt="1720 tests" />
+  </a>
   <a href="https://github.com/sprklai/zenii/pulls">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs welcome" />
   </a>
-  <a href="https://github.com/sprklai/zenii/actions/workflows/ci.yml">
-    <img src="https://img.shields.io/badge/tests-1696-blue?style=flat-square" alt="1696 tests" />
-  </a>
 </p>
 
-Zenii is for developers who want AI to behave like infrastructure instead of a browser tab.
-Run one local service. Call it from `curl`, scripts, cron jobs, or an MCP client. Use the same
-backend from the native desktop app, CLI, or TUI.
+---
 
-## See It Work
+## Start in 60 seconds
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sprklai/zenii/main/install.sh | bash
 zenii-daemon &
 
-# Store something once
+# Store a fact once
 curl -s -X POST http://localhost:18981/memory \
   -H "Content-Type: application/json" \
   -d '{"key":"deploy","content":"Production database is on port 5434"}' >/dev/null
 
-# Ask through chat later
+# Ask about it later — from a script, cron job, or another machine
 curl -s -X POST http://localhost:18981/chat \
   -H "Content-Type: application/json" \
   -d '{"session_id":"ops","prompt":"What port is the production database on?"}' | jq -r '.response'
 ```
 
-That is the core value: write state once, use it from anywhere that talks to Zenii.
+That is the core contract: write state once, read it from anywhere that speaks HTTP.
 
-## What Zenii Is
+---
 
-- A local daemon with a REST and WebSocket API at `localhost:18981`
-- A shared AI backend for the desktop app, CLI, TUI, scripts, and MCP clients
-- Persistent memory, provider routing, and tool execution in one local service
-- A native Rust/Tauri stack instead of an Electron wrapper
+## Why Zenii
+
+Most AI tools are per-session and per-interface. You get memory in the chat UI but not in your shell script. You wire a tool to one agent and have to re-wire it to the next.
+
+Zenii solves this with a **shared local backend**:
+
+| Without Zenii | With Zenii |
+|---|---|
+| Each script manages its own AI context | One daemon holds memory for all of them |
+| Tools re-implemented per project | 19 tools registered once, available everywhere |
+| Provider API keys scattered across configs | One credential store, one place to rotate |
+| Desktop UI and scripts drift apart | Both call the same gateway |
+| MCP tools only available inside the IDE | Expose the same tools to any MCP client |
+
+---
 
 ## Architecture
 
@@ -65,36 +74,34 @@ That is the core value: write state once, use it from anywhere that talks to Zen
   <img src="docs/assets/zenii_architecture.png" alt="Zenii system architecture" width="720" />
 </p>
 
-One Rust library crate (`zenii-core`) contains all business logic. Thin binary crates (daemon, CLI, TUI, desktop) are shell wrappers. All share the same axum gateway, SQLite database, agent loop, and tool registry.
+One Rust library crate (`zenii-core`) holds all business logic. Five thin binary crates (daemon, CLI, TUI, desktop, MCP server) are shell wrappers around the same axum gateway, SQLite database, agent loop, and tool registry.
 
-## Good Fit
-
-- Local automations that need shared memory across scripts, bots, and tools
-- Developer tooling that wants one AI backend behind HTTP or MCP
-- Self-hosted workflows where privacy and local control matter
-- Projects that want a desktop UI and a scriptable backend without maintaining both separately
-
-## Current Product Boundaries
-
-- Zenii is not a hosted SaaS product
-- Zenii is not a drop-in OpenAI-compatible server today
-- Mobile is planned, but not shipped in this repository
+---
 
 ## What Ships Today
 
-- `zenii-daemon`: local API server
-- `zenii`: CLI client
-- `zenii-tui`: terminal UI
-- `zenii-desktop`: Tauri desktop app
-- `zenii-mcp-server`: MCP server for Claude Code, Cursor, and similar clients
-- 19 tools total (16 base + 3 feature-gated: channels, scheduler, workflows)
-- 133 total API routes: 105 base routes and 28 feature-gated routes
-- 6+ AI providers (OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Ollama) — any OpenAI-compatible API endpoint can be added as a custom provider
-- LLM wiki with binary document ingestion (PDF, DOCX, PPTX, XLSX, images via MarkItDown)
-- Memory intelligence: BM25 field weighting, temporal decay scoring, semantic deduplication
-- MCP Server (`zenii-mcp-server`): expose all 19 tools to Claude Code, Cursor, VS Code, and other MCP clients
-- MCP Client (`mcp-client` feature): consume tools from external MCP servers (GitHub, Postgres, Filesystem, etc.) via stdio — HTTP transport planned
-- MIT license
+**Interfaces**
+
+| Binary | Use it for |
+|---|---|
+| `zenii-daemon` | Local HTTP + WebSocket API server — the core of everything |
+| `zenii` | Quick prompts, shell pipelines, terminal workflows |
+| `zenii-tui` | Interactive terminal UI |
+| `zenii-desktop` | Native Tauri desktop app |
+| `zenii-mcp-server` | Expose all 19 Zenii tools to Claude Code, Cursor, VS Code |
+
+**Capabilities**
+
+- **19 tools** (16 base + 3 feature-gated: channels, scheduler, workflows)
+- **133 API routes** (105 base + 28 feature-gated)
+- **6+ AI providers**: OpenAI, Anthropic, Gemini, OpenRouter, Vercel AI Gateway, Ollama — or any OpenAI-compatible endpoint
+- **MCP server**: expose tools to external agents
+- **MCP client**: consume tools from external MCP servers (GitHub, Postgres, Filesystem, etc.)
+- **Persistent memory**: BM25 field weighting, temporal decay scoring, semantic deduplication
+- **LLM wiki**: ingest PDFs, DOCX, PPTX, XLSX, and images via MarkItDown
+- **Channels** (feature-gated): Telegram, Slack, Discord
+
+---
 
 ## Install
 
@@ -109,18 +116,19 @@ Installs `zenii` (CLI) and `zenii-daemon` to `~/.local/bin`.
 ### Windows
 
 Download and run the desktop installer (`.msi` or `.exe`) from
-[GitHub Releases](https://github.com/sprklai/zenii/releases/latest) —
-it includes the daemon and full GUI.
+[GitHub Releases](https://github.com/sprklai/zenii/releases/latest).
 
-For headless / CLI-only, grab `zenii.exe` and `zenii-daemon.exe` from the same Releases page.
+For headless / CLI-only, grab `zenii.exe` and `zenii-daemon.exe` from the same page.
 
-### Any platform (Rust / Cargo)
+### Cargo
 
 ```sh
 cargo install --git https://github.com/sprklai/zenii zenii zenii-daemon
 ```
 
-Full platform notes and source builds: [Installation & Usage](https://docs.zenii.sprklai.com/installation-and-usage)
+Full platform notes: [Installation & Usage](https://docs.zenii.sprklai.com/installation-and-usage)
+
+---
 
 ## Build from Source
 
@@ -134,22 +142,13 @@ cargo build --release -p zenii-cli          # CLI client
 cd crates/zenii-desktop && cargo tauri build # desktop app
 ```
 
-Full setup and cross-compilation instructions: [docs/development.md](docs/development.md)
+Full setup guide: [docs/development.md](docs/development.md)
 
-## Interfaces
+---
 
-| Surface | Best for |
-|---|---|
-| `zenii-daemon` | Local API server for scripts, automations, and services |
-| `zenii` | Quick prompts, shell pipelines, and terminal workflows |
-| `zenii-tui` | Terminal-native interactive use |
-| `zenii-desktop` | Native desktop UI on top of the same backend |
-| `zenii-mcp-server` | Exposing Zenii tools to external coding agents |
-| `mcp-client` feature | Consuming tools from external MCP servers inside the agent |
+## Use with Claude Code / Cursor (MCP)
 
-## MCP Example
-
-Add Zenii to `.mcp.json`:
+Add to `.mcp.json`:
 
 ```json
 {
@@ -162,28 +161,46 @@ Add Zenii to `.mcp.json`:
 }
 ```
 
-More integration detail lives in [AGENT.md](AGENT.md).
+Full integration guide: [AGENT.md](AGENT.md)
+
+---
+
+## Good Fit
+
+- Local automations that need shared memory across scripts, bots, and scheduled jobs
+- Developer tooling that wants a single AI backend reachable via HTTP or MCP
+- Self-hosted workflows where privacy and local control matter
+- Projects that want a desktop UI and a scriptable backend without maintaining two stacks
+
+## Not a Good Fit
+
+- Hosted SaaS or multi-user deployments (single-user local daemon only)
+- Drop-in OpenAI-compatible server (Zenii has its own API surface)
+- Mobile apps (planned, not yet shipped)
+
+---
 
 ## Docs
 
-- [Documentation site](https://docs.zenii.sprklai.com)
+- [Website](https://zenii.sprklai.com)
+- [Documentation](https://docs.zenii.sprklai.com)
 - [Installation & Usage](https://docs.zenii.sprklai.com/installation-and-usage)
 - [API Reference](https://docs.zenii.sprklai.com/api-reference)
 - [CLI Reference](https://docs.zenii.sprklai.com/cli-reference)
 - [Configuration](https://docs.zenii.sprklai.com/configuration)
 - [LLM Wiki](https://docs.zenii.sprklai.com/wiki)
 - [Architecture](https://docs.zenii.sprklai.com/architecture)
-- [Development](https://docs.zenii.sprklai.com/development)
 - [CHANGELOG.md](CHANGELOG.md)
 - [ROADMAP.md](ROADMAP.md)
 
+---
+
 ## Contributing
 
-Small documentation fixes, typo fixes, tests, and focused bug fixes can go straight to a PR.
+Typo fixes, tests, and focused bug fixes can go straight to a PR.
 Larger feature work should start with [CONTRIBUTING.md](CONTRIBUTING.md).
 
-If Zenii is useful to you, star the repo:
-<https://github.com/sprklai/zenii>
+If Zenii is useful to you — [star the repo](https://github.com/sprklai/zenii) and tell a developer friend.
 
 ## License
 
