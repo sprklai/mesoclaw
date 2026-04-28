@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-04-28
+
+### Fixed
+- Wiki ingest file picker (Linux/GTK): add MIME types (`text/markdown`, `text/x-markdown`, `text/plain`, `text/html`, `text/x-org`, `text/x-rst`) alongside bare extensions so GTK file chooser surfaces `.md`, `.txt`, `.org`, `.rst` files instead of silently filtering them
+- Wiki ingest routing: align `.html`/`.htm` with backend — route to `/wiki/upload` (MarkItDown conversion) instead of `/wiki/ingest` (raw text)
+
+### Changed
+- CI: Docker image build is now opt-in via `--docker` flag; normal releases skip the ~3-hour multi-arch build
+- README: sharper why-Zenii framing, expanded wiki/MCP/workflow/scheduler sections, capability table
+
+### Chores
+- Bump `lru` 0.16.4 → 0.17.0
+- Bump `docker/metadata-action` 5 → 6, `docker/build-push-action` 6 → 7, `docker/login-action` 3 → 4, `docker/setup-buildx-action` 3 → 4
+
 ## [0.1.20] - 2026-04-26
 
 ### Fixed
