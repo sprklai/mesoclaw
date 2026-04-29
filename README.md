@@ -8,7 +8,7 @@
 
 <p align="center">
   Run a daemon at <code>localhost:18981</code>. Your desktop app, CLI, TUI, scripts,
-  and MCP clients share the same memory, tools, providers, and permissions — no sync, no duplication.
+  and MCP clients share the same memory, tools, providers, channels, and scheduler — no sync, no duplication.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT license" />
   </a>
   <a href="https://github.com/sprklai/zenii/actions/workflows/ci.yml">
-    <img src="https://img.shields.io/badge/tests-1720-blue?style=flat-square" alt="1720 tests" />
+    <img src="https://img.shields.io/badge/tests-1696-blue?style=flat-square" alt="1696 tests" />
   </a>
   <a href="https://github.com/sprklai/zenii/pulls">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs welcome" />
