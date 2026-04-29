@@ -53,6 +53,8 @@ slug: /architecture
 
 ## System Architecture
 
+![Zenii Architecture](assets/zenii_architecture.png)
+
 ```mermaid
 graph TD
     subgraph Clients["Clients"]

@@ -50,6 +50,13 @@ curl -s -X POST http://localhost:18981/chat \
 
 That is the core contract: write state once, read it from anywhere that speaks HTTP.
 
+> [!TIP]
+> **Interactive API Docs** — once the daemon is running, open
+> **[http://127.0.0.1:18981/api-docs](http://127.0.0.1:18981/api-docs)**
+> in your browser. You get a full Swagger-style explorer: every endpoint documented, live request
+> testing, and code-snippet generation for **curl, Python, Go, TypeScript, Rust**, and more.
+> No separate setup needed — it's built in.
+
 ---
 
 ## Why Zenii
@@ -237,6 +244,16 @@ Full setup guide: [docs/development.md](docs/development.md)
 - Projects that want a desktop UI and a scriptable backend without maintaining two stacks
 - Self-hosted on a VPS, Raspberry Pi, or Docker — runs as a systemd service or container behind nginx/Caddy ([Deployment guide](https://docs.zenii.sprklai.com/deployment))
 
+## Zenii PiDog (Raspberry Pi) Demo
+
+<p align="center">
+  <img src="assets/Zenii-PiDog.gif" alt="Zenii running on a Raspberry Pi PiDog robot" width="540" />
+</p>
+
+Zenii runs on ARM — same binary, same API. Deploy it on a Raspberry Pi, attach tools, and your hardware becomes an AI-addressable endpoint over HTTP.
+
+---
+
 ## Not a Good Fit
 
 - Multi-user or SaaS deployments (single-user daemon, no multi-tenant auth)
@@ -250,6 +267,7 @@ Full setup guide: [docs/development.md](docs/development.md)
 - [Website](https://zenii.sprklai.com)
 - [Documentation](https://docs.zenii.sprklai.com)
 - [Installation & Usage](https://docs.zenii.sprklai.com/installation-and-usage)
+- [**Interactive API Explorer**](http://127.0.0.1:18981/api-docs) — live Swagger-style docs at `localhost:18981/api-docs` (daemon must be running)
 - [API Reference](https://docs.zenii.sprklai.com/api-reference)
 - [CLI Reference](https://docs.zenii.sprklai.com/cli-reference)
 - [Configuration](https://docs.zenii.sprklai.com/configuration)
