@@ -49,6 +49,7 @@ Review the staged and unstaged changes (use `git diff` and `git diff --cached`) 
    - `backendTests`: count via `cargo test --workspace 2>&1 | awk '/test result/{sum+=$4} END{print sum}'`
    - Other fields (`binarySize`, `debRpmSize`, `startupSeconds`, `llmProviders`, `messagingChannels`, `crates`, `securityLayers`, `platformTargets`, `compileFlags`) — update manually only if the code changes warrant it.
    - Read the current `website-data.json`, apply only the fields that changed, write back.
+   - After writing `website-data.json`, read `backendTests` from it and update the test count badge in `README.md`: replace `tests-<N>-blue` with `tests-<backendTests>-blue` and `alt="<N> tests"` with `alt="<backendTests> tests"`.
 4. **`docs/` directory** — Update relevant docs if the changes affect:
    - `docs/architecture.md` — new modules, traits, data flows, or structural changes
    - `docs/phases.md` — phase status changes or deliverable updates

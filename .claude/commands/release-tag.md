@@ -96,7 +96,7 @@ After the version bump, update `website-data.json` to reflect current codebase m
 - `backendTests`: count via `cargo test --workspace 2>&1 | awk '/test result/{sum+=$4} END{print sum}'`
 - Other fields (`binarySize`, `debRpmSize`, `startupSeconds`, `llmProviders`, `messagingChannels`, `crates`, `securityLayers`, `platformTargets`, `compileFlags`) — update only if you have reason to believe they changed.
 
-Read the current `website-data.json`, update only the fields above, write back. Do NOT ask the user — just update and proceed.
+Read the current `website-data.json`, update only the fields above, write back. After writing, read `backendTests` from it and update the test count badge in `README.md`: replace `tests-<N>-blue` with `tests-<backendTests>-blue` and `alt="<N> tests"` with `alt="<backendTests> tests"`. Do NOT ask the user — just update and proceed.
 
 ### Step 4: Update CHANGELOG body
 
