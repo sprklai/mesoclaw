@@ -126,3 +126,19 @@
 		<Background />
 	</SvelteFlow>
 </div>
+
+<style>
+	:global(.svelte-flow__edge-path) {
+		stroke: #6366f1;
+		stroke-width: 2.5px;
+	}
+	:global(.svelte-flow__edge.selected .svelte-flow__edge-path),
+	:global(.svelte-flow__edge:hover .svelte-flow__edge-path) {
+		stroke: #a855f7;
+		stroke-width: 3px;
+	}
+	:global(.svelte-flow__connection-path) {
+		stroke: #6366f1;
+		stroke-width: 2.5px;
+	}
+</style>
