@@ -65,6 +65,12 @@ export const CATEGORY_STYLES: Record<string, CategoryStyle> = {
 		iconText: 'text-yellow-500',
 		accent: 'border-l-yellow-500',
 		handleBorder: '!border-yellow-500'
+	},
+	wiki: {
+		iconBg: 'bg-teal-500/15',
+		iconText: 'text-teal-500',
+		accent: 'border-l-teal-500',
+		handleBorder: '!border-teal-500'
 	}
 };
 

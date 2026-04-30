@@ -44,7 +44,8 @@ export type NodeCategory =
   | "channels"
   | "config"
   | "schedule"
-  | "flow";
+  | "flow"
+  | "wiki";
 
 export interface NodeDefinition {
   type: string;
@@ -97,6 +98,17 @@ function toolFromStep(keys: string[]) {
       if (args[k] !== undefined) out[k] = args[k];
     }
     return out;
+  };
+}
+
+/** Pack wiki fields into `{ type: 'tool', tool: 'wiki', args: { action, ...keys } }`. */
+function wikiToStep(action: string, keys: string[]) {
+  return (data: StepRec): StepRec => {
+    const args: StepRec = { action };
+    for (const k of keys) {
+      if (data[k] !== undefined) args[k] = data[k];
+    }
+    return { type: "tool", tool: "wiki", args };
   };
 }
 
@@ -880,6 +892,105 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       return out;
     },
   },
+  // ── Wiki ──────────────────────────────────────────────────────────────
+  {
+    type: "wiki_search",
+    label: "wb_node_wiki_search_label",
+    category: "wiki",
+    icon: "SearchCode",
+    description: "wb_node_wiki_search_desc",
+    visual: "standard",
+    fields: [
+      {
+        key: "query",
+        label: "wb_field_wiki_query_label",
+        type: "text",
+        required: true,
+        placeholder: "wb_field_wiki_query_placeholder",
+        description: "wb_field_wiki_query_description",
+      },
+      {
+        key: "limit",
+        label: "wb_field_limit_label",
+        type: "number",
+        default: 10,
+        description: "wb_field_wiki_search_limit_description",
+      },
+    ],
+    handles: STANDARD_HANDLES,
+    fromStep: toolFromStep(["query", "limit"]),
+    toStep: wikiToStep("search", ["query", "limit"]),
+  },
+  {
+    type: "wiki_get",
+    label: "wb_node_wiki_get_label",
+    category: "wiki",
+    icon: "BookOpen",
+    description: "wb_node_wiki_get_desc",
+    visual: "standard",
+    fields: [
+      {
+        key: "slug",
+        label: "wb_field_wiki_slug_label",
+        type: "text",
+        required: true,
+        placeholder: "wb_field_wiki_slug_placeholder",
+        description: "wb_field_wiki_slug_description",
+      },
+    ],
+    handles: STANDARD_HANDLES,
+    fromStep: toolFromStep(["slug"]),
+    toStep: wikiToStep("get", ["slug"]),
+  },
+  {
+    type: "wiki_list",
+    label: "wb_node_wiki_list_label",
+    category: "wiki",
+    icon: "Library",
+    description: "wb_node_wiki_list_desc",
+    visual: "standard",
+    fields: [
+      {
+        key: "limit",
+        label: "wb_field_limit_label",
+        type: "number",
+        default: 20,
+        description: "wb_field_wiki_list_limit_description",
+      },
+    ],
+    handles: STANDARD_HANDLES,
+    fromStep: toolFromStep(["limit"]),
+    toStep: wikiToStep("list", ["limit"]),
+  },
+  {
+    type: "wiki_query",
+    label: "wb_node_wiki_query_label",
+    category: "wiki",
+    icon: "MessageSquare",
+    description: "wb_node_wiki_query_desc",
+    visual: "standard",
+    fields: [
+      {
+        key: "question",
+        label: "wb_field_wiki_question_label",
+        type: "textarea",
+        required: true,
+        placeholder: "wb_field_wiki_question_placeholder",
+        description: "wb_field_wiki_question_description",
+      },
+      {
+        key: "limit",
+        label: "wb_field_limit_label",
+        type: "number",
+        default: 5,
+        description: "wb_field_wiki_query_limit_description",
+      },
+    ],
+    handles: STANDARD_HANDLES,
+    fromStep: toolFromStep(["question", "limit"]),
+    toStep: wikiToStep("query", ["question", "limit"]),
+  },
+
   // Hidden: backend parallel execution not yet implemented (executor.rs:349)
   {
     type: "parallel",

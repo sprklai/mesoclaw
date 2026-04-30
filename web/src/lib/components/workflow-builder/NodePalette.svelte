@@ -17,11 +17,12 @@
 		channels: 'wb_cat_channels',
 		config: 'wb_cat_config',
 		schedule: 'wb_cat_schedule',
-		flow: 'wb_cat_flow'
+		flow: 'wb_cat_flow',
+		wiki: 'wb_cat_wiki'
 	};
 
 	const CATEGORY_ORDER: NodeCategory[] = [
-		'triggers', 'ai', 'search', 'system', 'files', 'memory', 'channels', 'config', 'schedule', 'flow'
+		'triggers', 'ai', 'search', 'system', 'files', 'memory', 'channels', 'config', 'schedule', 'flow', 'wiki'
 	];
 
 	let searchQuery = $state('');

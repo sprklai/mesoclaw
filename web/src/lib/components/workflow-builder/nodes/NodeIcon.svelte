@@ -24,6 +24,9 @@
 	import Timer from '@lucide/svelte/icons/timer';
 	import ToggleLeft from '@lucide/svelte/icons/toggle-left';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import BookOpen from '@lucide/svelte/icons/book-open';
+	import Library from '@lucide/svelte/icons/library';
+	import MessageSquare from '@lucide/svelte/icons/message-square';
 	import Zap from '@lucide/svelte/icons/zap';
 
 	let { name, class: cls = '' }: { name: string; class?: string } = $props();
@@ -54,6 +57,9 @@
 		Timer,
 		ToggleLeft,
 		Trash2,
+		BookOpen,
+		Library,
+		MessageSquare,
 		Zap
 	};
 

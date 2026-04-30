@@ -26,7 +26,7 @@ impl Tool for WikiSearchTool {
     }
 
     fn description(&self) -> &str {
-        "Search, retrieve, or list pages from the knowledge wiki. Use 'search' to find pages by keyword, 'get' to fetch a specific page by slug, or 'list' to browse all available pages with their TLDRs."
+        "Search, retrieve, list, or query pages from the knowledge wiki. Use 'search' to find pages by keyword, 'get' to fetch a specific page by slug, 'list' to browse all available pages with their TLDRs, or 'query' to retrieve the full body of the most relevant pages for a natural-language question (pipe the output into an LLM for synthesis)."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
@@ -35,7 +35,7 @@ impl Tool for WikiSearchTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["search", "get", "list"],
+                    "enum": ["search", "get", "list", "query"],
                     "description": "The wiki operation to perform"
                 },
                 "query": {
@@ -46,9 +46,13 @@ impl Tool for WikiSearchTool {
                     "type": "string",
                     "description": "Page slug to retrieve (required for 'get')"
                 },
+                "question": {
+                    "type": "string",
+                    "description": "Natural-language question whose answer should be found in the wiki (required for 'query')"
+                },
                 "limit": {
                     "type": "integer",
-                    "description": "Maximum results for 'search' or 'list' (default: 10)"
+                    "description": "Maximum results for 'search', 'list', or 'query' (defaults: search=10, list=10, query=5)"
                 }
             },
             "required": ["action"]
@@ -165,8 +169,38 @@ impl Tool for WikiSearchTool {
                     serde_json::to_string_pretty(&results).unwrap_or_default(),
                 ))
             }
+            "query" => {
+                let question = args["question"]
+                    .as_str()
+                    .ok_or_else(|| ZeniiError::Validation("missing 'question' for query".into()))?
+                    .to_string();
+                let limit = args["limit"].as_u64().unwrap_or(5) as usize;
+
+                let wiki = self.wiki.clone().lock_owned().await;
+                let pages = tokio::task::spawn_blocking(move || {
+                    wiki.search_pages(&question)
+                        .map(|v| v.into_iter().take(limit).collect::<Vec<_>>())
+                })
+                .await
+                .map_err(|e| ZeniiError::Tool(format!("wiki task panicked: {e}")))??;
+
+                if pages.is_empty() {
+                    return Ok(ToolResult::ok(
+                        "No relevant wiki pages found for this question.",
+                    ));
+                }
+
+                // Return full page bodies as context, suitable for piping into an LLM node.
+                let context = pages
+                    .into_iter()
+                    .map(|p| format!("### {} ({})\n\n{}", p.title, p.slug, p.body))
+                    .collect::<Vec<_>>()
+                    .join("\n\n---\n\n");
+
+                Ok(ToolResult::ok(context))
+            }
             other => Ok(ToolResult::err(format!(
-                "Unknown action '{other}'. Valid actions: search, get, list"
+                "Unknown action '{other}'. Valid actions: search, get, list, query"
             ))),
         }
     }
@@ -324,7 +358,69 @@ Used in transformer models.
         assert!(matches!(result, Err(crate::ZeniiError::Validation(_))));
     }
 
-    // WT.7 — metadata: name, description, schema
+    // WT.10 — query with matching question returns page body context
+    #[tokio::test]
+    async fn wiki_tool_query_returns_context() {
+        let (_dir, tool) = setup();
+        let result = tool
+            .execute(serde_json::json!({
+                "action": "query",
+                "question": "attention",
+                "limit": 3
+            }))
+            .await
+            .unwrap();
+
+        assert!(result.success);
+        // Output contains the heading format: ### {title} ({slug})
+        assert!(result.output.contains("Self Attention"));
+        assert!(result.output.contains("self-attention"));
+    }
+
+    // WT.11 — query with no match returns informative message
+    #[tokio::test]
+    async fn wiki_tool_query_no_match() {
+        let (_dir, tool) = setup();
+        let result = tool
+            .execute(serde_json::json!({
+                "action": "query",
+                "question": "quantum-xyz-nonexistent"
+            }))
+            .await
+            .unwrap();
+
+        assert!(result.success);
+        assert!(result.output.contains("No relevant wiki pages found"));
+    }
+
+    // WT.12 — query without question returns Validation error
+    #[tokio::test]
+    async fn wiki_tool_query_missing_question() {
+        let (_dir, tool) = setup();
+        let result = tool.execute(serde_json::json!({ "action": "query" })).await;
+        assert!(matches!(result, Err(crate::ZeniiError::Validation(_))));
+    }
+
+    // WT.13 — query respects limit
+    #[tokio::test]
+    async fn wiki_tool_query_respects_limit() {
+        let (_dir, tool) = setup();
+        // Only 1 page in the test wiki — limit=1 should return it
+        let result = tool
+            .execute(serde_json::json!({
+                "action": "query",
+                "question": "attention",
+                "limit": 1
+            }))
+            .await
+            .unwrap();
+
+        assert!(result.success);
+        // Should contain page heading separator format
+        assert!(result.output.contains("###"));
+    }
+
+    // WT.7 — metadata: name, description, schema includes query action
     #[test]
     fn wiki_tool_metadata() {
         let wiki = Arc::new(Mutex::new(
@@ -333,11 +429,15 @@ Used in transformer models.
         let tool = WikiSearchTool::new(wiki);
 
         assert_eq!(tool.name(), "wiki");
-        assert!(tool.description().len() > 20);
+        assert!(tool.description().contains("query"));
 
         let schema = tool.parameters_schema();
         assert_eq!(schema["type"], "object");
         let required = schema["required"].as_array().unwrap();
         assert!(required.contains(&serde_json::json!("action")));
+
+        let action_enum = schema["properties"]["action"]["enum"].as_array().unwrap();
+        assert!(action_enum.contains(&serde_json::json!("query")));
+        assert!(schema["properties"]["question"].is_object());
     }
 }
