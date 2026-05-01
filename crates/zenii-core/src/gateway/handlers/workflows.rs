@@ -645,7 +645,7 @@ mod tests {
             .unwrap();
 
         let wf_dir = dir.path().join("workflows_test");
-        let registry = Arc::new(crate::workflows::WorkflowRegistry::new(wf_dir).unwrap());
+        let _registry = Arc::new(crate::workflows::WorkflowRegistry::new(wf_dir).unwrap());
         let config = crate::config::AppConfig {
             workflow_max_concurrent: 2,
             ..Default::default()
@@ -721,6 +721,7 @@ mod tests {
                             timeout_secs: None,
                         }],
                         layout: None,
+                        schema_version: None,
                         created_at: "2026-01-01T00:00:00Z".into(),
                         updated_at: "2026-01-01T00:00:00Z".into(),
                     })
@@ -772,6 +773,7 @@ mod tests {
                         timeout_secs: None,
                     }],
                     layout: None,
+                    schema_version: None,
                     created_at: "2026-01-01T00:00:00Z".into(),
                     updated_at: "2026-01-01T00:00:00Z".into(),
                 })

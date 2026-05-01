@@ -414,10 +414,6 @@ fn workflow_routes() -> Router<Arc<AppState>> {
                 get(handlers::workflows::list_workflows).post(handlers::workflows::create_workflow),
             )
             .route(
-                "/workflows/generate",
-                post(handlers::workflows::generate_workflow),
-            )
-            .route(
                 "/workflows/{id}",
                 get(handlers::workflows::get_workflow)
                     .put(handlers::workflows::update_workflow)

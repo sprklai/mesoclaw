@@ -391,7 +391,7 @@ mod tests {
             id: "wf-sched".into(),
             name: "Scheduled".into(),
             description: "runs on cron".into(),
-            schedule: Some("0 * * * *".into()),
+            schedule: Some("0 0 * * * *".into()),
             steps: vec![WorkflowStep {
                 name: "s1".into(),
                 step_type: StepType::Delay { seconds: 1 },
@@ -413,7 +413,7 @@ mod tests {
         let registry = WorkflowRegistry::new(dir.path().to_path_buf()).unwrap();
         registry.save(wf.clone()).unwrap();
         let loaded = registry.get("wf-sched").unwrap();
-        assert_eq!(loaded.schedule.as_deref(), Some("0 * * * *"));
+        assert_eq!(loaded.schedule.as_deref(), Some("0 0 * * * *"));
     }
 
     // SCH-REC.2 — workflow without schedule has None schedule field
