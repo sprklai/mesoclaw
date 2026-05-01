@@ -3,6 +3,23 @@
 // Adding a new node = adding one object to NODE_DEFINITIONS.
 
 // ---------------------------------------------------------------------------
+// Backend tool name cross-reference (keep in sync with boot.rs registrations)
+// ---------------------------------------------------------------------------
+// Always-registered:
+//   system_info, web_search, file_read, file_write, file_list, file_search,
+//   content_search, shell, process, patch, learn, propose_skill_change,
+//   memory, agent_notes, config, wiki
+// Feature-gated:
+//   channel_send  (feature: channels)
+//   scheduler     (feature: scheduler)
+//   workflows     (feature: workflows)
+//
+// Nodes whose toStep() emits a tool name NOT in the list above must be
+// marked hidden:true so they are invisible in the palette and generate no
+// false-positive validation passes.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
 // Interfaces
 // ---------------------------------------------------------------------------
 
@@ -240,6 +257,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       return out;
     },
   },
+  // hidden: tool 'agent_turn' not yet implemented in backend — use the 'llm' node instead
   {
     type: "agent_turn",
     label: "wb_node_agent_turn_label",
@@ -247,6 +265,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     icon: "Bot",
     description: "wb_node_agent_turn_description",
     visual: "standard",
+    hidden: true,
     fields: [
       {
         key: "prompt",
@@ -689,6 +708,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       return { type: "tool", tool: "channel_send", args };
     },
   },
+  // hidden: tool 'notify' not yet implemented in backend — use channel_send with the notification router instead
   {
     type: "notify",
     label: "wb_node_notify_label",
@@ -696,6 +716,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     icon: "Bell",
     description: "wb_node_notify_description",
     visual: "standard",
+    hidden: true,
     fields: [
       {
         key: "title",
@@ -789,6 +810,8 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
   },
 
   // ── Schedule ──────────────────────────────────────────────────────────
+  // These nodes dispatch to the 'scheduler' tool (feature: scheduler).
+  // They are feature-gated — hidden when the scheduler feature is not enabled.
   {
     type: "create_job",
     label: "wb_node_create_job_label",
@@ -796,6 +819,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     icon: "CalendarPlus",
     description: "wb_node_create_job_description",
     visual: "standard",
+    featureGate: "scheduler",
     fields: [
       {
         key: "name",
@@ -806,12 +830,23 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
         description: "wb_field_job_name_description",
       },
       {
-        key: "schedule",
-        label: "wb_field_schedule_label",
-        type: "text",
+        key: "schedule_type",
+        label: "wb_field_schedule_type_label",
+        type: "select",
+        options: [
+          { value: "cron", label: "wb_option_schedule_type_cron" },
+          { value: "interval", label: "wb_option_schedule_type_interval" },
+          { value: "human", label: "wb_option_schedule_type_human" },
+        ],
         required: true,
-        placeholder: "wb_field_schedule_placeholder",
-        description: "wb_field_schedule_description",
+        description: "wb_field_schedule_type_description",
+      },
+      {
+        key: "cron_expr",
+        label: "wb_field_cron_expr_label",
+        type: "text",
+        placeholder: "wb_field_cron_expr_placeholder",
+        description: "wb_field_cron_expr_description",
       },
       {
         key: "payload_type",
@@ -825,14 +860,21 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
             value: "send_via_channel",
             label: "wb_option_payload_send_via_channel",
           },
-          { value: "workflow", label: "wb_option_payload_workflow" },
         ],
+        required: true,
         description: "wb_field_payload_type_description",
       },
     ],
     handles: STANDARD_HANDLES,
-    fromStep: toolFromStep(["name", "schedule", "payload_type"]),
-    toStep: toolToStep("create_job", ["name", "schedule", "payload_type"]),
+    fromStep: toolFromStep(["name", "schedule_type", "cron_expr", "payload_type"]),
+    toStep(data: StepRec): StepRec {
+      const args: StepRec = { action: "create" };
+      if (data.name !== undefined) args.name = data.name;
+      if (data.schedule_type !== undefined) args.schedule_type = data.schedule_type;
+      if (data.cron_expr !== undefined) args.cron_expr = data.cron_expr;
+      if (data.payload_type !== undefined) args.payload_type = data.payload_type;
+      return { type: "tool", tool: "scheduler", args };
+    },
   },
   {
     type: "toggle_job",
@@ -841,14 +883,15 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     icon: "ToggleLeft",
     description: "wb_node_toggle_job_description",
     visual: "standard",
+    featureGate: "scheduler",
     fields: [
       {
-        key: "job_name",
-        label: "wb_field_job_name_label",
+        key: "job_id",
+        label: "wb_field_job_id_label",
         type: "text",
         required: true,
-        placeholder: "wb_field_job_name_placeholder",
-        description: "wb_field_toggle_job_name_description",
+        placeholder: "wb_field_job_id_placeholder",
+        description: "wb_field_toggle_job_id_description",
       },
       {
         key: "enabled",
@@ -858,8 +901,13 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       },
     ],
     handles: STANDARD_HANDLES,
-    fromStep: toolFromStep(["job_name", "enabled"]),
-    toStep: toolToStep("toggle_job", ["job_name", "enabled"]),
+    fromStep: toolFromStep(["job_id", "enabled"]),
+    toStep(data: StepRec): StepRec {
+      const args: StepRec = { action: "toggle" };
+      if (data.job_id !== undefined) args.job_id = data.job_id;
+      if (data.enabled !== undefined) args.enabled = data.enabled;
+      return { type: "tool", tool: "scheduler", args };
+    },
   },
 
   // ── Flow ──────────────────────────────────────────────────────────────

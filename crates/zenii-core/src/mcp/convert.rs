@@ -61,6 +61,7 @@ mod tests {
                 "required": ["query"]
             }),
             risk_level: RiskLevel::Low,
+            param_summary: String::new(),
         }
     }
 
@@ -100,6 +101,7 @@ mod tests {
             description: "test".into(),
             parameters: serde_json::json!("not an object"),
             risk_level: RiskLevel::Low,
+            param_summary: String::new(),
         };
         let mcp = tool_info_to_mcp(&info, "");
         assert_eq!(mcp.input_schema["type"], "object");

@@ -5,6 +5,7 @@
 	import { getCategoryStyle } from './node-colors';
 	import NodeIcon from './NodeIcon.svelte';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 
 	let { data }: { data: Record<string, unknown>; id: string } = $props();
 
@@ -14,13 +15,15 @@
 	const category = $derived(definition?.category ?? 'system');
 	const iconName = $derived(definition?.icon ?? 'Zap');
 	const style = $derived(getCategoryStyle(category));
+	// Show warning badge if definition is missing or marked hidden (unsupported in backend)
+	const isUnsupported = $derived(!definition || definition.hidden === true);
 </script>
 
 <!-- Input on left, output on right — n8n style square card -->
 <div
 	class="w-[110px] rounded-2xl border-2 bg-card text-card-foreground shadow-md flex flex-col items-center py-4 px-3 gap-2 transition-shadow
 		{isRunning ? 'ring-2 ring-yellow-400 shadow-yellow-400/20' : 'hover:shadow-xl'}
-		{style.handleBorder.replace('!border-', 'border-')}"
+		{isUnsupported ? 'border-orange-400/60' : style.handleBorder.replace('!border-', 'border-')}"
 >
 	<Handle
 		type="target"
@@ -46,6 +49,14 @@
 			</div>
 		{/if}
 	</div>
+
+	<!-- Unsupported warning badge -->
+	{#if isUnsupported}
+		<div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-400/15 text-orange-400">
+			<TriangleAlert class="h-3 w-3 shrink-0" />
+			<span class="text-[9px] font-medium leading-none">Not supported</span>
+		</div>
+	{/if}
 
 	<Handle
 		type="source"
