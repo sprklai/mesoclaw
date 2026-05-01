@@ -7,6 +7,8 @@ export interface WorkflowMeta {
   name: string;
   description: string;
   schedule: string | null;
+  /** Preserved from the original workflow — only set on first creation if absent (Issue 4). */
+  created_at?: string;
 }
 
 export interface NodePosition {
@@ -50,6 +52,7 @@ export interface Workflow {
   layout?: WorkflowLayout;
   created_at: string;
   updated_at: string;
+  schema_version?: number;
 }
 
 /**
@@ -195,6 +198,7 @@ export function graphToWorkflow(
   }
 
   const id = meta.id ?? slugify(meta.name);
+  const now = new Date().toISOString();
 
   return {
     id,
@@ -203,8 +207,10 @@ export function graphToWorkflow(
     schedule: meta.schedule,
     steps,
     layout,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    // Preserve existing created_at; only set on first creation (Issue 4)
+    created_at: meta.created_at ?? now,
+    updated_at: now,
+    schema_version: 1,
   };
 }
 
@@ -369,12 +375,19 @@ export function generateStepName(
 
 /**
  * Serialize a Workflow object to TOML string suitable for the backend API.
+ *
+ * Constraints on step args:
+ * - Tool step `args` must be flat key-value pairs only (string, number, boolean,
+ *   simple arrays). Nested objects are not supported in TOML inline tables and
+ *   will throw at call time (Issue 1).
  */
 export function workflowToToml(wf: Workflow): string {
   const lines: string[] = [];
   lines.push(`id = ${tomlStr(wf.id)}`);
   lines.push(`name = ${tomlStr(wf.name)}`);
   lines.push(`description = ${tomlStr(wf.description)}`);
+  // Always write schema_version so future schema changes can be detected (Issue 6)
+  lines.push(`schema_version = ${wf.schema_version ?? 1}`);
   if (wf.schedule) lines.push(`schedule = ${tomlStr(wf.schedule)}`);
   lines.push("");
 
@@ -395,8 +408,16 @@ export function workflowToToml(wf: Workflow): string {
     if (step.depends_on.length > 0) {
       lines.push(`depends_on = [${step.depends_on.map(tomlStr).join(", ")}]`);
     }
-    if (step.timeout_secs) lines.push(`timeout_secs = ${step.timeout_secs}`);
-    if (step.retry) {
+    // Issue 2: use strict undefined/null check so timeout_secs = 0 is preserved
+    if (step.timeout_secs !== undefined && step.timeout_secs !== null) {
+      lines.push(`timeout_secs = ${step.timeout_secs}`);
+    }
+    // Issue 3: only write retry when both sub-fields are defined numbers
+    if (
+      step.retry !== undefined &&
+      typeof step.retry.max_retries === "number" &&
+      typeof step.retry.retry_delay_ms === "number"
+    ) {
       lines.push(
         `retry = { max_retries = ${step.retry.max_retries}, retry_delay_ms = ${step.retry.retry_delay_ms} }`,
       );
@@ -410,6 +431,7 @@ export function workflowToToml(wf: Workflow): string {
         );
       }
     }
+    // Issue 1: validate args are flat before serializing
     if (step.args && Object.keys(step.args).length > 0) {
       lines.push(`args = ${tomlInlineTable(step.args)}`);
     }
@@ -434,17 +456,32 @@ function tomlStr(s: string): string {
   return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`;
 }
 
-/** Serialize a flat object as a TOML inline table: { key = "val", num = 5 } */
+/**
+ * Serialize a flat object as a TOML inline table: { key = "val", num = 5 }
+ *
+ * Constraint (Issue 1): tool step args must be flat key-value pairs only.
+ * Nested objects (typeof v === "object" and not Array) are not valid in TOML
+ * inline tables produced here. Throws if a nested object is detected so the
+ * caller gets a clear error rather than silently producing invalid TOML.
+ */
 function tomlInlineTable(obj: Record<string, unknown>): string {
   const pairs: string[] = [];
   for (const [k, v] of Object.entries(obj)) {
-    if (typeof v === "string") pairs.push(`${k} = ${tomlStr(v)}`);
-    else if (typeof v === "number" || typeof v === "boolean")
+    if (typeof v === "string") {
+      pairs.push(`${k} = ${tomlStr(v)}`);
+    } else if (typeof v === "number" || typeof v === "boolean") {
       pairs.push(`${k} = ${v}`);
-    else if (Array.isArray(v))
+    } else if (Array.isArray(v)) {
       pairs.push(
         `${k} = [${v.map((item) => (typeof item === "string" ? tomlStr(item) : String(item))).join(", ")}]`,
       );
+    } else if (v !== null && typeof v === "object") {
+      // Issue 1: nested objects produce invalid TOML inline table syntax
+      throw new Error(
+        `tool step args must be flat key-value pairs — nested objects not supported (key: "${k}")`,
+      );
+    }
+    // null / undefined values are silently skipped (no TOML representation)
   }
   return `{ ${pairs.join(", ")} }`;
 }

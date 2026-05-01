@@ -224,6 +224,7 @@ impl WorkflowTool {
             layout: None,
             created_at: now.clone(),
             updated_at: now,
+            schema_version: Some(1),
         };
 
         if let Err(e) = self.registry.save(workflow) {
