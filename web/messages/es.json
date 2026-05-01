@@ -1046,5 +1046,10 @@
   "mcp_clients_error_id_spaces": "El ID no puede contener espacios",
   "mcp_clients_error_id_exists": "El ID ya existe",
   "mcp_clients_error_cmd_required": "El comando es obligatorio",
-  "mcp_clients_error_url_invalid": "La URL debe comenzar con http:// o https://"
+  "mcp_clients_error_url_invalid": "La URL debe comenzar con http:// o https://",
+  "dashboard_wiki_comparisons": "[EN] Comparisons",
+  "dashboard_wiki_concepts": "[EN] Concepts",
+  "dashboard_wiki_entities": "[EN] Entities",
+  "dashboard_wiki_sources": "[EN] Docs",
+  "dashboard_wiki_topics": "[EN] Topics"
 }

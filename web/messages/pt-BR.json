@@ -1039,5 +1039,17 @@
   "mcp_clients_error_id_spaces": "O ID não pode conter espaços",
   "mcp_clients_error_id_exists": "O ID já existe",
   "mcp_clients_error_cmd_required": "O comando é obrigatório",
-  "mcp_clients_error_url_invalid": "A URL deve começar com http:// ou https://"
+  "mcp_clients_error_url_invalid": "A URL deve começar com http:// ou https://",
+  "dashboard_wiki_comparisons": "[EN] Comparisons",
+  "dashboard_wiki_concepts": "[EN] Concepts",
+  "dashboard_wiki_entities": "[EN] Entities",
+  "dashboard_wiki_sources": "[EN] Docs",
+  "dashboard_wiki_topics": "[EN] Topics",
+  "wiki_dup_checking": "[EN] Checking...",
+  "wiki_dup_exact": "[EN] Unchanged duplicate",
+  "wiki_dup_include": "[EN] Include",
+  "wiki_dup_renamed": "[EN] Matches \"{name}\"",
+  "wiki_dup_skip": "[EN] Skip",
+  "wiki_dup_updated": "[EN] Already ingested",
+  "wiki_ingest_all_skipped": "[EN] All files skipped"
 }

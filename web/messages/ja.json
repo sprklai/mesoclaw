@@ -1046,5 +1046,10 @@
   "mcp_clients_error_id_spaces": "IDにスペースは含められません",
   "mcp_clients_error_id_exists": "このIDはすでに存在します",
   "mcp_clients_error_cmd_required": "コマンドは必須です",
-  "mcp_clients_error_url_invalid": "URLはhttp://またはhttps://で始まる必要があります"
+  "mcp_clients_error_url_invalid": "URLはhttp://またはhttps://で始まる必要があります",
+  "dashboard_wiki_comparisons": "[EN] Comparisons",
+  "dashboard_wiki_concepts": "[EN] Concepts",
+  "dashboard_wiki_entities": "[EN] Entities",
+  "dashboard_wiki_sources": "[EN] Docs",
+  "dashboard_wiki_topics": "[EN] Topics"
 }

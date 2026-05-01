@@ -46,6 +46,11 @@
 		{/if}
 	</div>
 
+	<div class="flex justify-between px-3 py-1 text-[9px] text-muted-foreground">
+		<span class="text-green-500">{t('wb_handle_true')}</span>
+		<span class="text-red-400">{t('wb_handle_false')}</span>
+	</div>
+
 	<!-- Branch indicators aligned with handles -->
 	<div class="w-full flex flex-col items-end gap-3 pr-0.5 text-[9px] font-semibold">
 		<span class="text-emerald-500">true ●</span>

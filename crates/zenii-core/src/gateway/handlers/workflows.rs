@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,9 @@ use crate::{Result, ZeniiError};
 fn is_valid_workflow_id(id: &str) -> bool {
     !id.is_empty() && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
 }
+
+const LIST_DEFAULT_LIMIT: usize = 50;
+const LIST_MAX_LIMIT: usize = 200;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct GenerateWorkflowRequest {
@@ -82,13 +85,47 @@ pub async fn create_workflow(
     Ok((StatusCode::CREATED, Json(workflow)))
 }
 
-pub async fn list_workflows(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse> {
+#[derive(Debug, Deserialize)]
+pub struct ListWorkflowsQuery {
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ListWorkflowsResponse {
+    pub workflows: Vec<Workflow>,
+    pub total: usize,
+    pub offset: usize,
+    pub limit: usize,
+}
+
+pub async fn list_workflows(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListWorkflowsQuery>,
+) -> Result<impl IntoResponse> {
     let registry = state
         .workflow_registry
         .as_ref()
         .ok_or_else(|| ZeniiError::Workflow("workflow feature not initialized".into()))?;
 
-    Ok(Json(registry.list()))
+    let limit = query
+        .limit
+        .unwrap_or(LIST_DEFAULT_LIMIT)
+        .min(LIST_MAX_LIMIT);
+    let offset = query.offset.unwrap_or(0);
+
+    let mut all = registry.list();
+    // Stable ordering by id so pagination is deterministic
+    all.sort_by(|a, b| a.id.cmp(&b.id));
+    let total = all.len();
+    let workflows = all.into_iter().skip(offset).take(limit).collect();
+
+    Ok(Json(ListWorkflowsResponse {
+        workflows,
+        total,
+        offset,
+        limit,
+    }))
 }
 
 pub async fn get_workflow(
@@ -185,7 +222,10 @@ pub async fn delete_workflow(
         .as_ref()
         .ok_or_else(|| ZeniiError::Workflow("workflow feature not initialized".into()))?;
 
-    registry.delete(&id)?;
+    let deleted = registry.delete(&id)?;
+    if !deleted {
+        return Err(ZeniiError::NotFound(format!("workflow '{id}' not found")));
+    }
     let _ = state
         .event_bus
         .publish(crate::event_bus::AppEvent::WorkflowsChanged);
@@ -315,6 +355,17 @@ pub async fn workflow_history(
     if !is_valid_workflow_id(&id) {
         return Err(ZeniiError::Validation("invalid workflow id".into()));
     }
+
+    // Verify the workflow exists before fetching history
+    let registry = state
+        .workflow_registry
+        .as_ref()
+        .ok_or_else(|| ZeniiError::Workflow("workflow feature not initialized".into()))?;
+
+    if registry.get(&id).is_none() {
+        return Err(ZeniiError::NotFound(format!("workflow '{id}' not found")));
+    }
+
     let executor = state
         .workflow_executor
         .as_ref()
@@ -584,5 +635,143 @@ mod tests {
         // 3rd run attempt: verify the count check fires
         let would_be_rejected = active_runs.len() >= config.workflow_max_concurrent;
         assert!(would_be_rejected, "3rd run should be rejected by max_concurrent check");
+    }
+
+    // P.1 — delete unknown workflow returns 404
+    #[cfg(feature = "workflows")]
+    #[tokio::test]
+    async fn delete_unknown_workflow_returns_404() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state_with_workflows().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .method("DELETE")
+            .uri("/workflows/does-not-exist")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    // P.2 — list workflows returns paginated response with total field
+    #[cfg(feature = "workflows")]
+    #[tokio::test]
+    async fn list_workflows_pagination() {
+        use crate::workflows::{FailurePolicy, StepType, Workflow, WorkflowStep};
+
+        let (_dir, state) = crate::gateway::handlers::tests::test_state_with_workflows().await;
+
+        // Pre-populate with 3 workflows directly via the registry
+        {
+            let registry = state.workflow_registry.as_ref().unwrap();
+            for i in 1..=3_u32 {
+                registry
+                    .save(Workflow {
+                        id: format!("wf-{i:02}"),
+                        name: format!("Workflow {i}"),
+                        description: format!("desc {i}"),
+                        schedule: None,
+                        steps: vec![WorkflowStep {
+                            name: "s1".into(),
+                            step_type: StepType::Delay { seconds: 1 },
+                            depends_on: vec![],
+                            retry: None,
+                            failure_policy: FailurePolicy::Stop,
+                            timeout_secs: None,
+                        }],
+                        layout: None,
+                        created_at: "2026-01-01T00:00:00Z".into(),
+                        updated_at: "2026-01-01T00:00:00Z".into(),
+                    })
+                    .unwrap();
+            }
+        }
+
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .uri("/workflows?limit=2&offset=0")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["total"], 3);
+        assert_eq!(json["limit"], 2);
+        assert_eq!(json["offset"], 0);
+        assert_eq!(json["workflows"].as_array().unwrap().len(), 2);
+    }
+
+    // P.3 — list_workflows default limit and total present when no query params
+    #[cfg(feature = "workflows")]
+    #[tokio::test]
+    async fn list_workflows_default_limit() {
+        use crate::workflows::{FailurePolicy, StepType, Workflow, WorkflowStep};
+
+        let (_dir, state) = crate::gateway::handlers::tests::test_state_with_workflows().await;
+
+        {
+            let registry = state.workflow_registry.as_ref().unwrap();
+            registry
+                .save(Workflow {
+                    id: "wf-single".into(),
+                    name: "Single".into(),
+                    description: "only one".into(),
+                    schedule: None,
+                    steps: vec![WorkflowStep {
+                        name: "s1".into(),
+                        step_type: StepType::Delay { seconds: 1 },
+                        depends_on: vec![],
+                        retry: None,
+                        failure_policy: FailurePolicy::Stop,
+                        timeout_secs: None,
+                    }],
+                    layout: None,
+                    created_at: "2026-01-01T00:00:00Z".into(),
+                    updated_at: "2026-01-01T00:00:00Z".into(),
+                })
+                .unwrap();
+        }
+
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .uri("/workflows")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["total"], 1);
+        assert_eq!(json["limit"], 50); // default
+        assert_eq!(json["offset"], 0);
+        assert_eq!(json["workflows"].as_array().unwrap().len(), 1);
+    }
+
+    // P.4 — history for unknown workflow returns 404
+    #[cfg(feature = "workflows")]
+    #[tokio::test]
+    async fn history_unknown_workflow_returns_404() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state_with_workflows().await;
+        // workflow_executor is None so if we got past the registry check it would be
+        // 500; the 404 must come from the registry existence check.
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .uri("/workflows/does-not-exist/history")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 }

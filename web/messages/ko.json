@@ -1039,5 +1039,17 @@
   "mcp_clients_error_id_spaces": "ID에 공백이 포함될 수 없습니다",
   "mcp_clients_error_id_exists": "이미 존재하는 ID입니다",
   "mcp_clients_error_cmd_required": "명령은 필수입니다",
-  "mcp_clients_error_url_invalid": "URL은 http:// 또는 https://로 시작해야 합니다"
+  "mcp_clients_error_url_invalid": "URL은 http:// 또는 https://로 시작해야 합니다",
+  "dashboard_wiki_comparisons": "[EN] Comparisons",
+  "dashboard_wiki_concepts": "[EN] Concepts",
+  "dashboard_wiki_entities": "[EN] Entities",
+  "dashboard_wiki_sources": "[EN] Docs",
+  "dashboard_wiki_topics": "[EN] Topics",
+  "wiki_dup_checking": "[EN] Checking...",
+  "wiki_dup_exact": "[EN] Unchanged duplicate",
+  "wiki_dup_include": "[EN] Include",
+  "wiki_dup_renamed": "[EN] Matches \"{name}\"",
+  "wiki_dup_skip": "[EN] Skip",
+  "wiki_dup_updated": "[EN] Already ingested",
+  "wiki_ingest_all_skipped": "[EN] All files skipped"
 }

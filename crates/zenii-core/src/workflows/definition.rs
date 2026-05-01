@@ -720,6 +720,36 @@ mod tests {
         }
     }
 
+    // P.5 — step name with space must be rejected by validate()
+    // NOTE: Requires Agent A's `Workflow::validate()` method to be merged.
+    // Until then this test is marked #[ignore] so CI stays green.
+    #[test]
+    #[ignore = "requires Workflow::validate() from agent-a branch"]
+    fn step_name_with_space_fails_validation() {
+        let wf = Workflow {
+            id: "test".into(),
+            name: "Test".into(),
+            description: "desc".into(),
+            schedule: None,
+            steps: vec![WorkflowStep {
+                name: "step name".into(), // contains a space — must be rejected
+                step_type: StepType::Delay { seconds: 1 },
+                depends_on: vec![],
+                retry: None,
+                failure_policy: FailurePolicy::Stop,
+                timeout_secs: None,
+            }],
+            layout: None,
+            created_at: "2026-01-01T00:00:00Z".into(),
+            updated_at: "2026-01-01T00:00:00Z".into(),
+        };
+        // Once Workflow::validate() exists:
+        // let result = wf.validate();
+        // assert!(result.is_err(), "step name with space must be rejected");
+        // assert!(result.unwrap_err().to_string().contains("step name"));
+        let _ = wf; // suppress unused warning until validate() lands
+    }
+
     // 5.13
     #[test]
     fn workflow_from_toml_minimal() {

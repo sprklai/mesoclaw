@@ -178,4 +178,24 @@ pub(crate) mod tests {
         });
         (dir, state)
     }
+
+    /// Like `test_state` but sets up a real WorkflowRegistry so workflow 404 / pagination
+    /// tests can exercise the actual handler logic.
+    #[cfg(feature = "workflows")]
+    pub async fn test_state_with_workflows()
+    -> (tempfile::TempDir, Arc<AppState>)
+    {
+        use crate::workflows::WorkflowRegistry;
+
+        let (dir, base_state) = test_state().await;
+        let workflows_dir = dir.path().join("workflows");
+        let registry = Arc::new(WorkflowRegistry::new(workflows_dir).unwrap());
+
+        // Unwrap the Arc, update the field, re-wrap.
+        // SAFETY: test_state returns a freshly constructed Arc with refcount 1.
+        let mut state = Arc::try_unwrap(base_state)
+            .unwrap_or_else(|_| panic!("test_state must return unique Arc"));
+        state.workflow_registry = Some(registry);
+        (dir, Arc::new(state))
+    }
 }
