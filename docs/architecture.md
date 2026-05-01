@@ -2075,6 +2075,13 @@ flowchart TD
         Types["StepType variants<br>Tool, Llm, Condition, Parallel, Delay"]
     end
 
+    subgraph Generator["WorkflowGenerator - NL to TOML"]
+        NLDesc["NL Description<br>Plain English input"]
+        WFGen["WorkflowGenerator<br>NL → Workflow struct"]
+        Validate["Validate tool names<br>against ToolRegistry"]
+        Result["GenerateResult<br>workflow + confidence"]
+    end
+
     subgraph Registry["WorkflowRegistry - DashMap"]
         Load["load_all from directory"]
         CRUD["save / get / list / delete"]
@@ -2103,6 +2110,11 @@ flowchart TD
         WfDone["WorkflowCompleted"]
     end
 
+    NLDesc --> WFGen
+    WFGen --> Validate
+    Validate --> Result
+    Result --> TOML
+    
     TOML --> Load
     Load --> CRUD
     CRUD --> DAG
@@ -2117,6 +2129,7 @@ flowchart TD
     StepExec -.-> WfDone
 
     style Definition fill:#2196F3,color:#fff
+    style Generator fill:#9E9E9E,color:#fff
     style Registry fill:#4CAF50,color:#fff
     style Execution fill:#FF9800,color:#fff
     style Runtime fill:#9E9E9E,color:#fff
@@ -2137,6 +2150,7 @@ flowchart TD
 | `WorkflowRunStatus` | `workflows/definition.rs` | Enum: Running, Completed, Failed, Cancelled |
 | `WorkflowRegistry` | `workflows/mod.rs` | DashMap-backed CRUD + TOML persistence to disk |
 | `WorkflowExecutor` | `workflows/executor.rs` | DAG builder, topological execution, DB persistence, retry/timeout |
+| `WorkflowGenerator` | `workflows/generator.rs` | Converts NL descriptions to `Workflow` structs via `ZeniiAgent::prompt()`. Validates tool names against `ToolRegistry`. Returns `GenerateResult` with workflow, confidence, and clarifying question. |
 | `dispatch_step` | `workflows/runtime.rs` | Step type dispatcher with template resolution |
 | `resolve` | `workflows/templates.rs` | Minijinja template engine for inter-step data flow |
 

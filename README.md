@@ -181,6 +181,8 @@ steps:
 
 Run manually: `POST /workflows/daily-digest/run`
 
+**Natural Language Workflow Creation** — describe a workflow in plain English; Zenii generates the TOML and opens the visual builder automatically. Available from the Workflows page (toggle to "Describe in English") and from the chat window (⬡ Workflow button, mutually exclusive with Delegate).
+
 **Scheduler** — trigger any prompt or workflow on a cron schedule, executed as a full agent turn with access to all tools:
 
 ```bash
