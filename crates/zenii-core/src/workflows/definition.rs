@@ -783,6 +783,7 @@ mod tests {
             ],
             layout: None,
             created_at: "2026-01-01T00:00:00Z".into(),
+            schema_version: Some(1),
             updated_at: "2026-01-01T00:00:00Z".into(),
         }
     }
@@ -849,6 +850,7 @@ mod tests {
             ],
             layout: None,
             created_at: "2026-01-01T00:00:00Z".into(),
+            schema_version: None,
             updated_at: "2026-01-01T00:00:00Z".into(),
         };
         let err = wf.validate().unwrap_err();
