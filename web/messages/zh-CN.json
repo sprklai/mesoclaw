@@ -1039,5 +1039,17 @@
   "mcp_clients_error_id_spaces": "ID 不能包含空格",
   "mcp_clients_error_id_exists": "ID 已存在",
   "mcp_clients_error_cmd_required": "命令是必填项",
-  "mcp_clients_error_url_invalid": "URL 必须以 http:// 或 https:// 开头"
+  "mcp_clients_error_url_invalid": "URL 必须以 http:// 或 https:// 开头",
+  "dashboard_wiki_comparisons": "[EN] Comparisons",
+  "dashboard_wiki_concepts": "[EN] Concepts",
+  "dashboard_wiki_entities": "[EN] Entities",
+  "dashboard_wiki_sources": "[EN] Docs",
+  "dashboard_wiki_topics": "[EN] Topics",
+  "wiki_dup_checking": "[EN] Checking...",
+  "wiki_dup_exact": "[EN] Unchanged duplicate",
+  "wiki_dup_include": "[EN] Include",
+  "wiki_dup_renamed": "[EN] Matches \"{name}\"",
+  "wiki_dup_skip": "[EN] Skip",
+  "wiki_dup_updated": "[EN] Already ingested",
+  "wiki_ingest_all_skipped": "[EN] All files skipped"
 }

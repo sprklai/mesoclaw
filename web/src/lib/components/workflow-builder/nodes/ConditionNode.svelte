@@ -30,8 +30,8 @@
 	{/if}
 
 	<div class="flex justify-between px-3 py-1 text-[9px] text-muted-foreground">
-		<span class="text-green-500">true</span>
-		<span class="text-red-400">false</span>
+		<span class="text-green-500">{t('wb_handle_true')}</span>
+		<span class="text-red-400">{t('wb_handle_false')}</span>
 	</div>
 
 	<Handle
