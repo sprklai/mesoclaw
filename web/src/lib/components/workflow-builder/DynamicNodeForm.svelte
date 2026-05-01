@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { nodeRegistry, type NodeFieldDef } from './node-registry';
+	import { nodeRegistry } from './node-registry';
 	import { builderStore } from '$lib/stores/workflow-builder.svelte';
 	import { Switch } from '$lib/components/ui/switch';
-	import { Button } from '$lib/components/ui/button';
 	import { t } from './i18n-utils';
 
 	const node = $derived(builderStore.selectedNode);
@@ -16,6 +15,28 @@
 		if (typeof fp === 'object' && (fp as Record<string, unknown>).fallback) return 'fallback';
 		return String(fp);
 	});
+
+	/** Step name validation: only [a-z0-9_], non-empty */
+	const STEP_NAME_RE = /^[a-z0-9_]+$/;
+	const stepNameValue = $derived((node?.data.stepName as string) ?? '');
+	const stepNameError = $derived.by(() => {
+		if (!stepNameValue) return t('wb_validation_step_name_empty');
+		if (!STEP_NAME_RE.test(stepNameValue)) return t('wb_validation_step_name_invalid');
+		return '';
+	});
+
+	/** Fallback step validation */
+	const fallbackStep = $derived.by(() => {
+		if (!node) return '';
+		const fp = node.data.failure_policy;
+		if (typeof fp === 'object' && fp !== null) {
+			return ((fp as Record<string, Record<string, string>>).Fallback?.step) ?? '';
+		}
+		return '';
+	});
+	const fallbackStepError = $derived(
+		fpValue === 'fallback' && !fallbackStep ? t('wb_validation_fallback_step_required') : ''
+	);
 
 	function getNodeStepNames(): string[] {
 		return builderStore.nodes
@@ -63,8 +84,11 @@
 				value={node.data.stepName ?? ''}
 				oninput={(e) => updateStepName((e.target as HTMLInputElement).value)}
 				placeholder={t('wb_config_name_placeholder')}
-				class="w-full rounded-md border bg-background text-foreground px-2 py-1.5 text-sm"
+				class="w-full rounded-md border bg-background text-foreground px-2 py-1.5 text-sm {stepNameError ? 'border-red-500' : ''}"
 			/>
+			{#if stepNameError}
+				<p class="text-xs text-red-500">{stepNameError}</p>
+			{/if}
 		</div>
 
 		<!-- Dynamic fields from definition -->
@@ -246,13 +270,16 @@
 						id="fallback-step-{node.id}"
 						value={String((node.data.failure_policy as Record<string, Record<string, string>>)?.fallback?.step ?? '')}
 						onchange={(e) => updateCommon('failure_policy', { fallback: { step: (e.target as HTMLSelectElement).value } })}
-						class="w-full rounded-md border bg-background text-foreground px-2 py-1.5 text-sm"
+						class="w-full rounded-md border bg-background text-foreground px-2 py-1.5 text-sm {fallbackStepError ? 'border-red-500' : ''}"
 					>
-						<option value="">---</option>
+						<option value="">{t('wb_validation_fallback_step_required')}</option>
 						{#each getNodeStepNames() as name}
 							<option value={name}>{name}</option>
 						{/each}
 					</select>
+					{#if fallbackStepError}
+						<p class="text-xs text-red-500">{fallbackStepError}</p>
+					{/if}
 				</div>
 			{/if}
 		</div>

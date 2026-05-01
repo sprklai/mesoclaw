@@ -117,13 +117,120 @@ export function workflowToGraph(workflow: Workflow): {
 }
 
 /**
+ * Validate the graph before converting to a workflow.
+ * Throws a descriptive Error if validation fails.
+ */
+export function validateGraph(nodes: Node[], edges: Edge[]): void {
+  // Identify trigger nodes (excluded from step-level validation)
+  const triggerNodeIds = new Set(
+    nodes
+      .filter((n) => {
+        const dt = (n.data as Record<string, unknown>).definitionType as
+          | string
+          | undefined;
+        return dt === "trigger_manual" || dt === "trigger_cron";
+      })
+      .map((n) => n.id),
+  );
+
+  const nonTriggerNodes = nodes.filter((n) => !triggerNodeIds.has(n.id));
+
+  // Step name uniqueness
+  const stepNames: string[] = nonTriggerNodes.map(
+    (n) => ((n.data as Record<string, unknown>).stepName as string) || n.id,
+  );
+  const seenNames = new Set<string>();
+  for (const name of stepNames) {
+    if (seenNames.has(name)) {
+      throw new Error(`duplicate step name: ${name}`);
+    }
+    seenNames.add(name);
+  }
+
+  // Build adjacency from edges (excluding condition branch handle edges)
+  const conditionNodeIds = new Set(
+    nodes
+      .filter(
+        (n) =>
+          (n.data as Record<string, unknown>).definitionType === "condition",
+      )
+      .map((n) => n.id),
+  );
+
+  const outgoing = new Map<string, Set<string>>();
+  const incoming = new Map<string, Set<string>>();
+  for (const n of nodes) {
+    outgoing.set(n.id, new Set());
+    incoming.set(n.id, new Set());
+  }
+  for (const edge of edges) {
+    outgoing.get(edge.source)?.add(edge.target);
+    incoming.get(edge.target)?.add(edge.source);
+  }
+
+  // Cycle detection via DFS — detect back edges
+  const WHITE = 0,
+    GRAY = 1,
+    BLACK = 2;
+  const color = new Map<string, number>();
+  for (const n of nodes) color.set(n.id, WHITE);
+
+  function dfs(id: string): boolean {
+    color.set(id, GRAY);
+    for (const neighbor of outgoing.get(id) ?? []) {
+      if (color.get(neighbor) === GRAY) return true; // back edge = cycle
+      if (color.get(neighbor) === WHITE && dfs(neighbor)) return true;
+    }
+    color.set(id, BLACK);
+    return false;
+  }
+
+  for (const n of nodes) {
+    if (color.get(n.id) === WHITE && dfs(n.id)) {
+      throw new Error("cycle detected in workflow graph");
+    }
+  }
+
+  // Orphan detection: non-trigger nodes with zero incoming AND zero outgoing edges,
+  // only when there are other nodes to connect to (single-step workflows are valid)
+  if (nonTriggerNodes.length > 1) {
+    for (const n of nonTriggerNodes) {
+      const hasIn = (incoming.get(n.id)?.size ?? 0) > 0;
+      const hasOut = (outgoing.get(n.id)?.size ?? 0) > 0;
+      if (!hasIn && !hasOut) {
+        const name =
+          ((n.data as Record<string, unknown>).stepName as string) || n.id;
+        throw new Error(`orphan node detected: ${name}`);
+      }
+    }
+  }
+
+  // Condition node branch validation
+  for (const n of nodes) {
+    if (!conditionNodeIds.has(n.id)) continue;
+    const data = n.data as Record<string, unknown>;
+    const name = (data.stepName as string) || n.id;
+    const ifTrue = data.if_true as string | undefined;
+    const ifFalse = data.if_false as string | undefined;
+    if (!ifTrue || !ifFalse) {
+      throw new Error(
+        `condition node "${name}" requires both true and false branches`,
+      );
+    }
+  }
+}
+
+/**
  * Convert @xyflow/svelte nodes and edges back to a backend Workflow.
+ * Runs graph validation before building — throws Error on invalid graph.
  */
 export function graphToWorkflow(
   nodes: Node[],
   edges: Edge[],
   meta: WorkflowMeta,
 ): Workflow {
+  validateGraph(nodes, edges);
+
   // Build a set of condition node IDs so we can filter their handle edges from depends_on
   const conditionNodeIds = new Set(
     nodes

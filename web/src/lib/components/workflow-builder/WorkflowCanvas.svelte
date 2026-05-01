@@ -27,6 +27,24 @@
 			targetHandle: connection.targetHandle ?? undefined
 		};
 		builderStore.addEdge(edge);
+
+		// Sync condition node if_true / if_false when branch edges are connected
+		const sourceNode = builderStore.nodes.find((n) => n.id === connection.source);
+		if (
+			sourceNode &&
+			(sourceNode.data as Record<string, unknown>).definitionType === 'condition'
+		) {
+			const targetNode = builderStore.nodes.find((n) => n.id === connection.target);
+			const targetStepName = targetNode
+				? ((targetNode.data as Record<string, unknown>).stepName as string) || connection.target
+				: connection.target;
+
+			if (connection.sourceHandle === 'true') {
+				builderStore.updateNodeData(connection.source, { if_true: targetStepName });
+			} else if (connection.sourceHandle === 'false') {
+				builderStore.updateNodeData(connection.source, { if_false: targetStepName });
+			}
+		}
 	}
 
 	function handleNodeClick({ node }: { node: { id: string }; event: MouseEvent | TouchEvent }) {
@@ -42,6 +60,21 @@
 			builderStore.removeNode(n.id);
 		}
 		for (const e of deletedEdges) {
+			// When a condition branch edge is removed, clear the corresponding field
+			const fullEdge = builderStore.edges.find((edge) => edge.id === e.id);
+			if (fullEdge) {
+				const sourceNode = builderStore.nodes.find((n) => n.id === fullEdge.source);
+				if (
+					sourceNode &&
+					(sourceNode.data as Record<string, unknown>).definitionType === 'condition'
+				) {
+					if (fullEdge.sourceHandle === 'true') {
+						builderStore.updateNodeData(fullEdge.source, { if_true: '' });
+					} else if (fullEdge.sourceHandle === 'false') {
+						builderStore.updateNodeData(fullEdge.source, { if_false: '' });
+					}
+				}
+			}
 			builderStore.removeEdge(e.id);
 		}
 	}
