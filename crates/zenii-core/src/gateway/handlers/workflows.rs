@@ -4,11 +4,45 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::gateway::state::AppState;
 use crate::workflows::Workflow;
 use crate::{Result, ZeniiError};
+
+#[derive(Debug, Deserialize)]
+pub struct GenerateWorkflowRequest {
+    pub description: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GenerateWorkflowResponse {
+    pub toml: String,
+    pub confidence: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clarifying_question: Option<String>,
+}
+
+pub async fn generate_workflow(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<GenerateWorkflowRequest>,
+) -> Result<impl IntoResponse> {
+    let generator = state
+        .workflow_generator
+        .as_ref()
+        .ok_or_else(|| ZeniiError::Workflow("workflow generator not initialized".into()))?;
+
+    let result = generator.generate(&req.description).await?;
+
+    Ok(Json(GenerateWorkflowResponse {
+        toml: result.toml,
+        confidence: match result.confidence {
+            crate::workflows::generator::Confidence::High => "high".to_string(),
+            crate::workflows::generator::Confidence::Low => "low".to_string(),
+        },
+        clarifying_question: result.clarifying_question,
+    }))
+}
 
 #[derive(Debug, Deserialize)]
 pub struct CreateWorkflowRequest {
@@ -347,6 +381,23 @@ mod tests {
         let req = Request::builder()
             .uri("/workflows/test/runs/run1")
             .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 5.49 — generate workflow returns error when generator not initialized
+    #[tokio::test]
+    async fn test_generate_workflow_no_generator() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows/generate")
+            .header("content-type", "application/json")
+            .body(Body::from(r#"{"description":"check my disk"}"#))
             .unwrap();
 
         let resp = app.oneshot(req).await.unwrap();
