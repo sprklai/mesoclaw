@@ -85,6 +85,8 @@ pub struct Services {
     pub workflow_registry: Option<Arc<crate::workflows::WorkflowRegistry>>,
     #[cfg(feature = "workflows")]
     pub workflow_executor: Option<Arc<crate::workflows::executor::WorkflowExecutor>>,
+    #[cfg(feature = "workflows")]
+    pub workflow_generator: Option<Arc<crate::workflows::generator::WorkflowGenerator>>,
     pub usage_logger: Arc<crate::logging::UsageLogger>,
     /// Whether the local embedding model is downloaded and ready.
     pub embedding_model_available: Arc<AtomicBool>,
@@ -675,6 +677,20 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         config.workflow_step_max_retries,
     )));
 
+    #[cfg(all(feature = "workflows", feature = "ai"))]
+    let workflow_generator_init = match (agent.as_ref(), tools.as_ref()) {
+        (Some(ag), tr) => {
+            let _ = tr; // tools is always present; this avoids unused variable warning
+            Some(Arc::new(crate::workflows::generator::WorkflowGenerator::new(
+                Arc::clone(ag),
+                Arc::clone(&tools),
+            )))
+        }
+        _ => None,
+    };
+    #[cfg(all(feature = "workflows", not(feature = "ai")))]
+    let workflow_generator_init: Option<Arc<crate::workflows::generator::WorkflowGenerator>> = None;
+
     // Register WorkflowTool (post-Arc, DashMap allows it)
     #[cfg(feature = "workflows")]
     if let (Some(wf_reg), Some(wf_exec)) = (&workflow_registry_init, &workflow_executor_init) {
@@ -930,6 +946,8 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
         workflow_registry: workflow_registry_init,
         #[cfg(feature = "workflows")]
         workflow_executor: workflow_executor_init,
+        #[cfg(feature = "workflows")]
+        workflow_generator: workflow_generator_init,
         usage_logger,
         embedding_model_available,
         approval_broker: Some(Arc::new(crate::security::approval::ApprovalBroker::new(
@@ -990,6 +1008,8 @@ impl From<Services> for AppState {
             workflow_registry: s.workflow_registry,
             #[cfg(feature = "workflows")]
             workflow_executor: s.workflow_executor,
+            #[cfg(feature = "workflows")]
+            workflow_generator: s.workflow_generator,
             #[cfg(feature = "workflows")]
             active_workflow_runs: Arc::new(dashmap::DashMap::new()),
             usage_logger: s.usage_logger,
