@@ -1101,26 +1101,5 @@
   "mcp_clients_error_id_exists": "ID already exists",
   "mcp_clients_error_cmd_required": "Command is required",
   "mcp_clients_error_url_invalid": "URL must start with http:// or https://",
-
-  "wb_node_wiki_search_label": "Wiki Search",
-  "wb_node_wiki_search_desc": "Search wiki pages by keyword",
-  "wb_node_wiki_get_label": "Wiki Get Page",
-  "wb_node_wiki_get_desc": "Fetch a wiki page by slug",
-  "wb_node_wiki_list_label": "Wiki List",
-  "wb_node_wiki_list_desc": "List all wiki pages",
-  "wb_node_wiki_query_label": "Wiki Query",
-  "wb_node_wiki_query_desc": "Retrieve relevant wiki context for a question",
-
-  "wb_field_wiki_query_label": "Search Query",
-  "wb_field_wiki_query_placeholder": "Enter keywords to search...",
-  "wb_field_wiki_query_description": "Keyword search over wiki page titles, TLDRs and body text",
-  "wb_field_wiki_search_limit_description": "Maximum number of matching pages to return",
-  "wb_field_wiki_slug_label": "Page Slug",
-  "wb_field_wiki_slug_placeholder": "e.g. self-attention",
-  "wb_field_wiki_slug_description": "The unique slug identifier of the wiki page to fetch",
-  "wb_field_wiki_list_limit_description": "Maximum number of pages to return",
-  "wb_field_wiki_question_label": "Question",
-  "wb_field_wiki_question_placeholder": "What do you want to know?",
-  "wb_field_wiki_question_description": "Natural language question — returns full body of the most relevant wiki pages as context",
-  "wb_field_wiki_query_limit_description": "Maximum number of relevant pages to include in the context"
+  "wb_run_save_first": "Save workflow before running"
 }

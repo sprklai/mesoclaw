@@ -16,7 +16,19 @@
 	import { toast } from 'svelte-sonner';
 	import * as m from '$lib/paraglide/messages';
 
-	let codeContent = $state('');
+	// Live TOML derived from current canvas state — updates as the user edits
+	let codeContent = $derived.by(() => {
+		try {
+			const wf = graphToWorkflow(builderStore.nodes, builderStore.edges, {
+				name: builderStore.workflowName || 'Untitled',
+				description: builderStore.workflowDescription,
+				schedule: builderStore.workflowSchedule
+			});
+			return workflowToToml(wf);
+		} catch (err) {
+			return `# Error generating TOML: ${err instanceof Error ? err.message : String(err)}`;
+		}
+	});
 	let unsavedDialogOpen = $state(false);
 	let pendingNavigationUrl = $state<string | null>(null);
 

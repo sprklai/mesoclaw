@@ -79,6 +79,7 @@ const WORKFLOW_SAFETY_TIMEOUT_MS = 10 * 60 * 1000;
 function createWorkflowsStore() {
   let workflows = $state<Workflow[]>([]);
   let loading = $state(false);
+  let isSaving = $state(false);
   let error = $state<string | null>(null);
   let runningWorkflows = $state<Map<string, WorkflowRunProgress>>(new Map());
   const timeouts = new Map<string, ReturnType<typeof setTimeout>>();
@@ -89,6 +90,9 @@ function createWorkflowsStore() {
     },
     get loading() {
       return loading;
+    },
+    get isSaving() {
+      return isSaving;
     },
     get error() {
       return error;
@@ -209,22 +213,40 @@ function createWorkflowsStore() {
     },
 
     async create(tomlContent: string): Promise<Workflow> {
-      const result = await apiPost<Workflow>("/workflows", {
-        toml_content: tomlContent,
-      });
-      await this.load();
-      return result;
+      if (isSaving) return Promise.reject(new Error("Save already in progress"));
+      isSaving = true;
+      loading = true;
+      error = null;
+      try {
+        const result = await apiPost<Workflow>("/workflows", {
+          toml_content: tomlContent,
+        });
+        await this.load();
+        return result;
+      } finally {
+        isSaving = false;
+        loading = false;
+      }
     },
 
     async update(id: string, tomlContent: string): Promise<Workflow> {
-      const result = await apiPut<Workflow>(
-        `/workflows/${encodeURIComponent(id)}`,
-        {
-          toml_content: tomlContent,
-        },
-      );
-      await this.load();
-      return result;
+      if (isSaving) return Promise.reject(new Error("Save already in progress"));
+      isSaving = true;
+      loading = true;
+      error = null;
+      try {
+        const result = await apiPut<Workflow>(
+          `/workflows/${encodeURIComponent(id)}`,
+          {
+            toml_content: tomlContent,
+          },
+        );
+        await this.load();
+        return result;
+      } finally {
+        isSaving = false;
+        loading = false;
+      }
     },
 
     async getRawToml(id: string): Promise<string> {

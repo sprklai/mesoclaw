@@ -15,7 +15,7 @@ function createWorkflowBuilderStore() {
 
   // UI state
   let isDirty = $state(false);
-  let suppressDirty = $state(false); // suppress dirty marking after load
+  let _loadingFromBackend = false; // synchronous flag: suppresses dirty while loading from backend
   let viewMode = $state<"visual" | "code">("visual");
   let isRunning = $state(false); // whether this workflow is currently executing
 
@@ -83,14 +83,14 @@ function createWorkflowBuilderStore() {
     },
 
     // Setters — SvelteFlow bind:nodes/bind:edges triggers these on every internal update.
-    // suppressDirty prevents false dirty state after loadWorkflow/reset.
+    // _loadingFromBackend prevents false dirty state after loadWorkflow/reset/markSaved.
     set nodes(v: Node[]) {
       nodes = v;
-      if (!suppressDirty) isDirty = true;
+      if (!_loadingFromBackend) isDirty = true;
     },
     set edges(v: Edge[]) {
       edges = v;
-      if (!suppressDirty) isDirty = true;
+      if (!_loadingFromBackend) isDirty = true;
     },
 
     selectNode(id: string | null) {
@@ -314,7 +314,9 @@ function createWorkflowBuilderStore() {
       graphNodes: Node[],
       graphEdges: Edge[],
     ) {
-      suppressDirty = true;
+      // Set synchronously — SvelteFlow's bind:nodes/bind:edges writeback runs in the
+      // same microtask queue, so a synchronous flag is sufficient to suppress false dirty.
+      _loadingFromBackend = true;
       workflowId = wf.id;
       workflowName = wf.name;
       workflowDescription = wf.description;
@@ -325,15 +327,12 @@ function createWorkflowBuilderStore() {
       isDirty = false;
       viewMode = "visual";
       isRunning = false;
-      // Release after SvelteFlow fully processes bind:nodes/bind:edges + fitView
-      setTimeout(() => {
-        suppressDirty = false;
-      }, 150);
+      _loadingFromBackend = false;
     },
 
     // Reset for a new workflow
     reset() {
-      suppressDirty = true;
+      _loadingFromBackend = true;
       workflowId = null;
       workflowName = "";
       workflowDescription = "";
@@ -344,21 +343,17 @@ function createWorkflowBuilderStore() {
       isDirty = false;
       viewMode = "visual";
       isRunning = false;
-      setTimeout(() => {
-        suppressDirty = false;
-      }, 150);
+      _loadingFromBackend = false;
     },
 
     // Mark as saved (clears dirty flag)
     // Must suppress SvelteFlow's reactive bind:nodes/bind:edges writeback
     // which otherwise immediately re-sets isDirty via the setters.
     markSaved(id?: string) {
-      suppressDirty = true;
+      _loadingFromBackend = true;
       if (id) workflowId = id;
       isDirty = false;
-      setTimeout(() => {
-        suppressDirty = false;
-      }, 150);
+      _loadingFromBackend = false;
     },
   };
 }
