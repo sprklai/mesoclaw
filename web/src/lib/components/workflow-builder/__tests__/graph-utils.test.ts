@@ -76,20 +76,18 @@ describe("validateGraph — cycle detection", () => {
 });
 
 // ---------------------------------------------------------------------------
-// validateGraph — orphan detection
+// validateGraph — disconnected steps are valid independent DAG roots
 // ---------------------------------------------------------------------------
 
-describe("validateGraph — orphan detection", () => {
-  it("throws when a non-trigger node has no edges", () => {
+describe("validateGraph — disconnected steps", () => {
+  it("does not throw when a non-trigger node has no edges (valid independent root)", () => {
     const nodes = [
       makeNode("trigger", "trigger_manual"),
       makeNode("step_a", "llm"),
-      makeNode("orphan", "llm"), // no edges at all
+      makeNode("step_b", "llm"), // disconnected — valid independent root step
     ];
     const edges = [makeEdge("trigger", "step_a")];
-    expect(() => validateGraph(nodes, edges)).toThrow(
-      "orphan node detected: orphan",
-    );
+    expect(() => validateGraph(nodes, edges)).not.toThrow();
   });
 
   it("does not throw for trigger nodes with no incoming edges", () => {

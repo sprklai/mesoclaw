@@ -192,19 +192,6 @@ export function validateGraph(nodes: Node[], edges: Edge[]): void {
   }
 
   // Orphan detection: non-trigger nodes with zero incoming AND zero outgoing edges,
-  // only when there are other nodes to connect to (single-step workflows are valid)
-  if (nonTriggerNodes.length > 1) {
-    for (const n of nonTriggerNodes) {
-      const hasIn = (incoming.get(n.id)?.size ?? 0) > 0;
-      const hasOut = (outgoing.get(n.id)?.size ?? 0) > 0;
-      if (!hasIn && !hasOut) {
-        const name =
-          ((n.data as Record<string, unknown>).stepName as string) || n.id;
-        throw new Error(`orphan node detected: ${name}`);
-      }
-    }
-  }
-
   // Condition node branch validation
   for (const n of nodes) {
     if (!conditionNodeIds.has(n.id)) continue;

@@ -25,28 +25,27 @@
 	let creating = $state(false);
 	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 	let lastRefreshedActivity = 0;
-	// Guard: only one loadDashboardData() in flight at a time to avoid loading-state races.
 	let loadInFlight = false;
+	let pendingRefresh = false;
 
 	$effect(() => {
 		loadDashboardData();
 	});
 
 	// Debounce-refresh dashboard when push events arrive (session/message/channel activity).
-	// Only schedules a refresh when no load is already in flight.
 	$effect(() => {
 		const ts = notificationStore.lastActivityAt;
 		if (ts > lastRefreshedActivity) {
 			clearTimeout(refreshTimer);
 			refreshTimer = setTimeout(() => {
 				lastRefreshedActivity = ts;
-				if (!loadInFlight) loadDashboardData();
+				loadDashboardData();
 			}, 2000);
 		}
 	});
 
 	async function loadDashboardData() {
-		if (loadInFlight) return;
+		if (loadInFlight) { pendingRefresh = true; return; }
 		loadInFlight = true;
 		loading = true;
 		try {
@@ -54,7 +53,6 @@
 				sessionsStore.load(),
 				memoryStore.loadAll(),
 				schedulerStore.load(),
-				workflowsStore.load(),
 				channelsStore.load(),
 				inboxStore.load(),
 				wikiStore.load(),
@@ -63,7 +61,13 @@
 		} finally {
 			loading = false;
 			loadInFlight = false;
+			if (pendingRefresh) {
+				pendingRefresh = false;
+				loadDashboardData();
+			}
 		}
+		// Workflows loads independently so it never blocks the page-level loading gate
+		workflowsStore.load().catch(() => {});
 	}
 
 	async function handleNewChat(e: Event) {
@@ -373,7 +377,7 @@
 				</div>
 			</Card.Header>
 			<Card.Content>
-				{#if loading}
+				{#if workflowsStore.loading}
 					<Skeleton class="h-4 w-28" />
 					<div class="mt-3 flex gap-6">
 						<Skeleton class="h-10 w-14" />

@@ -30,7 +30,7 @@
 		if (!node) return '';
 		const fp = node.data.failure_policy;
 		if (typeof fp === 'object' && fp !== null) {
-			return ((fp as Record<string, Record<string, string>>).Fallback?.step) ?? '';
+			return ((fp as Record<string, Record<string, string>>).fallback?.step) ?? '';
 		}
 		return '';
 	});

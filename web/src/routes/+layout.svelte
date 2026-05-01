@@ -20,6 +20,7 @@
 	import { inboxStore } from '$lib/stores/inbox.svelte';
 	import '$lib/stores/theme.svelte';
 	import { localeStore } from '$lib/stores/locale.svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { sessionsStore } from '$lib/stores/sessions.svelte';
 	import { notificationStore } from '$lib/stores/notifications.svelte';
@@ -103,18 +104,15 @@
 								<Sidebar.MenuItem>
 									<Sidebar.MenuButton
 										isActive={page.url.pathname === item.href || (item.href !== '/' && page.url.pathname.startsWith(item.href))}
+										onclick={() => goto(item.href)}
 									>
-										{#snippet child({ props })}
-											<a href={item.href} {...props}>
-												<item.icon class="h-4 w-4" />
-												<span>{item.label}</span>
-												{#if item.href === '/channels' && inboxStore.totalUnread > 0}
-													<span class="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground">
-														{inboxStore.totalUnread}
-													</span>
-												{/if}
-											</a>
-										{/snippet}
+										<item.icon class="h-4 w-4" />
+										<span>{item.label}</span>
+										{#if item.href === '/channels' && inboxStore.totalUnread > 0}
+											<span class="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground">
+												{inboxStore.totalUnread}
+											</span>
+										{/if}
 									</Sidebar.MenuButton>
 								</Sidebar.MenuItem>
 							{/each}
@@ -152,13 +150,10 @@
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
 							isActive={page.url.pathname.startsWith('/settings')}
+							onclick={() => goto('/settings')}
 						>
-							{#snippet child({ props })}
-								<a href="/settings" {...props}>
-									<Settings class="h-4 w-4" />
-									<span>{m.nav_settings()}</span>
-								</a>
-							{/snippet}
+							<Settings class="h-4 w-4" />
+							<span>{m.nav_settings()}</span>
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>

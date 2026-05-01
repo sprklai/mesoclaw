@@ -66,15 +66,15 @@ function createWorkflowBuilderStore() {
         const data = n.data as Record<string, unknown>;
         const stepName = (data.stepName as string) || "";
         if (!stepName || !STEP_NAME_RE.test(stepName)) return true;
-        // Fallback step must be non-empty when failure_policy is Fallback
+        // Fallback step must be non-empty when failure_policy is fallback
         const fp = data.failure_policy;
         if (
           fp !== null &&
           typeof fp === "object" &&
-          (fp as Record<string, unknown>).Fallback
+          (fp as Record<string, unknown>).fallback
         ) {
           const fallbackStep = (
-            (fp as Record<string, unknown>).Fallback as Record<string, string>
+            (fp as Record<string, unknown>).fallback as Record<string, string>
           ).step;
           if (!fallbackStep) return true;
         }
@@ -181,13 +181,13 @@ function createWorkflowBuilderStore() {
           if (
             fp !== null &&
             typeof fp === "object" &&
-            (fp as Record<string, unknown>).Fallback
+            (fp as Record<string, unknown>).fallback
           ) {
             const fallbackStep = (
-              (fp as Record<string, unknown>).Fallback as Record<string, string>
+              (fp as Record<string, unknown>).fallback as Record<string, string>
             ).step;
             if (fallbackStep === removedStepName) {
-              newData.failure_policy = { Fallback: { step: "" } };
+              newData.failure_policy = { fallback: { step: "" } };
               changed = true;
             }
           }
@@ -278,12 +278,12 @@ function createWorkflowBuilderStore() {
         if (
           fp !== null &&
           typeof fp === "object" &&
-          (fp as Record<string, unknown>).Fallback
+          (fp as Record<string, unknown>).fallback
         ) {
           const fallback = (fp as Record<string, unknown>)
-            .Fallback as Record<string, string>;
+            .fallback as Record<string, string>;
           if (fallback.step === oldId) {
-            newData.failure_policy = { Fallback: { step: newId } };
+            newData.failure_policy = { fallback: { step: newId } };
             changed = true;
           }
         }

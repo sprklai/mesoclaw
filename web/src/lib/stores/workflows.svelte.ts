@@ -276,24 +276,27 @@ function createWorkflowsStore() {
     _generateController: null as AbortController | null,
 
     async generateWorkflow(description: string): Promise<GenerateWorkflowResult> {
-      // Issue 4: abort any in-flight generate request before starting a new one.
+      // Abort any in-flight generate request before starting a new one.
       if (this._generateController) {
         this._generateController.abort();
       }
-      this._generateController = new AbortController();
-      const signal = this._generateController.signal;
+      const controller = new AbortController();
+      this._generateController = controller;
+      const signal = controller.signal;
 
       let res: { toml: string; confidence: 'high' | 'low'; clarifying_question?: string; saved: boolean };
       try {
         res = await apiPost<typeof res>('/workflows/generate', { description }, { signal });
       } catch (e: unknown) {
-        // Issue 4: swallow AbortError silently (user started a new request).
         if (e instanceof Error && e.name === 'AbortError') {
-          throw e; // re-throw so caller can decide; caller should also swallow AbortError
+          throw e; // re-throw so caller can swallow AbortError
         }
         throw e;
       } finally {
-        this._generateController = null;
+        // Only clear the ref if no newer request has replaced the controller.
+        if (this._generateController === controller) {
+          this._generateController = null;
+        }
       }
 
       // Issue 7: backend now handles save logic and sets saved=true only for high-confidence.
