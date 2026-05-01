@@ -1,5 +1,6 @@
 pub mod definition;
 pub mod executor;
+pub mod generator;
 pub mod runtime;
 pub mod templates;
 
