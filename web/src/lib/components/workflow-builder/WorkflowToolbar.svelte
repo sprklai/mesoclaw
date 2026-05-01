@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { builderStore } from '$lib/stores/workflow-builder.svelte';
+	import { workflowsStore } from '$lib/stores/workflows.svelte';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import Save from '@lucide/svelte/icons/save';
 	import Play from '@lucide/svelte/icons/play';
@@ -92,7 +93,13 @@
 		<Download class="h-4 w-4" />
 	</Button>
 
-	<Button variant="ghost" size="sm" onclick={onRun} disabled={builderStore.isRunning}>
+	<Button
+		variant="ghost"
+		size="sm"
+		onclick={onRun}
+		disabled={builderStore.isRunning || builderStore.nodes.length === 0 || builderStore.isDirty}
+		title={builderStore.isDirty ? t('wb_run_save_first') : undefined}
+	>
 		{#if builderStore.isRunning}
 			<Loader2 class="h-4 w-4 animate-spin" />
 		{:else}
@@ -100,8 +107,12 @@
 		{/if}
 	</Button>
 
-	<Button variant="default" size="sm" onclick={onSave} disabled={!builderStore.isDirty}>
-		<Save class="h-4 w-4 mr-1" />
+	<Button variant="default" size="sm" onclick={onSave} disabled={!builderStore.isDirty || workflowsStore.isSaving}>
+		{#if workflowsStore.isSaving}
+			<Loader2 class="h-4 w-4 mr-1 animate-spin" />
+		{:else}
+			<Save class="h-4 w-4 mr-1" />
+		{/if}
 		{t('wb_toolbar_save')}
 	</Button>
 </div>

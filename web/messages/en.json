@@ -1051,5 +1051,6 @@
   "mcp_clients_error_id_spaces": "ID cannot contain spaces",
   "mcp_clients_error_id_exists": "ID already exists",
   "mcp_clients_error_cmd_required": "Command is required",
-  "mcp_clients_error_url_invalid": "URL must start with http:// or https://"
+  "mcp_clients_error_url_invalid": "URL must start with http:// or https://",
+  "wb_run_save_first": "Save workflow before running"
 }
