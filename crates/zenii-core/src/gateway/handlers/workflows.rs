@@ -4,11 +4,84 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::gateway::state::AppState;
 use crate::workflows::Workflow;
 use crate::{Result, ZeniiError};
+
+/// Maximum allowed description length in bytes (Issue 5).
+const MAX_DESCRIPTION_BYTES: usize = 4000;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GenerateWorkflowRequest {
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GenerateWorkflowResponse {
+    pub toml: String,
+    pub confidence: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clarifying_question: Option<String>,
+    /// Whether the workflow was saved to the database.
+    /// `false` when confidence is low — the TOML is returned as a preview only.
+    pub saved: bool,
+}
+
+pub async fn generate_workflow(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<GenerateWorkflowRequest>,
+) -> Result<impl IntoResponse> {
+    // Issue 5: reject overlong descriptions before touching the LLM.
+    if req.description.len() > MAX_DESCRIPTION_BYTES {
+        return Err(ZeniiError::Validation(format!(
+            "description too long: {} bytes (max {MAX_DESCRIPTION_BYTES})",
+            req.description.len()
+        )));
+    }
+
+    let generator = state
+        .workflow_generator
+        .as_ref()
+        .ok_or_else(|| ZeniiError::Agent("no agent configured: workflow generation requires an AI provider to be configured".into()))?;
+
+    let result = generator.generate(&req.description).await?;
+
+    let is_low = result.confidence == crate::workflows::generator::Confidence::Low;
+
+    // Issue 7: only save when confidence is High.
+    // Issue 8: validate via TOML round-trip before saving (non-empty steps already
+    //          enforced by generator; TOML parse here catches any structural gaps).
+    let saved = if !is_low {
+        if let Some(ref wf) = result.workflow {
+            if let Some(ref registry) = state.workflow_registry {
+                // Re-parse TOML to validate (catches serialization edge cases).
+                let _: Workflow = toml::from_str(&result.toml).map_err(|e| {
+                    ZeniiError::Workflow(format!("Generated workflow is invalid: {e}"))
+                })?;
+                registry.save(wf.clone())?;
+                let _ = state
+                    .event_bus
+                    .publish(crate::event_bus::AppEvent::WorkflowsChanged);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    Ok(Json(GenerateWorkflowResponse {
+        toml: result.toml,
+        confidence: if is_low { "low".to_string() } else { "high".to_string() },
+        clarifying_question: result.clarifying_question,
+        saved,
+    }))
+}
 
 #[derive(Debug, Deserialize)]
 pub struct CreateWorkflowRequest {
@@ -351,5 +424,43 @@ mod tests {
 
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // 5.49 — generate workflow returns 503 when no AI provider is configured
+    #[tokio::test]
+    async fn test_generate_workflow_no_generator() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows/generate")
+            .header("content-type", "application/json")
+            .body(Body::from(r#"{"description":"check my disk"}"#))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    // 5.50 — generate workflow rejects description > 4000 bytes with HTTP 400
+    #[tokio::test]
+    async fn test_generate_workflow_description_too_long() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        // Build a description that exceeds 4000 bytes.
+        let long_desc = "a".repeat(4001);
+        let body = serde_json::json!({ "description": long_desc }).to_string();
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows/generate")
+            .header("content-type", "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 }

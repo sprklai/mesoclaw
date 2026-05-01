@@ -86,6 +86,8 @@ pub struct AppState {
     #[cfg(feature = "workflows")]
     pub workflow_executor: Option<Arc<crate::workflows::executor::WorkflowExecutor>>,
     #[cfg(feature = "workflows")]
+    pub workflow_generator: Option<Arc<crate::workflows::generator::WorkflowGenerator>>,
+    #[cfg(feature = "workflows")]
     pub active_workflow_runs: Arc<dashmap::DashMap<String, tokio::task::AbortHandle>>,
     pub usage_logger: Arc<UsageLogger>,
     /// Whether the local embedding model is downloaded and ready.

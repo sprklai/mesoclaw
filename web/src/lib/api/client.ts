@@ -182,7 +182,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 export async function apiPost<T>(
   path: string,
   body?: unknown,
-  opts?: { timeout?: number },
+  opts?: { timeout?: number; signal?: AbortSignal },
 ): Promise<T> {
   return api<T>(path, {
     method: "POST",

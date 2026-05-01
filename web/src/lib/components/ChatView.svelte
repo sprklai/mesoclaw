@@ -37,6 +37,7 @@
 	import { delegationStore, buildDelegationRecord } from '$lib/stores/delegation.svelte';
 	import { notificationStore } from '$lib/stores/notifications.svelte';
 	import { approvalsStore } from '$lib/stores/approvals.svelte';
+	import { workflowsStore, isGenerateSuccess } from '$lib/stores/workflows.svelte';
 	import { ToolApproval } from '$lib/components/ai-elements/tool-approval';
 	import { createChatStream, sendApprovalResponse, type ChatConnection } from '$lib/api/websocket';
 	import { goto } from '$app/navigation';
@@ -48,6 +49,12 @@
 	let activeWs = $state<ChatConnection | null>(null);
 	let editText = $state("");
 	let delegationEnabled = $state(false);
+	let workflowMode = $state(false);
+	let workflowGenerating = $state(false);
+	let workflowError = $state('');
+	let workflowQuestion = $state('');
+	let workflowWaitingAnswer = $state(false);
+	let workflowOriginalMsg = $state('');
 
 	onMount(async () => {
 		try {
@@ -123,6 +130,36 @@
 	}
 
 	async function handleSubmit(message: PromptInputMessage) {
+		if (workflowMode) {
+			const msg = (message.text ?? '').trim();
+			if (!msg) return;
+			workflowGenerating = true;
+			workflowError = '';
+			try {
+				const desc = workflowWaitingAnswer
+					? `${workflowOriginalMsg}\n${msg}`
+					: msg;
+				if (!workflowWaitingAnswer) workflowOriginalMsg = msg;
+				editText = '';
+
+				const result = await workflowsStore.generateWorkflow(desc);
+				if (isGenerateSuccess(result)) {
+					workflowMode = false;
+					workflowWaitingAnswer = false;
+					workflowOriginalMsg = '';
+					await goto(`/workflows/${result.id}`);
+				} else {
+					workflowQuestion = result.clarifyingQuestion;
+					workflowWaitingAnswer = true;
+				}
+			} catch (e) {
+				workflowError = e instanceof Error ? e.message : m.workflow_chat_error_generic();
+			} finally {
+				workflowGenerating = false;
+			}
+			return;
+		}
+
 		const prompt = (message.text ?? '').trim();
 		if (!prompt || messagesStore.streaming || !hasUsableModel) return;
 
@@ -403,6 +440,16 @@
 				{m.chat_no_api_key_suffix()}
 			</div>
 		{/if}
+		{#if workflowMode && workflowWaitingAnswer}
+			<div class="mb-2 rounded border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-300">
+				<p class="font-medium mb-1">{m.workflow_chat_question_heading()}</p>
+				<p>{workflowQuestion}</p>
+				<p class="text-xs text-muted-foreground mt-1">{m.workflow_chat_question_hint()}</p>
+			</div>
+		{/if}
+		{#if workflowMode && workflowError}
+			<div class="mb-2 text-xs text-destructive">{workflowError}</div>
+		{/if}
 		<PromptInput onSubmit={handleSubmit}>
 			<PromptInputTextarea
 				bind:value={editText}
@@ -431,10 +478,38 @@
 						</PromptInputModelSelectContent>
 					</PromptInputModelSelect>
 				{/if}
-				<label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none" title={m.chat_delegate_tooltip()}>
-					<input type="checkbox" bind:checked={delegationEnabled} class="accent-cyan-500" />
-					{m.chat_delegate_label()}
-				</label>
+				<div class="flex items-center rounded-md border border-border overflow-hidden text-xs">
+					<button
+						class="px-2.5 py-1 transition-colors select-none
+						       {delegationEnabled
+						           ? 'bg-cyan-500/15 text-cyan-400 border-r border-cyan-500/30'
+						           : 'text-muted-foreground hover:text-foreground border-r border-border'}"
+						onclick={() => {
+							delegationEnabled = !delegationEnabled;
+							if (delegationEnabled) workflowMode = false;
+						}}
+						title={m.chat_delegate_tooltip()}>
+						{m.chat_delegate_label()}
+					</button>
+					<button
+						class="px-2.5 py-1 transition-colors select-none
+						       {workflowMode
+						           ? 'bg-blue-500/15 text-blue-400'
+						           : 'text-muted-foreground hover:text-foreground'}"
+						onclick={() => {
+							workflowMode = !workflowMode;
+							if (workflowMode) {
+								delegationEnabled = false;
+								workflowError = '';
+								workflowQuestion = '';
+								workflowWaitingAnswer = false;
+							}
+						}}
+						title={m.workflow_chat_workflow_tooltip()}
+						disabled={workflowGenerating}>
+						{m.workflow_chat_workflow_label()}
+					</button>
+				</div>
 				<div class="flex-1"></div>
 				<PromptInputSubmit
 					status={messagesStore.streaming ? 'streaming' : 'idle'}
