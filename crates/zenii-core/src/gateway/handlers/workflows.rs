@@ -10,12 +10,12 @@ use crate::gateway::state::AppState;
 use crate::workflows::Workflow;
 use crate::{Result, ZeniiError};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct GenerateWorkflowRequest {
     pub description: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GenerateWorkflowResponse {
     pub toml: String,
     pub confidence: String,
@@ -30,7 +30,7 @@ pub async fn generate_workflow(
     let generator = state
         .workflow_generator
         .as_ref()
-        .ok_or_else(|| ZeniiError::Workflow("workflow generator not initialized".into()))?;
+        .ok_or_else(|| ZeniiError::Agent("no agent configured: workflow generation requires an AI provider to be configured".into()))?;
 
     let result = generator.generate(&req.description).await?;
 
@@ -387,7 +387,7 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    // 5.49 — generate workflow returns error when generator not initialized
+    // 5.49 — generate workflow returns 503 when no AI provider is configured
     #[tokio::test]
     async fn test_generate_workflow_no_generator() {
         let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
@@ -401,6 +401,6 @@ mod tests {
             .unwrap();
 
         let resp = app.oneshot(req).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 }
