@@ -65,6 +65,15 @@ export interface WorkflowRunProgress {
   startedAt: number;
 }
 
+// Result types for generateWorkflow
+export type GenerateSuccess = { id: string };
+export type GenerateNeedsInput = { clarifyingQuestion: string };
+export type GenerateWorkflowResult = GenerateSuccess | GenerateNeedsInput;
+
+export function isGenerateSuccess(r: GenerateWorkflowResult): r is GenerateSuccess {
+  return 'id' in r;
+}
+
 const WORKFLOW_SAFETY_TIMEOUT_MS = 10 * 60 * 1000;
 
 function createWorkflowsStore() {
@@ -229,6 +238,24 @@ function createWorkflowsStore() {
 
     async run(id: string): Promise<void> {
       await apiPost(`/workflows/${encodeURIComponent(id)}/run`, {});
+    },
+
+    async generateWorkflow(description: string): Promise<GenerateWorkflowResult> {
+      const res = await apiPost<{
+        toml: string;
+        confidence: 'high' | 'low';
+        clarifying_question?: string;
+      }>('/workflows/generate', { description });
+
+      if (res.confidence === 'low') {
+        return { clarifyingQuestion: res.clarifying_question ?? 'Can you provide more details?' };
+      }
+
+      // Save the generated workflow
+      const saved = await apiPost<{ id: string }>('/workflows', {
+        toml_content: res.toml,
+      });
+      return { id: saved.id };
     },
 
     async history(id: string): Promise<WorkflowRun[]> {
