@@ -25,24 +25,29 @@
 	let creating = $state(false);
 	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 	let lastRefreshedActivity = 0;
+	// Guard: only one loadDashboardData() in flight at a time to avoid loading-state races.
+	let loadInFlight = false;
 
 	$effect(() => {
 		loadDashboardData();
 	});
 
-	// Debounce-refresh dashboard when push events arrive (session/message/channel activity)
+	// Debounce-refresh dashboard when push events arrive (session/message/channel activity).
+	// Only schedules a refresh when no load is already in flight.
 	$effect(() => {
 		const ts = notificationStore.lastActivityAt;
 		if (ts > lastRefreshedActivity) {
 			clearTimeout(refreshTimer);
 			refreshTimer = setTimeout(() => {
 				lastRefreshedActivity = ts;
-				loadDashboardData();
+				if (!loadInFlight) loadDashboardData();
 			}, 2000);
 		}
 	});
 
 	async function loadDashboardData() {
+		if (loadInFlight) return;
+		loadInFlight = true;
 		loading = true;
 		try {
 			await Promise.allSettled([
@@ -57,6 +62,7 @@
 			]);
 		} finally {
 			loading = false;
+			loadInFlight = false;
 		}
 	}
 
@@ -373,27 +379,30 @@
 						<Skeleton class="h-10 w-14" />
 						<Skeleton class="h-10 w-14" />
 					</div>
+				{:else if workflowsStore.error}
+					<p class="text-sm text-destructive">{workflowsStore.error}</p>
 				{:else}
 					{@const stats = workflowStats()}
 					<p class="text-xs text-muted-foreground">
 						{m.dashboard_workflows_count({ count: stats.total, suffix: stats.total !== 1 ? 's' : '' })}
 					</p>
-					<div class="mt-3 flex gap-6">
-						{#if stats.running > 0}
+					{#if stats.total > 0}
+						<div class="mt-3 flex gap-6">
+							{#if stats.running > 0}
+								<div class="text-center">
+									<div class="text-2xl font-bold text-green-500">{stats.running}</div>
+									<div class="text-xs text-muted-foreground">{m.dashboard_workflows_running()}</div>
+								</div>
+							{/if}
 							<div class="text-center">
-								<div class="text-2xl font-bold text-green-500">{stats.running}</div>
-								<div class="text-xs text-muted-foreground">{m.dashboard_workflows_running()}</div>
+								<div class="text-2xl font-bold text-zinc-400">
+									{stats.total - stats.running}
+								</div>
+								<div class="text-xs text-muted-foreground">{m.dashboard_workflows_idle()}</div>
 							</div>
-						{/if}
-						<div class="text-center">
-							<div class="text-2xl font-bold text-zinc-400">
-								{stats.total - stats.running}
-							</div>
-							<div class="text-xs text-muted-foreground">{m.dashboard_workflows_idle()}</div>
 						</div>
-					</div>
-					{#if stats.total === 0}
-						<p class="text-sm text-muted-foreground">{m.dashboard_no_workflows()}</p>
+					{:else}
+						<p class="mt-1 text-sm text-muted-foreground">{m.dashboard_no_workflows()}</p>
 					{/if}
 				{/if}
 			</Card.Content>

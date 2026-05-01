@@ -150,12 +150,16 @@ pub struct WorkflowRun {
 /// Returns `true` if `s` consists solely of lowercase ASCII letters, digits, underscores, or
 /// hyphens and is non-empty.
 fn is_valid_id(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+    !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
 }
 
 /// Returns `true` if `s` is a valid step name: non-empty, only `[a-z0-9_]`.
 fn is_valid_step_name(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+    !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 impl Workflow {
@@ -171,12 +175,16 @@ impl Workflow {
 
         // name: non-empty
         if self.name.trim().is_empty() {
-            return Err(ZeniiError::Validation("workflow name must not be empty".into()));
+            return Err(ZeniiError::Validation(
+                "workflow name must not be empty".into(),
+            ));
         }
 
         // steps: non-empty
         if self.steps.is_empty() {
-            return Err(ZeniiError::Validation("workflow must have at least one step".into()));
+            return Err(ZeniiError::Validation(
+                "workflow must have at least one step".into(),
+            ));
         }
 
         // Collect step names for reference validation
@@ -228,7 +236,10 @@ impl Workflow {
             }
 
             // Condition if_true / if_false
-            if let StepType::Condition { if_true, if_false, .. } = &step.step_type {
+            if let StepType::Condition {
+                if_true, if_false, ..
+            } = &step.step_type
+            {
                 if !step_name_set.contains(if_true.as_str()) {
                     return Err(ZeniiError::Validation(format!(
                         "step '{}' if_true references unknown step '{if_true}'",
@@ -246,7 +257,9 @@ impl Workflow {
             }
 
             // Fallback in failure policy
-            if let FailurePolicy::Fallback { step: fallback_step } = &step.failure_policy
+            if let FailurePolicy::Fallback {
+                step: fallback_step,
+            } = &step.failure_policy
                 && !step_name_set.contains(fallback_step.as_str())
             {
                 return Err(ZeniiError::Validation(format!(
@@ -285,7 +298,10 @@ impl Workflow {
 /// Returns the name of a step involved in a cycle, or `None` if the graph is acyclic.
 fn detect_cycle(steps: &[WorkflowStep]) -> Option<String> {
     // Build adjacency: step_name -> Vec<step_name> (depends_on)
-    let adj: HashMap<&str, &Vec<String>> = steps.iter().map(|s| (s.name.as_str(), &s.depends_on)).collect();
+    let adj: HashMap<&str, &Vec<String>> = steps
+        .iter()
+        .map(|s| (s.name.as_str(), &s.depends_on))
+        .collect();
 
     // 0 = unvisited, 1 = in-stack, 2 = done
     let mut state: HashMap<&str, u8> = HashMap::new();
@@ -304,7 +320,7 @@ fn dfs_visit<'a>(
     state: &mut HashMap<&'a str, u8>,
 ) -> Option<String> {
     match state.get(node).copied().unwrap_or(0) {
-        2 => return None, // already fully processed
+        2 => return None,                   // already fully processed
         1 => return Some(node.to_string()), // back edge → cycle
         _ => {}
     }
@@ -963,7 +979,9 @@ mod tests {
     #[test]
     fn validate_unknown_fallback() {
         let mut wf = valid_workflow();
-        wf.steps[0].failure_policy = FailurePolicy::Fallback { step: "no_such_step".into() };
+        wf.steps[0].failure_policy = FailurePolicy::Fallback {
+            step: "no_such_step".into(),
+        };
         let err = wf.validate().unwrap_err();
         assert!(err.to_string().contains("unknown step"), "{err}");
     }

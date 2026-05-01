@@ -681,10 +681,12 @@ pub async fn init_services(config: AppConfig) -> Result<Services> {
     let workflow_generator_init = match (agent.as_ref(), tools.as_ref()) {
         (Some(ag), tr) => {
             let _ = tr; // tools is always present; this avoids unused variable warning
-            Some(Arc::new(crate::workflows::generator::WorkflowGenerator::new(
-                Arc::clone(ag),
-                Arc::clone(&tools),
-            )))
+            Some(Arc::new(
+                crate::workflows::generator::WorkflowGenerator::new(
+                    Arc::clone(ag),
+                    Arc::clone(&tools),
+                ),
+            ))
         }
         _ => None,
     };

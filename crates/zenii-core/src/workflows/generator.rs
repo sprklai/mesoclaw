@@ -213,11 +213,8 @@ User description: {description}"#,
         }
 
         // ── Parse into Workflow ───────────────────────────────────────────────────
-        let workflow: Workflow = serde_json::from_value(json).map_err(|e| {
-            ZeniiError::Workflow(format!(
-                "Generated workflow is invalid: {e}"
-            ))
-        })?;
+        let workflow: Workflow = serde_json::from_value(json)
+            .map_err(|e| ZeniiError::Workflow(format!("Generated workflow is invalid: {e}")))?;
 
         // ── Issue 8: basic inline validation (non-empty steps, non-empty names) ──
         if workflow.steps.is_empty() {
@@ -353,9 +350,9 @@ mod tests {
     use serde_json::json;
 
     use crate::{
+        ZeniiError,
         tools::{registry::ToolRegistry, traits::ToolResult},
         workflows::generator::{Confidence, WorkflowGenerator},
-        ZeniiError,
     };
 
     // ── test helpers ──────────────────────────────────────────────────────────
@@ -411,8 +408,7 @@ mod tests {
                 .unwrap()
                 .block_on(async {
                     use crate::{
-                        ai::agent::ZeniiAgent,
-                        config::AppConfig,
+                        ai::agent::ZeniiAgent, config::AppConfig,
                         credential::InMemoryCredentialStore,
                     };
                     let creds = InMemoryCredentialStore::new();
@@ -525,7 +521,9 @@ mod tests {
 
         assert_eq!(result.confidence, Confidence::Low);
         assert!(result.workflow.is_some());
-        let q = result.clarifying_question.expect("should have clarifying question");
+        let q = result
+            .clarifying_question
+            .expect("should have clarifying question");
         assert!(
             q.contains("nonexistent_tool"),
             "question should name the unknown tool, got: {q}"
@@ -567,9 +565,18 @@ mod tests {
         let wfgen = make_generator();
         let ctx = wfgen.build_tools_context();
 
-        assert!(ctx.contains("web_search"), "context missing web_search: {ctx}");
-        assert!(ctx.contains("system_info"), "context missing system_info: {ctx}");
-        assert!(ctx.contains("Search the web"), "context missing description: {ctx}");
+        assert!(
+            ctx.contains("web_search"),
+            "context missing web_search: {ctx}"
+        );
+        assert!(
+            ctx.contains("system_info"),
+            "context missing system_info: {ctx}"
+        );
+        assert!(
+            ctx.contains("Search the web"),
+            "context missing description: {ctx}"
+        );
         // Output should be sorted alphabetically (system_info < web_search)
         let ws_pos = ctx.find("web_search").unwrap();
         let si_pos = ctx.find("system_info").unwrap();
@@ -585,8 +592,12 @@ mod tests {
         struct ParamTool;
         #[async_trait::async_trait]
         impl crate::tools::traits::Tool for ParamTool {
-            fn name(&self) -> &str { "param_tool" }
-            fn description(&self) -> &str { "A tool with params" }
+            fn name(&self) -> &str {
+                "param_tool"
+            }
+            fn description(&self) -> &str {
+                "A tool with params"
+            }
             fn parameters_schema(&self) -> serde_json::Value {
                 serde_json::json!({
                     "type": "object",
@@ -597,7 +608,10 @@ mod tests {
                     "required": ["query"]
                 })
             }
-            async fn execute(&self, _: serde_json::Value) -> crate::Result<crate::tools::traits::ToolResult> {
+            async fn execute(
+                &self,
+                _: serde_json::Value,
+            ) -> crate::Result<crate::tools::traits::ToolResult> {
                 Ok(crate::tools::traits::ToolResult::ok("ok"))
             }
         }
@@ -609,20 +623,46 @@ mod tests {
                 .build()
                 .unwrap()
                 .block_on(async {
-                    use crate::{ai::agent::ZeniiAgent, config::AppConfig, credential::InMemoryCredentialStore};
+                    use crate::{
+                        ai::agent::ZeniiAgent, config::AppConfig,
+                        credential::InMemoryCredentialStore,
+                    };
                     let creds = InMemoryCredentialStore::new();
                     let config = AppConfig::default();
                     let tools: Vec<Arc<dyn crate::tools::traits::Tool>> = vec![];
-                    ZeniiAgent::from_provider("ollama", "http://localhost:11434/v1", "llama3", false, &creds, &tools, &config, None, None).await.unwrap()
+                    ZeniiAgent::from_provider(
+                        "ollama",
+                        "http://localhost:11434/v1",
+                        "llama3",
+                        false,
+                        &creds,
+                        &tools,
+                        &config,
+                        None,
+                        None,
+                    )
+                    .await
+                    .unwrap()
                 })
-        }).join().unwrap();
+        })
+        .join()
+        .unwrap();
 
-        let wfgen2 = WorkflowGenerator { agent: Arc::new(agent), tool_registry: registry };
+        let wfgen2 = WorkflowGenerator {
+            agent: Arc::new(agent),
+            tool_registry: registry,
+        };
         let ctx = wfgen2.build_tools_context();
 
         // Line should contain param_tool followed by a param summary in parens
-        assert!(ctx.contains("param_tool"), "context missing param_tool: {ctx}");
-        assert!(ctx.contains("query"), "context missing param name 'query': {ctx}");
+        assert!(
+            ctx.contains("param_tool"),
+            "context missing param_tool: {ctx}"
+        );
+        assert!(
+            ctx.contains("query"),
+            "context missing param name 'query': {ctx}"
+        );
     }
 
     // ── G.7 (Agent F) — clarifying_question + steps → workflow returned, question ignored ─
@@ -682,7 +722,8 @@ mod tests {
             ],
             "created_at": "2026-01-01T00:00:00Z",
             "updated_at": "2026-01-01T00:00:00Z"
-        }).to_string();
+        })
+        .to_string();
 
         let result = wfgen.parse_and_assess(&json_str).unwrap();
 
@@ -704,7 +745,10 @@ mod tests {
         let result = wfgen.parse_and_assess(&wrapped).unwrap();
 
         assert_eq!(result.confidence, Confidence::High);
-        assert!(result.workflow.is_some(), "workflow should be extracted from surrounded text");
+        assert!(
+            result.workflow.is_some(),
+            "workflow should be extracted from surrounded text"
+        );
         assert!(!result.toml.is_empty());
     }
 
@@ -734,7 +778,10 @@ mod tests {
 
         let result = wfgen.parse_and_assess(&json_str).unwrap();
         assert_eq!(result.confidence, Confidence::Low);
-        assert!(!result.saved, "low-confidence result must have saved = false");
+        assert!(
+            !result.saved,
+            "low-confidence result must have saved = false"
+        );
     }
 
     // ── G.10 — high-confidence result also has saved = false (caller decides) ──
@@ -743,7 +790,10 @@ mod tests {
         let wfgen = make_generator();
         let result = wfgen.parse_and_assess(&known_tool_workflow_json()).unwrap();
         assert_eq!(result.confidence, Confidence::High);
-        assert!(!result.saved, "generator never sets saved=true; handler does that");
+        assert!(
+            !result.saved,
+            "generator never sets saved=true; handler does that"
+        );
     }
 
     // ── P.7 — parse_workflow_json tests (Agent I) ─────────────────────────────
@@ -813,8 +863,7 @@ mod tests {
         let wf = parse_workflow_json(realistic_llm_json()).unwrap();
 
         // Serialize to TOML
-        let toml_str = toml::to_string_pretty(&wf)
-            .expect("Workflow must serialize to valid TOML");
+        let toml_str = toml::to_string_pretty(&wf).expect("Workflow must serialize to valid TOML");
 
         // Deserialize back
         use crate::workflows::definition::Workflow;

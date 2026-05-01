@@ -13,7 +13,10 @@ use crate::{Result, ZeniiError};
 /// Returns `true` if the workflow ID is safe to use in file paths.
 /// Rejects IDs containing `/`, `\`, `.`, or any character outside `[a-z0-9_-]`.
 fn is_valid_workflow_id(id: &str) -> bool {
-    !id.is_empty() && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+    !id.is_empty()
+        && id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
 }
 
 const LIST_DEFAULT_LIMIT: usize = 50;
@@ -50,10 +53,12 @@ pub async fn generate_workflow(
         )));
     }
 
-    let generator = state
-        .workflow_generator
-        .as_ref()
-        .ok_or_else(|| ZeniiError::Agent("no agent configured: workflow generation requires an AI provider to be configured".into()))?;
+    let generator = state.workflow_generator.as_ref().ok_or_else(|| {
+        ZeniiError::Agent(
+            "no agent configured: workflow generation requires an AI provider to be configured"
+                .into(),
+        )
+    })?;
 
     let result = generator.generate(&req.description).await?;
 
@@ -86,7 +91,11 @@ pub async fn generate_workflow(
 
     Ok(Json(GenerateWorkflowResponse {
         toml: result.toml,
-        confidence: if is_low { "low".to_string() } else { "high".to_string() },
+        confidence: if is_low {
+            "low".to_string()
+        } else {
+            "high".to_string()
+        },
         clarifying_question: result.clarifying_question,
         saved,
     }))
@@ -611,7 +620,6 @@ mod tests {
         );
     }
 
-
     // 5.49 — generate workflow returns 503 when no AI provider is configured
     #[tokio::test]
     async fn test_generate_workflow_no_generator() {
@@ -654,8 +662,10 @@ mod tests {
         // Pre-populate active_runs to simulate 2 already-running workflows
         let active_runs: Arc<dashmap::DashMap<String, tokio::task::AbortHandle>> =
             Arc::new(dashmap::DashMap::new());
-        let task1 = tokio::spawn(async { tokio::time::sleep(std::time::Duration::from_secs(60)).await });
-        let task2 = tokio::spawn(async { tokio::time::sleep(std::time::Duration::from_secs(60)).await });
+        let task1 =
+            tokio::spawn(async { tokio::time::sleep(std::time::Duration::from_secs(60)).await });
+        let task2 =
+            tokio::spawn(async { tokio::time::sleep(std::time::Duration::from_secs(60)).await });
         active_runs.insert("run1".into(), task1.abort_handle());
         active_runs.insert("run2".into(), task2.abort_handle());
         task1.abort();
@@ -668,13 +678,19 @@ mod tests {
 
         // Build a state Arc with the active_runs pre-populated and max_concurrent=2.
         // We'll test the enforcement by directly checking the condition that the handler checks.
-        assert!(active_runs.len() >= config.workflow_max_concurrent,
+        assert!(
+            active_runs.len() >= config.workflow_max_concurrent,
             "pre-condition: active_runs.len()={} should be >= max_concurrent={}",
-            active_runs.len(), config.workflow_max_concurrent);
+            active_runs.len(),
+            config.workflow_max_concurrent
+        );
 
         // 3rd run attempt: verify the count check fires
         let would_be_rejected = active_runs.len() >= config.workflow_max_concurrent;
-        assert!(would_be_rejected, "3rd run should be rejected by max_concurrent check");
+        assert!(
+            would_be_rejected,
+            "3rd run should be rejected by max_concurrent check"
+        );
     }
 
     // P.1 — delete unknown workflow returns 404

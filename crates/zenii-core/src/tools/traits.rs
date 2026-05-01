@@ -74,20 +74,13 @@ pub trait Tool: Send + Sync {
         let required: std::collections::HashSet<&str> = schema
             .get("required")
             .and_then(|r| r.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str())
-                    .collect()
-            })
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
             .unwrap_or_default();
 
         let parts: Vec<String> = props
             .iter()
             .map(|(k, v)| {
-                let type_str = v
-                    .get("type")
-                    .and_then(|t| t.as_str())
-                    .unwrap_or("any");
+                let type_str = v.get("type").and_then(|t| t.as_str()).unwrap_or("any");
                 if required.contains(k.as_str()) {
                     format!("{k}: {type_str}")
                 } else {
@@ -159,8 +152,12 @@ mod tests {
 
         #[async_trait]
         impl Tool for SchemaTool {
-            fn name(&self) -> &str { "schema_tool" }
-            fn description(&self) -> &str { "Tool with schema" }
+            fn name(&self) -> &str {
+                "schema_tool"
+            }
+            fn description(&self) -> &str {
+                "Tool with schema"
+            }
             fn parameters_schema(&self) -> serde_json::Value {
                 serde_json::json!({
                     "type": "object",
@@ -179,10 +176,22 @@ mod tests {
         let tool = SchemaTool;
         let summary = tool.param_summary();
         assert!(!summary.is_empty(), "param_summary should not be empty");
-        assert!(summary.contains("query"), "should contain required param 'query'");
-        assert!(summary.contains("limit"), "should contain optional param 'limit'");
-        assert!(summary.contains("query: string"), "required param should not have '?'");
-        assert!(summary.contains("limit?: integer"), "optional param should have '?'");
+        assert!(
+            summary.contains("query"),
+            "should contain required param 'query'"
+        );
+        assert!(
+            summary.contains("limit"),
+            "should contain optional param 'limit'"
+        );
+        assert!(
+            summary.contains("query: string"),
+            "required param should not have '?'"
+        );
+        assert!(
+            summary.contains("limit?: integer"),
+            "optional param should have '?'"
+        );
     }
 
     // TA.10 — Default param_summary returns empty string when schema has no properties
@@ -194,8 +203,12 @@ mod tests {
 
         #[async_trait]
         impl Tool for NoParamTool {
-            fn name(&self) -> &str { "no_param_tool" }
-            fn description(&self) -> &str { "Tool without params" }
+            fn name(&self) -> &str {
+                "no_param_tool"
+            }
+            fn description(&self) -> &str {
+                "Tool without params"
+            }
             fn parameters_schema(&self) -> serde_json::Value {
                 serde_json::json!({"type": "object"})
             }

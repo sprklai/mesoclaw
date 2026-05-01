@@ -104,21 +104,16 @@ pub async fn dispatch_step(
             // Everything else is truthy.
             let resolved = templates::resolve(expression, step_outputs)?;
             let lower = resolved.trim().to_lowercase();
-            let is_true = !lower.is_empty()
-                && lower != "false"
-                && lower != "0"
-                && lower != "no";
+            let is_true = !lower.is_empty() && lower != "false" && lower != "0" && lower != "no";
             if is_true {
                 Ok(if_true.clone())
             } else {
                 Ok(if_false.clone().unwrap_or_default())
             }
         }
-        StepType::Parallel { steps: _ } => {
-            Err(ZeniiError::Workflow(
-                "parallel step execution not yet implemented".into(),
-            ))
-        }
+        StepType::Parallel { steps: _ } => Err(ZeniiError::Workflow(
+            "parallel step execution not yet implemented".into(),
+        )),
         StepType::Delay { seconds } => {
             tokio::time::sleep(std::time::Duration::from_secs(*seconds)).await;
             Ok(format!("delayed {} seconds", seconds))
@@ -202,13 +197,8 @@ mod tests {
                 if_true: "yes".into(),
                 if_false: Some("no".into()),
             };
-            let result = dispatch_step(&step, &outputs, &tools, None)
-                .await
-                .unwrap();
-            assert_eq!(
-                result, "no",
-                "expected 'no' for falsy expression '{falsy}'"
-            );
+            let result = dispatch_step(&step, &outputs, &tools, None).await.unwrap();
+            assert_eq!(result, "no", "expected 'no' for falsy expression '{falsy}'");
         }
     }
 
@@ -224,9 +214,7 @@ mod tests {
                 if_true: "yes".into(),
                 if_false: Some("no".into()),
             };
-            let result = dispatch_step(&step, &outputs, &tools, None)
-                .await
-                .unwrap();
+            let result = dispatch_step(&step, &outputs, &tools, None).await.unwrap();
             assert_eq!(
                 result, "yes",
                 "expected 'yes' for truthy expression '{truthy}'"
@@ -258,9 +246,7 @@ mod tests {
         use crate::workflows::definition::StepOutput;
 
         let tools = ToolRegistry::new();
-        tools
-            .register(Arc::new(SystemInfoTool::new()))
-            .unwrap();
+        tools.register(Arc::new(SystemInfoTool::new())).unwrap();
 
         // Build step_outputs with a value containing quotes and newlines
         let tricky_output = "line1\nline2\twith\"quotes\"and\\backslash";
@@ -282,9 +268,7 @@ mod tests {
             if_true: "got_output".into(),
             if_false: Some("empty".into()),
         };
-        let result = dispatch_step(&step, &outputs, &tools, None)
-            .await
-            .unwrap();
+        let result = dispatch_step(&step, &outputs, &tools, None).await.unwrap();
         // Non-empty output is truthy
         assert_eq!(result, "got_output");
     }

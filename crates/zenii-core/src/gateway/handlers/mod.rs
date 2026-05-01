@@ -182,9 +182,7 @@ pub(crate) mod tests {
     /// Like `test_state` but sets up a real WorkflowRegistry so workflow 404 / pagination
     /// tests can exercise the actual handler logic.
     #[cfg(feature = "workflows")]
-    pub async fn test_state_with_workflows()
-    -> (tempfile::TempDir, Arc<AppState>)
-    {
+    pub async fn test_state_with_workflows() -> (tempfile::TempDir, Arc<AppState>) {
         use crate::workflows::WorkflowRegistry;
 
         let (dir, base_state) = test_state().await;

@@ -45,10 +45,7 @@ impl WorkflowRegistry {
                 match toml::from_str::<Workflow>(&content) {
                     Ok(wf) => {
                         // Check that the workflow id matches the file stem to avoid ghost files.
-                        let stem = path
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("");
+                        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
                         if wf.id != stem {
                             warn!(
                                 "Skipping workflow {:?}: id '{}' does not match filename stem '{stem}'",
@@ -58,15 +55,13 @@ impl WorkflowRegistry {
                         }
                         // Warn on unknown schema versions so callers can decide whether to upgrade.
                         const KNOWN_SCHEMA_VERSION: u32 = 1;
-                        if let Some(v) = wf.schema_version {
-                            if v > KNOWN_SCHEMA_VERSION {
-                                warn!(
-                                    "Workflow {:?} has schema_version={v}, \
-                                     which is newer than the supported version {KNOWN_SCHEMA_VERSION}. \
-                                     Some fields may be ignored.",
-                                    path
-                                );
-                            }
+                        if let Some(v) = wf.schema_version.filter(|&v| v > KNOWN_SCHEMA_VERSION) {
+                            warn!(
+                                "Workflow {:?} has schema_version={v}, \
+                                 which is newer than the supported version {KNOWN_SCHEMA_VERSION}. \
+                                 Some fields may be ignored.",
+                                path
+                            );
                         }
                         self.workflows.insert(wf.id.clone(), wf);
                     }
@@ -164,7 +159,11 @@ impl WorkflowRegistry {
                     timeout_secs: None,
                 };
                 // Try update first; if the job doesn't exist yet, add it
-                if scheduler.update_job(&workflow_id, job.clone()).await.is_err() {
+                if scheduler
+                    .update_job(&workflow_id, job.clone())
+                    .await
+                    .is_err()
+                {
                     if let Err(e) = scheduler.add_job(job).await {
                         warn!(
                             "workflow schedule reconcile: failed to register cron job for '{}': {e}",
@@ -368,7 +367,10 @@ mod tests {
 
         // Neither "foo" nor "bar" should be loaded
         assert!(registry.get("foo").is_none(), "foo should not be loaded");
-        assert!(registry.get("bar").is_none(), "bar should not be loaded (filename mismatch)");
+        assert!(
+            registry.get("bar").is_none(),
+            "bar should not be loaded (filename mismatch)"
+        );
         assert_eq!(registry.list().len(), 0);
     }
 
