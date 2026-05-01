@@ -548,6 +548,14 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     visual: "standard",
     fields: [
       {
+        key: "key",
+        label: "wb_field_memory_key_label",
+        type: "text",
+        required: true,
+        placeholder: "wb_field_memory_key_placeholder",
+        description: "wb_field_memory_key_description",
+      },
+      {
         key: "content",
         label: "wb_field_content_label",
         type: "textarea",
@@ -556,16 +564,27 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
         description: "wb_field_memory_store_content_description",
       },
       {
-        key: "tags",
-        label: "wb_field_tags_label",
-        type: "text",
-        placeholder: "wb_field_tags_placeholder",
-        description: "wb_field_tags_description",
+        key: "category",
+        label: "wb_field_memory_category_label",
+        type: "select",
+        options: [
+          { value: "conversation", label: "wb_option_memory_category_conversation" },
+          { value: "daily", label: "wb_option_memory_category_daily" },
+          { value: "core", label: "wb_option_memory_category_core" },
+        ],
+        default: "conversation",
+        description: "wb_field_memory_category_description",
       },
     ],
     handles: STANDARD_HANDLES,
-    fromStep: toolFromStep(["content", "tags"]),
-    toStep: toolToStep("memory_store", ["content", "tags"]),
+    fromStep: toolFromStep(["key", "content", "category"]),
+    toStep(data: StepRec): StepRec {
+      const args: StepRec = { action: "store" };
+      if (data.key !== undefined) args.key = data.key;
+      if (data.content !== undefined) args.content = data.content;
+      if (data.category !== undefined) args.category = data.category;
+      return { type: "tool", tool: "memory", args };
+    },
   },
   {
     type: "memory_recall",
@@ -593,7 +612,12 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     ],
     handles: STANDARD_HANDLES,
     fromStep: toolFromStep(["query", "limit"]),
-    toStep: toolToStep("memory_recall", ["query", "limit"]),
+    toStep(data: StepRec): StepRec {
+      const args: StepRec = { action: "recall" };
+      if (data.query !== undefined) args.query = data.query;
+      if (data.limit !== undefined) args.limit = data.limit;
+      return { type: "tool", tool: "memory", args };
+    },
   },
   {
     type: "memory_forget",
@@ -604,17 +628,21 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     visual: "standard",
     fields: [
       {
-        key: "memory_id",
-        label: "wb_field_memory_id_label",
+        key: "key",
+        label: "wb_field_memory_key_label",
         type: "text",
         required: true,
-        placeholder: "wb_field_memory_id_placeholder",
-        description: "wb_field_memory_id_description",
+        placeholder: "wb_field_memory_key_placeholder",
+        description: "wb_field_memory_forget_key_description",
       },
     ],
     handles: STANDARD_HANDLES,
-    fromStep: toolFromStep(["memory_id"]),
-    toStep: toolToStep("memory_forget", ["memory_id"]),
+    fromStep: toolFromStep(["key"]),
+    toStep(data: StepRec): StepRec {
+      const args: StepRec = { action: "forget" };
+      if (data.key !== undefined) args.key = data.key;
+      return { type: "tool", tool: "memory", args };
+    },
   },
 
   // ── Channels ──────────────────────────────────────────────────────────
@@ -642,14 +670,22 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
         placeholder: "wb_field_channel_message_placeholder",
         description: "wb_field_channel_message_description",
       },
+      {
+        key: "recipient",
+        label: "wb_field_recipient_label",
+        type: "text",
+        placeholder: "wb_field_recipient_placeholder",
+        description: "wb_field_recipient_description",
+      },
     ],
     handles: STANDARD_HANDLES,
     featureGate: "channels",
-    fromStep: toolFromStep(["channel", "message"]),
+    fromStep: toolFromStep(["channel", "message", "recipient"]),
     toStep(data: StepRec): StepRec {
       const args: StepRec = { action: "send" };
       if (data.channel !== undefined) args.channel = data.channel;
       if (data.message !== undefined) args.message = data.message;
+      if (data.recipient !== undefined) args.recipient = data.recipient;
       return { type: "tool", tool: "channel_send", args };
     },
   },
@@ -712,7 +748,11 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     ],
     handles: STANDARD_HANDLES,
     fromStep: toolFromStep(["key"]),
-    toStep: toolToStep("config_read", ["key"]),
+    toStep(data: StepRec): StepRec {
+      const args: StepRec = { action: "get" };
+      if (data.key !== undefined) args.key = data.key;
+      return { type: "tool", tool: "config", args };
+    },
   },
   {
     type: "config_update",
@@ -740,7 +780,12 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     ],
     handles: STANDARD_HANDLES,
     fromStep: toolFromStep(["key", "value"]),
-    toStep: toolToStep("config_update", ["key", "value"]),
+    toStep(data: StepRec): StepRec {
+      const args: StepRec = { action: "update" };
+      if (data.key !== undefined) args.key = data.key;
+      if (data.value !== undefined) args.value = data.value;
+      return { type: "tool", tool: "config", args };
+    },
   },
 
   // ── Schedule ──────────────────────────────────────────────────────────

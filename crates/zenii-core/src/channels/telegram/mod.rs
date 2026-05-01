@@ -170,8 +170,11 @@ impl ChannelSender for TelegramChannel {
             ));
         };
 
-        // Split oversized messages to respect Telegram's 4096 byte limit
-        let parts = super::format::split_message(&message.content, TELEGRAM_MAX_MESSAGE_BYTES);
+        // Convert markdown to Telegram HTML, then split to respect the 4096-byte limit.
+        // Raw content must be HTML-escaped/converted before sending with ParseMode::Html,
+        // otherwise bare `<`, `>`, `&` characters cause "can't parse entities" from the API.
+        let html_content = fmt::markdown_to_html(&message.content);
+        let parts = super::format::split_message(&html_content, TELEGRAM_MAX_MESSAGE_BYTES);
         for &cid in &chat_ids {
             for part in &parts {
                 bot.send_message(ChatId(cid), part)
@@ -525,8 +528,8 @@ impl ChannelSender for TelegramSender {
             ZeniiError::Channel(format!("telegram: invalid chat_id: {chat_id_str}"))
         })?;
 
-        // Split oversized messages to respect Telegram's 4096 byte limit
-        let parts = super::format::split_message(&message.content, TELEGRAM_MAX_MESSAGE_BYTES);
+        let html_content = fmt::markdown_to_html(&message.content);
+        let parts = super::format::split_message(&html_content, TELEGRAM_MAX_MESSAGE_BYTES);
         for part in parts {
             bot.send_message(ChatId(chat_id), &part)
                 .parse_mode(ParseMode::Html)

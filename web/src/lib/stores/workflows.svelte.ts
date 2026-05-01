@@ -22,7 +22,7 @@ export interface WorkflowStep {
   steps?: string[];
   timeout_secs?: number;
   retry?: { max_retries: number; retry_delay_ms: number };
-  failure_policy?: string | { Fallback: { step: string } };
+  failure_policy?: string | { fallback: { step: string } };
 }
 
 export interface NodePosition {

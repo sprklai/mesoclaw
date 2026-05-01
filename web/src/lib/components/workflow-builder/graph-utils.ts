@@ -38,7 +38,7 @@ export interface WorkflowStep {
   steps?: string[];
   timeout_secs?: number;
   retry?: RetryConfig;
-  failure_policy?: string | { Fallback: { step: string } };
+  failure_policy?: string | { fallback: { step: string } };
 }
 
 export interface Workflow {
@@ -55,12 +55,30 @@ export interface Workflow {
 /**
  * Convert a backend Workflow to @xyflow/svelte nodes and edges.
  */
+/** Resolve a workflow step to its node-registry type key.
+ *  Action-dispatched tools (memory, config) are mapped by tool+action pair. */
+function resolveNodeType(step: WorkflowStep): string {
+  if (step.type !== "tool") return step.type;
+  const tool = step.tool ?? step.type;
+  const action = step.args?.action as string | undefined;
+  if (tool === "memory" && action) {
+    if (action === "store" || action === "update") return "memory_store";
+    if (action === "recall") return "memory_recall";
+    if (action === "forget") return "memory_forget";
+  }
+  if (tool === "config" && action) {
+    if (action === "get") return "config_read";
+    if (action === "update") return "config_update";
+  }
+  return tool;
+}
+
 export function workflowToGraph(workflow: Workflow): {
   nodes: Node[];
   edges: Edge[];
 } {
   const nodes: Node[] = workflow.steps.map((step) => {
-    const defType = step.type === "tool" ? (step.tool ?? step.type) : step.type;
+    const defType = resolveNodeType(step);
     const def = nodeRegistry.get(defType);
     const nodeData = def?.fromStep
       ? def.fromStep(step as unknown as Record<string, unknown>)
@@ -174,13 +192,13 @@ export function graphToWorkflow(
         }
       }
 
-      // Failure policy: accept string or Fallback object
+      // Failure policy: accept string or fallback object
       if (data.failure_policy !== undefined) {
         const fp = data.failure_policy;
         if (typeof fp === "string") {
           step.failure_policy = fp === "stop" ? undefined : fp;
         } else {
-          step.failure_policy = fp as { Fallback: { step: string } };
+          step.failure_policy = fp as { fallback: { step: string } };
         }
       }
 
@@ -404,9 +422,9 @@ export function workflowToToml(wf: Workflow): string {
     if (step.failure_policy !== undefined) {
       if (typeof step.failure_policy === "string") {
         lines.push(`failure_policy = ${tomlStr(step.failure_policy)}`);
-      } else if (step.failure_policy.Fallback) {
+      } else if (step.failure_policy.fallback) {
         lines.push(
-          `failure_policy = { Fallback = { step = ${tomlStr(step.failure_policy.Fallback.step)} } }`,
+          `failure_policy = { fallback = { step = ${tomlStr(step.failure_policy.fallback.step)} } }`,
         );
       }
     }

@@ -13,7 +13,7 @@
 		const fp = node.data.failure_policy;
 		if (!fp || fp === 'stop') return 'stop';
 		if (fp === 'continue') return 'continue';
-		if (typeof fp === 'object') return 'fallback';
+		if (typeof fp === 'object' && (fp as Record<string, unknown>).fallback) return 'fallback';
 		return String(fp);
 	});
 
@@ -227,7 +227,7 @@
 					onchange={(e) => {
 						const val = (e.target as HTMLSelectElement).value;
 						if (val === 'fallback') {
-							updateCommon('failure_policy', { Fallback: { step: '' } });
+							updateCommon('failure_policy', { fallback: { step: '' } });
 						} else {
 							updateCommon('failure_policy', val);
 						}
@@ -244,8 +244,8 @@
 					<label for="fallback-step-{node.id}" class="text-xs font-medium text-muted-foreground">{t('wb_config_fallback_step_label')}</label>
 					<select
 						id="fallback-step-{node.id}"
-						value={String((node.data.failure_policy as Record<string, Record<string, string>>)?.Fallback?.step ?? '')}
-						onchange={(e) => updateCommon('failure_policy', { Fallback: { step: (e.target as HTMLSelectElement).value } })}
+						value={String((node.data.failure_policy as Record<string, Record<string, string>>)?.fallback?.step ?? '')}
+						onchange={(e) => updateCommon('failure_policy', { fallback: { step: (e.target as HTMLSelectElement).value } })}
 						class="w-full rounded-md border bg-background text-foreground px-2 py-1.5 text-sm"
 					>
 						<option value="">---</option>
