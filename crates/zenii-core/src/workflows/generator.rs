@@ -19,7 +19,7 @@ pub enum Confidence {
 }
 
 /// Result of a workflow generation request.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerateResult {
     /// The parsed workflow, if one was produced (None when only a clarifying question was returned).
     pub workflow: Option<Workflow>,
@@ -60,6 +60,11 @@ impl WorkflowGenerator {
     /// The agent is prompted with the available tools and expected JSON schema.
     /// The response is parsed, validated, and serialized to TOML.
     pub async fn generate(&self, description: &str) -> Result<GenerateResult, ZeniiError> {
+        if description.trim().is_empty() {
+            return Err(ZeniiError::Validation(
+                "workflow description cannot be empty".to_string(),
+            ));
+        }
         let tools_context = self.build_tools_context();
         let prompt = self.build_prompt(description, &tools_context);
         let response = self
@@ -142,11 +147,16 @@ User description: {description}"#,
     /// - If the workflow references unknown tools, returns `Confidence::Low` with a follow-up question.
     /// - Otherwise returns `Confidence::High` with the serialized TOML.
     pub(crate) fn parse_and_assess(&self, response: &str) -> Result<GenerateResult, ZeniiError> {
-        let trimmed = response
-            .trim()
-            .trim_start_matches("```json")
-            .trim_start_matches("```")
-            .trim_end_matches("```")
+        let trimmed = response.trim();
+        let trimmed = trimmed
+            .strip_prefix("```json")
+            .or_else(|| trimmed.strip_prefix("```"))
+            .map(|s| s.trim_start())
+            .unwrap_or(trimmed);
+        let trimmed = trimmed
+            .strip_suffix("```")
+            .map(|s| s.trim_end())
+            .unwrap_or(trimmed)
             .trim();
 
         let json: serde_json::Value = serde_json::from_str(trimmed)
@@ -282,29 +292,39 @@ mod tests {
             .unwrap();
 
         // Build a real agent using a no-key provider — constructor is cheap, no network call.
-        let agent = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async {
-                use crate::{ai::agent::ZeniiAgent, config::AppConfig, credential::InMemoryCredentialStore};
-                let creds = InMemoryCredentialStore::new();
-                let config = AppConfig::default();
-                let tools: Vec<Arc<dyn crate::tools::traits::Tool>> = vec![];
-                ZeniiAgent::from_provider(
-                    "ollama",
-                    "http://localhost:11434/v1",
-                    "llama3",
-                    false, // no API key required
-                    &creds,
-                    &tools,
-                    &config,
-                    None,
-                    None,
-                )
-                .await
-                .expect("agent construction should succeed for no-key provider")
-            });
+        // Wrapped in std::thread::spawn so it is safe to call from both #[test] and
+        // #[tokio::test] contexts without panicking on nested runtime creation.
+        let agent = std::thread::spawn(|| {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async {
+                    use crate::{
+                        ai::agent::ZeniiAgent,
+                        config::AppConfig,
+                        credential::InMemoryCredentialStore,
+                    };
+                    let creds = InMemoryCredentialStore::new();
+                    let config = AppConfig::default();
+                    let tools: Vec<Arc<dyn crate::tools::traits::Tool>> = vec![];
+                    ZeniiAgent::from_provider(
+                        "ollama",
+                        "http://localhost:11434/v1",
+                        "llama3",
+                        false, // no API key required
+                        &creds,
+                        &tools,
+                        &config,
+                        None,
+                        None,
+                    )
+                    .await
+                    .expect("agent construction should succeed for no-key provider")
+                })
+        })
+        .join()
+        .unwrap();
 
         WorkflowGenerator {
             agent: Arc::new(agent),
