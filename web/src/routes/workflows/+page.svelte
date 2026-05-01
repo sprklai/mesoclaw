@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import * as Card from '$lib/components/ui/card';
@@ -26,6 +26,7 @@
 	import {
 		workflowsStore,
 		isGenerateSuccess,
+		isGeneratePreview,
 		type Workflow,
 		type WorkflowRun,
 		type StepOutput
@@ -46,6 +47,7 @@
 	let formError = $state('');
 
 	// NL describe mode state
+	const NL_MAX_CHARS = 2000;
 	let createMode = $state<'toml' | 'describe'>('toml');
 	let nlDescription = $state('');
 	let nlGenerating = $state(false);
@@ -53,10 +55,16 @@
 	let nlQuestion = $state('');
 	let nlAnswer = $state('');
 	let nlWaitingAnswer = $state(false);
+	let nlPreviewToml = $state('');
 	let originalDescription = $state('');
 
 	onMount(() => {
 		workflowsStore.load();
+	});
+
+	// Issue 4: abort any in-flight generate request when navigating away.
+	onDestroy(() => {
+		workflowsStore.abortGenerate();
 	});
 
 	function resetForm() {
@@ -67,8 +75,11 @@
 
 	async function handleGenerate() {
 		if (!nlDescription.trim()) return;
+		// Issue 5: enforce max length client-side before sending.
+		if (nlDescription.length > NL_MAX_CHARS) return;
 		nlGenerating = true;
 		nlError = '';
+		nlPreviewToml = '';
 		try {
 			const desc = nlWaitingAnswer
 				? `${originalDescription}\n${nlAnswer}`
@@ -78,13 +89,23 @@
 			const result = await workflowsStore.generateWorkflow(desc);
 			if (isGenerateSuccess(result)) {
 				await goto(`/workflows/${result.id}`);
+			} else if (isGeneratePreview(result)) {
+				// Issue 7: low-confidence preview — show TOML + clarifying question.
+				nlPreviewToml = result.toml;
+				nlQuestion = result.clarifyingQuestion;
+				nlWaitingAnswer = true;
+				nlAnswer = '';
 			} else {
 				nlQuestion = result.clarifyingQuestion;
 				nlWaitingAnswer = true;
 				nlAnswer = '';
 			}
-		} catch (e) {
-			nlError = e instanceof Error ? e.message : m.workflow_generate_error_generic();
+		} catch (e: unknown) {
+			// Issue 3: never show raw provider error — may contain API key fragments.
+			// Issue 4: swallow AbortError silently.
+			if (e instanceof Error && e.name === 'AbortError') return;
+			console.error('[NL generate] error:', e);
+			nlError = m.workflow_generate_error_generic();
 		} finally {
 			nlGenerating = false;
 		}
@@ -280,11 +301,16 @@
 					<Button onclick={handleCreate} class="w-full">{editTarget ? m.workflows_update_button() : m.workflows_create_button()}</Button>
 				{:else}
 					<div class="space-y-2">
-						<label for="nl-description" class="text-sm font-medium">{m.workflow_describe_label()}</label>
+						<div class="flex items-center justify-between">
+							<label for="nl-description" class="text-sm font-medium">{m.workflow_describe_label()}</label>
+							<!-- Issue 5: character counter -->
+							<span class="text-xs text-muted-foreground {nlDescription.length > NL_MAX_CHARS ? 'text-destructive' : ''}">{nlDescription.length}/{NL_MAX_CHARS}</span>
+						</div>
 						<textarea
 							id="nl-description"
 							bind:value={nlDescription}
 							placeholder={m.workflow_describe_placeholder()}
+							maxlength={NL_MAX_CHARS}
 							class="w-full min-h-[120px] rounded border bg-muted/30 p-3 text-sm font-mono resize-y"
 							disabled={nlGenerating}
 						></textarea>
@@ -293,6 +319,13 @@
 					{#if nlWaitingAnswer}
 						<div class="rounded border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-300">
 							<p class="font-medium mb-2">{m.workflow_clarifying_question_heading()} {nlQuestion}</p>
+						<!-- Issue 7: show preview TOML when low-confidence -->
+						{#if nlPreviewToml}
+							<details class="mt-2 mb-3">
+								<summary class="cursor-pointer text-xs text-blue-400 hover:underline">Preview TOML (not saved)</summary>
+								<pre class="mt-1 text-xs bg-background rounded p-2 overflow-x-auto text-foreground">{nlPreviewToml}</pre>
+							</details>
+						{/if}
 							<textarea
 								bind:value={nlAnswer}
 								placeholder={m.workflow_clarifying_answer_placeholder()}
@@ -308,7 +341,7 @@
 
 					<button
 						onclick={handleGenerate}
-						disabled={nlGenerating || !nlDescription.trim() || (nlWaitingAnswer && !nlAnswer.trim())}
+						disabled={nlGenerating || !nlDescription.trim() || nlDescription.length > NL_MAX_CHARS || (nlWaitingAnswer && !nlAnswer.trim())}
 						class="w-full rounded bg-primary py-2 text-sm text-primary-foreground disabled:opacity-50">
 						{#if nlGenerating}
 							{m.workflow_generating()}

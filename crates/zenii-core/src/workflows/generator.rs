@@ -30,6 +30,8 @@ pub struct GenerateResult {
     pub clarifying_question: Option<String>,
     /// TOML serialization of the workflow (empty string when no workflow was produced).
     pub toml: String,
+    /// Whether the workflow was saved to the database (false = preview only, e.g. low confidence).
+    pub saved: bool,
 }
 
 /// Converts a natural-language description into a structured [`Workflow`] by prompting an LLM.
@@ -153,47 +155,89 @@ User description: {description}"#,
 
     /// Parse the LLM response and assess confidence.
     ///
-    /// - If the response contains `clarifying_question`, returns `Confidence::Low` with no workflow.
-    /// - If the workflow references unknown tools, returns `Confidence::Low` with a follow-up question.
-    /// - Otherwise returns `Confidence::High` with the serialized TOML.
+    /// - If the response contains only `clarifying_question` (no steps), returns that question.
+    /// - If the response contains both `clarifying_question` AND steps, prefers the workflow
+    ///   (logs a debug message that the question was ignored).
+    /// - If the workflow references unknown tools, returns `Confidence::Low` with a follow-up
+    ///   question and `saved = false`.
+    /// - Otherwise returns `Confidence::High` with the serialized TOML and `saved = false`
+    ///   (caller decides whether to persist).
     pub(crate) fn parse_and_assess(&self, response: &str) -> Result<GenerateResult, ZeniiError> {
-        let trimmed = response.trim();
-        let trimmed = trimmed
-            .strip_prefix("```json")
-            .or_else(|| trimmed.strip_prefix("```"))
-            .map(|s| s.trim_start())
-            .unwrap_or(trimmed);
-        let trimmed = trimmed
-            .strip_suffix("```")
-            .map(|s| s.trim_end())
-            .unwrap_or(trimmed)
-            .trim();
+        // ── Issue 2: robust JSON extraction ──────────────────────────────────────
+        // Find the outermost JSON object by locating the first `{` and last `}`.
+        // This handles markdown fences, surrounding text, Windows \r\n, and extra backticks.
+        let raw = response.trim();
+        let json_str = match (raw.find('{'), raw.rfind('}')) {
+            (Some(start), Some(end)) if end >= start => &raw[start..=end],
+            _ => {
+                return Err(ZeniiError::Workflow(
+                    "AI returned an unexpected format — try rephrasing your description"
+                        .to_string(),
+                ));
+            }
+        };
 
-        let json: serde_json::Value = serde_json::from_str(trimmed)
-            .map_err(|e| ZeniiError::Workflow(format!("LLM returned invalid JSON: {e}")))?;
+        let json: serde_json::Value = serde_json::from_str(json_str).map_err(|_| {
+            ZeniiError::Workflow(
+                "AI returned an unexpected format — try rephrasing your description".to_string(),
+            )
+        })?;
 
-        // Check for clarifying question shortcut
-        if let Some(q) = json
+        // ── Issue 1: prefer workflow when both question and steps are present ─────
+        let has_steps = json
+            .get("steps")
+            .and_then(|v| v.as_array())
+            .is_some_and(|a| !a.is_empty());
+        let clarifying_q = json
             .get("clarifying_question")
             .and_then(|v| v.as_str())
-        {
-            return Ok(GenerateResult {
-                workflow: None,
-                confidence: Confidence::Low,
-                clarifying_question: Some(q.to_string()),
-                toml: String::new(),
-            });
+            .filter(|q| !q.is_empty())
+            .map(|q| q.to_string());
+
+        if let Some(ref q) = clarifying_q {
+            if has_steps {
+                // LLM returned both: prefer the workflow, discard the question.
+                tracing::debug!(
+                    "LLM returned both clarifying_question and steps — ignoring question: {q}"
+                );
+            } else {
+                // Only a clarifying question, no workflow.
+                return Ok(GenerateResult {
+                    workflow: None,
+                    confidence: Confidence::Low,
+                    clarifying_question: Some(q.clone()),
+                    toml: String::new(),
+                    saved: false,
+                });
+            }
         }
 
-        // Parse into Workflow
+        // ── Parse into Workflow ───────────────────────────────────────────────────
         let workflow: Workflow = serde_json::from_value(json).map_err(|e| {
-            ZeniiError::Workflow(format!("LLM returned invalid workflow structure: {e}"))
+            ZeniiError::Workflow(format!(
+                "Generated workflow is invalid: {e}"
+            ))
         })?;
+
+        // ── Issue 8: basic inline validation (non-empty steps, non-empty names) ──
+        if workflow.steps.is_empty() {
+            return Err(ZeniiError::Validation(
+                "Generated workflow is invalid: must have at least one step".to_string(),
+            ));
+        }
+        for step in &workflow.steps {
+            if step.name.trim().is_empty() {
+                return Err(ZeniiError::Validation(
+                    "Generated workflow is invalid: all steps must have a non-empty name"
+                        .to_string(),
+                ));
+            }
+        }
 
         // Validate the parsed workflow before returning it
         workflow.validate()?;
 
-        // Check for unknown tools and build a per-tool known-param map simultaneously
+        // ── Check for unknown tools ───────────────────────────────────────────────
         let tool_infos = self.tool_registry.list();
         let known: HashSet<String> = tool_infos.iter().map(|t| t.name.clone()).collect();
 
@@ -254,8 +298,10 @@ User description: {description}"#,
                 confidence: Confidence::High,
                 clarifying_question: None,
                 toml,
+                saved: false,
             })
         } else if !unknown_tools.is_empty() {
+            // ── Issue 7: low-confidence → not saved, return preview + question ──
             let mut available: Vec<String> = known.into_iter().collect();
             available.sort();
             Ok(GenerateResult {
@@ -267,6 +313,7 @@ User description: {description}"#,
                     available.join(", ")
                 )),
                 toml,
+                saved: false,
             })
         } else {
             // Unknown arg keys: downgrade to Low confidence
@@ -279,6 +326,7 @@ User description: {description}"#,
                     bad_args.join(", ")
                 )),
                 toml,
+                saved: false,
             })
         }
     }
@@ -484,17 +532,18 @@ mod tests {
         );
     }
 
-    // ── G.4 — invalid JSON returns ZeniiError::Workflow ───────────────────────
+    // ── G.4 — invalid JSON returns ZeniiError::Workflow with user-friendly message ──
     #[test]
     fn test_parse_invalid_json_returns_error() {
         let wfgen = make_generator();
-        let result = wfgen.parse_and_assess("this is not json at all }{");
+        // No `{`/`}` in the input → format error
+        let result = wfgen.parse_and_assess("this is not json at all");
         assert!(result.is_err());
         match result.unwrap_err() {
             ZeniiError::Workflow(msg) => {
                 assert!(
-                    msg.contains("invalid JSON"),
-                    "error should mention invalid JSON, got: {msg}"
+                    msg.contains("unexpected format"),
+                    "error should mention unexpected format, got: {msg}"
                 );
             }
             other => panic!("expected ZeniiError::Workflow, got: {other}"),
@@ -527,7 +576,7 @@ mod tests {
         assert!(si_pos < ws_pos, "tools should be sorted alphabetically");
     }
 
-    // ── G.7 — build_tools_context includes param summary when available ───────
+    // ── G.7 (HEAD) — build_tools_context includes param summary when available ───────
     #[test]
     fn test_build_tools_context_includes_param_summary() {
         // Register a tool whose schema has properties so param_summary is non-empty
@@ -576,7 +625,43 @@ mod tests {
         assert!(ctx.contains("query"), "context missing param name 'query': {ctx}");
     }
 
-    // ── G.8 — unknown arg key downgrades confidence to Low ────────────────────
+    // ── G.7 (Agent F) — clarifying_question + steps → workflow returned, question ignored ─
+    #[test]
+    fn test_both_question_and_steps_prefers_workflow() {
+        let wfgen = make_generator();
+        // LLM returns both a clarifying_question AND valid steps — workflow must win.
+        let json_str = serde_json::json!({
+            "clarifying_question": "Which output format do you prefer?",
+            "id": "dual-wf",
+            "name": "Dual Workflow",
+            "description": "Has both question and steps",
+            "schedule": null,
+            "steps": [
+                {
+                    "name": "search",
+                    "type": "tool",
+                    "tool": "web_search",
+                    "args": {},
+                    "depends_on": [],
+                    "failure_policy": "stop"
+                }
+            ],
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z"
+        })
+        .to_string();
+
+        let result = wfgen.parse_and_assess(&json_str).unwrap();
+        // Should prefer the workflow, not return the question
+        assert!(result.workflow.is_some(), "workflow should be present");
+        assert_eq!(result.confidence, Confidence::High);
+        assert!(
+            result.clarifying_question.is_none(),
+            "clarifying question should be discarded when steps are present"
+        );
+    }
+
+    // ── G.8 (HEAD) — unknown arg key downgrades confidence to Low ────────────────────
     #[test]
     fn test_parse_bad_arg_key_downgrades_confidence() {
         let wfgen = make_generator();
@@ -605,6 +690,60 @@ mod tests {
         // This test just ensures the code path runs without panic.
         // When a real tool with a populated schema is used, bad keys downgrade confidence.
         assert!(result.workflow.is_some());
+    }
+
+    // ── G.8 (Agent F) — JSON wrapped in markdown fences + surrounding text ─────────────
+    #[test]
+    fn test_parse_json_with_surrounding_text_and_fences() {
+        let wfgen = make_generator();
+        // LLM responds with prose, triple-backtick fences, and trailing explanation.
+        let wrapped = format!(
+            "Here is the workflow I generated for you:\n\n```json\n{}\n```\n\nLet me know if you need changes.",
+            known_tool_workflow_json()
+        );
+        let result = wfgen.parse_and_assess(&wrapped).unwrap();
+
+        assert_eq!(result.confidence, Confidence::High);
+        assert!(result.workflow.is_some(), "workflow should be extracted from surrounded text");
+        assert!(!result.toml.is_empty());
+    }
+
+    // ── G.9 — low-confidence result has saved = false ─────────────────────────
+    #[test]
+    fn test_low_confidence_result_not_saved() {
+        let wfgen = make_generator();
+        let json_str = serde_json::json!({
+            "id": "low-conf-wf",
+            "name": "Low Confidence",
+            "description": "Unknown tool",
+            "schedule": null,
+            "steps": [
+                {
+                    "name": "ghost",
+                    "type": "tool",
+                    "tool": "nonexistent_tool",
+                    "args": {},
+                    "depends_on": [],
+                    "failure_policy": "stop"
+                }
+            ],
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z"
+        })
+        .to_string();
+
+        let result = wfgen.parse_and_assess(&json_str).unwrap();
+        assert_eq!(result.confidence, Confidence::Low);
+        assert!(!result.saved, "low-confidence result must have saved = false");
+    }
+
+    // ── G.10 — high-confidence result also has saved = false (caller decides) ──
+    #[test]
+    fn test_high_confidence_result_not_saved_by_generator() {
+        let wfgen = make_generator();
+        let result = wfgen.parse_and_assess(&known_tool_workflow_json()).unwrap();
+        assert_eq!(result.confidence, Confidence::High);
+        assert!(!result.saved, "generator never sets saved=true; handler does that");
     }
 
     // ── P.7 — parse_workflow_json tests (Agent I) ─────────────────────────────

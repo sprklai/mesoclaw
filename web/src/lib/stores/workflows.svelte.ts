@@ -68,11 +68,21 @@ export interface WorkflowRunProgress {
 // Result types for generateWorkflow
 export type GenerateSuccess = { id: string };
 export type GenerateNeedsInput = { clarifyingQuestion: string };
-export type GenerateWorkflowResult = GenerateSuccess | GenerateNeedsInput;
+/** Preview: low-confidence result not saved — show TOML and ask for clarification. */
+export type GeneratePreview = { toml: string; clarifyingQuestion: string };
+export type GenerateWorkflowResult =
+  | GenerateSuccess
+  | GenerateNeedsInput
+  | GeneratePreview;
 
 export function isGenerateSuccess(r: GenerateWorkflowResult): r is GenerateSuccess {
   return 'id' in r;
 }
+
+export function isGeneratePreview(r: GenerateWorkflowResult): r is GeneratePreview {
+  return 'toml' in r;
+}
+
 
 const WORKFLOW_SAFETY_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -262,22 +272,62 @@ function createWorkflowsStore() {
       await apiPost(`/workflows/${encodeURIComponent(id)}/run`, {});
     },
 
-    async generateWorkflow(description: string): Promise<GenerateWorkflowResult> {
-      const res = await apiPost<{
-        toml: string;
-        confidence: 'high' | 'low';
-        clarifying_question?: string;
-      }>('/workflows/generate', { description });
+    // Issue 4: AbortController ref for double-generate cancellation.
+    _generateController: null as AbortController | null,
 
-      if (res.confidence === 'low') {
-        return { clarifyingQuestion: res.clarifying_question ?? 'Can you provide more details?' };
+    async generateWorkflow(description: string): Promise<GenerateWorkflowResult> {
+      // Issue 4: abort any in-flight generate request before starting a new one.
+      if (this._generateController) {
+        this._generateController.abort();
+      }
+      this._generateController = new AbortController();
+      const signal = this._generateController.signal;
+
+      let res: { toml: string; confidence: 'high' | 'low'; clarifying_question?: string; saved: boolean };
+      try {
+        res = await apiPost<typeof res>('/workflows/generate', { description }, { signal });
+      } catch (e: unknown) {
+        // Issue 4: swallow AbortError silently (user started a new request).
+        if (e instanceof Error && e.name === 'AbortError') {
+          throw e; // re-throw so caller can decide; caller should also swallow AbortError
+        }
+        throw e;
+      } finally {
+        this._generateController = null;
       }
 
-      // Save the generated workflow
-      const saved = await apiPost<{ id: string }>('/workflows', {
-        toml_content: res.toml,
-      });
-      return { id: saved.id };
+      // Issue 7: backend now handles save logic and sets saved=true only for high-confidence.
+      if (res.saved) {
+        // High-confidence: backend already saved — parse the id from the TOML header.
+        // The backend saves and we need the id; extract from TOML (id = "...")
+        const idMatch = res.toml.match(/^id\s*=\s*"([^"]+)"/m);
+        if (idMatch) {
+          await this.load();
+          return { id: idMatch[1] };
+        }
+        // Fallback: reload and return first match
+        await this.load();
+        return { id: workflows[0]?.id ?? '' };
+      }
+
+      if (res.confidence === 'low') {
+        // Issue 7: low-confidence → preview only, not saved.
+        const question = res.clarifying_question ?? 'Can you provide more details?';
+        if (res.toml) {
+          return { toml: res.toml, clarifyingQuestion: question };
+        }
+        return { clarifyingQuestion: question };
+      }
+
+      // Confidence high but saved=false (e.g., no registry) — should not normally happen.
+      return { clarifyingQuestion: 'Generation succeeded but the workflow could not be saved. Please try again.' };
+    },
+
+    abortGenerate() {
+      if (this._generateController) {
+        this._generateController.abort();
+        this._generateController = null;
+      }
     },
 
     async history(id: string): Promise<WorkflowRun[]> {
