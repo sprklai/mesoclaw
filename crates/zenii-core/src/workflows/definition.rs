@@ -1,6 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
+
+use crate::{Result, ZeniiError};
 
 /// Canvas position for a workflow node in the visual builder.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,6 +141,179 @@ pub struct WorkflowRun {
     pub started_at: String,
     pub completed_at: Option<String>,
     pub error: Option<String>,
+}
+
+/// Returns `true` if `s` consists solely of lowercase ASCII letters, digits, underscores, or
+/// hyphens and is non-empty.
+fn is_valid_id(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+}
+
+/// Returns `true` if `s` is a valid step name: non-empty, only `[a-z0-9_]`.
+fn is_valid_step_name(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+impl Workflow {
+    /// Validate the workflow definition. Returns an error describing the first violation found.
+    pub fn validate(&self) -> Result<()> {
+        // id: non-empty, matches [a-z0-9_-]+
+        if !is_valid_id(&self.id) {
+            return Err(ZeniiError::Validation(format!(
+                "workflow id '{}' is invalid: must match [a-z0-9_-]+",
+                self.id
+            )));
+        }
+
+        // name: non-empty
+        if self.name.trim().is_empty() {
+            return Err(ZeniiError::Validation("workflow name must not be empty".into()));
+        }
+
+        // steps: non-empty
+        if self.steps.is_empty() {
+            return Err(ZeniiError::Validation("workflow must have at least one step".into()));
+        }
+
+        // Collect step names for reference validation
+        let mut step_name_set: HashSet<&str> = HashSet::new();
+
+        for step in &self.steps {
+            // Step name: non-empty, matches [a-z0-9_]+
+            if !is_valid_step_name(&step.name) {
+                return Err(ZeniiError::Validation(format!(
+                    "step name '{}' is invalid: must match [a-z0-9_]+",
+                    step.name
+                )));
+            }
+
+            // Step names must be unique
+            if !step_name_set.insert(step.name.as_str()) {
+                return Err(ZeniiError::Validation(format!(
+                    "duplicate step name '{}'",
+                    step.name
+                )));
+            }
+
+            // Condition and Parallel not yet implemented
+            match &step.step_type {
+                StepType::Condition { .. } => {
+                    return Err(ZeniiError::Workflow(
+                        "condition/parallel execution not yet implemented".into(),
+                    ));
+                }
+                StepType::Parallel { .. } => {
+                    return Err(ZeniiError::Workflow(
+                        "condition/parallel execution not yet implemented".into(),
+                    ));
+                }
+                _ => {}
+            }
+        }
+
+        // Now validate cross-references (depends_on, if_true/if_false, fallback)
+        for step in &self.steps {
+            // depends_on: all referenced steps must exist
+            for dep in &step.depends_on {
+                if !step_name_set.contains(dep.as_str()) {
+                    return Err(ZeniiError::Validation(format!(
+                        "step '{}' depends_on unknown step '{dep}'",
+                        step.name
+                    )));
+                }
+            }
+
+            // Condition if_true / if_false
+            if let StepType::Condition { if_true, if_false, .. } = &step.step_type {
+                if !step_name_set.contains(if_true.as_str()) {
+                    return Err(ZeniiError::Validation(format!(
+                        "step '{}' if_true references unknown step '{if_true}'",
+                        step.name
+                    )));
+                }
+                if let Some(f) = if_false
+                    && !step_name_set.contains(f.as_str())
+                {
+                    return Err(ZeniiError::Validation(format!(
+                        "step '{}' if_false references unknown step '{f}'",
+                        step.name
+                    )));
+                }
+            }
+
+            // Fallback in failure policy
+            if let FailurePolicy::Fallback { step: fallback_step } = &step.failure_policy
+                && !step_name_set.contains(fallback_step.as_str())
+            {
+                return Err(ZeniiError::Validation(format!(
+                    "step '{}' fallback references unknown step '{fallback_step}'",
+                    step.name
+                )));
+            }
+        }
+
+        // Cycle detection via DFS on depends_on edges
+        if let Some(cycle_step) = detect_cycle(&self.steps) {
+            return Err(ZeniiError::Validation(format!(
+                "circular dependency detected involving step '{cycle_step}'"
+            )));
+        }
+
+        // Schedule validation (if present): use cron crate
+        if let Some(sched) = &self.schedule {
+            #[cfg(feature = "workflows")]
+            {
+                cron::Schedule::from_str(sched).map_err(|e| {
+                    ZeniiError::Validation(format!("invalid cron schedule '{sched}': {e}"))
+                })?;
+            }
+            #[cfg(not(feature = "workflows"))]
+            {
+                let _ = sched; // cron not available without the workflows feature
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Perform DFS-based cycle detection on `depends_on` edges.
+/// Returns the name of a step involved in a cycle, or `None` if the graph is acyclic.
+fn detect_cycle(steps: &[WorkflowStep]) -> Option<String> {
+    // Build adjacency: step_name -> Vec<step_name> (depends_on)
+    let adj: HashMap<&str, &Vec<String>> = steps.iter().map(|s| (s.name.as_str(), &s.depends_on)).collect();
+
+    // 0 = unvisited, 1 = in-stack, 2 = done
+    let mut state: HashMap<&str, u8> = HashMap::new();
+
+    for step in steps {
+        if let Some(cycle) = dfs_visit(step.name.as_str(), &adj, &mut state) {
+            return Some(cycle);
+        }
+    }
+    None
+}
+
+fn dfs_visit<'a>(
+    node: &'a str,
+    adj: &HashMap<&'a str, &'a Vec<String>>,
+    state: &mut HashMap<&'a str, u8>,
+) -> Option<String> {
+    match state.get(node).copied().unwrap_or(0) {
+        2 => return None, // already fully processed
+        1 => return Some(node.to_string()), // back edge → cycle
+        _ => {}
+    }
+    state.insert(node, 1);
+    if let Some(deps) = adj.get(node) {
+        for dep in *deps {
+            if let Some(cycle) = dfs_visit(dep.as_str(), adj, state) {
+                return Some(cycle);
+            }
+        }
+    }
+    state.insert(node, 2);
+    None
 }
 
 #[cfg(test)]
@@ -521,5 +697,191 @@ mod tests {
         assert!(wf.steps[0].depends_on.is_empty());
         assert!(wf.steps[0].retry.is_none());
         assert!(matches!(wf.steps[0].failure_policy, FailurePolicy::Stop));
+    }
+
+    // ── validate() tests ──────────────────────────────────────────────────────
+
+    fn valid_workflow() -> Workflow {
+        Workflow {
+            id: "my-workflow".into(),
+            name: "My Workflow".into(),
+            description: "A valid workflow".into(),
+            schedule: None,
+            steps: vec![
+                WorkflowStep {
+                    name: "step_one".into(),
+                    step_type: StepType::Tool {
+                        tool: "shell".into(),
+                        args: serde_json::json!({}),
+                    },
+                    depends_on: vec![],
+                    retry: None,
+                    failure_policy: FailurePolicy::Stop,
+                    timeout_secs: None,
+                },
+                WorkflowStep {
+                    name: "step_two".into(),
+                    step_type: StepType::Llm {
+                        prompt: "Summarize".into(),
+                        model: None,
+                    },
+                    depends_on: vec!["step_one".into()],
+                    retry: None,
+                    failure_policy: FailurePolicy::Stop,
+                    timeout_secs: None,
+                },
+            ],
+            layout: None,
+            created_at: "2026-01-01T00:00:00Z".into(),
+            updated_at: "2026-01-01T00:00:00Z".into(),
+        }
+    }
+
+    // validate_ok — well-formed workflow passes
+    #[test]
+    fn validate_ok() {
+        let wf = valid_workflow();
+        assert!(wf.validate().is_ok());
+    }
+
+    // validate_empty_steps — empty steps list is rejected
+    #[test]
+    fn validate_empty_steps() {
+        let mut wf = valid_workflow();
+        wf.steps.clear();
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("at least one step"), "{err}");
+    }
+
+    // validate_duplicate_step_name — duplicate step names are rejected
+    #[test]
+    fn validate_duplicate_step_name() {
+        let mut wf = valid_workflow();
+        wf.steps[1].name = "step_one".into();
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("duplicate step name"), "{err}");
+    }
+
+    // validate_unknown_depends_on — unknown dependency is rejected
+    #[test]
+    fn validate_unknown_depends_on() {
+        let mut wf = valid_workflow();
+        wf.steps[1].depends_on = vec!["nonexistent".into()];
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("unknown step"), "{err}");
+    }
+
+    // validate_cycle — A→B→A is rejected
+    #[test]
+    fn validate_cycle() {
+        let wf = Workflow {
+            id: "cycle-wf".into(),
+            name: "Cycle".into(),
+            description: "cycle test".into(),
+            schedule: None,
+            steps: vec![
+                WorkflowStep {
+                    name: "step_a".into(),
+                    step_type: StepType::Delay { seconds: 1 },
+                    depends_on: vec!["step_b".into()],
+                    retry: None,
+                    failure_policy: FailurePolicy::Stop,
+                    timeout_secs: None,
+                },
+                WorkflowStep {
+                    name: "step_b".into(),
+                    step_type: StepType::Delay { seconds: 1 },
+                    depends_on: vec!["step_a".into()],
+                    retry: None,
+                    failure_policy: FailurePolicy::Stop,
+                    timeout_secs: None,
+                },
+            ],
+            layout: None,
+            created_at: "2026-01-01T00:00:00Z".into(),
+            updated_at: "2026-01-01T00:00:00Z".into(),
+        };
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("circular dependency"), "{err}");
+    }
+
+    // validate_invalid_schedule — garbage cron expression is rejected
+    #[cfg(feature = "workflows")]
+    #[test]
+    fn validate_invalid_schedule() {
+        let mut wf = valid_workflow();
+        wf.schedule = Some("not a cron expression".into());
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("invalid cron schedule"), "{err}");
+    }
+
+    // validate_valid_schedule — valid 7-field cron passes
+    #[cfg(feature = "workflows")]
+    #[test]
+    fn validate_valid_schedule() {
+        let mut wf = valid_workflow();
+        // 7-field cron: sec min hour dom month dow year
+        wf.schedule = Some("0 30 9 * * Mon *".into());
+        assert!(wf.validate().is_ok());
+    }
+
+    // validate_condition_step_rejected — condition step type returns not-implemented error
+    #[test]
+    fn validate_condition_step_rejected() {
+        let mut wf = valid_workflow();
+        wf.steps[0].step_type = StepType::Condition {
+            expression: "true".into(),
+            if_true: "step_two".into(),
+            if_false: None,
+        };
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("not yet implemented"), "{err}");
+    }
+
+    // validate_parallel_step_rejected — parallel step type returns not-implemented error
+    #[test]
+    fn validate_parallel_step_rejected() {
+        let mut wf = valid_workflow();
+        wf.steps[0].step_type = StepType::Parallel {
+            steps: vec!["step_two".into()],
+        };
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("not yet implemented"), "{err}");
+    }
+
+    // validate_empty_id — empty id is rejected
+    #[test]
+    fn validate_empty_id() {
+        let mut wf = valid_workflow();
+        wf.id = String::new();
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("invalid"), "{err}");
+    }
+
+    // validate_invalid_id_chars — id with path separators is rejected
+    #[test]
+    fn validate_invalid_id_chars() {
+        let mut wf = valid_workflow();
+        wf.id = "../evil".into();
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("invalid"), "{err}");
+    }
+
+    // validate_empty_name — empty name is rejected
+    #[test]
+    fn validate_empty_name() {
+        let mut wf = valid_workflow();
+        wf.name = String::new();
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("name"), "{err}");
+    }
+
+    // validate_unknown_fallback — fallback to unknown step is rejected
+    #[test]
+    fn validate_unknown_fallback() {
+        let mut wf = valid_workflow();
+        wf.steps[0].failure_policy = FailurePolicy::Fallback { step: "no_such_step".into() };
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("unknown step"), "{err}");
     }
 }

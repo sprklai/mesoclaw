@@ -1,5 +1,6 @@
 pub mod definition;
 pub mod executor;
+pub mod generator;
 pub mod runtime;
 pub mod templates;
 
@@ -42,6 +43,18 @@ impl WorkflowRegistry {
                 let content = std::fs::read_to_string(&path)?;
                 match toml::from_str::<Workflow>(&content) {
                     Ok(wf) => {
+                        // Check that the workflow id matches the file stem to avoid ghost files.
+                        let stem = path
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("");
+                        if wf.id != stem {
+                            warn!(
+                                "Skipping workflow {:?}: id '{}' does not match filename stem '{stem}'",
+                                path, wf.id
+                            );
+                            continue;
+                        }
                         self.workflows.insert(wf.id.clone(), wf);
                     }
                     Err(e) => {
@@ -62,7 +75,20 @@ impl WorkflowRegistry {
     }
 
     pub fn save(&self, workflow: Workflow) -> Result<()> {
+        // Validate before writing to disk
+        workflow.validate()?;
+
+        // Sanity check: the file we're about to write must match the workflow id.
+        // This is always true when id is valid (validate() ensures that), but we
+        // assert explicitly to guard against future refactors.
+        let intended_stem = workflow.id.clone();
         let path = self.directory.join(format!("{}.toml", workflow.id));
+        assert_eq!(
+            path.file_stem().and_then(|s| s.to_str()).unwrap_or(""),
+            intended_stem,
+            "save() invariant violated: file stem does not match workflow id"
+        );
+
         let content = toml::to_string_pretty(&workflow)
             .map_err(|e| ZeniiError::Workflow(format!("serialize error: {e}")))?;
         std::fs::write(&path, content)?;
@@ -208,5 +234,43 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let registry = WorkflowRegistry::new(dir.path().to_path_buf()).unwrap();
         assert!(registry.get("missing").is_none());
+    }
+
+    // registry_load_skips_mismatched_id — file named foo.toml but contains id = "bar" is skipped
+    #[test]
+    fn registry_load_skips_mismatched_id() {
+        let dir = tempfile::TempDir::new().unwrap();
+
+        // Write foo.toml with id = "bar" (mismatch)
+        let toml_content = r#"
+            id = "bar"
+            name = "Mismatch"
+            description = "ID does not match filename"
+
+            [[steps]]
+            name = "s1"
+            type = "delay"
+            seconds = 1
+        "#;
+        std::fs::write(dir.path().join("foo.toml"), toml_content).unwrap();
+
+        let registry = WorkflowRegistry::new(dir.path().to_path_buf()).unwrap();
+
+        // Neither "foo" nor "bar" should be loaded
+        assert!(registry.get("foo").is_none(), "foo should not be loaded");
+        assert!(registry.get("bar").is_none(), "bar should not be loaded (filename mismatch)");
+        assert_eq!(registry.list().len(), 0);
+    }
+
+    // registry_save_rejects_invalid_id — save() with invalid id returns Validation error
+    #[test]
+    fn registry_save_rejects_invalid_id() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let registry = WorkflowRegistry::new(dir.path().to_path_buf()).unwrap();
+
+        let mut wf = test_workflow("valid-id", "Valid");
+        wf.id = "../traversal".into();
+        let err = registry.save(wf).unwrap_err();
+        assert!(err.to_string().contains("invalid"), "{err}");
     }
 }
