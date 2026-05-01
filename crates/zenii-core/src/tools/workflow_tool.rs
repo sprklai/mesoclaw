@@ -17,6 +17,8 @@ pub struct WorkflowTool {
     executor: Arc<WorkflowExecutor>,
     tools: Arc<ToolRegistry>,
     event_bus: Arc<dyn EventBus>,
+    /// Serializes create operations so the check-then-insert is atomic.
+    create_lock: tokio::sync::Mutex<()>,
     #[cfg(feature = "scheduler")]
     scheduler: Option<Arc<crate::scheduler::TokioScheduler>>,
 }
@@ -34,6 +36,7 @@ impl WorkflowTool {
             executor,
             tools,
             event_bus,
+            create_lock: tokio::sync::Mutex::new(()),
             #[cfg(feature = "scheduler")]
             scheduler,
         }
@@ -207,13 +210,6 @@ impl WorkflowTool {
             .collect::<Vec<_>>()
             .join("-");
 
-        // Check for duplicate
-        if self.registry.get(&workflow_id).is_some() {
-            return Ok(ToolResult::err(format!(
-                "Workflow '{workflow_id}' already exists"
-            )));
-        }
-
         let now = chrono::Utc::now().to_rfc3339();
         let workflow = Workflow {
             id: workflow_id.clone(),
@@ -225,6 +221,15 @@ impl WorkflowTool {
             created_at: now.clone(),
             updated_at: now,
         };
+
+        // Hold the create_lock for the entire check+insert window so two concurrent
+        // creates with the same name cannot both pass the exists-check.
+        let _guard = self.create_lock.lock().await;
+        if self.registry.get(&workflow_id).is_some() {
+            return Ok(ToolResult::err(format!(
+                "Workflow '{workflow_id}' already exists"
+            )));
+        }
 
         if let Err(e) = self.registry.save(workflow) {
             return Ok(ToolResult::err(format!("Failed to save workflow: {e}")));

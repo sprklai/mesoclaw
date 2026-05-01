@@ -199,15 +199,8 @@ impl WorkflowExecutor {
                 success: output.success,
             });
 
-            // Persist step result (non-blocking: log on failure, don't halt workflow)
-            if let Err(e) = self.persist_step_result(&run_id, &output).await {
-                tracing::warn!(
-                    run_id = %run_id,
-                    step = %output.step_name,
-                    error = %e,
-                    "failed to persist step result"
-                );
-            }
+            // Step results are collected in step_outputs and persisted atomically
+            // in a single transaction at the end of the run (see persist_run_complete).
 
             let step_failed = !output.success;
             step_outputs.insert(step.name.clone(), output);
@@ -259,7 +252,7 @@ impl WorkflowExecutor {
                                     error: Some(e.to_string()),
                                 },
                             };
-                            // B.3: Emit event and persist result for fallback step
+                            // Emit event for fallback step; result is persisted atomically at run end.
                             let _ = event_bus.publish(
                                 crate::event_bus::AppEvent::WorkflowStepCompleted {
                                     workflow_id: workflow.id.clone(),
@@ -268,14 +261,6 @@ impl WorkflowExecutor {
                                     success: fb_output.success,
                                 },
                             );
-                            if let Err(e) = self.persist_step_result(&run_id, &fb_output).await {
-                                tracing::warn!(
-                                    run_id = %run_id,
-                                    step = %fallback_name,
-                                    error = %e,
-                                    "failed to persist fallback step result"
-                                );
-                            }
                             let fallback_failed = !fb_output.success;
                             step_outputs.insert(fallback_name.clone(), fb_output);
                             if fallback_failed {
@@ -297,11 +282,22 @@ impl WorkflowExecutor {
             WorkflowRunStatus::Completed => "completed",
             WorkflowRunStatus::Failed => "failed",
             WorkflowRunStatus::Cancelled => "cancelled",
-            _ => "failed",
+            WorkflowRunStatus::Running => "running",
         };
 
-        self.persist_run_end(&run_id, status_str, overall_error.as_deref(), &completed_at)
-            .await?;
+        // Persist all step results and the final run status in a single transaction.
+        // If the commit fails, propagate as a Workflow error so the caller knows
+        // the run result was not persisted.
+        let all_step_results: Vec<StepOutput> = step_outputs.values().cloned().collect();
+        self.persist_run_complete(
+            &run_id,
+            status_str,
+            overall_error.as_deref(),
+            &completed_at,
+            &all_step_results,
+        )
+        .await
+        .map_err(|e| ZeniiError::Workflow(format!("failed to persist run results: {e}")))?;
 
         let _ = event_bus.publish(crate::event_bus::AppEvent::WorkflowCompleted {
             workflow_id: workflow.id.clone(),
@@ -409,7 +405,10 @@ impl WorkflowExecutor {
                         });
                     }
                 }
-                Err(_) => {
+                Err(elapsed) => {
+                    // tokio::time::timeout returns Elapsed on timeout; propagate other
+                    // errors with their message. In practice timeout always gives Elapsed.
+                    let _ = elapsed; // tokio::time::error::Elapsed has no inner error
                     return Ok(StepOutput {
                         step_name: step.name.clone(),
                         output: String::new(),
@@ -420,7 +419,63 @@ impl WorkflowExecutor {
                 }
             }
         }
-        unreachable!()
+        // All retry attempts exhausted without returning from the Ok(Ok) arm above.
+        Err(ZeniiError::Workflow("step failed after max retries".into()))
+    }
+
+    /// Persist all step results and the final run status atomically in one transaction.
+    /// Called at the end of a run (success, failure, or cancellation).
+    async fn persist_run_complete(
+        &self,
+        run_id: &str,
+        status: &str,
+        error: Option<&str>,
+        completed_at: &str,
+        step_results: &[StepOutput],
+    ) -> Result<()> {
+        let rid = run_id.to_string();
+        let st = status.to_string();
+        let err = error.map(|s| s.to_string());
+        let cat = completed_at.to_string();
+        let steps: Vec<(String, String, String, bool, i64, Option<String>)> = step_results
+            .iter()
+            .map(|o| {
+                (
+                    uuid::Uuid::new_v4().to_string(),
+                    o.step_name.clone(),
+                    o.output.clone(),
+                    o.success,
+                    o.duration_ms as i64,
+                    o.error.clone(),
+                )
+            })
+            .collect();
+
+        db::with_db(&self.db, move |conn| {
+            // with_db provides &Connection; use execute_batch for BEGIN/COMMIT.
+            conn.execute_batch("BEGIN IMMEDIATE")?;
+            let result = (|| {
+                for (step_id, step_name, out, success, duration, step_err) in &steps {
+                    conn.execute(
+                        "INSERT INTO workflow_step_results (id, run_id, step_name, output, success, duration_ms, error) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                        rusqlite::params![step_id, rid, step_name, out, success, duration, step_err],
+                    )?;
+                }
+                conn.execute(
+                    "UPDATE workflow_runs SET status = ?1, error = ?2, completed_at = ?3 WHERE id = ?4",
+                    rusqlite::params![st, err, cat, rid],
+                )?;
+                Ok::<(), rusqlite::Error>(())
+            })();
+            match result {
+                Ok(()) => conn.execute_batch("COMMIT").map_err(|e| e.into()),
+                Err(e) => {
+                    let _ = conn.execute_batch("ROLLBACK");
+                    Err(ZeniiError::Database(e.to_string()))
+                }
+            }
+        })
+        .await
     }
 
     async fn persist_run_start(
@@ -438,24 +493,6 @@ impl WorkflowExecutor {
             conn.execute(
                 "INSERT INTO workflow_runs (id, workflow_id, workflow_name, status, started_at) VALUES (?1, ?2, ?3, 'running', ?4)",
                 rusqlite::params![rid, wid, wname, sat],
-            )?;
-            Ok(())
-        })
-        .await
-    }
-
-    async fn persist_step_result(&self, run_id: &str, output: &StepOutput) -> Result<()> {
-        let rid = run_id.to_string();
-        let step_id = uuid::Uuid::new_v4().to_string();
-        let step_name = output.step_name.clone();
-        let out = output.output.clone();
-        let success = output.success;
-        let duration = output.duration_ms as i64;
-        let error = output.error.clone();
-        db::with_db(&self.db, move |conn| {
-            conn.execute(
-                "INSERT INTO workflow_step_results (id, run_id, step_name, output, success, duration_ms, error) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                rusqlite::params![step_id, rid, step_name, out, success, duration, error],
             )?;
             Ok(())
         })
