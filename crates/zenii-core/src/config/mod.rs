@@ -34,7 +34,8 @@ pub fn load_config(path: &Path) -> Result<AppConfig> {
     }
     let content = std::fs::read_to_string(path)?;
     let mut config: AppConfig = toml::from_str(&content)?;
-    config.validate();
+    // Clamp soft-range fields on load; ignore hard-range errors (loaded from existing file)
+    let _ = config.validate();
     Ok(config)
 }
 

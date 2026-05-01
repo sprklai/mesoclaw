@@ -73,6 +73,12 @@ pub async fn create_workflow(
         .event_bus
         .publish(crate::event_bus::AppEvent::WorkflowsChanged);
 
+    // Reconcile scheduler registration for cron-scheduled workflows
+    #[cfg(feature = "scheduler")]
+    if let Some(ref scheduler) = state.scheduler {
+        crate::workflows::WorkflowRegistry::on_workflow_saved(&workflow, scheduler);
+    }
+
     Ok((StatusCode::CREATED, Json(workflow)))
 }
 
@@ -140,6 +146,13 @@ pub async fn update_workflow(
     let _ = state
         .event_bus
         .publish(crate::event_bus::AppEvent::WorkflowsChanged);
+
+    // Reconcile scheduler registration for cron-scheduled workflows
+    #[cfg(feature = "scheduler")]
+    if let Some(ref scheduler) = state.scheduler {
+        crate::workflows::WorkflowRegistry::on_workflow_saved(&workflow, scheduler);
+    }
+
     Ok(Json(workflow))
 }
 
@@ -176,6 +189,13 @@ pub async fn delete_workflow(
     let _ = state
         .event_bus
         .publish(crate::event_bus::AppEvent::WorkflowsChanged);
+
+    // Unregister cron job if scheduler is active
+    #[cfg(feature = "scheduler")]
+    if let Some(ref scheduler) = state.scheduler {
+        crate::workflows::WorkflowRegistry::on_workflow_deleted(&id, scheduler);
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }
 

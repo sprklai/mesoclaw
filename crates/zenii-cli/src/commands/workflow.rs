@@ -77,6 +77,17 @@ pub async fn create(client: &ZeniiClient, file: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub async fn update(client: &ZeniiClient, id: &str, file: &str) -> Result<(), String> {
+    let toml_content =
+        std::fs::read_to_string(file).map_err(|e| format!("Failed to read {file}: {e}"))?;
+
+    let body = json!({ "toml_content": toml_content });
+    let result: serde_json::Value = client.put(&format!("/workflows/{id}"), &body).await?;
+    let updated_id = result["id"].as_str().unwrap_or(id);
+    println!("Workflow updated: {updated_id}");
+    Ok(())
+}
+
 pub async fn run(client: &ZeniiClient, id: &str) -> Result<(), String> {
     let result: serde_json::Value = client
         .post(&format!("/workflows/{id}/run"), &json!({}))
