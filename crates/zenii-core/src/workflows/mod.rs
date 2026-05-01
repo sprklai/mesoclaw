@@ -55,6 +55,18 @@ impl WorkflowRegistry {
                             );
                             continue;
                         }
+                        // Warn on unknown schema versions so callers can decide whether to upgrade.
+                        const KNOWN_SCHEMA_VERSION: u32 = 1;
+                        if let Some(v) = wf.schema_version {
+                            if v > KNOWN_SCHEMA_VERSION {
+                                warn!(
+                                    "Workflow {:?} has schema_version={v}, \
+                                     which is newer than the supported version {KNOWN_SCHEMA_VERSION}. \
+                                     Some fields may be ignored.",
+                                    path
+                                );
+                            }
+                        }
                         self.workflows.insert(wf.id.clone(), wf);
                     }
                     Err(e) => {
@@ -74,6 +86,10 @@ impl WorkflowRegistry {
         self.workflows.iter().map(|r| r.value().clone()).collect()
     }
 
+    /// Persist a workflow to disk and update the in-memory registry.
+    ///
+    /// The file path is always derived from `workflow.id` — never from any
+    /// other source. Caller must validate the ID before calling save() (Issue 7).
     pub fn save(&self, workflow: Workflow) -> Result<()> {
         // Validate before writing to disk
         workflow.validate()?;
@@ -131,6 +147,7 @@ mod tests {
             layout: None,
             created_at: "2026-01-01T00:00:00Z".into(),
             updated_at: "2026-01-01T00:00:00Z".into(),
+            schema_version: Some(1),
         }
     }
 

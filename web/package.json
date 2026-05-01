@@ -53,6 +53,7 @@
     "dompurify": "^3.3.2",
     "runed": "^0.37.1",
     "shiki": "^4.0.1",
+    "smol-toml": "^1.6.1",
     "svelte-sonner": "^1.0.8",
     "svelte-streamdown": "^3.0.1",
     "svelte-toolbelt": "^0.10.6",

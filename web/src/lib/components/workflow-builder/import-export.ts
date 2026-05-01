@@ -1,3 +1,5 @@
+import { parse as parseToml } from "smol-toml";
+
 /** Download a workflow as a .toml file */
 export function exportWorkflowToml(
   rawToml: string,
@@ -19,25 +21,44 @@ export async function readWorkflowFile(file: File): Promise<string> {
   return file.text();
 }
 
-/** Validate that the content looks like a workflow TOML (basic sanity check) */
+/**
+ * Validate that the content is a well-formed workflow TOML.
+ *
+ * Issue 5: Uses smol-toml to parse the TOML rather than naive string matching,
+ * so structurally broken TOML is caught early rather than silently passed to
+ * the backend. Validates:
+ * - Parseable as valid TOML
+ * - `id` is a non-empty string
+ * - `name` is a non-empty string
+ * - `steps` is a non-empty array
+ */
 export function validateWorkflowToml(content: string): {
   valid: boolean;
   error?: string;
 } {
-  // Basic checks - the backend does full validation
   if (!content.trim()) {
     return { valid: false, error: "wb_import_error_empty" };
   }
-  // Must have at least an id and name field
-  if (!content.includes("id =") && !content.includes("id=")) {
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = parseToml(content) as Record<string, unknown>;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { valid: false, error: `wb_import_error_parse: ${msg}` };
+  }
+
+  if (typeof parsed.id !== "string" || parsed.id.trim() === "") {
     return { valid: false, error: "wb_import_error_no_id" };
   }
-  if (!content.includes("name =") && !content.includes("name=")) {
+
+  if (typeof parsed.name !== "string" || parsed.name.trim() === "") {
     return { valid: false, error: "wb_import_error_no_name" };
   }
-  // Must have at least one step
-  if (!content.includes("[[steps]]")) {
+
+  if (!Array.isArray(parsed.steps) || parsed.steps.length === 0) {
     return { valid: false, error: "wb_import_error_no_steps" };
   }
+
   return { valid: true };
 }

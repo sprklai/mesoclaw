@@ -28,6 +28,10 @@ pub struct Workflow {
     pub created_at: String,
     #[serde(default = "now_rfc3339")]
     pub updated_at: String,
+    /// Schema version for forward-compatibility. None / absent means version 1.
+    /// The loader warns if this exceeds the known version (Issue 6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema_version: Option<u32>,
 }
 
 fn now_rfc3339() -> String {
@@ -352,6 +356,7 @@ mod tests {
             layout: None,
             created_at: "2026-01-01T00:00:00Z".into(),
             updated_at: "2026-01-01T00:00:00Z".into(),
+            schema_version: Some(1),
         };
 
         let json = serde_json::to_string(&wf).unwrap();
@@ -605,6 +610,51 @@ mod tests {
         let back_layout = back.layout.unwrap();
         assert_eq!(back_layout.len(), 2);
         assert!((back_layout["gather"].x - 100.0).abs() < f32::EPSILON);
+    }
+
+    // 5.11e — schema_version roundtrips through TOML serialization (Issue 6)
+    #[test]
+    fn schema_version_toml_roundtrip() {
+        let wf = Workflow {
+            id: "sv-test".into(),
+            name: "Schema Version Test".into(),
+            description: "Verifies schema_version survives TOML serde".into(),
+            schedule: None,
+            steps: vec![WorkflowStep {
+                name: "s1".into(),
+                step_type: StepType::Delay { seconds: 1 },
+                depends_on: vec![],
+                retry: None,
+                failure_policy: FailurePolicy::Stop,
+                timeout_secs: None,
+            }],
+            layout: None,
+            created_at: "2026-01-01T00:00:00Z".into(),
+            updated_at: "2026-01-01T00:00:00Z".into(),
+            schema_version: Some(1),
+        };
+
+        let toml_str = toml::to_string_pretty(&wf).unwrap();
+        assert!(
+            toml_str.contains("schema_version"),
+            "serialized TOML must contain schema_version"
+        );
+
+        let back: Workflow = toml::from_str(&toml_str).unwrap();
+        assert_eq!(back.schema_version, Some(1));
+
+        // Absent schema_version deserializes as None (treated as v1)
+        let no_sv = r#"
+            id = "no-sv"
+            name = "No SV"
+            description = "No schema_version field"
+            [[steps]]
+            name = "s1"
+            type = "delay"
+            seconds = 1
+        "#;
+        let back2: Workflow = toml::from_str(no_sv).unwrap();
+        assert_eq!(back2.schema_version, None);
     }
 
     // 5.11d — Workflow without layout is backward-compatible

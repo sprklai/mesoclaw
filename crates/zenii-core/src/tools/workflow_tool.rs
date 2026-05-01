@@ -220,6 +220,7 @@ impl WorkflowTool {
             layout: None,
             created_at: now.clone(),
             updated_at: now,
+            schema_version: Some(1),
         };
 
         // Hold the create_lock for the entire check+insert window so two concurrent

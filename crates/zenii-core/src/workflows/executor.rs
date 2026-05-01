@@ -614,6 +614,7 @@ mod tests {
             layout: None,
             created_at: chrono::Utc::now().to_rfc3339(),
             updated_at: chrono::Utc::now().to_rfc3339(),
+            schema_version: Some(1),
         }
     }
 
