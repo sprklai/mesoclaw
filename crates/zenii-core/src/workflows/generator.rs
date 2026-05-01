@@ -190,6 +190,9 @@ User description: {description}"#,
             ZeniiError::Workflow(format!("LLM returned invalid workflow structure: {e}"))
         })?;
 
+        // Validate the parsed workflow before returning it
+        workflow.validate()?;
+
         // Check for unknown tools and build a per-tool known-param map simultaneously
         let tool_infos = self.tool_registry.list();
         let known: HashSet<String> = tool_infos.iter().map(|t| t.name.clone()).collect();

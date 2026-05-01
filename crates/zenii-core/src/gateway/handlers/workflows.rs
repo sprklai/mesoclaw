@@ -10,6 +10,12 @@ use crate::gateway::state::AppState;
 use crate::workflows::Workflow;
 use crate::{Result, ZeniiError};
 
+/// Returns `true` if the workflow ID is safe to use in file paths.
+/// Rejects IDs containing `/`, `\`, `.`, or any character outside `[a-z0-9_-]`.
+fn is_valid_workflow_id(id: &str) -> bool {
+    !id.is_empty() && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct GenerateWorkflowRequest {
     pub description: String,
@@ -53,12 +59,15 @@ pub async fn create_workflow(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateWorkflowRequest>,
 ) -> Result<impl IntoResponse> {
+    // Parse and validate input before checking registry availability
+    let workflow: Workflow = toml::from_str(&req.toml_content)?;
+    workflow.validate()?;
+
     let registry = state
         .workflow_registry
         .as_ref()
         .ok_or_else(|| ZeniiError::Workflow("workflow feature not initialized".into()))?;
 
-    let workflow: Workflow = toml::from_str(&req.toml_content)?;
     registry.save(workflow.clone())?;
     let _ = state
         .event_bus
@@ -80,6 +89,9 @@ pub async fn get_workflow(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse> {
+    if !is_valid_workflow_id(&id) {
+        return Err(ZeniiError::Validation("invalid workflow id".into()));
+    }
     let registry = state
         .workflow_registry
         .as_ref()
@@ -96,6 +108,9 @@ pub async fn update_workflow(
     Path(id): Path<String>,
     Json(req): Json<CreateWorkflowRequest>,
 ) -> Result<impl IntoResponse> {
+    if !is_valid_workflow_id(&id) {
+        return Err(ZeniiError::Validation("invalid workflow id".into()));
+    }
     let registry = state
         .workflow_registry
         .as_ref()
@@ -120,6 +135,7 @@ pub async fn update_workflow(
     workflow.created_at = existing.created_at;
     workflow.updated_at = chrono::Utc::now().to_rfc3339();
 
+    workflow.validate()?;
     registry.save(workflow.clone())?;
     let _ = state
         .event_bus
@@ -131,6 +147,9 @@ pub async fn get_workflow_raw(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse> {
+    if !is_valid_workflow_id(&id) {
+        return Err(ZeniiError::Validation("invalid workflow id".into()));
+    }
     let registry = state
         .workflow_registry
         .as_ref()
@@ -145,6 +164,9 @@ pub async fn delete_workflow(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse> {
+    if !is_valid_workflow_id(&id) {
+        return Err(ZeniiError::Validation("invalid workflow id".into()));
+    }
     let registry = state
         .workflow_registry
         .as_ref()
@@ -161,6 +183,9 @@ pub async fn run_workflow(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse> {
+    if !is_valid_workflow_id(&id) {
+        return Err(ZeniiError::Validation("invalid workflow id".into()));
+    }
     let registry = state
         .workflow_registry
         .as_ref()
@@ -215,6 +240,9 @@ pub async fn cancel_workflow_run(
     State(state): State<Arc<AppState>>,
     Path((workflow_id, run_id)): Path<(String, String)>,
 ) -> Result<impl IntoResponse> {
+    if !is_valid_workflow_id(&workflow_id) {
+        return Err(ZeniiError::Validation("invalid workflow id".into()));
+    }
     if let Some((_, handle)) = state.active_workflow_runs.remove(&run_id) {
         handle.abort();
 
@@ -245,6 +273,9 @@ pub async fn workflow_history(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse> {
+    if !is_valid_workflow_id(&id) {
+        return Err(ZeniiError::Validation("invalid workflow id".into()));
+    }
     let executor = state
         .workflow_executor
         .as_ref()
@@ -256,8 +287,11 @@ pub async fn workflow_history(
 
 pub async fn get_run_details(
     State(state): State<Arc<AppState>>,
-    Path((_, run_id)): Path<(String, String)>,
+    Path((workflow_id, run_id)): Path<(String, String)>,
 ) -> Result<impl IntoResponse> {
+    if !is_valid_workflow_id(&workflow_id) {
+        return Err(ZeniiError::Validation("invalid workflow id".into()));
+    }
     let executor = state
         .workflow_executor
         .as_ref()
@@ -385,6 +419,67 @@ mod tests {
 
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // is_valid_workflow_id unit tests
+    #[test]
+    fn workflow_id_valid_chars() {
+        use super::is_valid_workflow_id;
+        assert!(is_valid_workflow_id("my-workflow"));
+        assert!(is_valid_workflow_id("wf_123"));
+        assert!(is_valid_workflow_id("a"));
+        assert!(!is_valid_workflow_id(""));
+        assert!(!is_valid_workflow_id("../evil"));
+        assert!(!is_valid_workflow_id("foo/bar"));
+        assert!(!is_valid_workflow_id("foo\\bar"));
+        assert!(!is_valid_workflow_id("foo.bar"));
+        assert!(!is_valid_workflow_id("FOO")); // uppercase rejected
+        assert!(!is_valid_workflow_id("foo bar")); // space rejected
+    }
+
+    // Gateway: create with path-traversal ID returns 400
+    // Note: The ID comes from the TOML body (not the URL path) for create.
+    // An invalid id in the TOML triggers validate() → 400.
+    #[tokio::test]
+    async fn create_workflow_path_traversal_id_returns_400() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        // TOML with a path-traversal id — validate() rejects it before registry check
+        let body = serde_json::json!({
+            "toml_content": "id = \"../evil\"\nname = \"Evil\"\ndescription = \"d\"\n\n[[steps]]\nname = \"s1\"\ntype = \"delay\"\nseconds = 1"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&body).unwrap()))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    // Gateway: GET /workflows/{id} with path-traversal ID returns 400
+    #[tokio::test]
+    async fn get_workflow_path_traversal_returns_400() {
+        let (_dir, state) = crate::gateway::handlers::tests::test_state().await;
+        let app = crate::gateway::routes::build_router(state);
+
+        let req = Request::builder()
+            .uri("/workflows/..%2Fevil")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        // axum percent-decodes path params; ../evil is invalid → 400
+        // (axum may also reject the route match itself → 404; both are acceptable security outcomes)
+        assert!(
+            resp.status() == StatusCode::BAD_REQUEST || resp.status() == StatusCode::NOT_FOUND,
+            "expected 400 or 404, got {}",
+            resp.status()
+        );
     }
 
     // 5.49 — generate workflow returns 503 when no AI provider is configured
