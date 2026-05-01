@@ -605,12 +605,57 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    /// Validate and clamp config values to acceptable ranges.
-    /// Call this after loading config or before saving.
-    pub fn validate(&mut self) {
+    /// Validate config values. Returns an error if any field is out of acceptable range.
+    /// Also clamps soft-range fields (confidence scores, turn counts).
+    /// Call this before saving config to disk.
+    pub fn validate(&mut self) -> Result<(), crate::ZeniiError> {
+        // Clamp soft-range fields
         self.learning_min_confidence = self.learning_min_confidence.clamp(0.0, 1.0);
         self.agent_max_turns = self.agent_max_turns.clamp(1, 32);
         self.agent_max_continuations = self.agent_max_continuations.clamp(0, 5);
+
+        // Hard-range fields — reject invalid values
+        if self.workflow_max_concurrent == 0 || self.workflow_max_concurrent > 100 {
+            return Err(crate::ZeniiError::Validation(format!(
+                "workflow_max_concurrent must be between 1 and 100, got {}",
+                self.workflow_max_concurrent
+            )));
+        }
+        if self.agent_max_tokens == 0 || self.agent_max_tokens > 200_000 {
+            return Err(crate::ZeniiError::Validation(format!(
+                "agent_max_tokens must be between 1 and 200000, got {}",
+                self.agent_max_tokens
+            )));
+        }
+        // Timeout fields must be > 0
+        if self.tool_shell_timeout_secs == 0 {
+            return Err(crate::ZeniiError::Validation(
+                "tool_shell_timeout_secs must be > 0".into(),
+            ));
+        }
+        if self.agent_timeout_secs == 0 {
+            return Err(crate::ZeniiError::Validation(
+                "agent_timeout_secs must be > 0".into(),
+            ));
+        }
+        if self.web_search_timeout_secs == 0 {
+            return Err(crate::ZeniiError::Validation(
+                "web_search_timeout_secs must be > 0".into(),
+            ));
+        }
+        // URL fields: provider_base_url, if set, must be a valid http/https URL
+        if let Some(ref url) = self.provider_base_url {
+            let trimmed = url.trim();
+            if !trimmed.is_empty()
+                && !trimmed.starts_with("http://")
+                && !trimmed.starts_with("https://")
+            {
+                return Err(crate::ZeniiError::Validation(format!(
+                    "provider_base_url must be a valid http/https URL, got '{url}'"
+                )));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -949,10 +994,10 @@ mod tests {
     fn learning_min_confidence_clamped() {
         let mut config = AppConfig::default();
         config.learning_min_confidence = 1.5;
-        config.validate();
+        config.validate().unwrap();
         assert!(config.learning_min_confidence <= 1.0);
         config.learning_min_confidence = -0.5;
-        config.validate();
+        config.validate().unwrap();
         assert!(config.learning_min_confidence >= 0.0);
     }
 
@@ -992,15 +1037,15 @@ mod tests {
     fn tc_s5_validate_clamps_agent_max_turns() {
         let mut config = AppConfig::default();
         config.agent_max_turns = 0;
-        config.validate();
+        config.validate().unwrap();
         assert_eq!(config.agent_max_turns, 1);
 
         config.agent_max_turns = 100;
-        config.validate();
+        config.validate().unwrap();
         assert_eq!(config.agent_max_turns, 32);
 
         config.agent_max_turns = 16;
-        config.validate();
+        config.validate().unwrap();
         assert_eq!(config.agent_max_turns, 16);
     }
 
@@ -1009,11 +1054,11 @@ mod tests {
     fn tc_s6_validate_clamps_agent_max_continuations() {
         let mut config = AppConfig::default();
         config.agent_max_continuations = 10;
-        config.validate();
+        config.validate().unwrap();
         assert_eq!(config.agent_max_continuations, 5);
 
         config.agent_max_continuations = 0;
-        config.validate();
+        config.validate().unwrap();
         assert_eq!(config.agent_max_continuations, 0);
     }
 
@@ -1191,5 +1236,84 @@ mod tests {
         let config: AppConfig = toml::from_str(toml_str).unwrap();
         assert!(!config.wiki_context_injection_enabled);
         assert_eq!(config.wiki_context_max_pages, 5);
+    }
+
+    // VAL.1 — valid default config passes validate()
+    #[test]
+    fn validate_default_config_passes() {
+        let mut config = AppConfig::default();
+        assert!(config.validate().is_ok());
+    }
+
+    // VAL.2 — workflow_max_concurrent = 0 fails validate()
+    #[test]
+    fn validate_workflow_max_concurrent_zero_fails() {
+        let mut config = AppConfig::default();
+        config.workflow_max_concurrent = 0;
+        let err = config.validate().unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("workflow_max_concurrent"),
+            "error should mention field: {msg}"
+        );
+    }
+
+    // VAL.3 — workflow_max_concurrent = 101 fails validate()
+    #[test]
+    fn validate_workflow_max_concurrent_over_limit_fails() {
+        let mut config = AppConfig::default();
+        config.workflow_max_concurrent = 101;
+        let err = config.validate().unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("workflow_max_concurrent"), "{msg}");
+    }
+
+    // VAL.4 — agent_max_tokens = 0 fails validate()
+    #[test]
+    fn validate_agent_max_tokens_zero_fails() {
+        let mut config = AppConfig::default();
+        config.agent_max_tokens = 0;
+        let err = config.validate().unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("agent_max_tokens"),
+            "error should mention field: {msg}"
+        );
+    }
+
+    // VAL.5 — agent_max_tokens > 200000 fails validate()
+    #[test]
+    fn validate_agent_max_tokens_over_limit_fails() {
+        let mut config = AppConfig::default();
+        config.agent_max_tokens = 200_001;
+        let err = config.validate().unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("agent_max_tokens"), "{msg}");
+    }
+
+    // VAL.6 — provider_base_url without http/https scheme fails validate()
+    #[test]
+    fn validate_provider_base_url_invalid_fails() {
+        let mut config = AppConfig::default();
+        config.provider_base_url = Some("ftp://invalid".into());
+        let err = config.validate().unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("provider_base_url"), "{msg}");
+    }
+
+    // VAL.7 — valid provider_base_url passes validate()
+    #[test]
+    fn validate_provider_base_url_valid_passes() {
+        let mut config = AppConfig::default();
+        config.provider_base_url = Some("https://api.openai.com/v1".into());
+        assert!(config.validate().is_ok());
+    }
+
+    // VAL.8 — provider_base_url = None passes validate()
+    #[test]
+    fn validate_provider_base_url_none_passes() {
+        let mut config = AppConfig::default();
+        config.provider_base_url = None;
+        assert!(config.validate().is_ok());
     }
 }

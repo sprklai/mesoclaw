@@ -107,6 +107,9 @@ pub async fn update_config(
     let mut config = crate::config::load_config(&state.config_path)?;
 
     if let Some(obj) = body.as_object() {
+        // Unknown fields are silently ignored — serde does not deny_unknown_fields here
+        // because the config object is large and evolving. Clients sending extra fields
+        // (e.g., UI sending the full config back) must not get a 400 error.
         // Apply known fields
         if let Some(v) = obj
             .get("context_injection_enabled")
@@ -307,10 +310,40 @@ pub async fn update_config(
                 }
             }
         }
+        // Workflow engine tunables
+        if let Some(v) = obj.get("workflow_max_concurrent").and_then(|v| v.as_u64()) {
+            config.workflow_max_concurrent = v as usize;
+        }
+        if let Some(v) = obj.get("workflow_max_steps").and_then(|v| v.as_u64()) {
+            config.workflow_max_steps = v as usize;
+        }
+        if let Some(v) = obj
+            .get("workflow_step_timeout_secs")
+            .and_then(|v| v.as_u64())
+        {
+            config.workflow_step_timeout_secs = v;
+        }
+        // Agent tunables
+        if let Some(v) = obj.get("agent_max_tokens").and_then(|v| v.as_u64()) {
+            config.agent_max_tokens = v as usize;
+        }
+        if let Some(v) = obj.get("agent_max_turns").and_then(|v| v.as_u64()) {
+            config.agent_max_turns = v as usize;
+        }
+        if let Some(v) = obj.get("agent_timeout_secs").and_then(|v| v.as_u64()) {
+            config.agent_timeout_secs = v;
+        }
+        // Tool timeout tunables
+        if let Some(v) = obj.get("tool_shell_timeout_secs").and_then(|v| v.as_u64()) {
+            config.tool_shell_timeout_secs = v;
+        }
+        if let Some(v) = obj.get("web_search_timeout_secs").and_then(|v| v.as_u64()) {
+            config.web_search_timeout_secs = v;
+        }
     }
 
-    // Validate before saving
-    config.validate();
+    // Validate before saving — returns HTTP 400 on invalid field values
+    config.validate()?;
 
     crate::config::save_config(&state.config_path, &config)?;
 
@@ -688,6 +721,68 @@ mod tests {
             json["mcp_server_hidden_tools"],
             serde_json::json!(["shell"])
         );
+    }
+
+    // CFG.VAL.1 — PUT /config with workflow_max_concurrent = 0 returns 400
+    #[tokio::test]
+    async fn put_config_invalid_workflow_max_concurrent_rejected() {
+        let (_dir, state) = test_state().await;
+        let app = app(state);
+
+        let req = Request::builder()
+            .method("PUT")
+            .uri("/config")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({ "workflow_max_concurrent": 0 }))
+                    .unwrap(),
+            ))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    // CFG.VAL.2 — PUT /config with agent_max_tokens = 0 returns 400
+    #[tokio::test]
+    async fn put_config_invalid_agent_max_tokens_rejected() {
+        let (_dir, state) = test_state().await;
+        let app = app(state);
+
+        let req = Request::builder()
+            .method("PUT")
+            .uri("/config")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({ "agent_max_tokens": 0 })).unwrap(),
+            ))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    // CFG.VAL.3 — PUT /config with unknown fields returns 200 (silently ignored)
+    #[tokio::test]
+    async fn put_config_unknown_fields_ignored() {
+        let (_dir, state) = test_state().await;
+        let app = app(state);
+
+        let req = Request::builder()
+            .method("PUT")
+            .uri("/config")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({
+                    "this_field_does_not_exist": "some_value",
+                    "another_unknown_field": 42
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 
     #[tokio::test]

@@ -377,6 +377,13 @@ enum WorkflowAction {
         /// Path to TOML workflow file
         file: String,
     },
+    /// Update an existing workflow from a TOML file
+    Update {
+        /// Workflow ID
+        id: String,
+        /// Path to TOML workflow file
+        file: String,
+    },
     /// Run a workflow
     Run {
         /// Workflow ID
@@ -629,6 +636,9 @@ async fn main() {
             WorkflowAction::Get { id } => commands::workflow::get(&client, &id).await,
             WorkflowAction::Show { id } => commands::workflow::show(&client, &id).await,
             WorkflowAction::Create { file } => commands::workflow::create(&client, &file).await,
+            WorkflowAction::Update { id, file } => {
+                commands::workflow::update(&client, &id, &file).await
+            }
             WorkflowAction::Run { id } => commands::workflow::run(&client, &id).await,
             WorkflowAction::Delete { id } => commands::workflow::delete(&client, &id).await,
             WorkflowAction::History { id } => commands::workflow::history(&client, &id).await,
@@ -1325,6 +1335,20 @@ mod tests {
                 assert_eq!(file, "/tmp/wf.toml");
             }
             _ => panic!("expected Workflow Create"),
+        }
+    }
+
+    #[test]
+    fn parse_workflow_update() {
+        let cli = parse(&["zenii", "workflow", "update", "my-workflow", "/tmp/wf.toml"]);
+        match cli.command {
+            Commands::Workflow {
+                action: WorkflowAction::Update { id, file },
+            } => {
+                assert_eq!(id, "my-workflow");
+                assert_eq!(file, "/tmp/wf.toml");
+            }
+            _ => panic!("expected Workflow Update"),
         }
     }
 
