@@ -59,6 +59,29 @@ function createWorkflowBuilderStore() {
         : undefined;
     },
 
+    // Returns true if any node has an invalid step name or empty fallback step
+    get hasFormErrors(): boolean {
+      const STEP_NAME_RE = /^[a-z0-9_]+$/;
+      for (const n of nodes) {
+        const data = n.data as Record<string, unknown>;
+        const stepName = (data.stepName as string) || "";
+        if (!stepName || !STEP_NAME_RE.test(stepName)) return true;
+        // Fallback step must be non-empty when failure_policy is Fallback
+        const fp = data.failure_policy;
+        if (
+          fp !== null &&
+          typeof fp === "object" &&
+          (fp as Record<string, unknown>).Fallback
+        ) {
+          const fallbackStep = (
+            (fp as Record<string, unknown>).Fallback as Record<string, string>
+          ).step;
+          if (!fallbackStep) return true;
+        }
+      }
+      return false;
+    },
+
     // Setters — SvelteFlow bind:nodes/bind:edges triggers these on every internal update.
     // suppressDirty prevents false dirty state after loadWorkflow/reset.
     set nodes(v: Node[]) {
@@ -100,9 +123,78 @@ function createWorkflowBuilderStore() {
       isDirty = true;
     },
 
-    // Remove a node and its connected edges
+    // Remove a node and its connected edges, cleaning up references in other nodes
     removeNode(nodeId: string) {
-      nodes = nodes.filter((n) => n.id !== nodeId);
+      // Get the step name of the node being removed (for reference cleanup)
+      const removedNode = nodes.find((n) => n.id === nodeId);
+      const removedStepName = removedNode
+        ? (
+            (removedNode.data as Record<string, unknown>).stepName as
+              | string
+              | undefined
+          ) ?? nodeId
+        : nodeId;
+
+      nodes = nodes
+        .filter((n) => n.id !== nodeId)
+        .map((n) => {
+          const defType = (n.data as Record<string, unknown>)
+            .definitionType as string | undefined;
+          const def = defType ? nodeRegistry.get(defType) : undefined;
+          let changed = false;
+          const newData = { ...n.data } as Record<string, unknown>;
+
+          // Clean up step-ref / step-refs fields defined in the registry
+          if (def) {
+            for (const field of def.fields) {
+              if (
+                field.type === "step-ref" &&
+                newData[field.key] === removedStepName
+              ) {
+                newData[field.key] = "";
+                changed = true;
+              } else if (
+                field.type === "step-refs" &&
+                Array.isArray(newData[field.key])
+              ) {
+                const arr = newData[field.key] as string[];
+                if (arr.includes(removedStepName)) {
+                  newData[field.key] = arr.filter((s) => s !== removedStepName);
+                  changed = true;
+                }
+              }
+            }
+          }
+
+          // Clean up condition if_true / if_false
+          if (newData.if_true === removedStepName) {
+            newData.if_true = "";
+            changed = true;
+          }
+          if (newData.if_false === removedStepName) {
+            newData.if_false = "";
+            changed = true;
+          }
+
+          // Clean up fallback policy
+          const fp = newData.failure_policy;
+          if (
+            fp !== null &&
+            typeof fp === "object" &&
+            (fp as Record<string, unknown>).Fallback
+          ) {
+            const fallbackStep = (
+              (fp as Record<string, unknown>).Fallback as Record<string, string>
+            ).step;
+            if (fallbackStep === removedStepName) {
+              newData.failure_policy = { Fallback: { step: "" } };
+              changed = true;
+            }
+          }
+
+          return changed ? { ...n, data: newData } : n;
+        });
+
       edges = edges.filter((e) => e.source !== nodeId && e.target !== nodeId);
       if (selectedNodeId === nodeId) selectedNodeId = null;
       isDirty = true;
@@ -138,36 +230,64 @@ function createWorkflowBuilderStore() {
       isDirty = true;
     },
 
-    // Rename a node: update its id, data.stepName, edges, and step-ref fields in other nodes
+    // Rename a node: update its id, data.stepName, edges, and all step references in other nodes
     renameNode(oldId: string, newId: string) {
       if (oldId === newId) return;
       nodes = nodes.map((n) => {
         if (n.id === oldId) {
           return { ...n, id: newId, data: { ...n.data, stepName: newId } };
         }
-        // Rewrite step-ref/step-refs fields in other nodes that reference the old name
+        // Rewrite step-ref/step-refs/if_true/if_false/fallback in other nodes
         const defType = (n.data as Record<string, unknown>).definitionType as
           | string
           | undefined;
         const def = defType ? nodeRegistry.get(defType) : undefined;
-        if (!def) return n;
         let changed = false;
         const newData = { ...n.data } as Record<string, unknown>;
-        for (const field of def.fields) {
-          if (field.type === "step-ref" && newData[field.key] === oldId) {
-            newData[field.key] = newId;
-            changed = true;
-          } else if (
-            field.type === "step-refs" &&
-            Array.isArray(newData[field.key])
-          ) {
-            const arr = newData[field.key] as string[];
-            if (arr.includes(oldId)) {
-              newData[field.key] = arr.map((s) => (s === oldId ? newId : s));
+
+        if (def) {
+          for (const field of def.fields) {
+            if (field.type === "step-ref" && newData[field.key] === oldId) {
+              newData[field.key] = newId;
               changed = true;
+            } else if (
+              field.type === "step-refs" &&
+              Array.isArray(newData[field.key])
+            ) {
+              const arr = newData[field.key] as string[];
+              if (arr.includes(oldId)) {
+                newData[field.key] = arr.map((s) => (s === oldId ? newId : s));
+                changed = true;
+              }
             }
           }
         }
+
+        // Condition if_true / if_false
+        if (newData.if_true === oldId) {
+          newData.if_true = newId;
+          changed = true;
+        }
+        if (newData.if_false === oldId) {
+          newData.if_false = newId;
+          changed = true;
+        }
+
+        // Fallback policy
+        const fp = newData.failure_policy;
+        if (
+          fp !== null &&
+          typeof fp === "object" &&
+          (fp as Record<string, unknown>).Fallback
+        ) {
+          const fallback = (fp as Record<string, unknown>)
+            .Fallback as Record<string, string>;
+          if (fallback.step === oldId) {
+            newData.failure_policy = { Fallback: { step: newId } };
+            changed = true;
+          }
+        }
+
         return changed ? { ...n, data: newData } : n;
       });
       edges = edges.map((e) => ({

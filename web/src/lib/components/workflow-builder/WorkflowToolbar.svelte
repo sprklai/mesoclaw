@@ -100,7 +100,7 @@
 		{/if}
 	</Button>
 
-	<Button variant="default" size="sm" onclick={onSave} disabled={!builderStore.isDirty}>
+	<Button variant="default" size="sm" onclick={onSave} disabled={!builderStore.isDirty || builderStore.hasFormErrors}>
 		<Save class="h-4 w-4 mr-1" />
 		{t('wb_toolbar_save')}
 	</Button>

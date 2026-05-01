@@ -880,6 +880,80 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       return out;
     },
   },
+  // ── Wiki ──────────────────────────────────────────────────────────────
+  {
+    type: "wiki",
+    label: "wb_node_wiki_label",
+    category: "search",
+    icon: "BookOpen",
+    description: "wb_node_wiki_description",
+    visual: "standard",
+    fields: [
+      {
+        key: "action",
+        label: "wb_field_wiki_action_label",
+        type: "select",
+        options: [
+          { value: "search", label: "wb_option_wiki_action_search" },
+          { value: "get", label: "wb_option_wiki_action_get" },
+          { value: "list", label: "wb_option_wiki_action_list" },
+          { value: "query", label: "wb_option_wiki_action_query" },
+        ],
+        default: "search",
+        required: true,
+        description: "wb_field_wiki_action_description",
+      },
+      {
+        key: "query",
+        label: "wb_field_wiki_query_label",
+        type: "text",
+        placeholder: "wb_field_wiki_query_placeholder",
+        description: "wb_field_wiki_query_description",
+      },
+      {
+        key: "slug",
+        label: "wb_field_wiki_slug_label",
+        type: "text",
+        placeholder: "wb_field_wiki_slug_placeholder",
+        description: "wb_field_wiki_slug_description",
+      },
+      {
+        key: "question",
+        label: "wb_field_wiki_question_label",
+        type: "text",
+        placeholder: "wb_field_wiki_question_placeholder",
+        description: "wb_field_wiki_question_description",
+      },
+      {
+        key: "limit",
+        label: "wb_field_wiki_limit_label",
+        type: "number",
+        default: 10,
+        description: "wb_field_wiki_limit_description",
+      },
+    ],
+    handles: STANDARD_HANDLES,
+    fromStep(step) {
+      const args = (step.args ?? {}) as StepRec;
+      const out: StepRec = {};
+      if (args.action !== undefined) out.action = args.action;
+      if (args.query !== undefined) out.query = args.query;
+      if (args.slug !== undefined) out.slug = args.slug;
+      if (args.question !== undefined) out.question = args.question;
+      if (args.limit !== undefined) out.limit = args.limit;
+      return out;
+    },
+    toStep(data) {
+      const args: StepRec = {};
+      if (data.action !== undefined) args.action = data.action;
+      if (data.query !== undefined) args.query = data.query;
+      if (data.slug !== undefined) args.slug = data.slug;
+      if (data.question !== undefined) args.question = data.question;
+      if (data.limit !== undefined) args.limit = data.limit;
+      return { type: "tool", tool: "wiki", args };
+    },
+  },
+
   // Hidden: backend parallel execution not yet implemented (executor.rs:349)
   {
     type: "parallel",
