@@ -130,9 +130,7 @@ pub async fn create_workflow(
     Ok((StatusCode::CREATED, Json(workflow)))
 }
 
-pub async fn list_workflows(
-    State(state): State<Arc<AppState>>,
-) -> Result<impl IntoResponse> {
+pub async fn list_workflows(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse> {
     let registry = state
         .workflow_registry
         .as_ref()

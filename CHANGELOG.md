@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Dashboard: `GET /workflows` response contract restored to `Workflow[]` (was silently changed to a paginated envelope, breaking the dashboard render and leaving the Workflows card permanently in skeleton state)
+- Dashboard: `workflowsStore.load()` now uses a monotonic request-ID to prevent stale overlapping loads from overwriting newer state
+- Dashboard: `workflowsStore.load()` called at most once per page mount (no longer re-triggered on every 2-second WebSocket notification refresh from active channels)
+- Dashboard: `refreshTimer` cancelled on component destroy, preventing ghost refreshes after navigation
+- Sidebar navigation: restored `{#key localeStore.locale}` wrapper around page content
+- i18n: synced all 7 locale files — added 20 missing keys, removed 6 stale keys
+
 ## [0.1.21] - 2026-04-28
 
 ### Fixed
