@@ -71,7 +71,7 @@ All fields use `serde(default)`, so any field can be omitted to use its default 
 | `gateway_host` | String | `"127.0.0.1"` | IP address the gateway listens on |
 | `gateway_port` | u16 | `18981` | Port the gateway listens on |
 | `gateway_auth_token` | Option\<String\> | `null` | Bearer token for API authentication. If unset, auth is disabled |
-| `gateway_cors_origins` | Vec\<String\> | `["http://localhost:18971"]` | Allowed CORS origins. `["*"]` enables permissive CORS |
+| `gateway_cors_origins` | Vec\<String\> | `["http://localhost:18971", "tauri://localhost", "https://tauri.localhost"]` | Allowed CORS origins. `["*"]` enables permissive CORS; `[]` denies all cross-origin requests |
 | `ws_max_connections` | usize | `32` | Maximum concurrent WebSocket connections |
 
 ```toml
@@ -118,14 +118,14 @@ embedding_cache_size = 1000
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `security_autonomy_level` | String | `"supervised"` | Agent autonomy level (`supervised`, `semi-autonomous`, `autonomous`) |
+| `security_autonomy_level` | String | `"full"` | Agent autonomy level (`supervised`, `semi-autonomous`, `full`) |
 | `max_tool_retries` | u32 | `3` | Maximum retry attempts for failed tool executions |
 | `security_rate_limit_max` | u32 | `60` | Maximum requests per rate limit window |
 | `security_rate_limit_window_secs` | u64 | `60` | Rate limit window duration in seconds |
 | `security_audit_log_capacity` | usize | `1000` | Maximum number of audit log entries in memory |
 
 ```toml
-security_autonomy_level = "supervised"
+security_autonomy_level = "full"
 max_tool_retries = 3
 security_rate_limit_max = 60
 security_rate_limit_window_secs = 60
@@ -136,21 +136,20 @@ security_audit_log_capacity = 1000
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `provider_name` | String | `"openai"` | Default AI provider name. Alias: `default_provider` |
-| `provider_type` | String | `"openai"` | Provider type (used for API compatibility) |
+| `provider_name` | String | `"anthropic"` | Default AI provider name. Alias: `default_provider` |
+| `provider_type` | String | `"anthropic"` | Provider type (used for API compatibility) |
 | `provider_base_url` | Option\<String\> | `null` | Custom base URL for the provider API |
-| `provider_model_id` | String | `"gpt-4o"` | Default model ID. Alias: `default_model` |
+| `provider_model_id` | String | `"claude-sonnet-4-6"` | Default model ID. Alias: `default_model` |
 | `provider_api_key_env` | Option\<String\> | `null` | Environment variable name for the API key |
 | `agent_max_turns` | usize | `8` | Maximum agent turns (tool call loops) per request. Range: 1-32 |
 | `agent_max_tokens` | usize | `4096` | Maximum tokens for agent responses |
 | `agent_system_prompt` | Option\<String\> | `null` | Additional system prompt appended to identity (never replaces it) |
 
 ```toml
-provider_name = "openai"
-provider_type = "openai"
-provider_base_url = "https://api.openai.com/v1"
-provider_model_id = "gpt-4o"
-provider_api_key_env = "OPENAI_API_KEY"
+provider_name = "anthropic"
+provider_type = "anthropic"
+provider_model_id = "claude-sonnet-4-6"
+provider_api_key_env = "ANTHROPIC_API_KEY"
 agent_max_turns = 8
 agent_max_tokens = 4096
 agent_system_prompt = "Always respond concisely."
@@ -523,8 +522,8 @@ log_level = "info"
 # data_dir = "~/.local/share/zenii"  # uses platform default if unset
 
 # AI Agent
-provider_name = "openai"
-provider_model_id = "gpt-4o"
+provider_name = "anthropic"
+provider_model_id = "claude-sonnet-4-6"
 agent_max_turns = 8
 agent_max_tokens = 4096
 
@@ -539,7 +538,7 @@ memory_default_limit = 10
 embedding_dim = 384
 
 # Security
-security_autonomy_level = "supervised"
+security_autonomy_level = "full"
 max_tool_retries = 3
 security_rate_limit_max = 60
 security_rate_limit_window_secs = 60

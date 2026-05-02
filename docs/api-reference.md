@@ -45,7 +45,7 @@ slug: /api-reference
 
 **Base URL:** `http://localhost:18981`
 
-The Zenii gateway is an axum HTTP+WebSocket server. All routes accept and return JSON unless otherwise noted. CORS is configured via the `gateway_cors_origins` config field; an empty list or `["*"]` enables permissive CORS.
+The Zenii gateway is an axum HTTP+WebSocket server. All routes accept and return JSON unless otherwise noted. CORS is configured via the `gateway_cors_origins` config field. `["*"]` enables permissive CORS; an empty list denies all cross-origin requests. The default includes the Tauri app origins.
 
 ### Interactive API Documentation
 
@@ -1563,6 +1563,26 @@ The response includes the aggregated response plus per-task results with status,
 
 These routes require the `workflows` feature flag to be enabled at compile time.
 
+#### POST /workflows/generate
+
+Generate a workflow from a plain-English description using the configured LLM.
+
+**Request Body:**
+```json
+{ "description": "Every morning fetch the top 5 tech headlines and send them to Slack" }
+```
+
+**Response:**
+```json
+{
+  "toml": "id = \"...\"\n...",
+  "confidence": "high",
+  "saved": true
+}
+```
+
+High-confidence results are saved automatically (`saved: true`). Low-confidence results return a `clarifying_question` and are not saved.
+
 #### POST /workflows
 
 Create a workflow from a TOML definition.
@@ -1570,30 +1590,23 @@ Create a workflow from a TOML definition.
 **Request Body:**
 ```json
 {
-  "toml": "id = \"daily-report\"\nname = \"Daily Report\"\n\n[[steps]]\nname = \"fetch\"\ntype = \"tool\"\ntool = \"web_search\"\n[steps.args]\nquery = \"latest tech news\"\n\n[[steps]]\nname = \"summarize\"\ntype = \"llm\"\nprompt = \"Summarize: {{ steps.fetch.output }}\"\ndepends_on = [\"fetch\"]"
+  "toml_content": "id = \"daily-report\"\nname = \"Daily Report\"\n\n[[steps]]\nname = \"fetch\"\ntype = \"tool\"\ntool = \"web_search\"\n[steps.args]\nquery = \"latest tech news\"\n\n[[steps]]\nname = \"summarize\"\ntype = \"llm\"\nprompt = \"Summarize: {{ steps.fetch.output }}\"\ndepends_on = [\"fetch\"]"
 }
 ```
 
-**Response (201):**
-```json
-{
-  "id": "daily-report",
-  "name": "Daily Report",
-  "steps": 2
-}
-```
+**Response (201):** Full `Workflow` object.
 
 **Example:**
 ```bash
 curl -X POST http://localhost:18981/workflows \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"toml": "id = \"test\"\nname = \"Test\"\n\n[[steps]]\nname = \"greet\"\ntype = \"llm\"\nprompt = \"Say hello\""}'
+  -d '{"toml_content": "id = \"test\"\nname = \"Test\"\n\n[[steps]]\nname = \"greet\"\ntype = \"llm\"\nprompt = \"Say hello\""}'
 ```
 
 #### GET /workflows
 
-List all registered workflows.
+List all registered workflows. Returns a plain JSON array.
 
 **Response:**
 ```json
@@ -1601,8 +1614,10 @@ List all registered workflows.
   {
     "id": "daily-report",
     "name": "Daily Report",
-    "step_count": 2,
-    "schedule": null
+    "schedule": null,
+    "steps": [...],
+    "created_at": "2026-03-20T12:00:00Z",
+    "updated_at": "2026-03-20T12:00:00Z"
   }
 ]
 ```
@@ -1612,6 +1627,14 @@ List all registered workflows.
 Get a workflow definition by ID.
 
 **Response:** Full workflow object with steps, schedule, and metadata.
+
+#### PUT /workflows/{id}
+
+Update an existing workflow from a new TOML definition.
+
+**Request Body:** Same as `POST /workflows` — `{ "toml_content": "..." }`.
+
+**Response:** Updated `Workflow` object.
 
 #### GET /workflows/{id}/raw
 
@@ -1625,12 +1648,6 @@ Delete a workflow.
 
 **Response:** `204 No Content`
 
-#### POST /workflows/{id}/cancel
-
-Cancel a running workflow execution.
-
-**Response:** `200 OK`
-
 #### POST /workflows/{id}/run
 
 Execute a workflow. Returns immediately with run details (202 Accepted).
@@ -1638,10 +1655,8 @@ Execute a workflow. Returns immediately with run details (202 Accepted).
 **Response (202):**
 ```json
 {
-  "run_id": "run-uuid",
   "workflow_id": "daily-report",
-  "status": "running",
-  "started_at": "2026-03-20T12:00:00Z"
+  "run_id": "run-uuid"
 }
 ```
 
@@ -1650,6 +1665,12 @@ Execute a workflow. Returns immediately with run details (202 Accepted).
 curl -X POST http://localhost:18981/workflows/daily-report/run \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+#### POST /workflows/{id}/runs/{run_id}/cancel
+
+Cancel a specific running workflow execution.
+
+**Response:** `204 No Content`
 
 #### GET /workflows/{id}/history
 

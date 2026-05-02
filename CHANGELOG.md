@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Docs: workflow cancel response corrected to `204 No Content` (was documented as `200 OK`)
+- Docs: `POST /workflows/{id}/run` response trimmed to actual shape `{workflow_id, run_id}` (removed phantom `status`/`started_at` fields)
+- Docs: CORS behaviour clarified — empty `gateway_cors_origins` denies all cross-origin requests (was incorrectly documented as permissive); default now shows all three Tauri origins
+- Docs: provider defaults corrected to `anthropic` / `claude-sonnet-4-6` / `full` autonomy (was `openai` / `gpt-4o` / `supervised` throughout configuration docs)
+- Docs: stale `/ws` WebSocket endpoint corrected to `/ws/chat` in `wiki.md` and `development.md`
+- Docs: added missing `POST /workflows/generate` and `PUT /workflows/{id}` routes; fixed `POST /workflows` request body field `toml` → `toml_content`; updated `GET /workflows` response to plain array
+- Metrics: `gatewayEndpoints` updated from 120 → 133 (105 base + 28 feature-gated)
 - Dashboard: `GET /workflows` response contract restored to `Workflow[]` (was silently changed to a paginated envelope, breaking the dashboard render and leaving the Workflows card permanently in skeleton state)
 - Dashboard: `workflowsStore.load()` now uses a monotonic request-ID to prevent stale overlapping loads from overwriting newer state
 - Dashboard: `workflowsStore.load()` called at most once per page mount (no longer re-triggered on every 2-second WebSocket notification refresh from active channels)

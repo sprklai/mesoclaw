@@ -118,7 +118,7 @@ curl -X POST http://localhost:18981/sessions/$SESSION/messages \
 
 **Via WebSocket (streaming)**
 ```javascript
-const ws = new WebSocket('ws://localhost:18981/ws');
+const ws = new WebSocket('ws://localhost:18981/ws/chat');
 ws.send(JSON.stringify({
   type: "chat",
   session_id: "...",

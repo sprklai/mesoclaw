@@ -529,7 +529,7 @@ Use `websocat` to connect to the WebSocket endpoint:
 cargo install websocat
 
 # Connect to chat WebSocket (replace token)
-websocat "ws://localhost:18981/ws?token=your-token"
+websocat "ws://localhost:18981/ws/chat?token=your-token"
 
 # Send a chat message
 {"session_id": "test", "content": "Hello"}
