@@ -13,6 +13,7 @@
 	import { wikiStore } from '$lib/stores/wiki.svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
+	import { onDestroy } from 'svelte';
 	import { notificationStore } from '$lib/stores/notifications.svelte';
 	import MessageSquarePlus from '@lucide/svelte/icons/message-square-plus';
 	import Radio from '@lucide/svelte/icons/radio';
@@ -27,10 +28,13 @@
 	let lastRefreshedActivity = 0;
 	let loadInFlight = false;
 	let pendingRefresh = false;
+	let workflowsLoaded = false;
 
 	$effect(() => {
 		loadDashboardData();
 	});
+
+	onDestroy(() => clearTimeout(refreshTimer));
 
 	// Debounce-refresh dashboard when push events arrive (session/message/channel activity).
 	$effect(() => {
@@ -66,8 +70,13 @@
 				loadDashboardData();
 			}
 		}
-		// Workflows loads independently so it never blocks the page-level loading gate
-		workflowsStore.load().catch(() => {});
+		// Load workflows once on initial mount — not on every notification-triggered refresh.
+		// Re-loading on every channel activity would keep workflowsStore.loading = true
+		// indefinitely when the API is slow or feature-gated.
+		if (!workflowsLoaded) {
+			workflowsLoaded = true;
+			workflowsStore.load().catch(() => {});
+		}
 	}
 
 	async function handleNewChat(e: Event) {

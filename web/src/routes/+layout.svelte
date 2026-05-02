@@ -79,6 +79,7 @@
 		const baseUrl = getBaseUrl();
 		openInBrowser(`${baseUrl}/api-docs`);
 	}
+
 </script>
 
 <Toaster richColors />

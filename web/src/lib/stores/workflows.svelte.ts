@@ -93,6 +93,7 @@ function createWorkflowsStore() {
   let error = $state<string | null>(null);
   let runningWorkflows = $state<Map<string, WorkflowRunProgress>>(new Map());
   const timeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  let _loadSeq = 0;
 
   return {
     get workflows() {
@@ -208,17 +209,24 @@ function createWorkflowsStore() {
     },
 
     async load() {
+      const seq = ++_loadSeq;
       loading = true;
       error = null;
       try {
-        workflows = await apiGet<Workflow[]>("/workflows").catch(
-          (e: unknown) => {
-            error = e instanceof Error ? e.message : "Failed to load workflows";
-            return [] as Workflow[];
-          },
-        );
+        const raw = await apiGet<Workflow[] | { workflows: Workflow[] }>("/workflows");
+        // Normalize: backend may return a plain array or a paginated envelope.
+        const result: Workflow[] = Array.isArray(raw) ? raw : ((raw as { workflows: Workflow[] }).workflows ?? []);
+        if (seq === _loadSeq) {
+          workflows = result;
+        }
+      } catch (e: unknown) {
+        if (seq === _loadSeq) {
+          error = e instanceof Error ? e.message : "Failed to load workflows";
+        }
       } finally {
-        loading = false;
+        if (seq === _loadSeq) {
+          loading = false;
+        }
       }
     },
 

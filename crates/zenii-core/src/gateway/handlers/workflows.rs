@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
@@ -18,9 +18,6 @@ fn is_valid_workflow_id(id: &str) -> bool {
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
 }
-
-const LIST_DEFAULT_LIMIT: usize = 50;
-const LIST_MAX_LIMIT: usize = 200;
 
 /// Maximum allowed description length in bytes (Issue 5).
 const MAX_DESCRIPTION_BYTES: usize = 4000;
@@ -133,47 +130,17 @@ pub async fn create_workflow(
     Ok((StatusCode::CREATED, Json(workflow)))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ListWorkflowsQuery {
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ListWorkflowsResponse {
-    pub workflows: Vec<Workflow>,
-    pub total: usize,
-    pub offset: usize,
-    pub limit: usize,
-}
-
 pub async fn list_workflows(
     State(state): State<Arc<AppState>>,
-    Query(query): Query<ListWorkflowsQuery>,
 ) -> Result<impl IntoResponse> {
     let registry = state
         .workflow_registry
         .as_ref()
         .ok_or_else(|| ZeniiError::Workflow("workflow feature not initialized".into()))?;
 
-    let limit = query
-        .limit
-        .unwrap_or(LIST_DEFAULT_LIMIT)
-        .min(LIST_MAX_LIMIT);
-    let offset = query.offset.unwrap_or(0);
-
-    let mut all = registry.list();
-    // Stable ordering by id so pagination is deterministic
-    all.sort_by(|a, b| a.id.cmp(&b.id));
-    let total = all.len();
-    let workflows = all.into_iter().skip(offset).take(limit).collect();
-
-    Ok(Json(ListWorkflowsResponse {
-        workflows,
-        total,
-        offset,
-        limit,
-    }))
+    let mut workflows = registry.list();
+    workflows.sort_by(|a, b| a.id.cmp(&b.id));
+    Ok(Json(workflows))
 }
 
 pub async fn get_workflow(
@@ -710,15 +677,14 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
-    // P.2 — list workflows returns paginated response with total field
+    // P.2 — list workflows returns JSON array sorted by id
     #[cfg(feature = "workflows")]
     #[tokio::test]
-    async fn list_workflows_pagination() {
+    async fn list_workflows_returns_array() {
         use crate::workflows::{FailurePolicy, StepType, Workflow, WorkflowStep};
 
         let (_dir, state) = crate::gateway::handlers::tests::test_state_with_workflows().await;
 
-        // Pre-populate with 3 workflows directly via the registry
         {
             let registry = state.workflow_registry.as_ref().unwrap();
             for i in 1..=3_u32 {
@@ -748,7 +714,7 @@ mod tests {
         let app = crate::gateway::routes::build_router(state);
 
         let req = Request::builder()
-            .uri("/workflows?limit=2&offset=0")
+            .uri("/workflows")
             .body(Body::empty())
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
@@ -758,44 +724,16 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json["total"], 3);
-        assert_eq!(json["limit"], 2);
-        assert_eq!(json["offset"], 0);
-        assert_eq!(json["workflows"].as_array().unwrap().len(), 2);
+        // Must be a top-level array, not a paginated envelope
+        assert!(json.is_array(), "expected JSON array, got {json}");
+        assert_eq!(json.as_array().unwrap().len(), 3);
     }
 
-    // P.3 — list_workflows default limit and total present when no query params
+    // P.3 — list_workflows returns array when no workflows exist
     #[cfg(feature = "workflows")]
     #[tokio::test]
-    async fn list_workflows_default_limit() {
-        use crate::workflows::{FailurePolicy, StepType, Workflow, WorkflowStep};
-
+    async fn list_workflows_empty_returns_array() {
         let (_dir, state) = crate::gateway::handlers::tests::test_state_with_workflows().await;
-
-        {
-            let registry = state.workflow_registry.as_ref().unwrap();
-            registry
-                .save(Workflow {
-                    id: "wf-single".into(),
-                    name: "Single".into(),
-                    description: "only one".into(),
-                    schedule: None,
-                    steps: vec![WorkflowStep {
-                        name: "s1".into(),
-                        step_type: StepType::Delay { seconds: 1 },
-                        depends_on: vec![],
-                        retry: None,
-                        failure_policy: FailurePolicy::Stop,
-                        timeout_secs: None,
-                    }],
-                    layout: None,
-                    schema_version: None,
-                    created_at: "2026-01-01T00:00:00Z".into(),
-                    updated_at: "2026-01-01T00:00:00Z".into(),
-                })
-                .unwrap();
-        }
-
         let app = crate::gateway::routes::build_router(state);
 
         let req = Request::builder()
@@ -809,10 +747,8 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json["total"], 1);
-        assert_eq!(json["limit"], 50); // default
-        assert_eq!(json["offset"], 0);
-        assert_eq!(json["workflows"].as_array().unwrap().len(), 1);
+        assert!(json.is_array(), "expected JSON array, got {json}");
+        assert_eq!(json.as_array().unwrap().len(), 0);
     }
 
     // P.4 — history for unknown workflow returns 404
