@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-05-01
+
+### Added
+- Workflow builder: NL-to-TOML `WorkflowGenerator` — converts natural language descriptions into runnable workflow TOML via the LLM, wired into AppState and boot
+- Gateway: `POST /workflows/generate` endpoint for natural language workflow creation
+- Chat UI: Workflow mode button (mutually exclusive with Delegate mode) for inline workflow generation
+- Workflow creation page: NL describe mode with dedicated generation flow
+- Workflow builder: wiki nodes with full backend implementation
+- Workflow builder: n8n-style square card node redesign
+- i18n: workflow NL generation message keys across all locale files
+
 ### Fixed
 - Docs: workflow cancel response corrected to `204 No Content` (was documented as `200 OK`)
 - Docs: `POST /workflows/{id}/run` response trimmed to actual shape `{workflow_id, run_id}` (removed phantom `status`/`started_at` fields)
@@ -21,6 +32,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard: `refreshTimer` cancelled on component destroy, preventing ghost refreshes after navigation
 - Sidebar navigation: restored `{#key localeStore.locale}` wrapper around page content
 - i18n: synced all 7 locale files — added 20 missing keys, removed 6 stale keys
+- Workflows runtime: DB transaction correctness, condition evaluation, and node execution fixes
+- Workflows: added `Workflow::validate()`, path traversal guard, and filename safety checks
+- Workflows: phantom tool registration fixed; added `param_summary` to `Tool` trait
+- Workflows: post-merge test failures resolved across all agent branches; `schema_version` field added to test initializers
+- TOML round-trip: nested args guard, `timeout=0` edge case, and smoother serialisation
+- Config: `AppConfig::validate()`, schedule reconciliation, and CLI workflow correctness
+- NL generation: JSON extraction reliability, error sanitisation, and structured output robustness
+- UI: state races fixed — dirty flag sync, `isSaving` mutex, live CodeView updates
+- UI: graph integrity — cycle detection, wiki node round-trip, ref handling
+- UI: `goto()` navigation restored, workflows card decoupled, abort race fixed
+- Sidebar navigation: `<a href>` restored; workflows card race and error handling hardened
+- Polish: 404 handlers, list pagination, i18n parity, `ConditionNode` corrections
+- Telegram HTML encoding corrected for workflow node output messages
 
 ## [0.1.21] - 2026-04-28
 

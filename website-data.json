@@ -1,5 +1,5 @@
 {
-  "version": "0.1.21",
+  "version": "0.1.22",
   "agentTools": 16,
   "llmProviders": 6,
   "messagingChannels": 3,
@@ -7,7 +7,7 @@
   "binarySize": 20,
   "debRpmSize": 16,
   "startupSeconds": 3,
-  "gatewayEndpoints": 133,
+  "gatewayEndpoints": 103,
   "crates": 6,
   "securityLayers": 6,
   "platformTargets": 10,
