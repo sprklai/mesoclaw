@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.23] - 2026-05-03
+
 ### Added
 - Wiki: `ingested_at` ISO 8601 timestamp recorded on each source at ingest time; sources sorted newest-first in the UI
 - Wiki: per-source regeneration tracking — spinner is scoped to the specific source being regenerated
