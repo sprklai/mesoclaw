@@ -1045,6 +1045,7 @@
 	"mcp_clients_error_cmd_required": "O comando é obrigatório",
 	"mcp_clients_error_url_invalid": "A URL deve começar com http:// ou https://",
 	"dashboard_wiki_comparisons": "[EN] Comparisons",
+	"dashboard_wiki_queries": "[EN] Queries",
 	"dashboard_wiki_concepts": "[EN] Concepts",
 	"dashboard_wiki_entities": "[EN] Entities",
 	"dashboard_wiki_sources": "[EN] Docs",

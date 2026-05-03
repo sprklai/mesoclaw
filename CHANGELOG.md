@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Wiki: `ingested_at` ISO 8601 timestamp recorded on each source at ingest time; sources sorted newest-first in the UI
+- Wiki: per-source regeneration tracking — spinner is scoped to the specific source being regenerated
+- Wiki: source sort toggle (newest / A–Z) in the Sources panel
+- Wiki: file-type group hints in the upload drop zone (Markdown/HTML/PDF/Word/ZIP/Images)
+- Wiki: `repair_json_escapes` and `repair_literal_newlines` repair strategies so invalid LLM output (bad backslash escapes, literal newlines inside strings) is recovered without a full retry
+- Wiki: page-fetch limit raised to 5 000 in the store (backend cap lifted to 100 000) — effectively unlimited for normal wikis
+
+### Fixed
+- Dashboard: wiki page count now shows the server-side `total` rather than the number of pages currently loaded in memory
+- Dashboard: Query page type added to wiki breakdown; entity/topic accent colours swapped to match legend
+- Wiki: lint button now shows its label when idle (was showing only the running spinner label)
+- Wiki: sources panel re-lints automatically after an ingest if a prior lint result is already visible
+
 ## [0.1.22] - 2026-05-01
 
 ### Added

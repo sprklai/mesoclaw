@@ -37,8 +37,21 @@
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
 	import Copy from '@lucide/svelte/icons/copy';
 	import CheckCheck from '@lucide/svelte/icons/check-check';
+	import {
+		PromptInput,
+		PromptInputTextarea,
+		PromptInputToolbar,
+		PromptInputSubmit,
+		type PromptInputMessage,
+	} from '$lib/components/ai-elements/prompt-input';
 
 	const CATEGORIES = ['all', 'concepts', 'entities', 'topics', 'comparisons', 'queries'] as const;
+	const FILE_TYPE_GROUPS = [
+		'Markdown · Plain text · HTML · Org · RST',
+		'PDF · Word · PowerPoint · Excel',
+		'ZIP · EPUB',
+		'Images (jpg, png, gif, webp, bmp, tiff)',
+	];
 	// Add new accepted types here — drives both the file input and the drop zone hint.
 	// Text types go to /wiki/ingest (JSON body); binary types go to /wiki/upload (multipart).
 	const INGEST_ACCEPT =
@@ -364,6 +377,9 @@
 			await wikiStore.load();
 			wikiStore.loadGraph();
 			wikiStore.fetchSources();
+			if (wikiStore.lintIssues !== null) {
+				wikiStore.lint().catch(() => {});
+			}
 		}
 	}
 
@@ -470,7 +486,7 @@
 	let sourceSearchDebounced = $state('');
 	let sourceSearchTimeout: ReturnType<typeof setTimeout>;
 	let sourceFilter = $state<'all' | 'active' | 'inactive'>('all');
-	let regeneratingSource = $state<string | null>(null);
+	let sourceSort = $state<'newest' | 'az'>('newest');
 
 	// Lint search & filter
 	let lintSearch = $state('');
@@ -488,6 +504,11 @@
 			.filter(s =>
 				!sourceSearchDebounced ||
 				s.filename.toLowerCase().includes(sourceSearchDebounced.toLowerCase())
+			)
+			.toSorted((a, b) =>
+				sourceSort === 'newest'
+					? (b.ingested_at ?? '').localeCompare(a.ingested_at ?? '') || a.filename.localeCompare(b.filename)
+					: a.filename.localeCompare(b.filename)
 			)
 	);
 
@@ -664,15 +685,12 @@
 	}
 
 	async function handleRegenerateSource(filename: string) {
-		regeneratingSource = filename;
 		try {
 			await wikiStore.regenerateSource(filename);
 			toast.success(`Regenerated pages from "${filename}"`);
 		} catch (e) {
 			toast.error(e instanceof Error ? e.message : 'Regeneration failed');
 			console.error('[wiki] regenerateSource failed:', filename, e);
-		} finally {
-			regeneratingSource = null;
 		}
 	}
 
@@ -713,13 +731,13 @@
 	aria-label="Wiki knowledge base viewer"
 >
 	<!-- Header toolbar -->
-	<div class="flex shrink-0 items-center justify-between border-b px-4 py-3">
+	<div class="flex shrink-0 flex-wrap items-center justify-between gap-y-1 border-b px-4 py-2">
 		<div class="flex items-center gap-2">
 			<BookOpen class="h-5 w-5 text-muted-foreground" />
 			<h1 class="text-xl font-semibold">{m.wiki_page_title()}</h1>
 			{#if !wikiStore.loading}
 				<span class="text-sm text-muted-foreground">
-					({wikiStore.pages.length})
+					({wikiStore.total || wikiStore.pages.length})
 				</span>
 			{/if}
 		</div>
@@ -856,8 +874,13 @@
 						{/if}
 						<div class="border-t p-2">
 							<Button size="sm" class="w-full gap-1.5" onclick={handleRelint} disabled={wikiStore.linting}>
-								{#if wikiStore.linting}<Loader2 class="h-3.5 w-3.5 animate-spin" />{:else}<RefreshCw class="h-3.5 w-3.5" />{/if}
-								{m.wiki_lint_running()}
+								{#if wikiStore.linting}
+									<Loader2 class="h-3.5 w-3.5 animate-spin" />
+									{m.wiki_lint_running()}
+								{:else}
+									<RefreshCw class="h-3.5 w-3.5" />
+									{m.wiki_lint_button()}
+								{/if}
 							</Button>
 						</div>
 					</div>
@@ -894,13 +917,20 @@
 								value={sourceSearch}
 								oninput={handleSourceSearch}
 							/>
-							<div class="flex gap-1">
-								{#each ['all', 'active', 'inactive'] as f}
-									<button
-										class="rounded px-2 py-0.5 text-[11px] font-medium transition-colors {sourceFilter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}"
-										onclick={() => { sourceFilter = f as typeof sourceFilter; }}
-									>{f === 'all' ? 'All' : f === 'active' ? 'Active' : 'Inactive'}</button>
-								{/each}
+							<div class="flex items-center gap-1.5">
+								<div class="flex gap-1">
+									{#each ['all', 'active', 'inactive'] as f}
+										<button
+											class="rounded px-2 py-0.5 text-[11px] font-medium transition-colors {sourceFilter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}"
+											onclick={() => { sourceFilter = f as typeof sourceFilter; }}
+										>{f === 'all' ? 'All' : f === 'active' ? 'Active' : 'Inactive'}</button>
+									{/each}
+								</div>
+								<span class="text-muted-foreground/40 text-[11px]">·</span>
+								<button
+									class="rounded px-2 py-0.5 text-[11px] font-medium transition-colors {sourceSort === 'newest' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}"
+									onclick={() => { sourceSort = sourceSort === 'newest' ? 'az' : 'newest'; }}
+								>{sourceSort === 'newest' ? 'Newest' : 'A–Z'}</button>
 							</div>
 						</div>
 						<div class="max-h-48 overflow-y-auto p-2">
@@ -927,10 +957,10 @@
 												<button
 													class="rounded p-1 text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-40"
 													onclick={() => handleRegenerateSource(source.filename)}
-													disabled={regeneratingSource === source.filename || wikiStore.regenerating}
+													disabled={wikiStore.regeneratingSource === source.filename || wikiStore.regenerating}
 													title="Regenerate pages from this source"
 												>
-													{#if regeneratingSource === source.filename}
+													{#if wikiStore.regeneratingSource === source.filename}
 														<Loader2 class="h-3.5 w-3.5 animate-spin" />
 													{:else}
 														<RotateCw class="h-3.5 w-3.5" />
@@ -1027,6 +1057,22 @@
 				{/if}
 			</div>
 		</div>
+		{#if !wikiStore.loading && wikiStore.pages.length > 0}
+			{@const bt = {
+				concept: wikiStore.pages.filter(p => p.page_type === 'concept').length,
+				entity: wikiStore.pages.filter(p => p.page_type === 'entity').length,
+				topic: wikiStore.pages.filter(p => p.page_type === 'topic').length,
+				comparison: wikiStore.pages.filter(p => p.page_type === 'comparison').length,
+				query: wikiStore.pages.filter(p => p.page_type === 'query').length,
+			}}
+			<div class="basis-full flex items-center gap-3 pl-7 pb-0.5">
+				<span class="text-xs"><span class="font-semibold text-blue-500">{bt.concept}</span> <span class="text-muted-foreground">Concepts</span></span>
+				<span class="text-xs"><span class="font-semibold text-green-500">{bt.entity}</span> <span class="text-muted-foreground">Entities</span></span>
+				<span class="text-xs"><span class="font-semibold text-orange-500">{bt.topic}</span> <span class="text-muted-foreground">Topics</span></span>
+				{#if bt.comparison > 0}<span class="text-xs"><span class="font-semibold text-purple-500">{bt.comparison}</span> <span class="text-muted-foreground">Comparisons</span></span>{/if}
+				{#if bt.query > 0}<span class="text-xs"><span class="font-semibold text-pink-500">{bt.query}</span> <span class="text-muted-foreground">Queries</span></span>{/if}
+			</div>
+		{/if}
 	</div>
 
 	<!-- markitdown install banner -->
@@ -1275,27 +1321,20 @@
 			<Dialog.Title>{m.wiki_query_dialog_title()}</Dialog.Title>
 		</Dialog.Header>
 		<div class="space-y-3">
-			<div class="flex gap-2">
-				<textarea
-					class="min-h-[72px] flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+			<PromptInput
+				onSubmit={(msg: PromptInputMessage) => { queryQuestion = msg.text ?? ''; handleQuery(); }}
+			>
+				<PromptInputTextarea
 					placeholder={m.wiki_query_placeholder()}
 					bind:value={queryQuestion}
-					onkeydown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleQuery(); }}
-				></textarea>
-				<Button
-					class="shrink-0 self-end gap-1.5"
-					onclick={handleQuery}
-					disabled={wikiStore.querying || !queryQuestion.trim()}
-				>
-					{#if wikiStore.querying}
-						<Loader2 class="h-4 w-4 animate-spin" />
-						{m.wiki_query_asking()}
-					{:else}
-						<MessageCircleQuestion class="h-4 w-4" />
-						{m.wiki_query_ask()}
-					{/if}
-				</Button>
-			</div>
+				/>
+				<PromptInputToolbar>
+					<PromptInputSubmit
+						status={wikiStore.querying ? 'submitted' : 'idle'}
+						disabled={wikiStore.querying || !queryQuestion.trim()}
+					/>
+				</PromptInputToolbar>
+			</PromptInput>
 			<label class="flex cursor-pointer items-center gap-2 text-sm">
 				<input type="checkbox" class="h-4 w-4" bind:checked={querySave} />
 				{m.wiki_query_save_label()}
@@ -1383,10 +1422,10 @@
 		<Dialog.Header>
 			<Dialog.Title>{m.wiki_ingest_dialog_title()}</Dialog.Title>
 		</Dialog.Header>
-		<div class="space-y-3">
+		<div class="max-h-[70vh] overflow-y-auto space-y-3 pr-1">
 			<!-- File upload drop zone -->
 			<div
-				class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 p-6 transition-colors hover:border-muted-foreground/50"
+				class="flex h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 transition-colors hover:border-muted-foreground/50"
 				onclick={() => fileInput?.click()}
 				onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput?.click(); } }}
 				ondragover={handleDropZoneDragOver}
@@ -1394,13 +1433,8 @@
 				role="button"
 				tabindex="0"
 			>
-				<Upload class="mb-2 h-8 w-8 text-muted-foreground/50" />
-				<p class="text-sm text-muted-foreground">
-					{m.wiki_ingest_drop_hint()}
-				</p>
-				<p class="mt-0.5 text-xs text-muted-foreground/60">
-					{INGEST_ACCEPT.split(',').join(', ')}
-				</p>
+				<Upload class="mb-2 h-7 w-7 text-muted-foreground/50" />
+				<p class="text-sm text-muted-foreground">{m.wiki_ingest_drop_hint()}</p>
 				<input
 					bind:this={fileInput}
 					type="file"
@@ -1409,6 +1443,11 @@
 					class="hidden"
 					onchange={handleFileSelect}
 				/>
+			</div>
+			<div class="flex flex-wrap gap-1.5">
+				{#each FILE_TYPE_GROUPS as group}
+					<span class="rounded border px-1.5 py-0.5 text-xs text-muted-foreground">{group}</span>
+				{/each}
 			</div>
 
 			<!-- Converter unavailable hint when binary files are queued -->

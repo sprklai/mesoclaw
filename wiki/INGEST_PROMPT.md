@@ -43,6 +43,12 @@ Before writing, identify which pages reference which. Plan your links intentiona
 - Every topic page → all major child pages in `related`
 - Link on **first mention only** — not every occurrence
 
+**Back-linking (critical when existing wiki is provided):** For each new page you create, find
+1–2 existing pages in the wiki index that are most related and should mention the new page.
+Generate updated versions of those existing pages with `[[new-slug]]` wikilinks added to
+their body and the new slug added to their `related` list. This ensures new pages are never
+orphans — they always have at least one incoming wikilink from the existing wiki.
+
 ---
 
 ## Page Quality Standards
@@ -231,6 +237,9 @@ When the existing wiki index is provided:
   overwrite). Only update existing pages if you have new information to add — don't regenerate
   identical pages.
 - Merge `aliases`, `tags`, and `related` additively — don't drop existing values.
+- **Back-link requirement:** For every new page you create, include at least one updated
+  existing page that links back to it using `[[new-slug]]`. New pages must never be left as
+  orphans with no incoming wikilinks.
 
 Generate 5–15 wiki pages total as a JSON array. Each object must have exactly these fields:
 - `"page_type"`: one of `"entities"`, `"concepts"`, `"topics"`, `"comparisons"`, `"queries"`
@@ -239,3 +248,4 @@ Generate 5–15 wiki pages total as a JSON array. Each object must have exactly 
   the page type
 
 Return ONLY a valid JSON array. No explanation, no markdown code fences, no commentary.
+In the `"content"` value: escape every backslash as `\\`, newline as `\n`, and quote as `\"`.

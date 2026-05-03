@@ -108,6 +108,7 @@ struct SourceListItem {
     active: bool,
     last_run_id: Option<String>,
     pages: Vec<String>, // slugs of pages derived from this source
+    ingested_at: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -144,7 +145,7 @@ pub async fn list_wiki_pages(
     State(state): State<Arc<AppState>>,
     Query(params): Query<ListQuery>,
 ) -> impl IntoResponse {
-    let limit = params.limit.unwrap_or(50).min(200);
+    let limit = params.limit.unwrap_or(50).min(100_000);
     let offset = params.offset.unwrap_or(0);
     let wiki = Arc::clone(&state.wiki).lock_owned().await;
     let result = tokio::task::spawn_blocking(move || wiki.list_pages()).await;
@@ -373,6 +374,7 @@ pub async fn ingest_wiki_source(
                 active: true,
                 last_run_id: Some(run_id_c.clone()),
                 source_type: "text".to_string(),
+                ingested_at: Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
             });
             for page in &pages_c {
                 page_records.retain(|r| r.slug != page.slug);
@@ -453,6 +455,7 @@ pub async fn ingest_wiki_source(
             active: true,
             last_run_id: None,
             source_type: "text".to_string(),
+            ingested_at: Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
         });
         if let Err(e) = wiki.write_manifest(&sources, &page_records) {
             tracing::warn!("manifest write failed after fallback ingest: {e}");
@@ -537,6 +540,7 @@ pub async fn list_wiki_sources(State(state): State<Arc<AppState>>) -> impl IntoR
                     active: s.active,
                     last_run_id: s.last_run_id,
                     pages,
+                    ingested_at: s.ingested_at,
                 }
             })
             .collect();
@@ -773,6 +777,7 @@ pub async fn regenerate_wiki(
                     active: true,
                     last_run_id: Some(run_id.clone()),
                     source_type: "text".to_string(),
+                    ingested_at: Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()),
                 })
                 .collect();
             let preserved_query_pages: Vec<PageRecord> = manifest_pages_c
@@ -1050,6 +1055,7 @@ pub async fn regenerate_wiki_source(
                             active: s.active,
                             last_run_id: Some(run_id.clone()),
                             source_type: s.source_type,
+                            ingested_at: s.ingested_at,
                         }
                     } else {
                         s
@@ -1664,6 +1670,74 @@ async fn run_compiler(
     }
 }
 
+/// Replace invalid JSON escape sequences (`\X` where X is not a valid escape char)
+/// with their escaped form (`\\X`). Operates only inside JSON string literals so
+/// surrounding structure is left intact. Handles all input formats (markdown, PDF,
+/// Word, HTML, image OCR) where the LLM may fail to escape backslashes in content.
+fn repair_json_escapes(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut in_string = false;
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if in_string {
+            if c == '\\' {
+                let valid_next = chars
+                    .peek()
+                    .map(|&nx| matches!(nx, '"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't' | 'u'))
+                    .unwrap_or(false);
+                if valid_next {
+                    out.push(c);
+                } else {
+                    // Double the backslash so the following char is a literal
+                    out.push('\\');
+                    out.push('\\');
+                }
+            } else {
+                if c == '"' {
+                    in_string = false;
+                }
+                out.push(c);
+            }
+        } else {
+            if c == '"' {
+                in_string = true;
+            }
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// Replace literal (unescaped) newline and carriage-return bytes inside JSON string
+/// values with their `\n` / `\r` escape sequences. Covers the case where the LLM
+/// emits a multi-line `content` value with real newlines instead of `\n` literals.
+fn repair_literal_newlines(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 64);
+    let mut in_string = false;
+    let mut escaped = false;
+    for c in s.chars() {
+        if escaped {
+            escaped = false;
+            out.push(c);
+            continue;
+        }
+        match c {
+            '\\' if in_string => {
+                escaped = true;
+                out.push(c);
+            }
+            '"' => {
+                in_string = !in_string;
+                out.push(c);
+            }
+            '\n' if in_string => out.push_str("\\n"),
+            '\r' if in_string => out.push_str("\\r"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
 /// Find the outermost JSON array `[...]` span within `text`, correctly handling
 /// nested arrays/objects and JSON string literals (including escaped quotes).
 /// Returns a string slice into `text` covering the array, or `None` if not found.
@@ -1730,6 +1804,18 @@ fn extract_llm_pages(raw: &str) -> Result<Vec<LlmPage>, String> {
                 }
             }
             None
+        }),
+        // Strategy 4: LLM emitted invalid escape sequences (e.g. \a, \s from LaTeX,
+        // Windows paths, etc.). Repair \X → \\X for non-standard escapes, then re-try.
+        ("escape-repair", &|s| {
+            let repaired = repair_json_escapes(s);
+            find_json_array(&repaired).and_then(|span| serde_json::from_str(span).ok())
+        }),
+        // Strategy 5: LLM emitted literal newlines inside string values instead of \n.
+        // Covers markdown, PDF, HTML, image-OCR output from any source format.
+        ("newline-repair", &|s| {
+            let repaired = repair_literal_newlines(s);
+            find_json_array(&repaired).and_then(|span| serde_json::from_str(span).ok())
         }),
         // ↑ Add new strategies here.
     ];

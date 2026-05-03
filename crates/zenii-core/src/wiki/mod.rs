@@ -77,6 +77,9 @@ pub struct SourceRecord {
     /// `"binary"` — original bytes in `sources/original/`, converted markdown in `sources/converted/`
     #[serde(default = "default_source_type")]
     pub source_type: String,
+    /// ISO 8601 UTC timestamp of when this source was first ingested.
+    #[serde(default)]
+    pub ingested_at: Option<String>,
 }
 
 fn default_source_type() -> String {
@@ -881,13 +884,20 @@ impl WikiManager {
                         active: false,
                         last_run_id: None,
                         source_type: "text".to_string(),
+                        ingested_at: None,
                     },
                 );
             }
         }
 
         let mut records: Vec<SourceRecord> = known.into_values().collect();
-        records.sort_by(|a, b| a.filename.cmp(&b.filename));
+        // Newest-first by ingestion time; fall back to alphabetical for older records.
+        records.sort_by(|a, b| {
+            b.ingested_at
+                .as_deref()
+                .cmp(&a.ingested_at.as_deref())
+                .then_with(|| a.filename.cmp(&b.filename))
+        });
         Ok(records)
     }
 
@@ -2074,6 +2084,7 @@ No outbound links here.
                     active: true,
                     last_run_id: None,
                     source_type: "text".to_string(),
+                    ingested_at: None,
                 },
                 SourceRecord {
                     filename: "b.txt".into(),
@@ -2081,6 +2092,7 @@ No outbound links here.
                     active: true,
                     last_run_id: None,
                     source_type: "text".to_string(),
+                    ingested_at: None,
                 },
             ],
             &[],
@@ -2141,6 +2153,7 @@ No outbound links here.
                 active: true,
                 last_run_id: Some("run-001".into()),
                 source_type: "text".to_string(),
+                ingested_at: None,
             }],
             &[],
         )
@@ -2193,6 +2206,7 @@ No outbound links here.
                 active: true,
                 last_run_id: Some("run-1".into()),
                 source_type: "text".to_string(),
+                ingested_at: None,
             },
             SourceRecord {
                 filename: "doc-b.md".into(),
@@ -2200,6 +2214,7 @@ No outbound links here.
                 active: false,
                 last_run_id: None,
                 source_type: "text".to_string(),
+                ingested_at: None,
             },
         ];
         let pages = vec![PageRecord {

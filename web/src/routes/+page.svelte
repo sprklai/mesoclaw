@@ -334,7 +334,7 @@
 					</div>
 				{:else}
 					<p class="text-xs text-muted-foreground">
-						{m.dashboard_wiki_pages_count({ count: wikiStore.pages.length, suffix: wikiStore.pages.length !== 1 ? 's' : '' })}
+						{m.dashboard_wiki_pages_count({ count: wikiStore.total || wikiStore.pages.length, suffix: (wikiStore.total || wikiStore.pages.length) !== 1 ? 's' : '' })}
 					</p>
 					{#if wikiStore.pages.length > 0}
 						{@const byType = {
@@ -342,6 +342,7 @@
 							entity: wikiStore.pages.filter(p => p.page_type === 'entity').length,
 							topic: wikiStore.pages.filter(p => p.page_type === 'topic').length,
 							comparison: wikiStore.pages.filter(p => p.page_type === 'comparison').length,
+							query: wikiStore.pages.filter(p => p.page_type === 'query').length,
 						}}
 						<div class="mt-3 flex flex-wrap gap-6">
 							<div class="text-center">
@@ -349,17 +350,23 @@
 								<div class="text-xs text-muted-foreground">{m.dashboard_wiki_concepts()}</div>
 							</div>
 							<div class="text-center">
-								<div class="text-2xl font-bold text-orange-500">{byType.entity}</div>
+								<div class="text-2xl font-bold text-green-500">{byType.entity}</div>
 								<div class="text-xs text-muted-foreground">{m.dashboard_wiki_entities()}</div>
 							</div>
 							<div class="text-center">
-								<div class="text-2xl font-bold text-green-500">{byType.topic}</div>
+								<div class="text-2xl font-bold text-orange-500">{byType.topic}</div>
 								<div class="text-xs text-muted-foreground">{m.dashboard_wiki_topics()}</div>
 							</div>
 							{#if byType.comparison > 0}
 								<div class="text-center">
 									<div class="text-2xl font-bold text-purple-500">{byType.comparison}</div>
 									<div class="text-xs text-muted-foreground">{m.dashboard_wiki_comparisons()}</div>
+								</div>
+							{/if}
+							{#if byType.query > 0}
+								<div class="text-center">
+									<div class="text-2xl font-bold text-pink-500">{byType.query}</div>
+									<div class="text-xs text-muted-foreground">{m.dashboard_wiki_queries()}</div>
 								</div>
 							{/if}
 							<div class="text-center">

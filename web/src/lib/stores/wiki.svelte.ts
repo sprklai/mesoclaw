@@ -56,6 +56,7 @@ export interface SourceRecord {
   active: boolean;
   last_run_id: string | null;
   pages: string[]; // slugs of pages generated from this source
+  ingested_at?: string; // ISO 8601 UTC, set at ingest time
 }
 
 export interface FixedIssue {
@@ -96,6 +97,7 @@ let regenerateController: AbortController | null = null;
 
 function createWikiStore() {
   let pages = $state<WikiPage[]>([]);
+  let total = $state(0);
   let loading = $state(false);
   let syncing = $state(false);
   let graph = $state<WikiGraph | null>(null);
@@ -106,6 +108,7 @@ function createWikiStore() {
   let sources = $state<SourceRecord[]>([]);
   let sourcesLoading = $state(false);
   let regenerating = $state(false);
+  let regeneratingSource = $state<string | null>(null);
   let lintFixed = $state<FixedIssue[]>([]);
   let converterStatus = $state<ConverterStatus | null>(null);
   let converterChecking = $state(false);
@@ -113,6 +116,9 @@ function createWikiStore() {
   return {
     get pages() {
       return pages;
+    },
+    get total() {
+      return total;
     },
     get loading() {
       return loading;
@@ -144,6 +150,9 @@ function createWikiStore() {
     get regenerating() {
       return regenerating;
     },
+    get regeneratingSource() {
+      return regeneratingSource;
+    },
     get lintFixed() {
       return lintFixed;
     },
@@ -164,9 +173,11 @@ function createWikiStore() {
           total: number;
           limit: number;
           offset: number;
-        }>("/wiki?limit=200&offset=0");
+        }>("/wiki?limit=5000&offset=0");
         if (seq !== loadSeq) return;
-        pages = [...new Map(data.pages.map((p) => [p.slug, p])).values()];
+        pages = [...new Map(data.pages.map((p) => [p.slug, p])).values()]
+          .sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''));
+        total = data.total;
       } finally {
         if (seq === loadSeq) loading = false;
       }
@@ -332,7 +343,7 @@ function createWikiStore() {
           issues: LintIssue[];
           fixed: FixedIssue[];
           summary: string;
-        }>("/wiki/lint", { auto_fix: true });
+        }>("/wiki/lint", { auto_fix: true }, { timeout: 120_000 });
         lintIssues = res.issues;
         lintFixed = res.fixed ?? [];
         return res.issues;
@@ -413,7 +424,7 @@ function createWikiStore() {
     },
 
     async regenerateSource(filename: string, model?: string): Promise<void> {
-      regenerating = true;
+      regeneratingSource = filename;
       try {
         await apiPost(
           `/wiki/sources/${encodeURIComponent(filename)}/regenerate`,
@@ -432,7 +443,7 @@ function createWikiStore() {
           }
         }
       } finally {
-        regenerating = false;
+        regeneratingSource = null;
       }
     },
 
@@ -479,6 +490,7 @@ function createWikiStore() {
 
     clear() {
       pages = [];
+      total = 0;
       graph = null;
       lintIssues = null;
     },
