@@ -25,12 +25,18 @@
 	import { sessionsStore } from '$lib/stores/sessions.svelte';
 	import { notificationStore } from '$lib/stores/notifications.svelte';
 	import { capabilitiesStore } from '$lib/stores/capabilities.svelte';
+	import { providersStore } from '$lib/stores/providers.svelte';
 	import { getBaseUrl, getToken } from '$lib/api/client';
 	import { getAppVersion, openInBrowser } from '$lib/tauri';
 	import { onDestroy } from 'svelte';
+	import Bot from '@lucide/svelte/icons/bot';
 
 	let { children } = $props();
 	let appVersion = $state<string | null>(null);
+
+	const sidebarModelLabel = $derived(
+		providersStore.configuredModels.find(m => m.value === providersStore.selectedModel)?.label ?? null
+	);
 
 	function handleVisibilityChange() {
 		if (document.visibilityState === 'visible') {
@@ -42,6 +48,8 @@
 	function handleGatewayReady() {
 		sessionsStore.load();
 		capabilitiesStore.load();
+		providersStore.load();
+		providersStore.loadDefault();
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 
 		const baseUrl = getBaseUrl();
@@ -148,6 +156,17 @@
 							</Sidebar.MenuButton>
 						</div>
 					</Sidebar.MenuItem>
+					{#if sidebarModelLabel}
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton
+							onclick={() => goto('/settings/providers')}
+							class="text-muted-foreground hover:text-foreground"
+						>
+							<Bot class="h-4 w-4 shrink-0" />
+							<span class="truncate text-xs">{sidebarModelLabel}</span>
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					{/if}
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
 							isActive={page.url.pathname.startsWith('/settings')}
