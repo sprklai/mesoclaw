@@ -104,7 +104,7 @@
 				</div>
 			</Sidebar.Header>
 
-			<Sidebar.Content>
+			<div class="shrink-0">
 				{#key localeStore.locale}
 				<Sidebar.Group>
 					<Sidebar.GroupContent>
@@ -130,7 +130,11 @@
 				</Sidebar.Group>
 
 				<Separator />
+				{/key}
+			</div>
 
+			<Sidebar.Content>
+				{#key localeStore.locale}
 				<SessionList />
 				{/key}
 			</Sidebar.Content>
