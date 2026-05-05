@@ -141,7 +141,7 @@
 					{#if sidebarModelLabel}
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
-							onclick={() => goto('/settings')}
+							onclick={() => goto('/settings#providers')}
 							class="text-muted-foreground hover:text-foreground"
 						>
 							<Bot class="h-4 w-4 shrink-0" />
