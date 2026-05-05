@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-05-04
+
+### Added
+- Sidebar: default model chip in footer — shows the active model (e.g. "OpenAI / GPT-5.4 Mini") with a bot icon; clicking navigates to Settings → AI Providers
+
+### Fixed
+- Sidebar: header and nav items now stay pinned; only the chat session list scrolls vertically
+- Sidebar: nav items (Home → Knowledge Wiki) extracted from the scrollable content zone so they never scroll away
+- Sidebar: "Star on GitHub" merged into the same split row as Settings (label shortened to "Star")
+- Sidebar: model chip click correctly routes to `/settings#providers` (was returning 404)
+
+### Changed
+- Sidebar footer layout: model chip (top) → Docs/API Docs → Star|Settings
+
+### Dependencies
+- lru 0.17.0 → 0.18.0
+- openssl 0.10.78 → 0.10.79
+- rig-core 0.35.0 → 0.36.0
+- diffy 0.4.2 → 0.5.0
+
 ## [0.1.23] - 2026-05-03
 
 ### Added
