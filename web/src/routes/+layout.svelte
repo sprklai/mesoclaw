@@ -138,12 +138,17 @@
 			<Sidebar.Footer class="sticky bottom-0 z-10 bg-sidebar-accent/50 border-t border-sidebar-border">
 				{#key localeStore.locale}
 				<Sidebar.Menu>
+					{#if sidebarModelLabel}
 					<Sidebar.MenuItem>
-						<Sidebar.MenuButton onclick={() => openInBrowser('https://github.com/sprklai/zenii')}>
-							<Star class="h-4 w-4" />
-							<span>{m.nav_star_github()}</span>
+						<Sidebar.MenuButton
+							onclick={() => goto('/settings')}
+							class="text-muted-foreground hover:text-foreground"
+						>
+							<Bot class="h-4 w-4 shrink-0" />
+							<span class="truncate text-xs">{sidebarModelLabel}</span>
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
+					{/if}
 					<Sidebar.MenuItem>
 						<div class="flex items-center gap-0 rounded-md border border-sidebar-border overflow-hidden">
 							<Sidebar.MenuButton onclick={() => openInBrowser('https://docs.zenii.sprklai.com/installation-and-usage')} class="flex-1 !rounded-none border-r border-sidebar-border">
@@ -156,25 +161,21 @@
 							</Sidebar.MenuButton>
 						</div>
 					</Sidebar.MenuItem>
-					{#if sidebarModelLabel}
 					<Sidebar.MenuItem>
-						<Sidebar.MenuButton
-							onclick={() => goto('/settings/providers')}
-							class="text-muted-foreground hover:text-foreground"
-						>
-							<Bot class="h-4 w-4 shrink-0" />
-							<span class="truncate text-xs">{sidebarModelLabel}</span>
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					{/if}
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton
-							isActive={page.url.pathname.startsWith('/settings')}
-							onclick={() => goto('/settings')}
-						>
-							<Settings class="h-4 w-4" />
-							<span>{m.nav_settings()}</span>
-						</Sidebar.MenuButton>
+						<div class="flex items-center gap-0 rounded-md border border-sidebar-border overflow-hidden">
+							<Sidebar.MenuButton onclick={() => openInBrowser('https://github.com/sprklai/zenii')} class="flex-1 !rounded-none border-r border-sidebar-border">
+								<Star class="h-4 w-4" />
+								<span>Star</span>
+							</Sidebar.MenuButton>
+							<Sidebar.MenuButton
+								isActive={page.url.pathname.startsWith('/settings')}
+								onclick={() => goto('/settings')}
+								class="flex-1 !rounded-none"
+							>
+								<Settings class="h-4 w-4" />
+								<span>{m.nav_settings()}</span>
+							</Sidebar.MenuButton>
+						</div>
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
 				{/key}

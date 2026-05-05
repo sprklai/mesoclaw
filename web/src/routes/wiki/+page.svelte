@@ -14,14 +14,6 @@
 	import { shikiThemes } from '$lib/components/ai-elements/code/shiki';
 	import { isTauri, openPath, openConfigFile, openWikiDir, openInBrowser } from '$lib/tauri';
 	import { configStore } from '$lib/stores/config.svelte';
-	import { providersStore } from '$lib/stores/providers.svelte';
-	import {
-		PromptInputModelSelect,
-		PromptInputModelSelectTrigger,
-		PromptInputModelSelectContent,
-		PromptInputModelSelectItem,
-		PromptInputModelSelectValue,
-	} from '$lib/components/ai-elements/prompt-input';
 	import * as m from '$lib/paraglide/messages';
 	import Search from '@lucide/svelte/icons/search';
 	import BookOpen from '@lucide/svelte/icons/book-open';
@@ -203,8 +195,6 @@
 		wikiStore.load();
 		wikiStore.loadGraph();
 		wikiStore.checkConverter();
-		providersStore.load();
-		providersStore.loadDefault();
 		if (!configStore.config || Object.keys(configStore.config).length === 0) {
 			await configStore.load();
 		}
@@ -569,19 +559,6 @@
 		} catch (e) {
 			toast.error('Failed to open config', { description: e instanceof Error ? e.message : String(e) });
 		}
-	}
-
-	async function handleWikiModelChange(value: string | undefined) {
-		if (!value) return;
-		providersStore.selectedModel = value;
-		const [providerId, ...rest] = value.split(':');
-		const modelId = rest.join(':');
-		await providersStore.setDefault(providerId, modelId);
-		await configStore.update({
-			provider_name: providerId,
-			provider_type: providerId,
-			provider_model_id: modelId,
-		});
 	}
 
 	async function handleOpenPrompt() {
@@ -1040,7 +1017,7 @@
 					<Settings class="h-3.5 w-3.5" />
 				</Button>
 				{#if gearOpen}
-					<div class="absolute right-0 top-full z-50 mt-1.5 w-64 rounded-lg border bg-popover py-1 shadow-lg" role="none" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+					<div class="absolute right-0 top-full z-50 mt-1.5 w-52 rounded-lg border bg-popover py-1 shadow-lg" role="none" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 						<button
 							class="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted"
 							onclick={() => { closeAllPopovers(); handleSync(); }}
@@ -1058,26 +1035,6 @@
 							<Tag class="h-3.5 w-3.5 text-muted-foreground" />
 							{m.wiki_gear_change_prompt()}
 						</button>
-						{#if providersStore.configuredModels.length > 0}
-						<div class="px-3 py-2">
-							<p class="mb-1.5 text-xs font-medium text-foreground">Default Model</p>
-							<PromptInputModelSelect
-								value={providersStore.selectedModel}
-								onValueChange={handleWikiModelChange}
-							>
-								<PromptInputModelSelectTrigger class="h-8 w-full border text-xs">
-									<PromptInputModelSelectValue placeholder="Select a model" />
-								</PromptInputModelSelectTrigger>
-								<PromptInputModelSelectContent>
-									{#each providersStore.configuredModels as model}
-										<PromptInputModelSelectItem value={model.value}>
-											{model.label}
-										</PromptInputModelSelectItem>
-									{/each}
-								</PromptInputModelSelectContent>
-							</PromptInputModelSelect>
-						</div>
-						{/if}
 						{#if isTauri}
 							<button
 								class="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted"
