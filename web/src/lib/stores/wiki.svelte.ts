@@ -250,6 +250,14 @@ function createWikiStore() {
           signal: ingestController.signal,
           timeout: 120_000,
         });
+        if (res.pages.length > 0) {
+          const newSlugs = new Set(res.pages.map((p) => p.slug));
+          pages = [
+            ...pages.filter((p) => !newSlugs.has(p.slug)),
+            ...res.pages,
+          ].sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''));
+          total = pages.length;
+        }
         return {
           slug: res.primary_slug,
           page_count: res.pages.length,
@@ -306,6 +314,14 @@ function createWikiStore() {
             message: string;
           })
         : { pages: [], primary_slug: "", message: "" };
+      if (res.pages.length > 0) {
+        const newSlugs = new Set(res.pages.map((p) => p.slug));
+        pages = [
+          ...pages.filter((p) => !newSlugs.has(p.slug)),
+          ...res.pages,
+        ].sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''));
+        total = pages.length;
+      }
       return {
         slug: res.primary_slug,
         page_count: res.pages.length,
@@ -322,12 +338,19 @@ function createWikiStore() {
       queryController = new AbortController();
       querying = true;
       try {
-        return await api<QueryResult>("/wiki/query", {
+        const result = await api<QueryResult>("/wiki/query", {
           method: "POST",
           body: JSON.stringify({ question, save, model }),
           signal: queryController.signal,
           timeout: 120_000,
         });
+        if (result.saved_page) {
+          const slug = result.saved_page.slug;
+          pages = [result.saved_page, ...pages.filter((p) => p.slug !== slug)]
+            .sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''));
+          total = pages.length;
+        }
+        return result;
       } catch (e) {
         if (e instanceof Error && e.name === "AbortError") throw e;
         throw e;
@@ -463,6 +486,22 @@ function createWikiStore() {
       graph = null;
       await this.load();
       return res.deleted;
+    },
+
+    async deletePage(slug: string): Promise<void> {
+      await apiDelete<{ slug: string; deleted: boolean }>(`/wiki/pages/${encodeURIComponent(slug)}`);
+      pages = pages.filter((p) => p.slug !== slug);
+      total = pages.length;
+      // Refresh derived state so stale data doesn't persist in graph, sources, or lint.
+      if (graph !== null) {
+        try { await this.loadGraph(); } catch { /* non-fatal */ }
+      }
+      if (sources.length > 0) {
+        try { await this.fetchSources(); } catch { /* non-fatal */ }
+      }
+      if (lintIssues !== null) {
+        try { await this.lint(); } catch { /* non-fatal */ }
+      }
     },
 
     async deleteAllPages(): Promise<number> {

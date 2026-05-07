@@ -2237,6 +2237,45 @@ pub async fn delete_all_wiki_sources(State(state): State<Arc<AppState>>) -> impl
         .into_response()
 }
 
+/// DELETE /wiki/pages/{slug} — delete a single wiki page by slug.
+pub async fn delete_wiki_page(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(slug): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    let wiki = Arc::clone(&state.wiki).lock_owned().await;
+    let slug_c = slug.clone();
+    let result = tokio::task::spawn_blocking(move || wiki.delete_page(&slug_c)).await;
+    match result {
+        Ok(Ok(true)) => {
+            // Forget the deleted page from memory so agents can't see stale context.
+            let key = format!("wiki:{slug}");
+            if let Err(e) = state.memory.forget(&key).await {
+                tracing::warn!("memory forget failed for '{key}': {e}");
+            }
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({ "slug": slug, "deleted": true })),
+            )
+                .into_response()
+        }
+        Ok(Ok(false)) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": format!("page '{}' not found", slug) })),
+        )
+            .into_response(),
+        Ok(Err(e)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": format!("task panic: {e}") })),
+        )
+            .into_response(),
+    }
+}
+
 /// DELETE /wiki/pages — delete all wiki pages and reset index.md.
 pub async fn delete_wiki_pages(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let wiki = Arc::clone(&state.wiki).lock_owned().await;

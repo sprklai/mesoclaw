@@ -101,8 +101,19 @@
 	let pageLoading = $state(false);
 	// Replace [[slug]] wikilink syntax with markdown links so the prose renderer shows them.
 	const processedBody = $derived(
-		selectedPage?.body.replace(/\[\[([^\]]+)\]\]/g, (_, slug) => `[${slug}](#wiki-${slug})`) ?? ''
+		selectedPage?.body.replace(/\[\[([^\]]+)\]\]/g, (_, slug) => `[${slug}](/#wiki-${slug})`) ?? ''
 	);
+
+	// Match only the exact generated-stub signature from the LLM prompt template.
+	// Loose substring matching risks flagging legitimate pages that discuss "stub pages".
+	function isStub(page: WikiPage): boolean {
+		return (
+			page.tldr?.trim() === 'Stub.' &&
+			page.body?.includes('Stub page — fill in details.')
+		);
+	}
+
+	let showStubsOnly = $state(false);
 	let showGraph = $state(true);
 	let ingestOpen = $state(false);
 	let ingestFiles = $state<File[]>([]);
@@ -170,9 +181,11 @@
 	};
 
 	let filteredPages = $derived.by(() => {
-		if (activeCategory === 'all') return wikiStore.pages;
-		const type = CATEGORY_TYPE[activeCategory] ?? activeCategory.slice(0, -1);
-		return wikiStore.pages.filter((p) => p.page_type === type);
+		let base = activeCategory === 'all'
+			? wikiStore.pages
+			: wikiStore.pages.filter((p) => p.page_type === (CATEGORY_TYPE[activeCategory] ?? activeCategory.slice(0, -1)));
+		if (showStubsOnly) return base.filter(isStub);
+		return base;
 	});
 
 	// L6: deferred — currentTheme is already a minimal $derived that only changes when
@@ -694,6 +707,41 @@
 		}
 	}
 
+	let deletingStub = $state(false);
+
+	async function handleDeleteStub() {
+		if (!selectedPage) return;
+		const slug = selectedPage.slug;
+		deletingStub = true;
+		try {
+			await wikiStore.deletePage(slug);
+			selectedPage = null;
+			toast.success(`Deleted stub page "${slug}"`);
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : 'Delete failed');
+		} finally {
+			deletingStub = false;
+		}
+	}
+
+	let deletingOrphan = $state<string | null>(null);
+
+	async function handleDeleteOrphan(issue: LintIssue) {
+		deletingOrphan = issue.page_slug;
+		try {
+			await wikiStore.deletePage(issue.page_slug);
+			// Clear selected page if it was the one deleted
+			if (selectedPage?.slug === issue.page_slug) selectedPage = null;
+			// Re-lint to refresh issue list
+			await wikiStore.lint();
+			toast.success(`Deleted orphan page "${issue.page_slug}"`);
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : 'Delete failed');
+		} finally {
+			deletingOrphan = null;
+		}
+	}
+
 	async function handleRegenerateFromIssue(issue: LintIssue) {
 		const src = sourceForSlug(issue.page_slug);
 		if (!src) return;
@@ -855,6 +903,19 @@
 													title="Regenerate pages from source"
 												>
 													<RotateCw class="h-3 w-3" />
+												</button>
+											{:else if issue.kind === 'orphan_page'}
+												<button
+													class="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+													onclick={() => handleDeleteOrphan(issue)}
+													disabled={deletingOrphan === issue.page_slug}
+													title="Delete orphan page"
+												>
+													{#if deletingOrphan === issue.page_slug}
+														<Loader2 class="h-3 w-3 animate-spin" />
+													{:else}
+														<Trash2 class="h-3 w-3" />
+													{/if}
 												</button>
 											{/if}
 										</div>
@@ -1064,6 +1125,7 @@
 				topic: wikiStore.pages.filter(p => p.page_type === 'topic').length,
 				comparison: wikiStore.pages.filter(p => p.page_type === 'comparison').length,
 				query: wikiStore.pages.filter(p => p.page_type === 'query').length,
+				stub: wikiStore.pages.filter(isStub).length,
 			}}
 			<div class="basis-full flex items-center gap-3 pl-7 pb-0.5">
 				<span class="text-xs"><span class="font-semibold text-blue-500">{bt.concept}</span> <span class="text-muted-foreground">Concepts</span></span>
@@ -1071,6 +1133,15 @@
 				<span class="text-xs"><span class="font-semibold text-orange-500">{bt.topic}</span> <span class="text-muted-foreground">Topics</span></span>
 				{#if bt.comparison > 0}<span class="text-xs"><span class="font-semibold text-purple-500">{bt.comparison}</span> <span class="text-muted-foreground">Comparisons</span></span>{/if}
 				{#if bt.query > 0}<span class="text-xs"><span class="font-semibold text-pink-500">{bt.query}</span> <span class="text-muted-foreground">Queries</span></span>{/if}
+				{#if bt.stub > 0}
+					<button
+						class="text-xs rounded px-1.5 py-0 transition-colors {showStubsOnly ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 font-semibold' : 'text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400'}"
+						onclick={() => { showStubsOnly = !showStubsOnly; selectedPage = null; showGraph = false; }}
+						title={showStubsOnly ? 'Show all pages' : 'Show only stub pages'}
+					>
+						<span class="font-semibold text-amber-500">{bt.stub}</span> Stubs
+					</button>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -1178,6 +1249,9 @@
 									<span class="rounded px-1 py-0 text-[10px] font-medium {typeColor(page.page_type)}">
 										{page.page_type}
 									</span>
+									{#if isStub(page)}
+										<span class="rounded px-1 py-0 text-[9px] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">stub</span>
+									{/if}
 									{#if page.updated}
 										<span class="text-[10px] text-muted-foreground">{page.updated}</span>
 									{/if}
@@ -1220,6 +1294,44 @@
 					<Skeleton class="h-4 w-3/4" />
 				</div>
 			{:else if selectedPage}
+				<!-- Stub banner -->
+				{#if isStub(selectedPage)}
+					{@const stubSource = sourceForSlug(selectedPage.slug)}
+					<div class="flex shrink-0 items-center gap-2 border-b bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
+						<AlertTriangle class="h-4 w-4 shrink-0" />
+						<span class="flex-1">This page is a stub — content was not generated yet.</span>
+						{#if stubSource}
+							<Button
+								size="sm"
+								variant="outline"
+								class="h-7 gap-1 border-amber-500/40 text-xs hover:bg-amber-500/10"
+								onclick={() => handleRegenerateSource(stubSource)}
+								disabled={wikiStore.regeneratingSource === stubSource || wikiStore.regenerating}
+							>
+								{#if wikiStore.regeneratingSource === stubSource}
+									<Loader2 class="h-3 w-3 animate-spin" />
+								{:else}
+									<RotateCw class="h-3 w-3" />
+								{/if}
+								Regenerate
+							</Button>
+						{/if}
+						<Button
+							size="sm"
+							variant="outline"
+							class="h-7 gap-1 border-destructive/30 text-xs text-destructive hover:bg-destructive/10"
+							onclick={handleDeleteStub}
+							disabled={deletingStub}
+						>
+							{#if deletingStub}
+								<Loader2 class="h-3 w-3 animate-spin" />
+							{:else}
+								<Trash2 class="h-3 w-3" />
+							{/if}
+							Delete
+						</Button>
+					</div>
+				{/if}
 				<!-- Page reader -->
 				<div class="flex-1 overflow-y-auto p-6">
 					<!-- Title + meta -->
@@ -1261,9 +1373,9 @@
 								const a = (e.target as HTMLElement).closest('a');
 								if (a) {
 									const href = a.getAttribute('href') ?? '';
-									if (href.startsWith('#wiki-')) {
+									if (href.startsWith('/#wiki-')) {
 										e.preventDefault();
-										handleWikilinkClick(href.slice(6));
+										handleWikilinkClick(href.slice(7));
 									} else if (href.startsWith('http://') || href.startsWith('https://')) {
 										e.preventDefault();
 										openInBrowser(href);

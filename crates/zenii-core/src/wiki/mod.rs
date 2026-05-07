@@ -523,12 +523,18 @@ impl WikiManager {
         let known_slugs: std::collections::HashSet<&str> =
             pages.iter().map(|p| p.slug.as_str()).collect();
 
-        // Build inbound-link count map: slug → number of other pages linking here
+        // Build inbound-link count map: slug → number of other pages linking here.
+        // Both [[wikilinks]] in the body and `related:` frontmatter entries count.
         let mut inbound: std::collections::HashMap<&str, usize> =
             pages.iter().map(|p| (p.slug.as_str(), 0usize)).collect();
         for page in &pages {
             for link in &page.wikilinks {
                 if let Some(count) = inbound.get_mut(link.as_str()) {
+                    *count += 1;
+                }
+            }
+            for rel in &page.related {
+                if let Some(count) = inbound.get_mut(rel.as_str()) {
                     *count += 1;
                 }
             }
@@ -572,11 +578,11 @@ impl WikiManager {
                         kind: "orphan_page".to_string(),
                         page_slug: page.slug.clone(),
                         detail: format!(
-                            "'{}' has no incoming wikilinks from any other page",
+                            "'{}' has no incoming wikilinks or related references from any other page",
                             page.slug
                         ),
                         fix: format!(
-                            "Add a [[{}]] wikilink from at least one other page, or delete this page if it is a stub.",
+                            "Add a [[{}]] wikilink or a 'related:' entry from at least one other page, or delete this page if it is a stub.",
                             page.slug
                         ),
                     });
@@ -613,6 +619,25 @@ impl WikiManager {
             }
         }
 
+        // Lint 5: broken source references — sources listed in frontmatter that no longer exist
+        let sources_dir = self.wiki_dir.join("sources");
+        let converted_dir = sources_dir.join("converted");
+        for page in &pages {
+            for src in &page.sources {
+                if !sources_dir.join(src).exists() && !converted_dir.join(src).exists() {
+                    issues.push(LintIssue {
+                        kind: "broken_source_ref".to_string(),
+                        page_slug: page.slug.clone(),
+                        detail: format!("source '{}' not found in wiki/sources/", src),
+                        fix: format!(
+                            "Re-ingest '{}' or remove it from the sources list in '{}'.",
+                            src, page.slug
+                        ),
+                    });
+                }
+            }
+        }
+
         Ok(issues)
     }
 
@@ -620,9 +645,10 @@ impl WikiManager {
     ///
     /// Fixes applied:
     /// - `missing_updated` → patches the page file's YAML frontmatter `updated:` field to today
-    /// - `broken_wikilink` → creates a minimal stub concept page for the broken slug
+    /// - `broken_wikilink` → not auto-fixable; returned as a remaining issue
     /// - `missing_index_entry` → calls `update_index()` once to rebuild the full index
     /// - `orphan_page` → not auto-fixable; returned as a remaining issue
+    /// - `broken_source_ref` → removes the dead source filename from the page's frontmatter sources list
     ///
     /// Returns `(fixed, remaining)`.
     pub fn lint_fix(
@@ -661,42 +687,12 @@ impl WikiManager {
                     }
                 }
                 "broken_wikilink" => {
-                    // The issue's `detail` contains the broken slug target.
-                    // Extract from detail: "[[{target}]] has no matching page file"
-                    let broken_slug = extract_broken_slug(&issue.detail)
-                        .unwrap_or_else(|| issue.page_slug.clone());
-                    // Only create stub if it doesn't already exist
-                    if self.get_page(&broken_slug)?.is_none() {
-                        let title = broken_slug
-                            .replace('-', " ")
-                            .split_whitespace()
-                            .map(|w| {
-                                let mut c = w.chars();
-                                match c.next() {
-                                    None => String::new(),
-                                    Some(f) => f.to_uppercase().to_string() + c.as_str(),
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                            .join(" ");
-                        let stub = format!(
-                            "---\ntitle: {title}\ntype: concept\ntags: []\nsources: []\nupdated: {today}\n---\n\n# {title}\n\n_Stub page — fill in details._\n\n## TLDR\nStub.\n"
-                        );
-                        self.write_page("concepts", &broken_slug, &stub)?;
-                        needs_index_rebuild = true;
-                        fixed.push(FixedIssue {
-                            kind: issue.kind.clone(),
-                            slug: issue.page_slug.clone(),
-                            action: format!("Created stub page for [[{broken_slug}]]"),
-                        });
-                    } else {
-                        // Page already exists (maybe just created); mark fixed
-                        fixed.push(FixedIssue {
-                            kind: issue.kind.clone(),
-                            slug: issue.page_slug.clone(),
-                            action: format!("Stub for [[{broken_slug}]] already exists"),
-                        });
-                    }
+                    remaining.push(issue.clone());
+                }
+                "broken_source_ref" => {
+                    // Removing a source reference silently hides provenance loss.
+                    // Report as a manual-fix issue; only remove during explicit source deletion.
+                    remaining.push(issue.clone());
                 }
                 "missing_index_entry" => {
                     // Batch: rebuild index once at the end
@@ -836,6 +832,42 @@ impl WikiManager {
         let (sources, _pages) = self.read_manifest()?;
         self.write_manifest(&sources, &[])?;
         Ok(count)
+    }
+
+    /// Delete a single wiki page by slug. Removes the file, updates the manifest,
+    /// and rebuilds index.md. Returns `true` if the page was found and deleted.
+    ///
+    /// If the slug is not in the manifest (e.g. manually-created or legacy page),
+    /// falls back to scanning the `pages/` subdirectories by filename so the UI
+    /// can always delete what it can list.
+    pub fn delete_page(&self, slug: &str) -> Result<bool, ZeniiError> {
+        let (sources, pages) = self.read_manifest()?;
+
+        // Primary path: manifest lookup
+        if let Some(record) = pages.iter().find(|r| r.slug == slug) {
+            let path = self.wiki_dir.join(&record.path);
+            if path.exists() {
+                std::fs::remove_file(&path)?;
+            }
+            let remaining: Vec<PageRecord> = pages.into_iter().filter(|r| r.slug != slug).collect();
+            self.write_manifest(&sources, &remaining)?;
+            self.update_index()?;
+            return Ok(true);
+        }
+
+        // Fallback: scan pages/ subdirectories for a file named `{slug}.md`
+        let pages_dir = self.wiki_dir.join("pages");
+        let filename = format!("{slug}.md");
+        for subdir in PAGE_SUBDIRS {
+            let candidate = pages_dir.join(subdir).join(&filename);
+            if candidate.exists() {
+                std::fs::remove_file(&candidate)?;
+                self.update_index()?;
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 
     // ── Sources ──────────────────────────────────────────────────────────────
@@ -1423,17 +1455,6 @@ fn extract_wikilinks(body: &str) -> Vec<String> {
     links
 }
 
-/// Extract the broken slug from a lint detail string like "[[broken-slug]] has no matching page file".
-fn extract_broken_slug(detail: &str) -> Option<String> {
-    let start = detail.find("[[")? + 2;
-    let end = detail.find("]]")?;
-    if start < end {
-        Some(detail[start..end].to_string())
-    } else {
-        None
-    }
-}
-
 /// Patch or insert the `updated:` field in a page's YAML frontmatter.
 fn set_updated_in_frontmatter(content: &str, date: &str) -> String {
     let Some(rest) = content.strip_prefix("---") else {
@@ -1953,6 +1974,114 @@ No outbound links here.
         assert!(
             issues.iter().any(|i| i.kind == "broken_wikilink"),
             "broken wikilink must be reported"
+        );
+    }
+
+    // W32b: lint_fix() does not create stub pages for broken wikilinks
+    #[test]
+    fn lint_fix_does_not_create_stub_for_broken_wikilink() {
+        let dir = TempDir::new().unwrap();
+        let content = "---\ntitle: \"Page With Broken Link\"\ntype: concept\ntags: []\nsources: []\nupdated: 2026-01-01\n---\n\n## TLDR\nLinks to nothing.\n\n## Body\nSee [[nonexistent-page]] for details.\n";
+        let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
+        seed_page(&mgr, "concepts", "page-with-broken-link", content);
+        let issues = mgr.lint().unwrap();
+        let broken: Vec<_> = issues
+            .iter()
+            .filter(|i| i.kind == "broken_wikilink")
+            .cloned()
+            .collect();
+        assert!(!broken.is_empty(), "expected at least one broken_wikilink issue");
+        let (fixed, remaining) = mgr.lint_fix(&broken).unwrap();
+        assert!(fixed.is_empty(), "broken_wikilink must not be auto-fixed");
+        assert_eq!(remaining.len(), broken.len(), "all broken_wikilinks must remain");
+        assert!(
+            mgr.get_page("nonexistent-page").unwrap().is_none(),
+            "no stub page must be created"
+        );
+    }
+
+    // W32c: lint() does not flag a page as orphan when another page has it in `related:`
+    #[test]
+    fn lint_related_prevents_orphan() {
+        let dir = TempDir::new().unwrap();
+        let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
+        let page_a = "---\ntitle: \"Page A\"\ntype: concept\ntags: []\nsources: []\nupdated: 2026-01-01\nrelated: [page-b]\n---\n\n## TLDR\nA.\n\n## Body\nContent.\n";
+        let page_b = "---\ntitle: \"Page B\"\ntype: concept\ntags: []\nsources: []\nupdated: 2026-01-01\n---\n\n## TLDR\nB.\n\n## Body\nContent.\n";
+        seed_page(&mgr, "concepts", "page-a", page_a);
+        seed_page(&mgr, "concepts", "page-b", page_b);
+        let issues = mgr.lint().unwrap();
+        // page-b has page-a's related: pointing at it → must NOT be orphan
+        assert!(
+            !issues.iter().any(|i| i.kind == "orphan_page" && i.page_slug == "page-b"),
+            "page-b referenced via related: must not be flagged as orphan"
+        );
+    }
+
+    // W37: lint() reports broken_source_ref for a page whose sources entry is missing on disk
+    #[test]
+    fn lint_detects_broken_source_ref() {
+        let dir = TempDir::new().unwrap();
+        let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
+        let content = "---\ntitle: \"Sourced Page\"\ntype: concept\ntags: []\nsources: [missing-file.md]\nupdated: 2026-01-01\n---\n\n## TLDR\nHas a dead source.\n\n## Body\nContent.\n";
+        seed_page(&mgr, "concepts", "sourced-page", content);
+        let issues = mgr.lint().unwrap();
+        assert!(
+            issues.iter().any(|i| i.kind == "broken_source_ref" && i.page_slug == "sourced-page"),
+            "broken source ref must be reported"
+        );
+    }
+
+    // W37b: lint() does not report broken_source_ref when the source file exists
+    #[test]
+    fn lint_no_broken_source_ref_when_file_exists() {
+        let dir = TempDir::new().unwrap();
+        let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
+        // Create the source file on disk
+        let sources_dir = dir.path().join("sources");
+        std::fs::write(sources_dir.join("real-source.md"), "# Real Source").unwrap();
+        let content = "---\ntitle: \"Sourced Page\"\ntype: concept\ntags: []\nsources: [real-source.md]\nupdated: 2026-01-01\n---\n\n## TLDR\nHas a real source.\n\n## Body\nContent.\n";
+        seed_page(&mgr, "concepts", "sourced-page", content);
+        let issues = mgr.lint().unwrap();
+        assert!(
+            !issues.iter().any(|i| i.kind == "broken_source_ref"),
+            "no broken_source_ref when source file exists"
+        );
+    }
+
+    // W37c: lint_fix() removes dead source entry from frontmatter
+    #[test]
+    fn lint_fix_removes_dead_source_from_frontmatter() {
+        let dir = TempDir::new().unwrap();
+        let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
+        let content = "---\ntitle: \"Sourced Page\"\ntype: concept\ntags: []\nsources: [missing-file.md]\nupdated: 2026-01-01\n---\n\n## TLDR\nHas a dead source.\n\n## Body\nContent.\n";
+        seed_page(&mgr, "concepts", "sourced-page", content);
+        // Seed a manifest entry so lint_fix can find the file path
+        let page_record = crate::wiki::PageRecord {
+            slug: "sourced-page".to_string(),
+            page_type: "concept".to_string(),
+            path: "pages/concepts/sourced-page.md".to_string(),
+            sources: vec!["missing-file.md".to_string()],
+            last_run_id: "run-1".to_string(),
+            managed_by: "source_ingest".to_string(),
+        };
+        let (src_records, _) = mgr.read_manifest().unwrap();
+        mgr.write_manifest(&src_records, &[page_record]).unwrap();
+
+        let issues = mgr.lint().unwrap();
+        let broken: Vec<_> = issues
+            .iter()
+            .filter(|i| i.kind == "broken_source_ref")
+            .cloned()
+            .collect();
+        assert!(!broken.is_empty(), "expected broken_source_ref issue");
+        let (fixed, remaining) = mgr.lint_fix(&broken).unwrap();
+        assert!(!fixed.is_empty(), "broken_source_ref must be auto-fixed");
+        assert!(remaining.is_empty(), "no issues should remain");
+        // Verify the file was updated — sources should now be empty
+        let page = mgr.get_page("sourced-page").unwrap().unwrap();
+        assert!(
+            page.sources.is_empty(),
+            "dead source must be removed from page frontmatter"
         );
     }
 

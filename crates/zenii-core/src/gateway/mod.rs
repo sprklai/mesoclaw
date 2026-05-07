@@ -9,10 +9,12 @@ pub mod state;
 use std::sync::Arc;
 
 use tokio::net::TcpListener;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{Result, ZeniiError};
 use state::AppState;
+
+const WIKI_MAINTENANCE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
 
 /// The gateway HTTP+WS server.
 pub struct GatewayServer {
@@ -35,7 +37,7 @@ impl GatewayServer {
         shutdown: impl std::future::Future<Output = ()> + Send + 'static,
         ready_tx: Option<tokio::sync::oneshot::Sender<()>>,
     ) -> Result<()> {
-        let router = routes::build_router(self.state);
+        let router = routes::build_router(Arc::clone(&self.state));
         let addr = format!("{host}:{port}");
 
         let listener = TcpListener::bind(&addr)
@@ -48,6 +50,8 @@ impl GatewayServer {
             let _ = tx.send(());
         }
 
+        tokio::spawn(wiki_maintenance_loop(Arc::clone(&self.state)));
+
         axum::serve(listener, router)
             .with_graceful_shutdown(shutdown)
             .await
@@ -55,6 +59,39 @@ impl GatewayServer {
 
         info!("Gateway shut down cleanly");
         Ok(())
+    }
+}
+
+/// Runs lint auto-fix every [`WIKI_MAINTENANCE_INTERVAL`].
+///
+/// Only applies safe, non-destructive fixes (e.g. backfilling missing `updated`
+/// dates). Stub deletion and source-ref cleanup are intentionally excluded —
+/// those require explicit user action.
+async fn wiki_maintenance_loop(state: Arc<AppState>) {
+    let mut interval = tokio::time::interval(WIKI_MAINTENANCE_INTERVAL);
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    interval.tick().await; // skip the immediate first tick on startup
+
+    loop {
+        interval.tick().await;
+        info!("Wiki maintenance: running lint auto-fix");
+
+        let wiki = Arc::clone(&state.wiki);
+        let result = tokio::task::spawn_blocking(move || {
+            let wiki = wiki.blocking_lock();
+            let issues = wiki.lint()?;
+            let (fixed, remaining) = wiki.lint_fix(&issues)?;
+            Ok::<_, ZeniiError>((remaining.len(), fixed.len()))
+        })
+        .await;
+
+        match result {
+            Ok(Ok((remaining, fixed))) => {
+                info!("Wiki maintenance done: {fixed} auto-fixed, {remaining} issues need manual review")
+            }
+            Ok(Err(e)) => warn!("Wiki maintenance error: {e}"),
+            Err(e) => warn!("Wiki maintenance task panicked: {e}"),
+        }
     }
 }
 
