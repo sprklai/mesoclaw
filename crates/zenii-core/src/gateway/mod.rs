@@ -87,7 +87,9 @@ async fn wiki_maintenance_loop(state: Arc<AppState>) {
 
         match result {
             Ok(Ok((remaining, fixed))) => {
-                info!("Wiki maintenance done: {fixed} auto-fixed, {remaining} issues need manual review")
+                info!(
+                    "Wiki maintenance done: {fixed} auto-fixed, {remaining} issues need manual review"
+                )
             }
             Ok(Err(e)) => warn!("Wiki maintenance error: {e}"),
             Err(e) => warn!("Wiki maintenance task panicked: {e}"),

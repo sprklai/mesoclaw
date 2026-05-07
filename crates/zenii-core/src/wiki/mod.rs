@@ -1990,10 +1990,17 @@ No outbound links here.
             .filter(|i| i.kind == "broken_wikilink")
             .cloned()
             .collect();
-        assert!(!broken.is_empty(), "expected at least one broken_wikilink issue");
+        assert!(
+            !broken.is_empty(),
+            "expected at least one broken_wikilink issue"
+        );
         let (fixed, remaining) = mgr.lint_fix(&broken).unwrap();
         assert!(fixed.is_empty(), "broken_wikilink must not be auto-fixed");
-        assert_eq!(remaining.len(), broken.len(), "all broken_wikilinks must remain");
+        assert_eq!(
+            remaining.len(),
+            broken.len(),
+            "all broken_wikilinks must remain"
+        );
         assert!(
             mgr.get_page("nonexistent-page").unwrap().is_none(),
             "no stub page must be created"
@@ -2012,7 +2019,9 @@ No outbound links here.
         let issues = mgr.lint().unwrap();
         // page-b has page-a's related: pointing at it → must NOT be orphan
         assert!(
-            !issues.iter().any(|i| i.kind == "orphan_page" && i.page_slug == "page-b"),
+            !issues
+                .iter()
+                .any(|i| i.kind == "orphan_page" && i.page_slug == "page-b"),
             "page-b referenced via related: must not be flagged as orphan"
         );
     }
@@ -2026,7 +2035,9 @@ No outbound links here.
         seed_page(&mgr, "concepts", "sourced-page", content);
         let issues = mgr.lint().unwrap();
         assert!(
-            issues.iter().any(|i| i.kind == "broken_source_ref" && i.page_slug == "sourced-page"),
+            issues
+                .iter()
+                .any(|i| i.kind == "broken_source_ref" && i.page_slug == "sourced-page"),
             "broken source ref must be reported"
         );
     }

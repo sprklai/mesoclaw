@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Wiki: `DELETE /wiki/pages/{slug}` — single-page delete with memory cleanup
+- Wiki: background maintenance loop (every 6 h) — runs lint auto-fix (non-destructive only; no auto-deletion)
+- Wiki UI: stub detection — amber banner on stub pages with Regenerate / Delete actions, stub badge in page list, stub count in stats bar with filter toggle
+
+### Fixed
+- Wiki UI: wikilinks in page body no longer render as `[blocked]`; Streamdown's URL guard now passes for internal anchor links
+- Wiki: `delete_page` falls back to disk scan for pages absent from the manifest (e.g. manually-created pages)
+- Wiki: `broken_source_ref` lint issues are no longer silently auto-fixed; they are reported for manual review to preserve provenance
+- Wiki UI: deleting a single page now refreshes graph, sources, and lint state in the frontend store
+
 ## [0.1.24] - 2026-05-04
 
 ### Added
