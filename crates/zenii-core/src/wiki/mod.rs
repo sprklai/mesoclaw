@@ -2089,7 +2089,10 @@ No outbound links here.
         // broken_source_ref is intentionally NOT auto-fixed — removing provenance
         // silently hides integrity loss and must be done explicitly by the user.
         assert!(fixed.is_empty(), "broken_source_ref must NOT be auto-fixed");
-        assert!(!remaining.is_empty(), "broken_source_ref must remain as a manual-fix issue");
+        assert!(
+            !remaining.is_empty(),
+            "broken_source_ref must remain as a manual-fix issue"
+        );
         // Verify the file was NOT modified — sources should still reference the dead file
         let page = mgr.get_page("sourced-page").unwrap().unwrap();
         assert!(
