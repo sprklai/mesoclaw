@@ -2061,7 +2061,7 @@ No outbound links here.
 
     // W37c: lint_fix() removes dead source entry from frontmatter
     #[test]
-    fn lint_fix_removes_dead_source_from_frontmatter() {
+    fn lint_fix_reports_broken_source_ref_as_manual_fix() {
         let dir = TempDir::new().unwrap();
         let mgr = WikiManager::new(dir.path().to_path_buf()).unwrap();
         let content = "---\ntitle: \"Sourced Page\"\ntype: concept\ntags: []\nsources: [missing-file.md]\nupdated: 2026-01-01\n---\n\n## TLDR\nHas a dead source.\n\n## Body\nContent.\n";
@@ -2086,13 +2086,15 @@ No outbound links here.
             .collect();
         assert!(!broken.is_empty(), "expected broken_source_ref issue");
         let (fixed, remaining) = mgr.lint_fix(&broken).unwrap();
-        assert!(!fixed.is_empty(), "broken_source_ref must be auto-fixed");
-        assert!(remaining.is_empty(), "no issues should remain");
-        // Verify the file was updated — sources should now be empty
+        // broken_source_ref is intentionally NOT auto-fixed — removing provenance
+        // silently hides integrity loss and must be done explicitly by the user.
+        assert!(fixed.is_empty(), "broken_source_ref must NOT be auto-fixed");
+        assert!(!remaining.is_empty(), "broken_source_ref must remain as a manual-fix issue");
+        // Verify the file was NOT modified — sources should still reference the dead file
         let page = mgr.get_page("sourced-page").unwrap().unwrap();
         assert!(
-            page.sources.is_empty(),
-            "dead source must be removed from page frontmatter"
+            !page.sources.is_empty(),
+            "sources must not be silently removed by lint_fix"
         );
     }
 
