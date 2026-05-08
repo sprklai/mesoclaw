@@ -2,6 +2,8 @@
 	import '../app.css';
 	import * as m from '$lib/paraglide/messages';
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { Separator } from '$lib/components/ui/separator';
 	import { Button } from '$lib/components/ui/button';
 	import AuthGate from '$lib/components/AuthGate.svelte';
@@ -16,6 +18,7 @@
 	import BookOpen from '@lucide/svelte/icons/book-open';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Star from '@lucide/svelte/icons/star';
+	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import WifiOff from '@lucide/svelte/icons/wifi-off';
 	import { inboxStore } from '$lib/stores/inbox.svelte';
 	import '$lib/stores/theme.svelte';
@@ -33,7 +36,6 @@
 
 	let { children } = $props();
 	let appVersion = $state<string | null>(null);
-
 	const sidebarModelLabel = $derived(
 		providersStore.configuredModels.find(m => m.value === providersStore.selectedModel)?.label ?? null
 	);
@@ -154,32 +156,64 @@
 					</Sidebar.MenuItem>
 					{/if}
 					<Sidebar.MenuItem>
-						<div class="flex items-center gap-0 rounded-md border border-sidebar-border overflow-hidden">
-							<Sidebar.MenuButton onclick={() => openInBrowser('https://docs.zenii.sprklai.com/installation-and-usage')} class="flex-1 !rounded-none border-r border-sidebar-border">
-								<FileText class="h-4 w-4" />
-								<span>{m.nav_docs()}</span>
-							</Sidebar.MenuButton>
-							<Sidebar.MenuButton onclick={handleApiDocs} class="flex-1 !rounded-none">
-								<BookOpen class="h-4 w-4" />
-								<span>{m.nav_api_docs()}</span>
-							</Sidebar.MenuButton>
-						</div>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<div class="flex items-center gap-0 rounded-md border border-sidebar-border overflow-hidden">
-							<Sidebar.MenuButton onclick={() => openInBrowser('https://github.com/sprklai/zenii')} class="flex-1 !rounded-none border-r border-sidebar-border">
-								<Star class="h-4 w-4" />
-								<span>Star</span>
-							</Sidebar.MenuButton>
-							<Sidebar.MenuButton
-								isActive={page.url.pathname.startsWith('/settings')}
-								onclick={() => goto('/settings')}
-								class="flex-1 !rounded-none"
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<Sidebar.MenuButton
+										size="lg"
+										class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+										{...props}
+									>
+										<Avatar.Root class="size-8 rounded-lg">
+											<Avatar.Image src="/app-icon-32.png" alt={m.app_name()} />
+											<Avatar.Fallback class="rounded-lg">Z</Avatar.Fallback>
+										</Avatar.Root>
+										<div class="grid flex-1 text-start text-sm leading-tight">
+											<span class="truncate font-medium">{getBaseUrl()}</span>
+										</div>
+										<ChevronsUpDown class="ms-auto size-4" />
+									</Sidebar.MenuButton>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content
+								class="w-(--bits-dropdown-menu-anchor-width) min-w-56 rounded-lg"
+								side="right"
+								align="end"
+								sideOffset={4}
 							>
-								<Settings class="h-4 w-4" />
-								<span>{m.nav_settings()}</span>
-							</Sidebar.MenuButton>
-						</div>
+								<DropdownMenu.Label class="p-0 font-normal">
+									<div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
+										<Avatar.Root class="size-8 rounded-lg">
+											<Avatar.Image src="/app-icon-32.png" alt={m.app_name()} />
+											<Avatar.Fallback class="rounded-lg">Z</Avatar.Fallback>
+										</Avatar.Root>
+										<div class="grid flex-1 text-start text-sm leading-tight">
+											<span class="truncate font-medium">{getBaseUrl()}</span>
+										</div>
+									</div>
+								</DropdownMenu.Label>
+								<DropdownMenu.Separator />
+								<DropdownMenu.Group>
+									<DropdownMenu.Item onclick={() => openInBrowser('https://github.com/sprklai/zenii')}>
+										<Star />
+										Star on GitHub
+									</DropdownMenu.Item>
+									<DropdownMenu.Item onclick={() => openInBrowser('https://docs.zenii.sprklai.com/installation-and-usage')}>
+										<FileText />
+										{m.nav_docs()}
+									</DropdownMenu.Item>
+									<DropdownMenu.Item onclick={handleApiDocs}>
+										<BookOpen />
+										{m.nav_api_docs()}
+									</DropdownMenu.Item>
+								</DropdownMenu.Group>
+								<DropdownMenu.Separator />
+								<DropdownMenu.Item onclick={() => goto('/settings')}>
+									<Settings />
+									{m.nav_settings()}
+								</DropdownMenu.Item>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
 				{/key}

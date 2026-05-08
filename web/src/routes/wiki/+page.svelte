@@ -652,7 +652,7 @@
 			return;
 		}
 		openPopover = 'lint';
-		if (!wikiStore.lintIssues) {
+		if (!wikiStore.lintIssues && !wikiStore.linting) {
 			try {
 				await wikiStore.lint();
 			} catch {
@@ -664,6 +664,13 @@
 	async function handleRelint() {
 		try {
 			await wikiStore.lint();
+			const remaining = wikiStore.lintIssues?.length ?? 0;
+			const fixed = wikiStore.lintFixed.length;
+			toast.success(
+				fixed > 0
+					? `Lint complete: ${fixed} auto-fixed, ${remaining} remaining`
+					: `Lint complete: ${remaining} issue${remaining === 1 ? '' : 's'} found`
+			);
 		} catch {
 			toast.error(m.wiki_lint_error());
 		}
@@ -819,7 +826,6 @@
 					size="sm"
 					class="gap-1.5"
 					onclick={(e) => { e.stopPropagation(); handleLint(); }}
-					disabled={wikiStore.linting}
 				>
 					{#if wikiStore.linting}
 						<Loader2 class="h-3.5 w-3.5 animate-spin" />
@@ -856,6 +862,12 @@
 								Auto-fixed {wikiStore.lintFixed.length} issue{wikiStore.lintFixed.length === 1 ? '' : 's'}
 							</div>
 						{/if}
+						<!-- Manual-fix notice -->
+						{#if wikiStore.lintIssues !== null && wikiStore.lintIssues.some(i => i.kind === 'orphan_page' || i.kind === 'broken_wikilink')}
+							<div class="border-b bg-amber-500/5 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+								🛠 Orphan pages and broken links require manual edits — Re-lint cannot fix them automatically.
+							</div>
+						{/if}
 						<!-- Search + filter bar (only when there are issues) -->
 						{#if wikiStore.lintIssues !== null && wikiStore.lintIssues.length > 0}
 							<div class="border-b px-2 py-2 space-y-1.5">
@@ -890,9 +902,14 @@
 											<div class="flex min-w-0 flex-1 items-center gap-1.5">
 												<AlertTriangle class="h-3.5 w-3.5 shrink-0 text-yellow-500" />
 												<span class="font-mono font-medium text-yellow-600 dark:text-yellow-400">{issue.kind}</span>
+												{#if ['orphan_page', 'broken_wikilink'].includes(issue.kind)}
+													<span class="shrink-0 text-[10px] text-amber-600 dark:text-amber-400" title="Requires manual edit">🛠</span>
+												{:else}
+													<span class="shrink-0 text-[10px] text-green-600 dark:text-green-400" title="Auto-fixable via Re-lint">⚡</span>
+												{/if}
 												<button
 													class="truncate font-medium text-primary hover:underline"
-													onclick={() => { handleSelectPage(issue.page_slug); lintPopOpen = false; }}
+													onclick={() => { handleSelectPage(issue.page_slug); closeAllPopovers(); }}
 												>{issue.page_slug}</button>
 											</div>
 											{#if sourceForSlug(issue.page_slug) && ['broken_wikilink', 'missing_updated'].includes(issue.kind)}
@@ -940,7 +957,7 @@
 									{m.wiki_lint_running()}
 								{:else}
 									<RefreshCw class="h-3.5 w-3.5" />
-									{m.wiki_lint_button()}
+									Re-lint
 								{/if}
 							</Button>
 						</div>
@@ -1440,7 +1457,7 @@
 					placeholder={m.wiki_query_placeholder()}
 					bind:value={queryQuestion}
 				/>
-				<PromptInputToolbar>
+				<PromptInputToolbar class="justify-end">
 					<PromptInputSubmit
 						status={wikiStore.querying ? 'submitted' : 'idle'}
 						disabled={wikiStore.querying || !queryQuestion.trim()}
