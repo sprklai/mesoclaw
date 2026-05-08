@@ -648,7 +648,7 @@ impl WikiManager {
     /// - `broken_wikilink` → not auto-fixable; returned as a remaining issue
     /// - `missing_index_entry` → calls `update_index()` once to rebuild the full index
     /// - `orphan_page` → not auto-fixable; returned as a remaining issue
-    /// - `broken_source_ref` → removes the dead source filename from the page's frontmatter sources list
+    /// - `broken_source_ref` → not auto-fixable; returned as a remaining issue (removing provenance silently hides integrity loss)
     ///
     /// Returns `(fixed, remaining)`.
     pub fn lint_fix(
@@ -2059,7 +2059,7 @@ No outbound links here.
         );
     }
 
-    // W37c: lint_fix() removes dead source entry from frontmatter
+    // W37c: lint_fix() reports broken_source_ref as manual-fix (does NOT remove the entry)
     #[test]
     fn lint_fix_reports_broken_source_ref_as_manual_fix() {
         let dir = TempDir::new().unwrap();

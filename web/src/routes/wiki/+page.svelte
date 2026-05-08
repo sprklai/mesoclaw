@@ -505,7 +505,7 @@
 	let lintSearch = $state('');
 	let lintSearchDebounced = $state('');
 	let lintSearchTimeout: ReturnType<typeof setTimeout>;
-	type LintKindFilter = 'all' | 'broken_wikilink' | 'orphan_page' | 'missing_index_entry' | 'missing_updated';
+	type LintKindFilter = 'all' | 'broken_wikilink' | 'orphan_page' | 'broken_source_ref' | 'missing_index_entry' | 'missing_updated';
 	let lintKindFilter = $state<LintKindFilter>('all');
 
 	const visibleSources = $derived(
@@ -863,9 +863,9 @@
 							</div>
 						{/if}
 						<!-- Manual-fix notice -->
-						{#if wikiStore.lintIssues !== null && wikiStore.lintIssues.some(i => i.kind === 'orphan_page' || i.kind === 'broken_wikilink')}
+						{#if wikiStore.lintIssues !== null && wikiStore.lintIssues.some(i => i.kind === 'orphan_page' || i.kind === 'broken_wikilink' || i.kind === 'broken_source_ref')}
 							<div class="border-b bg-amber-500/5 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400">
-								🛠 Orphan pages and broken links require manual edits — Re-lint cannot fix them automatically.
+								🛠 Orphan pages, broken links, and broken source refs require manual edits — Re-lint cannot fix them automatically.
 							</div>
 						{/if}
 						<!-- Search + filter bar (only when there are issues) -->
@@ -882,6 +882,7 @@
 										{ v: 'all', label: 'All' },
 										{ v: 'broken_wikilink', label: '🔗 Broken' },
 										{ v: 'orphan_page', label: '🏝 Orphan' },
+										{ v: 'broken_source_ref', label: '📎 Source' },
 										{ v: 'missing_index_entry', label: '📋 Index' },
 										{ v: 'missing_updated', label: '📅 Date' }
 									] as f}
@@ -902,7 +903,7 @@
 											<div class="flex min-w-0 flex-1 items-center gap-1.5">
 												<AlertTriangle class="h-3.5 w-3.5 shrink-0 text-yellow-500" />
 												<span class="font-mono font-medium text-yellow-600 dark:text-yellow-400">{issue.kind}</span>
-												{#if ['orphan_page', 'broken_wikilink'].includes(issue.kind)}
+												{#if ['orphan_page', 'broken_wikilink', 'broken_source_ref'].includes(issue.kind)}
 													<span class="shrink-0 text-[10px] text-amber-600 dark:text-amber-400" title="Requires manual edit">🛠</span>
 												{:else}
 													<span class="shrink-0 text-[10px] text-green-600 dark:text-green-400" title="Auto-fixable via Re-lint">⚡</span>
