@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-07
+
 ### Added
 - Wiki: `DELETE /wiki/pages/{slug}` — single-page delete with memory cleanup
 - Wiki: background maintenance loop (every 6 h) — runs lint auto-fix (non-destructive only; no auto-deletion)
@@ -17,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Wiki: `delete_page` falls back to disk scan for pages absent from the manifest (e.g. manually-created pages)
 - Wiki: `broken_source_ref` lint issues are no longer silently auto-fixed; they are reported for manual review to preserve provenance
 - Wiki UI: deleting a single page now refreshes graph, sources, and lint state in the frontend store
+- Wiki UI: `broken_source_ref` issues now show 🛠 manual-fix icon (was incorrectly ⚡ auto-fixable) and appear in filter bar under "📎 Source"
+- Wiki UI: sidebar dropdown unresponsive after wiki compile error fixed
+
+### Internationalisation
+- All 7 locales (zh-CN, es, ja, hi, pt-BR, ko, fr) now have translations for 141 previously-English UI strings covering the workflow builder, wiki UI, schedule labels, settings tabs, and notification targets
 
 ## [0.1.24] - 2026-05-04
 
