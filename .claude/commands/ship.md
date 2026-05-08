@@ -44,12 +44,19 @@ Review the staged and unstaged changes (use `git diff` and `git diff --cached`) 
 2. **`CHANGELOG.md`** — Add entries for any user-facing changes (features, fixes, breaking changes). Follow the existing format and group under the current unreleased version section. Create a new section if needed.
 3. **`website-data.json`** — Sync derived metrics with the current codebase state:
    - `version`: read from `grep -m1 '^version = "' Cargo.toml | sed 's/.*"\(.*\)".*/\1/'`
-   - `gatewayEndpoints`: count via `grep -c '\.route(' crates/zenii-core/src/gateway/routes.rs`
+   - `totalEndpoints`: count via `bash scripts/count-endpoints.sh` (reads `docs/api-endpoints.md` — update that file first if routes changed)
    - `agentTools`: count via `grep -c 'registry\.register\b' crates/zenii-core/src/boot.rs`
    - `backendTests`: count via `cargo test --workspace 2>&1 | awk '/test result/{sum+=$4} END{print sum}'`
    - Other fields (`binarySize`, `debRpmSize`, `startupSeconds`, `llmProviders`, `messagingChannels`, `crates`, `securityLayers`, `platformTargets`, `compileFlags`) — update manually only if the code changes warrant it.
    - Read the current `website-data.json`, apply only the fields that changed, write back.
    - After writing `website-data.json`, read `backendTests` from it and update the test count badge in `README.md`: replace `tests-<N>-blue` with `tests-<backendTests>-blue` and `alt="<N> tests"` with `alt="<backendTests> tests"`.
+   - If `totalEndpoints` changed, update only the route count in the GitHub repo description (preserve everything else):
+     ```bash
+     ENDPOINTS=$(jq '.totalEndpoints' website-data.json)
+     CURRENT_DESC=$(gh repo view sprklai/zenii --json description -q '.description')
+     NEW_DESC=$(echo "$CURRENT_DESC" | sed "s/[0-9]\+ API \(routes\|endpoints\)/${ENDPOINTS} API endpoints/")
+     gh repo edit sprklai/zenii --description "$NEW_DESC"
+     ```
 4. **`docs/` directory** — Update relevant docs if the changes affect:
    - `docs/architecture.md` — new modules, traits, data flows, or structural changes
    - `docs/phases.md` — phase status changes or deliverable updates

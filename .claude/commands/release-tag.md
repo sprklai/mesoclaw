@@ -91,12 +91,22 @@ If the script exits with a non-zero code, STOP and report the error.
 After the version bump, update `website-data.json` to reflect current codebase metrics:
 
 - `version`: the new version just bumped (read from Cargo.toml)
-- `gatewayEndpoints`: count via `grep -c '\.route(' crates/zenii-core/src/gateway/routes.rs`
+- `totalEndpoints`: count via `bash scripts/count-endpoints.sh` (reads `docs/api-endpoints.md` — update that file first if routes changed)
 - `agentTools`: count via `grep -c 'registry\.register\b' crates/zenii-core/src/boot.rs`
 - `backendTests`: count via `cargo test --workspace 2>&1 | awk '/test result/{sum+=$4} END{print sum}'`
 - Other fields (`binarySize`, `debRpmSize`, `startupSeconds`, `llmProviders`, `messagingChannels`, `crates`, `securityLayers`, `platformTargets`, `compileFlags`) — update only if you have reason to believe they changed.
 
-Read the current `website-data.json`, update only the fields above, write back. After writing, read `backendTests` from it and update the test count badge in `README.md`: replace `tests-<N>-blue` with `tests-<backendTests>-blue` and `alt="<N> tests"` with `alt="<backendTests> tests"`. Do NOT ask the user — just update and proceed.
+Read the current `website-data.json`, update only the fields above, write back. After writing:
+- Read `backendTests` from it and update the test count badge in `README.md`: replace `tests-<N>-blue` with `tests-<backendTests>-blue` and `alt="<N> tests"` with `alt="<backendTests> tests"`.
+- If `totalEndpoints` changed, update only the route count in the GitHub repo description (preserve everything else):
+  ```bash
+  ENDPOINTS=$(jq '.totalEndpoints' website-data.json)
+  CURRENT_DESC=$(gh repo view sprklai/zenii --json description -q '.description')
+  NEW_DESC=$(echo "$CURRENT_DESC" | sed "s/[0-9]\+ API \(routes\|endpoints\)/${ENDPOINTS} API endpoints/")
+  gh repo edit sprklai/zenii --description "$NEW_DESC"
+  ```
+
+Do NOT ask the user — just update and proceed.
 
 ### Step 4: Update CHANGELOG body
 
