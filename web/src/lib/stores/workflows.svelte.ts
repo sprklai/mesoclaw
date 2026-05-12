@@ -90,6 +90,7 @@ function createWorkflowsStore() {
   let workflows = $state<Workflow[]>([]);
   let loading = $state(false);
   let isSaving = $state(false);
+  let _saveLock = false; // plain boolean guard for synchronous visibility in async context
   let error = $state<string | null>(null);
   let runningWorkflows = $state<Map<string, WorkflowRunProgress>>(new Map());
   const timeouts = new Map<string, ReturnType<typeof setTimeout>>();
@@ -231,7 +232,8 @@ function createWorkflowsStore() {
     },
 
     async create(tomlContent: string): Promise<Workflow> {
-      if (isSaving) return Promise.reject(new Error("Save already in progress"));
+      if (_saveLock) return Promise.reject(new Error("Save already in progress"));
+      _saveLock = true;
       isSaving = true;
       loading = true;
       error = null;
@@ -242,13 +244,15 @@ function createWorkflowsStore() {
         await this.load();
         return result;
       } finally {
+        _saveLock = false;
         isSaving = false;
         loading = false;
       }
     },
 
     async update(id: string, tomlContent: string): Promise<Workflow> {
-      if (isSaving) return Promise.reject(new Error("Save already in progress"));
+      if (_saveLock) return Promise.reject(new Error("Save already in progress"));
+      _saveLock = true;
       isSaving = true;
       loading = true;
       error = null;
@@ -262,6 +266,7 @@ function createWorkflowsStore() {
         await this.load();
         return result;
       } finally {
+        _saveLock = false;
         isSaving = false;
         loading = false;
       }
