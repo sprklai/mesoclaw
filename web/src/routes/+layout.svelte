@@ -30,7 +30,8 @@
 	import { capabilitiesStore } from '$lib/stores/capabilities.svelte';
 	import { providersStore } from '$lib/stores/providers.svelte';
 	import { getBaseUrl, getToken } from '$lib/api/client';
-	import { getAppVersion, openInBrowser } from '$lib/tauri';
+	import { getAppVersion, openInBrowser, isTauri, openLogDir } from '$lib/tauri';
+	import ScrollText from '@lucide/svelte/icons/scroll-text';
 	import { onDestroy } from 'svelte';
 	import Bot from '@lucide/svelte/icons/bot';
 
@@ -212,6 +213,13 @@
 									<Settings />
 									{m.nav_settings()}
 								</DropdownMenu.Item>
+								{#if isTauri}
+									<DropdownMenu.Separator />
+									<DropdownMenu.Item onclick={openLogDir}>
+										<ScrollText />
+										{m.nav_open_logs()}
+									</DropdownMenu.Item>
+								{/if}
 							</DropdownMenu.Content>
 						</DropdownMenu.Root>
 					</Sidebar.MenuItem>

@@ -31,6 +31,13 @@ export async function openDataDir(): Promise<void> {
   await invoke("open_data_dir");
 }
 
+/** Open the logs directory in the OS file manager. No-op outside Tauri. */
+export async function openLogDir(): Promise<void> {
+  if (!isTauri) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("open_log_dir");
+}
+
 /** Open the wiki sources directory in the OS file manager.
  *  Resolves `wiki_dir` from config (including custom overrides) on the Rust
  *  side, so the opener always has permission for the real path. No-op outside Tauri. */

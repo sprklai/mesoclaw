@@ -152,6 +152,7 @@
   "nav_docs": "문서",
   "nav_home": "홈",
   "nav_memory": "메모리",
+  "nav_open_logs": "로그 열기",
   "nav_notifications_disconnected": "실시간 알림이 연결 해제되었습니다.",
   "nav_reconnect_button": "재연결",
   "nav_schedule": "일정",

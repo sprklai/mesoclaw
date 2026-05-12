@@ -152,6 +152,7 @@
   "nav_docs": "Documentation",
   "nav_home": "Accueil",
   "nav_memory": "Mémoire",
+  "nav_open_logs": "Ouvrir les journaux",
   "nav_notifications_disconnected": "Notifications en temps réel déconnectées.",
   "nav_reconnect_button": "Reconnecter",
   "nav_schedule": "Planification",

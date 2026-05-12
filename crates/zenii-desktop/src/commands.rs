@@ -175,6 +175,15 @@ pub fn show_notification(app: tauri::AppHandle, title: String, body: String) -> 
 }
 
 #[tauri::command]
+pub fn open_log_dir() -> Result<(), String> {
+    let config_path = zenii_core::config::default_config_path();
+    let config = zenii_core::config::load_config(&config_path).map_err(|e| e.to_string())?;
+    let log_dir = zenii_core::logging::resolve_log_dir(&config);
+    std::fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
+    opener::open(log_dir.to_string_lossy().as_ref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn open_data_dir() -> Result<(), String> {
     let data_dir = resolve_data_dir();
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;

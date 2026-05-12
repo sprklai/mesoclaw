@@ -57,6 +57,7 @@ pub fn run() {
             commands::get_app_version,
             commands::get_boot_status,
             commands::open_data_dir,
+            commands::open_log_dir,
             commands::open_wiki_dir,
             commands::open_config_file,
             commands::show_notification,
