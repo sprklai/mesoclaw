@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-14
+
+### Fixed
+- Workflows: 5-field standard cron expressions (e.g. `0 17 * * *`) now accepted — backend normalizes to 6-field format required by `cron` crate before validation
+- Workflows: generator prompt no longer advertises `condition` and `parallel` step types (backend rejects them); 6-field cron format contract added so AI generates valid schedules
+- Workflows: generated schedules are normalized before `validate()` and TOML serialization
+- Workflows: `on_workflow_saved` now called after generate-save so scheduled workflows are registered with the cron scheduler
+- Workflows: generate API timeout raised from 15s to 120s to accommodate LLM response time
+- Workflows: raw `ERRORCODE:` prefix stripped from error messages in chat and workflows page
+- Workflow builder: schedule input normalizes 5-field cron on change; TOML serializer normalizes before writing; import validator checks field count
+- Workflow builder: condition node hidden from palette (not yet implemented in backend)
+
+### Added
+- Desktop: Open Logs button in sidebar footer dropdown
+
+### Changed
+- Cron normalization deduplicated: shared `normalize_cron_expr` helper used by scheduler, workflow validator, and generator
+
 ## [0.2.0] - 2026-05-07
 
 ### Added
