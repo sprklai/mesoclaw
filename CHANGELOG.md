@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-05-15
+
+### Fixed
+- Scheduler: `normalize_cron_expr` defined locally in `tokio_scheduler` to avoid cross-feature import failure on embedded targets built without `--features workflows`
+
 ## [0.2.1] - 2026-05-14
 
 ### Fixed
