@@ -942,7 +942,10 @@ mod tests {
     fn validate_valid_schedule_5_field() {
         let mut wf = valid_workflow();
         wf.schedule = Some("0 17 * * *".into());
-        assert!(wf.validate().is_ok(), "5-field cron should be accepted after normalization");
+        assert!(
+            wf.validate().is_ok(),
+            "5-field cron should be accepted after normalization"
+        );
     }
 
     // validate_valid_schedule_6_field — 6-field cron passes without normalization
@@ -951,7 +954,10 @@ mod tests {
     fn validate_valid_schedule_6_field() {
         let mut wf = valid_workflow();
         wf.schedule = Some("0 0 17 * * *".into());
-        assert!(wf.validate().is_ok(), "6-field cron should be accepted as-is");
+        assert!(
+            wf.validate().is_ok(),
+            "6-field cron should be accepted as-is"
+        );
     }
 
     // validate_invalid_schedule_4_field — 4-field cron is rejected

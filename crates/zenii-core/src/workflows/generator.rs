@@ -7,7 +7,7 @@ use crate::{
     ai::agent::ZeniiAgent,
     error::ZeniiError,
     tools::registry::ToolRegistry,
-    workflows::definition::{normalize_cron_expr, StepType, Workflow},
+    workflows::definition::{StepType, Workflow, normalize_cron_expr},
 };
 
 /// Confidence level of a generated workflow.
