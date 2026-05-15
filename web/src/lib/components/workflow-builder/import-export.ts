@@ -60,5 +60,15 @@ export function validateWorkflowToml(content: string): {
     return { valid: false, error: "wb_import_error_no_steps" };
   }
 
+  if (parsed.schedule !== undefined && parsed.schedule !== null) {
+    if (typeof parsed.schedule !== "string") {
+      return { valid: false, error: "wb_import_error_invalid_schedule" };
+    }
+    const fieldCount = parsed.schedule.trim().split(/\s+/).length;
+    if (fieldCount < 5 || fieldCount > 7) {
+      return { valid: false, error: "wb_import_error_invalid_schedule" };
+    }
+  }
+
   return { valid: true };
 }

@@ -500,7 +500,11 @@ export function workflowToToml(wf: Workflow): string {
   lines.push(`description = ${tomlStr(wf.description)}`);
   // Always write schema_version so future schema changes can be detected (Issue 6)
   lines.push(`schema_version = ${wf.schema_version ?? 1}`);
-  if (wf.schedule) lines.push(`schedule = ${tomlStr(wf.schedule)}`);
+  if (wf.schedule) {
+    const parts = wf.schedule.trim().split(/\s+/);
+    const normalized = parts.length === 5 ? `0 ${wf.schedule.trim()}` : wf.schedule.trim();
+    lines.push(`schedule = ${tomlStr(normalized)}`);
+  }
   lines.push("");
 
   for (const step of wf.steps) {

@@ -105,7 +105,12 @@
 			// Issue 4: swallow AbortError silently.
 			if (e instanceof Error && e.name === 'AbortError') return;
 			console.error('[NL generate] error:', e);
-			nlError = m.workflow_generate_error_generic();
+			if (e instanceof Error) {
+				const match = e.message.match(/^[A-Z_]+:\s*(.+)$/s);
+				nlError = match ? match[1] : e.message;
+			} else {
+				nlError = m.workflow_generate_error_generic();
+			}
 		} finally {
 			nlGenerating = false;
 		}
@@ -127,7 +132,12 @@
 			resetForm();
 			showForm = false;
 		} catch (e) {
-			formError = e instanceof Error ? e.message : editTarget ? m.workflows_update_error() : m.workflows_create_error();
+			if (e instanceof Error) {
+				const match = e.message.match(/^[A-Z_]+:\s*(.+)$/s);
+				formError = match ? match[1] : e.message;
+			} else {
+				formError = editTarget ? m.workflows_update_error() : m.workflows_create_error();
+			}
 		}
 	}
 

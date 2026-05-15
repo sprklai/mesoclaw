@@ -7,7 +7,7 @@ use crate::{
     ai::agent::ZeniiAgent,
     error::ZeniiError,
     tools::registry::ToolRegistry,
-    workflows::definition::{StepType, Workflow},
+    workflows::definition::{normalize_cron_expr, StepType, Workflow},
 };
 
 /// Confidence level of a generated workflow.
@@ -138,11 +138,12 @@ Otherwise return a workflow object with this exact structure:
   "updated_at": "2026-01-01T00:00:00Z"
 }}
 
+schedule: null means no schedule. To schedule, set "schedule" to a 6-field cron string:
+"sec min hour dom month dow" — e.g. "0 0 17 * * *" (5pm daily), "0 30 9 * * Mon-Fri" (9:30am weekdays).
+
 StepType variants (use the "type" field to select):
 - "tool"      : requires "tool" (exact name from list above) and optional "args" object
 - "llm"       : requires "prompt" string, optional "model"
-- "condition" : requires "expression", "if_true", optional "if_false"
-- "parallel"  : requires "steps" array of step names
 - "delay"     : requires "seconds" integer
 
 failure_policy values: "stop" | "continue" | {{"fallback": {{"step": "<step_name>"}}}}
@@ -213,8 +214,13 @@ User description: {description}"#,
         }
 
         // ── Parse into Workflow ───────────────────────────────────────────────────
-        let workflow: Workflow = serde_json::from_value(json)
+        let mut workflow: Workflow = serde_json::from_value(json)
             .map_err(|e| ZeniiError::Workflow(format!("Generated workflow is invalid: {e}")))?;
+
+        // Normalize 5-field cron to 6-field before validation and TOML output.
+        if let Some(ref sched) = workflow.schedule.clone() {
+            workflow.schedule = Some(normalize_cron_expr(sched));
+        }
 
         // ── Issue 8: basic inline validation (non-empty steps, non-empty names) ──
         if workflow.steps.is_empty() {

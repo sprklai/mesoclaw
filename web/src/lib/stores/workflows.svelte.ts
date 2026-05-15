@@ -299,7 +299,7 @@ function createWorkflowsStore() {
 
       let res: { toml: string; confidence: 'high' | 'low'; clarifying_question?: string; saved: boolean };
       try {
-        res = await apiPost<typeof res>('/workflows/generate', { description }, { signal });
+        res = await apiPost<typeof res>('/workflows/generate', { description }, { signal, timeout: 120_000 });
       } catch (e: unknown) {
         if (e instanceof Error && e.name === 'AbortError') {
           throw e; // re-throw so caller can swallow AbortError

@@ -5,8 +5,8 @@ pub mod runtime;
 pub mod templates;
 
 pub use definition::{
-    FailurePolicy, NodePosition, RetryConfig, StepOutput, StepType, Workflow, WorkflowRun,
-    WorkflowRunStatus, WorkflowStep,
+    normalize_cron_expr, FailurePolicy, NodePosition, RetryConfig, StepOutput, StepType, Workflow,
+    WorkflowRun, WorkflowRunStatus, WorkflowStep,
 };
 
 use std::path::PathBuf;

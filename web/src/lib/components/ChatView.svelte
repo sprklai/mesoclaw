@@ -153,7 +153,12 @@
 					workflowWaitingAnswer = true;
 				}
 			} catch (e) {
-				workflowError = e instanceof Error ? e.message : m.workflow_chat_error_generic();
+				if (e instanceof Error) {
+					const match = e.message.match(/^[A-Z_]+:\s*(.+)$/s);
+					workflowError = match ? match[1] : e.message;
+				} else {
+					workflowError = m.workflow_chat_error_generic();
+				}
 			} finally {
 				workflowGenerating = false;
 			}

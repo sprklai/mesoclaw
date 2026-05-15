@@ -72,6 +72,10 @@ pub async fn generate_workflow(
                     ZeniiError::Workflow(format!("Generated workflow is invalid: {e}"))
                 })?;
                 registry.save(wf.clone())?;
+                #[cfg(feature = "scheduler")]
+                if let Some(ref scheduler) = state.scheduler {
+                    crate::workflows::WorkflowRegistry::on_workflow_saved(wf, scheduler);
+                }
                 let _ = state
                     .event_bus
                     .publish(crate::event_bus::AppEvent::WorkflowsChanged);

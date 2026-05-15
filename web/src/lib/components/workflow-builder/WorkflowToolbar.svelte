@@ -48,7 +48,14 @@
 		<input
 			type="text"
 			value={builderStore.workflowSchedule ?? ''}
-			oninput={(e) => builderStore.updateMeta({ schedule: (e.target as HTMLInputElement).value || null })}
+			onchange={(e) => {
+				const raw = (e.target as HTMLInputElement).value.trim();
+				if (!raw) { builderStore.updateMeta({ schedule: null }); return; }
+				const parts = raw.split(/\s+/);
+				const normalized = parts.length === 5 ? `0 ${raw}` : raw;
+				builderStore.updateMeta({ schedule: normalized });
+				(e.target as HTMLInputElement).value = normalized;
+			}}
 			placeholder={t('wb_toolbar_schedule_placeholder')}
 			class="bg-transparent border border-dashed rounded px-1.5 py-0.5 text-xs text-muted-foreground focus:outline-none focus:border-foreground/40 w-32 font-mono"
 		/>

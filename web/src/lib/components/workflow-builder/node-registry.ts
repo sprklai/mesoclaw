@@ -947,6 +947,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     icon: "GitBranch",
     description: "wb_node_condition_description",
     visual: "condition",
+    hidden: true,
     fields: [
       {
         key: "expression",

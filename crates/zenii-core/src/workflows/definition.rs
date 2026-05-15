@@ -5,6 +5,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Result, ZeniiError};
 
+/// Normalize a cron expression to the 6-field format required by the `cron` crate
+/// (sec min hour dom month dow). If exactly 5 fields are given (standard Unix cron),
+/// a seconds field of "0" is prepended. All other field counts are returned as-is.
+pub fn normalize_cron_expr(expr: &str) -> String {
+    if expr.split_whitespace().count() == 5 {
+        format!("0 {expr}")
+    } else {
+        expr.to_owned()
+    }
+}
+
 /// Canvas position for a workflow node in the visual builder.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodePosition {
@@ -280,7 +291,8 @@ impl Workflow {
         if let Some(sched) = &self.schedule {
             #[cfg(feature = "workflows")]
             {
-                cron::Schedule::from_str(sched).map_err(|e| {
+                let normalized = normalize_cron_expr(sched);
+                cron::Schedule::from_str(&normalized).map_err(|e| {
                     ZeniiError::Validation(format!("invalid cron schedule '{sched}': {e}"))
                 })?;
             }
@@ -922,6 +934,44 @@ mod tests {
         // 7-field cron: sec min hour dom month dow year
         wf.schedule = Some("0 30 9 * * Mon *".into());
         assert!(wf.validate().is_ok());
+    }
+
+    // validate_valid_schedule_5_field — standard 5-field cron is normalized and passes
+    #[cfg(feature = "workflows")]
+    #[test]
+    fn validate_valid_schedule_5_field() {
+        let mut wf = valid_workflow();
+        wf.schedule = Some("0 17 * * *".into());
+        assert!(wf.validate().is_ok(), "5-field cron should be accepted after normalization");
+    }
+
+    // validate_valid_schedule_6_field — 6-field cron passes without normalization
+    #[cfg(feature = "workflows")]
+    #[test]
+    fn validate_valid_schedule_6_field() {
+        let mut wf = valid_workflow();
+        wf.schedule = Some("0 0 17 * * *".into());
+        assert!(wf.validate().is_ok(), "6-field cron should be accepted as-is");
+    }
+
+    // validate_invalid_schedule_4_field — 4-field cron is rejected
+    #[cfg(feature = "workflows")]
+    #[test]
+    fn validate_invalid_schedule_4_field() {
+        let mut wf = valid_workflow();
+        wf.schedule = Some("17 * * *".into());
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("invalid cron schedule"), "{err}");
+    }
+
+    // validate_invalid_schedule_8_field — 8-field cron is rejected
+    #[cfg(feature = "workflows")]
+    #[test]
+    fn validate_invalid_schedule_8_field() {
+        let mut wf = valid_workflow();
+        wf.schedule = Some("0 0 17 * * * 2026 extra".into());
+        let err = wf.validate().unwrap_err();
+        assert!(err.to_string().contains("invalid cron schedule"), "{err}");
     }
 
     // validate_condition_step_rejected — condition step type returns not-implemented error

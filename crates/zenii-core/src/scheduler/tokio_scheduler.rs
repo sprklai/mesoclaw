@@ -16,6 +16,7 @@ use crate::db::{self, DbPool};
 use crate::event_bus::{AppEvent, EventBus};
 #[cfg(feature = "gateway")]
 use crate::gateway::state::AppState;
+use crate::workflows::normalize_cron_expr;
 use crate::{Result, ZeniiError};
 
 use super::heartbeat::backoff_secs;
@@ -282,13 +283,7 @@ impl TokioScheduler {
         match schedule {
             Schedule::Interval { secs } => Ok(Utc::now() + chrono::Duration::seconds(*secs as i64)),
             Schedule::Cron { expr } => {
-                // Support 5-field (min hr dom mon dow) or 6/7-field expressions
-                let full_expr = if expr.split_whitespace().count() == 5 {
-                    format!("0 {expr}")
-                } else {
-                    expr.clone()
-                };
-                let schedule = cron::Schedule::from_str(&full_expr)
+                let schedule = cron::Schedule::from_str(&normalize_cron_expr(expr))
                     .map_err(|e| ZeniiError::Scheduler(format!("invalid cron: {e}")))?;
                 schedule
                     .upcoming(chrono::Local)
@@ -357,12 +352,7 @@ impl TokioScheduler {
 
         // Validate cron expression if applicable
         if let Schedule::Cron { ref expr } = job.schedule {
-            let full_expr = if expr.split_whitespace().count() == 5 {
-                format!("0 {expr}")
-            } else {
-                expr.clone()
-            };
-            cron::Schedule::from_str(&full_expr)
+            cron::Schedule::from_str(&normalize_cron_expr(expr))
                 .map_err(|e| ZeniiError::Scheduler(format!("invalid cron expression: {e}")))?;
         }
 
