@@ -16,8 +16,15 @@ use crate::db::{self, DbPool};
 use crate::event_bus::{AppEvent, EventBus};
 #[cfg(feature = "gateway")]
 use crate::gateway::state::AppState;
-use crate::workflows::normalize_cron_expr;
 use crate::{Result, ZeniiError};
+
+fn normalize_cron_expr(expr: &str) -> String {
+    if expr.split_whitespace().count() == 5 {
+        format!("0 {expr}")
+    } else {
+        expr.to_owned()
+    }
+}
 
 use super::heartbeat::backoff_secs;
 use super::traits::*;
