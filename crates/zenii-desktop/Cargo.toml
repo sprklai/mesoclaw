@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [build-dependencies]
-tauri-build = { version = "2.5", features = [] }
+tauri-build = { version = "2.6", features = [] }
 
 [dependencies]
 zenii-core = { workspace = true, features = ["gateway", "ai", "keyring", "channels", "channels-telegram", "channels-slack", "channels-discord"] }
