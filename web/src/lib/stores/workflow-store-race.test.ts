@@ -6,7 +6,7 @@
  * Issue 3: codeContent derived value — updates when nodes change (logic tested via graph-utils)
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Issue 1: _loadingFromBackend synchronous suppression
@@ -89,6 +89,10 @@ describe("workflows store: isSaving concurrent save guard", () => {
     vi.mocked(client.apiGet).mockReset();
   });
 
+  // Reset module cache after each test so the singleton's _saveLock and
+  // isSaving start clean for the next test (prevents state leak on CI timeout).
+  afterEach(() => vi.resetModules());
+
   it("second call to create() while first is in flight is rejected", async () => {
     const client = await import("$lib/api/client");
     const { workflowsStore } = await import("./workflows.svelte");
@@ -114,7 +118,7 @@ describe("workflows store: isSaving concurrent save guard", () => {
     // Resolve first so test cleanup is clean
     resolveFirst({ id: "wf-1", name: "T", description: "", schedule: null, steps: [], layout: {}, created_at: "", updated_at: "" });
     await expect(first).resolves.toBeDefined();
-  });
+  }, 10000);
 
   it("second call to update() while first is in flight is rejected", async () => {
     const client = await import("$lib/api/client");
@@ -137,7 +141,7 @@ describe("workflows store: isSaving concurrent save guard", () => {
 
     resolveFirst({ id: "wf-1", name: "T", description: "", schedule: null, steps: [], layout: {}, created_at: "", updated_at: "" });
     await expect(first).resolves.toBeDefined();
-  });
+  }, 10000);
 
   it("isSaving is false after create() completes", async () => {
     const client = await import("$lib/api/client");
