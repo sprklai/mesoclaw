@@ -920,6 +920,7 @@ mod tests {
             total_tokens: 150,
             cached_input_tokens: 20,
             cache_creation_input_tokens: 0,
+            reasoning_tokens: 0,
         };
         let usage = TokenUsage::from_rig(rig_usage);
         assert_eq!(usage.input_tokens, 100);

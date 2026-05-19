@@ -16,6 +16,8 @@ pub mod user;
 pub mod wiki;
 
 #[cfg(feature = "ai")]
+extern crate rig_core as rig;
+#[cfg(feature = "ai")]
 pub mod ai;
 pub mod boot;
 #[cfg(feature = "channels")]
