@@ -8,7 +8,7 @@ tauri-build = { version = "2.5", features = [] }
 
 [dependencies]
 zenii-core = { workspace = true, features = ["gateway", "ai", "keyring", "channels", "channels-telegram", "channels-slack", "channels-discord"] }
-tauri = { version = "2.10", features = ["tray-icon"] }
+tauri = { version = "2.11", features = ["tray-icon"] }
 tauri-plugin-window-state = "2.4"
 tauri-plugin-single-instance = "2.4"
 tauri-plugin-opener = "2.5"
