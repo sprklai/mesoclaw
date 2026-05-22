@@ -33,6 +33,9 @@ tempfile = "3"
 openssl = { version = "0.10", features = ["vendored"], optional = true }
 percent-encoding = "2"
 
+[dev-dependencies]
+httpmock = "0.7"
+
 [features]
 vendored-openssl = ["dep:openssl"]
 scheduler = []

@@ -22,7 +22,7 @@ struct ChannelMessage {
 pub async fn list(client: &ZeniiClient, source: Option<&str>) -> Result<(), String> {
     let mut path = "/channels/sessions?limit=50".to_string();
     if let Some(src) = source {
-        path.push_str(&format!("&source={src}"));
+        path.push_str(&format!("&source={}", encode_query_value(src)));
     }
 
     let sessions: Vec<ChannelSession> = client.get(&path).await?;
@@ -59,7 +59,10 @@ pub async fn messages(
     limit: usize,
     before: Option<&str>,
 ) -> Result<(), String> {
-    let mut path = format!("/channels/sessions/{session_id}/messages?limit={limit}");
+    let mut path = format!(
+        "/channels/sessions/{}/messages?limit={limit}",
+        encode_path_segment(session_id)
+    );
     if let Some(bid) = before {
         path.push_str(&format!("&before={bid}"));
     }
@@ -84,10 +87,3 @@ pub async fn messages(
     Ok(())
 }
 
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max.saturating_sub(3)])
-    }
-}

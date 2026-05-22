@@ -43,6 +43,7 @@ pub fn encode_path_segment(s: &str) -> String {
     percent_encode(s.as_bytes(), PATH_CHARS).to_string()
 }
 
+#[cfg(feature = "channels")]
 pub fn encode_query_value(s: &str) -> String {
     percent_encode(s.as_bytes(), QUERY_CHARS).to_string()
 }

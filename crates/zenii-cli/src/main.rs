@@ -178,7 +178,8 @@ enum KeyAction {
     Set {
         /// Provider/service name (e.g. openai, anthropic, tavily, brave)
         provider: String,
-        /// API key value
+        /// API key value (or set ZENII_CREDENTIAL_VALUE to avoid shell history)
+        #[arg(env = "ZENII_CREDENTIAL_VALUE")]
         key: String,
     },
     /// Remove an API key for a provider or service
@@ -192,7 +193,8 @@ enum KeyAction {
         channel: String,
         /// Credential field (e.g. token, bot_token, access_token)
         field: String,
-        /// Credential value
+        /// Credential value (or set ZENII_CREDENTIAL_VALUE to avoid shell history)
+        #[arg(env = "ZENII_CREDENTIAL_VALUE")]
         value: String,
     },
     /// Remove a channel credential field
@@ -206,7 +208,8 @@ enum KeyAction {
     SetRaw {
         /// Full credential key
         key: String,
-        /// Credential value
+        /// Credential value (or set ZENII_CREDENTIAL_VALUE to avoid shell history)
+        #[arg(env = "ZENII_CREDENTIAL_VALUE")]
         value: String,
     },
     /// Remove a raw credential key
@@ -1043,6 +1046,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "scheduler")]
     #[test]
     fn parse_schedule_toggle() {
         let cli = parse(&["zenii", "schedule", "toggle", "job-123"]);
@@ -1056,6 +1060,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "scheduler")]
     #[test]
     fn parse_schedule_delete() {
         let cli = parse(&["zenii", "schedule", "delete", "job-456"]);
@@ -1069,6 +1074,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "scheduler")]
     #[test]
     fn parse_schedule_history() {
         let cli = parse(&["zenii", "schedule", "history", "job-789"]);
@@ -1083,6 +1089,7 @@ mod tests {
     }
 
     // IN.18 — parse channel list
+    #[cfg(feature = "channels")]
     #[test]
     fn parse_channel_list() {
         let cli = parse(&["zenii", "channel", "list"]);
@@ -1095,6 +1102,7 @@ mod tests {
     }
 
     // IN.19 — parse channel list with source filter
+    #[cfg(feature = "channels")]
     #[test]
     fn parse_channel_list_with_source() {
         let cli = parse(&["zenii", "channel", "list", "--source", "telegram"]);
@@ -1109,6 +1117,7 @@ mod tests {
     }
 
     // IN.20 — parse channel messages
+    #[cfg(feature = "channels")]
     #[test]
     fn parse_channel_messages() {
         let cli = parse(&["zenii", "channel", "messages", "sess-123"]);
@@ -1130,6 +1139,7 @@ mod tests {
     }
 
     // IN.21 — parse channel messages with options
+    #[cfg(feature = "channels")]
     #[test]
     fn parse_channel_messages_with_options() {
         let cli = parse(&[

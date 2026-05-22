@@ -253,3 +253,122 @@ pub async fn info(client: &ZeniiClient, name: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use httpmock::prelude::*;
+
+    use super::*;
+
+    fn mock_plugin_json(enabled: bool) -> serde_json::Value {
+        json!({
+            "manifest": {
+                "plugin": {
+                    "name": "test-plugin",
+                    "version": "1.0.0",
+                    "description": "A test plugin"
+                },
+                "tools": [],
+                "skills": []
+            },
+            "enabled": enabled,
+            "installed_at": "2026-01-01T00:00:00Z",
+            "source": "bundled"
+        })
+    }
+
+    fn test_client(port: u16) -> ZeniiClient {
+        ZeniiClient::new("127.0.0.1", port, None)
+    }
+
+    // enable on already-enabled plugin must NOT call toggle
+    #[tokio::test]
+    async fn enable_already_enabled_skips_toggle() {
+        let server = MockServer::start();
+        let get_mock = server.mock(|when, then| {
+            when.method(GET).path("/plugins/my-plugin");
+            then.status(200).json_body(mock_plugin_json(true));
+        });
+        let toggle_mock = server.mock(|when, then| {
+            when.method(PUT).path("/plugins/my-plugin/toggle");
+            then.status(200).json_body(mock_plugin_json(false));
+        });
+
+        let result = enable(&test_client(server.port()), "my-plugin").await;
+        assert!(result.is_ok());
+        assert_eq!(get_mock.hits(), 1);
+        assert_eq!(toggle_mock.hits(), 0, "toggle must not be called when already enabled");
+    }
+
+    // disable on already-disabled plugin must NOT call toggle
+    #[tokio::test]
+    async fn disable_already_disabled_skips_toggle() {
+        let server = MockServer::start();
+        let get_mock = server.mock(|when, then| {
+            when.method(GET).path("/plugins/my-plugin");
+            then.status(200).json_body(mock_plugin_json(false));
+        });
+        let toggle_mock = server.mock(|when, then| {
+            when.method(PUT).path("/plugins/my-plugin/toggle");
+            then.status(200).json_body(mock_plugin_json(true));
+        });
+
+        let result = disable(&test_client(server.port()), "my-plugin").await;
+        assert!(result.is_ok());
+        assert_eq!(get_mock.hits(), 1);
+        assert_eq!(toggle_mock.hits(), 0, "toggle must not be called when already disabled");
+    }
+
+    // enable on a disabled plugin must call GET then PUT toggle
+    #[tokio::test]
+    async fn enable_disabled_plugin_calls_toggle() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(GET).path("/plugins/my-plugin");
+            then.status(200).json_body(mock_plugin_json(false));
+        });
+        let toggle_mock = server.mock(|when, then| {
+            when.method(PUT).path("/plugins/my-plugin/toggle");
+            then.status(200).json_body(mock_plugin_json(true));
+        });
+
+        let result = enable(&test_client(server.port()), "my-plugin").await;
+        assert!(result.is_ok());
+        assert_eq!(toggle_mock.hits(), 1);
+    }
+
+    // disable on an enabled plugin must call GET then PUT toggle
+    #[tokio::test]
+    async fn disable_enabled_plugin_calls_toggle() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(GET).path("/plugins/my-plugin");
+            then.status(200).json_body(mock_plugin_json(true));
+        });
+        let toggle_mock = server.mock(|when, then| {
+            when.method(PUT).path("/plugins/my-plugin/toggle");
+            then.status(200).json_body(mock_plugin_json(false));
+        });
+
+        let result = disable(&test_client(server.port()), "my-plugin").await;
+        assert!(result.is_ok());
+        assert_eq!(toggle_mock.hits(), 1);
+    }
+
+    // plugin name with special chars is percent-encoded in path
+    #[tokio::test]
+    async fn enable_encodes_plugin_name_in_path() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(GET).path("/plugins/my%2Fplugin");
+            then.status(200).json_body(mock_plugin_json(false));
+        });
+        server.mock(|when, then| {
+            when.method(PUT).path("/plugins/my%2Fplugin/toggle");
+            then.status(200).json_body(mock_plugin_json(true));
+        });
+
+        let result = enable(&test_client(server.port()), "my/plugin").await;
+        assert!(result.is_ok());
+    }
+}
+

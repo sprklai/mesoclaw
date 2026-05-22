@@ -122,3 +122,73 @@ pub async fn list(client: &ZeniiClient) -> Result<(), String> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use httpmock::prelude::*;
+    use serde_json::json;
+
+    use super::*;
+
+    fn test_client(port: u16) -> ZeniiClient {
+        ZeniiClient::new("127.0.0.1", port, None)
+    }
+
+    // remove encodes the constructed credential key in the DELETE path
+    #[tokio::test]
+    async fn remove_encodes_provider_name() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            // space in provider name → api_key:my%20provider
+            when.method(DELETE).path("/credentials/api_key:my%20provider");
+            then.status(200).json_body(json!({}));
+        });
+
+        let result = remove(&test_client(server.port()), "my provider").await;
+        assert!(result.is_ok());
+        assert_eq!(mock.hits(), 1);
+    }
+
+    // remove_raw encodes slashes and other special chars in raw keys
+    #[tokio::test]
+    async fn remove_raw_encodes_slash_in_key() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            // slash encoded as %2F, colon preserved
+            when.method(DELETE).path("/credentials/chan%2Fnel:foo");
+            then.status(200).json_body(json!({}));
+        });
+
+        let result = remove_raw(&test_client(server.port()), "chan/nel:foo").await;
+        assert!(result.is_ok());
+        assert_eq!(mock.hits(), 1);
+    }
+
+    // remove_channel encodes the compound credential key (normal case — colons preserved)
+    #[tokio::test]
+    async fn remove_channel_normal_key() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(DELETE).path("/credentials/channel:telegram:token");
+            then.status(200).json_body(json!({}));
+        });
+
+        let result = remove_channel(&test_client(server.port()), "telegram", "token").await;
+        assert!(result.is_ok());
+        assert_eq!(mock.hits(), 1);
+    }
+
+    // remove_channel encodes slashes in field names
+    #[tokio::test]
+    async fn remove_channel_encodes_slash_in_field() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(DELETE).path("/credentials/channel:slack:bot%2Ftoken");
+            then.status(200).json_body(json!({}));
+        });
+
+        let result = remove_channel(&test_client(server.port()), "slack", "bot/token").await;
+        assert!(result.is_ok());
+        assert_eq!(mock.hits(), 1);
+    }
+}

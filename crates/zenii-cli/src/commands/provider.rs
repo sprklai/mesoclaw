@@ -33,7 +33,10 @@ pub async fn list(client: &ZeniiClient) -> Result<(), String> {
 pub async fn test_connection(client: &ZeniiClient, provider_id: &str) -> Result<(), String> {
     println!("Testing connection to {provider_id}...");
     let result: serde_json::Value = client
-        .post(&format!("/providers/{provider_id}/test"), &json!({}))
+        .post(
+            &format!("/providers/{}/test", encode_path_segment(provider_id)),
+            &json!({}),
+        )
         .await?;
 
     let success = result["success"].as_bool().unwrap_or(false);
@@ -66,7 +69,9 @@ pub async fn add(client: &ZeniiClient, id: &str, name: &str, base_url: &str) -> 
 }
 
 pub async fn remove(client: &ZeniiClient, id: &str) -> Result<(), String> {
-    client.delete(&format!("/providers/{id}")).await?;
+    client
+        .delete(&format!("/providers/{}", encode_path_segment(id)))
+        .await?;
     println!("Provider '{id}' removed.");
     Ok(())
 }
