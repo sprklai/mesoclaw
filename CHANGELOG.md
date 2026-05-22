@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-05-22
+
+### Fixed
+- Import: add `serde_json` library for failing test
+- CLI: percent-encode URL segments and read credentials from env
+- Delegation: inject system preamble into sub-agents and coordinator
+- TUI: fix 6 audit findings — data-loss, panics, and WS error handling
+- Daemon: harden startup — ExitCode cleanup, remote-bind guard, signal handling
+- Security: apply 10 findings from codex audit of zenii-core
+- Tests: reset module cache between isSaving tests to prevent state leak
+
+### Changed
+- Style: apply rustfmt formatting across CLI, core, and TUI crates
+- Chore: remove AI attribution from commits and enforce functional commit messages
+- Deps: bump rig-core from 0.36.0 to 0.37.0
+
 ## [0.2.2] - 2026-05-15
 
 ### Fixed
