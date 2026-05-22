@@ -14,6 +14,7 @@ use super::CredentialStore;
 /// enabling the `list()` operation.
 pub struct KeyringStore {
     service_id: String,
+    index_lock: tokio::sync::Mutex<()>,
 }
 
 impl KeyringStore {
@@ -45,7 +46,7 @@ impl KeyringStore {
 
         let _ = entry.delete_credential(); // cleanup, ignore errors
 
-        Ok(Self { service_id })
+        Ok(Self { service_id, index_lock: tokio::sync::Mutex::new(()) })
     }
 
     /// Build with a specific service ID (for testing).
@@ -64,6 +65,9 @@ impl CredentialStore for KeyringStore {
         let key = key.to_string();
         let value = value.to_string();
         let service_id = self.service_id.clone();
+
+        // Serialize index read-modify-write to prevent concurrent races.
+        let _guard = self.index_lock.lock().await;
 
         // Clone self's data for the blocking task
         let store_service = service_id.clone();
@@ -125,6 +129,9 @@ impl CredentialStore for KeyringStore {
     async fn delete(&self, key: &str) -> Result<bool> {
         let key = key.to_string();
         let service_id = self.service_id.clone();
+
+        // Serialize index read-modify-write to prevent concurrent races.
+        let _guard = self.index_lock.lock().await;
 
         tokio::task::spawn_blocking(move || {
             let entry = keyring::Entry::new(&service_id, &key)

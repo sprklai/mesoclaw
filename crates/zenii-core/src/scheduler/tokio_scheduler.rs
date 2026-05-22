@@ -41,6 +41,7 @@ type JobRow = (
     String,         // created_at
     Option<String>, // active_hours_json
     i32,            // delete_after_run
+    Option<i64>,    // timeout_secs
 );
 
 /// Tokio-driven scheduler with DashMap registry and SQLite persistence.
@@ -104,7 +105,7 @@ impl TokioScheduler {
             let mut stmt = conn.prepare(
                 "SELECT id, name, schedule_json, session_target, payload_json, \
                  enabled, error_count, next_run, created_at, active_hours_json, \
-                 delete_after_run FROM scheduled_jobs",
+                 delete_after_run, timeout_secs FROM scheduled_jobs",
             )?;
             let jobs: Vec<JobRow> = stmt
                 .query_map([], |row| {
@@ -120,9 +121,10 @@ impl TokioScheduler {
                         row.get(8)?,
                         row.get(9)?,
                         row.get(10)?,
+                        row.get(11)?,
                     ))
                 })?
-                .filter_map(|r| r.ok())
+                .filter_map(|r| r.map_err(|e| tracing::warn!("DB row error in load_jobs: {e}")).ok())
                 .collect();
             Ok(jobs)
         })
@@ -141,6 +143,7 @@ impl TokioScheduler {
             _created_at,
             active_hours_json,
             delete_after_run,
+            timeout_secs_val,
         ) in rows
         {
             let schedule: Schedule = match serde_json::from_str(&schedule_json) {
@@ -173,7 +176,7 @@ impl TokioScheduler {
                 next_run,
                 active_hours,
                 delete_after_run: delete_after_run != 0,
-                timeout_secs: None,
+                timeout_secs: timeout_secs_val.map(|v: i64| v as u64),
             };
             self.jobs.insert(id.clone(), job);
             count += 1;
@@ -212,14 +215,21 @@ impl TokioScheduler {
         let enabled = if job.enabled { 1i32 } else { 0 };
         let error_count = job.error_count as i32;
         let delete_after_run = if job.delete_after_run { 1i32 } else { 0 };
+        let timeout_secs = job.timeout_secs.map(|v| v as i64);
 
         let pool = db.clone();
         db::with_db(&pool, move |conn| {
             conn.execute(
-                "INSERT OR REPLACE INTO scheduled_jobs \
+                "INSERT INTO scheduled_jobs \
                  (id, name, schedule_json, session_target, payload_json, \
-                  enabled, error_count, next_run, created_at, active_hours_json, delete_after_run) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'), ?9, ?10)",
+                  enabled, error_count, next_run, created_at, active_hours_json, delete_after_run, timeout_secs) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'), ?9, ?10, ?11) \
+                 ON CONFLICT(id) DO UPDATE SET \
+                  name=excluded.name, schedule_json=excluded.schedule_json, \
+                  session_target=excluded.session_target, payload_json=excluded.payload_json, \
+                  enabled=excluded.enabled, error_count=excluded.error_count, \
+                  next_run=excluded.next_run, active_hours_json=excluded.active_hours_json, \
+                  delete_after_run=excluded.delete_after_run, timeout_secs=excluded.timeout_secs",
                 rusqlite::params![
                     id,
                     name,
@@ -231,6 +241,7 @@ impl TokioScheduler {
                     next_run,
                     active_hours_json,
                     delete_after_run,
+                    timeout_secs,
                 ],
             )?;
             Ok(())

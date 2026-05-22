@@ -557,14 +557,20 @@ impl SecurityPolicy {
             }
         }
 
-        // Canonicalize if path exists to resolve symlinks
+        // Canonicalize to resolve symlinks. For paths that don't exist yet,
+        // canonicalize the parent directory so a symlinked parent can't escape
+        // the workspace root after validation passes.
         let effective_path = if path.exists() {
             match std::fs::canonicalize(path) {
                 Ok(canonical) => canonical,
                 Err(_) => path.to_path_buf(),
             }
         } else {
-            path.to_path_buf()
+            path.parent()
+                .filter(|p| !p.as_os_str().is_empty() && p.exists())
+                .and_then(|parent| std::fs::canonicalize(parent).ok())
+                .and_then(|canon| path.file_name().map(|f| canon.join(f)))
+                .unwrap_or_else(|| path.to_path_buf())
         };
 
         // Blocked directories (check canonical path)

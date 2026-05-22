@@ -387,23 +387,21 @@ pub async fn resolve_agent_with_tools(
     surface: &str,
     skip_approval: bool,
 ) -> Result<Arc<ZeniiAgent>> {
-    // Try requested model first, then last_used, then default model
-    let model_spec = if let Some(spec) = requested_model {
-        // Explicit model — also update last_used_model
-        {
-            let mut last = state.last_used_model.write().await;
-            *last = Some(spec.to_string());
-        }
-        Some(spec.to_string())
+    // Try requested model first, then last_used, then default model.
+    // persist_model is written to last_used_model only after successful agent
+    // construction so a bad model string doesn't pollute the fallback chain.
+    let (model_spec, persist_model) = if let Some(spec) = requested_model {
+        let s = spec.to_string();
+        (Some(s.clone()), Some(s))
     } else {
         // Check last_used_model
         let last = state.last_used_model.read().await;
         if let Some(ref last_model) = *last {
-            Some(last_model.clone())
+            (Some(last_model.clone()), None)
         } else if let Some((pid, mid)) = state.provider_registry.get_default_model().await? {
-            Some(format!("{pid}:{mid}"))
+            (Some(format!("{pid}:{mid}")), None)
         } else {
-            None
+            (None, None)
         }
     };
 
@@ -489,6 +487,10 @@ pub async fn resolve_agent_with_tools(
             .await?
         };
 
+        if let Some(spec) = persist_model {
+            let mut last = state.last_used_model.write().await;
+            *last = Some(spec);
+        }
         return Ok(Arc::new(agent));
     }
 

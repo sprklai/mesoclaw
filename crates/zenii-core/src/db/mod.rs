@@ -44,7 +44,8 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 
     if version < 1 {
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS sessions (
+            "BEGIN IMMEDIATE;
+            CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL DEFAULT 'Untitled',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -81,13 +82,15 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
-            PRAGMA user_version = 1;",
+            PRAGMA user_version = 1;
+            COMMIT;",
         )?;
     }
 
     if version < 2 {
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS user_observations (
+            "BEGIN IMMEDIATE;
+            CREATE TABLE IF NOT EXISTS user_observations (
                 id TEXT PRIMARY KEY,
                 category TEXT NOT NULL,
                 key TEXT NOT NULL UNIQUE,
@@ -102,13 +105,15 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             CREATE INDEX IF NOT EXISTS idx_observations_confidence
                 ON user_observations(confidence DESC);
 
-            PRAGMA user_version = 2;",
+            PRAGMA user_version = 2;
+            COMMIT;",
         )?;
     }
 
     if version < 3 {
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS ai_providers (
+            "BEGIN IMMEDIATE;
+            CREATE TABLE IF NOT EXISTS ai_providers (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 base_url TEXT NOT NULL,
@@ -132,13 +137,15 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             CREATE INDEX IF NOT EXISTS idx_ai_models_provider
                 ON ai_models(provider_id);
 
-            PRAGMA user_version = 3;",
+            PRAGMA user_version = 3;
+            COMMIT;",
         )?;
     }
 
     if version < 4 {
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS tool_calls (
+            "BEGIN IMMEDIATE;
+            CREATE TABLE IF NOT EXISTS tool_calls (
                 id TEXT PRIMARY KEY,
                 message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
                 session_id TEXT NOT NULL,
@@ -153,11 +160,13 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             CREATE INDEX IF NOT EXISTS idx_tool_calls_message
                 ON tool_calls(message_id);
 
-            PRAGMA user_version = 4;",
+            PRAGMA user_version = 4;
+            COMMIT;",
         )?;
     }
 
     if version < 5 {
+        conn.execute_batch("BEGIN IMMEDIATE;")?;
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS context_summaries (
                 key TEXT PRIMARY KEY,
@@ -179,9 +188,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             );
 
             CREATE INDEX IF NOT EXISTS idx_skill_proposals_status
-                ON skill_proposals(status);
-
-            PRAGMA user_version = 5;",
+                ON skill_proposals(status);",
         )?;
 
         // Add summary column to sessions table (ALTER TABLE is separate from batch)
@@ -195,11 +202,13 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         if !has_summary {
             conn.execute_batch("ALTER TABLE sessions ADD COLUMN summary TEXT;")?;
         }
+        conn.execute_batch("PRAGMA user_version = 5; COMMIT;")?;
     }
 
     if version < 6 {
         conn.execute_batch(
-            "DROP TABLE IF EXISTS schedule_jobs;
+            "BEGIN IMMEDIATE;
+            DROP TABLE IF EXISTS schedule_jobs;
 
             CREATE TABLE IF NOT EXISTS scheduled_jobs (
                 id TEXT PRIMARY KEY,
@@ -215,11 +224,13 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
                 delete_after_run INTEGER NOT NULL DEFAULT 0
             );
 
-            PRAGMA user_version = 6;",
+            PRAGMA user_version = 6;
+            COMMIT;",
         )?;
     }
 
     if version < 7 {
+        conn.execute_batch("BEGIN IMMEDIATE;")?;
         // Add source column to sessions table for channel tracking
         let has_source: bool = conn
             .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'")
@@ -233,10 +244,11 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             )?;
         }
 
-        conn.execute_batch("PRAGMA user_version = 7;")?;
+        conn.execute_batch("PRAGMA user_version = 7; COMMIT;")?;
     }
 
     if version < 8 {
+        conn.execute_batch("BEGIN IMMEDIATE;")?;
         // Add supports_tools column to ai_models table
         let has_supports_tools: bool = conn
             .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='ai_models'")
@@ -250,10 +262,11 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             )?;
         }
 
-        conn.execute_batch("PRAGMA user_version = 8;")?;
+        conn.execute_batch("PRAGMA user_version = 8; COMMIT;")?;
     }
 
     if version < 9 {
+        conn.execute_batch("BEGIN IMMEDIATE;")?;
         // Add channel_key column to sessions for deduplication
         let has_channel_key: bool = conn
             .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'")
@@ -269,13 +282,15 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_channel_key
                 ON sessions(channel_key) WHERE channel_key IS NOT NULL;
 
-            PRAGMA user_version = 9;",
+            PRAGMA user_version = 9;
+            COMMIT;",
         )?;
     }
 
     if version < 10 {
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS agent_rules (
+            "BEGIN IMMEDIATE;
+            CREATE TABLE IF NOT EXISTS agent_rules (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 content TEXT NOT NULL,
                 category TEXT NOT NULL DEFAULT 'general',
@@ -288,13 +303,15 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             CREATE INDEX IF NOT EXISTS idx_agent_rules_active
                 ON agent_rules(active);
 
-            PRAGMA user_version = 10;",
+            PRAGMA user_version = 10;
+            COMMIT;",
         )?;
     }
 
     if version < 11 {
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS workflow_runs (
+            "BEGIN IMMEDIATE;
+            CREATE TABLE IF NOT EXISTS workflow_runs (
                 id TEXT PRIMARY KEY,
                 workflow_id TEXT NOT NULL,
                 workflow_name TEXT NOT NULL,
@@ -319,13 +336,15 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             CREATE INDEX IF NOT EXISTS idx_step_results_run
                 ON workflow_step_results(run_id);
 
-            PRAGMA user_version = 11;",
+            PRAGMA user_version = 11;
+            COMMIT;",
         )?;
     }
 
     if version < 12 {
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS approval_rules (
+            "BEGIN IMMEDIATE;
+            CREATE TABLE IF NOT EXISTS approval_rules (
                 id TEXT PRIMARY KEY,
                 tool_name TEXT NOT NULL,
                 pattern TEXT,
@@ -336,13 +355,15 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             CREATE INDEX IF NOT EXISTS idx_approval_rules_tool
                 ON approval_rules(tool_name, surface);
 
-            PRAGMA user_version = 12;",
+            PRAGMA user_version = 12;
+            COMMIT;",
         )?;
     }
 
     if version < 13 {
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS delegation_tasks (
+            "BEGIN IMMEDIATE;
+            CREATE TABLE IF NOT EXISTS delegation_tasks (
                 id TEXT PRIMARY KEY,
                 message_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
@@ -361,7 +382,17 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             CREATE INDEX IF NOT EXISTS idx_delegation_tasks_message
                 ON delegation_tasks(message_id);
 
-            PRAGMA user_version = 13;",
+            PRAGMA user_version = 13;
+            COMMIT;",
+        )?;
+    }
+
+    if version < 14 {
+        conn.execute_batch(
+            "BEGIN IMMEDIATE;
+            ALTER TABLE scheduled_jobs ADD COLUMN timeout_secs INTEGER;
+            PRAGMA user_version = 14;
+            COMMIT;",
         )?;
     }
 
@@ -414,7 +445,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 13);
+        assert_eq!(version, 14);
     }
 
     #[test]
@@ -598,7 +629,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 13);
+        assert_eq!(version, 14);
     }
 
     // IN.9 — Migration v9 adds channel_key column and unique index
@@ -704,7 +735,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 13);
+        assert_eq!(version, 14);
     }
 
     // Migration v13 creates delegation_tasks table
@@ -718,7 +749,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 13);
+        assert_eq!(version, 14);
 
         // Verify table exists via SELECT
         let count: i64 = conn

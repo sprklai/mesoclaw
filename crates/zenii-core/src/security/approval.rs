@@ -223,7 +223,7 @@ impl ApprovalBroker {
                     })
                 })
                 .map_err(crate::ZeniiError::from)?
-                .filter_map(|r| r.ok())
+                .filter_map(|r| r.map_err(|e| tracing::warn!("DB row error in list_rules: {e}")).ok())
                 .collect();
 
             Ok(rules)
@@ -278,7 +278,7 @@ impl ApprovalBroker {
                     })
                 })
                 .map_err(crate::ZeniiError::from)?
-                .filter_map(|r| r.ok())
+                .filter_map(|r| r.map_err(|e| tracing::warn!("DB row error in find_matching_rule: {e}")).ok())
                 .collect();
 
             for rule in rules {

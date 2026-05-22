@@ -102,7 +102,8 @@ impl Tool for ProcessTool {
                     .and_then(|v| v.as_u64())
                     .ok_or_else(|| ZeniiError::Tool("missing 'pid' argument for kill".into()))?;
 
-                let pid_u32 = pid as u32;
+                let pid_u32 = u32::try_from(pid)
+                    .map_err(|_| ZeniiError::Tool(format!("pid {pid} exceeds u32::MAX (4294967295)")))?;
                 let result = tokio::task::spawn_blocking(move || {
                     let sys = sysinfo::System::new_with_specifics(
                         sysinfo::RefreshKind::nothing()

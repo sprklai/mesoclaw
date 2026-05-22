@@ -18,8 +18,10 @@ use super::CredentialStore;
 /// unavailable. Credentials are stored in a JSON file encrypted with AES-256-GCM,
 /// keyed from a machine-derived secret (hostname + username + data_dir + service_id).
 ///
-/// Security model: better than plaintext, comparable to OS keyring for local threats.
-/// NOT resistant to root access or memory dumps (same threat model as OS keyring).
+/// Security model: better than plaintext, but weaker than the OS keyring. The encryption
+/// key is derived from observable system properties (hostname, username, data_dir,
+/// service_id) — an attacker with a copy of the credential file can reconstruct the key
+/// offline. NOT resistant to root access or memory dumps.
 pub struct FileCredentialStore {
     path: PathBuf,
     key: Key<Aes256Gcm>,

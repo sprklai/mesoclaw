@@ -252,11 +252,8 @@ impl ChannelRouter {
         let (tool_event_tx, mut tool_event_rx) = broadcast::channel::<ToolCallEvent>(32);
 
         // 8. Resolve agent WITH tool events and channel-filtered tools
-        let tool_override = if allowed_tools.is_empty() {
-            None // empty policy = no tools
-        } else {
-            Some(allowed_tools)
-        };
+        // Some(vec![]) = explicit "no tools"; None = use surface-permission defaults.
+        let tool_override = Some(allowed_tools);
         let agent = match crate::ai::resolve_agent_with_tools(
             None,
             state,

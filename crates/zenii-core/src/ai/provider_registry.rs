@@ -154,7 +154,7 @@ impl ProviderRegistry {
                         created_at: row.get(6)?,
                     })
                 })?
-                .filter_map(|r| r.ok())
+                .filter_map(|r| r.map_err(|e| tracing::warn!("DB row error in list_providers: {e}")).ok())
                 .collect();
 
             let mut result = Vec::with_capacity(providers.len());
@@ -517,7 +517,7 @@ fn load_models_for_provider(
                 is_active: row.get::<_, i32>(7)? != 0,
             })
         })?
-        .filter_map(|r| r.ok())
+        .filter_map(|r| r.map_err(|e| tracing::warn!("DB row error in load_models: {e}")).ok())
         .collect();
 
     Ok(models)
