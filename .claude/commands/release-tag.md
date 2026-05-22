@@ -197,8 +197,6 @@ Create the release commit:
 ```bash
 git commit -m "$(cat <<'EOF'
 release: v<VERSION>
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
 )"
 ```

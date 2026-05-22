@@ -471,6 +471,37 @@ For frontend fixes (Svelte/TypeScript files):
 - After all frontend fixes, run `cd web && bun run check` once
 - Revert any fix that causes type errors
 
+### Step 7b: Commit applied fixes
+
+After all fixes in Step 7 are applied and `cargo check --workspace` is green, commit the changes.
+
+Group fixes into one commit per logical scope (one crate, one concern, or one module). For each commit:
+
+```bash
+git add <specific files changed>
+git commit -m "<conventional commit message>"
+```
+
+**Commit message rules:**
+- Format: `fix(<scope>): <what was functionally changed>`
+- Describe the behavior that changed — not that it was found by an audit
+- `<scope>` = the crate or module name (e.g., `gateway`, `tui`, `daemon`, `cli`, `core`)
+
+**Good:**
+- `fix(gateway): validate URL path segments before forwarding`
+- `fix(tui): handle WebSocket close frame without panicking`
+- `fix(daemon): guard against remote bind address at startup`
+- `fix(core): avoid holding mutex across await in session manager`
+
+**Forbidden — never reference the audit source or finding count:**
+- ~~`fix(security): apply N findings from codex audit`~~
+- ~~`fix(tui): fix 6 audit findings`~~
+- ~~`chore: apply codex suggestions`~~
+- ~~`fix: address AI audit results`~~
+
+If all fixes touch the same crate, a single commit is fine.
+If fixes span multiple crates, create one commit per crate.
+
 ### Step 8: Full verification
 
 Run the full verification suite:

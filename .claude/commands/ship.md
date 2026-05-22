@@ -134,8 +134,6 @@ Proceed immediately to Step 7 without asking for confirmation.
 ```
 git commit -m "$(cat <<'EOF'
 <descriptive message based on changes>
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
 )"
 ```
