@@ -264,6 +264,7 @@ pub async fn info(client: &ZeniiClient, name: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use httpmock::prelude::*;
+    use serde_json::json;
 
     use super::*;
 
