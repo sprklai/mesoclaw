@@ -10,6 +10,9 @@ use crate::security::permissions::ToolPermissions;
 pub struct AppConfig {
     pub gateway_host: String,
     pub gateway_port: u16,
+    /// Allow binding to non-loopback addresses. When false (default), the daemon
+    /// refuses to start if `gateway_host` is not a loopback address.
+    pub allow_remote_binding: bool,
     pub log_level: String,
     pub data_dir: Option<String>,
     pub db_path: Option<String>,
@@ -344,6 +347,7 @@ impl Default for AppConfig {
         Self {
             gateway_host: "127.0.0.1".into(),
             gateway_port: 18981,
+            allow_remote_binding: false,
             log_level: "info".into(),
             data_dir: None,
             db_path: None,

@@ -1,8 +1,9 @@
 use std::path::PathBuf;
+use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::Parser;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use zenii_core::boot;
 use zenii_core::config::{default_config_path, load_or_create_config};
@@ -17,7 +18,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ExitCode {
     let args = Args::parse();
 
     let config_path = args.config.unwrap_or_else(default_config_path);
@@ -26,13 +27,13 @@ async fn main() {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Failed to load config from {}: {e}", config_path.display());
-            std::process::exit(1);
+            return ExitCode::FAILURE;
         }
     };
 
     if let Err(e) = zenii_core::logging::init_tracing(&config, "daemon", false) {
         eprintln!("Failed to initialize tracing: {e}");
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     }
 
     info!("Config loaded from {}", config_path.display());
@@ -41,12 +42,23 @@ async fn main() {
     let host = config.gateway_host.clone();
     let port = config.gateway_port;
 
+    if !config.allow_remote_binding && !is_loopback(&host) {
+        error!(
+            host = %host,
+            "gateway_host is not a loopback address; set allow_remote_binding = true in config to permit this"
+        );
+        return ExitCode::FAILURE;
+    }
+    if config.allow_remote_binding && !is_loopback(&host) {
+        warn!(host = %host, "Binding gateway to non-loopback address — API is reachable from the network");
+    }
+
     // Initialize all services
     let services = match boot::init_services(config).await {
         Ok(s) => s,
         Err(e) => {
             error!("Failed to initialize services: {e}");
-            std::process::exit(1);
+            return ExitCode::FAILURE;
         }
     };
 
@@ -77,7 +89,9 @@ async fn main() {
         }
         #[cfg(not(unix))]
         {
-            tokio::signal::ctrl_c().await.ok();
+            if let Err(e) = tokio::signal::ctrl_c().await {
+                error!("Failed to register Ctrl-C handler: {e}");
+            }
         }
         info!("Shutdown signal received, draining connections...");
     };
@@ -87,6 +101,12 @@ async fn main() {
         .await
     {
         error!("Gateway server error: {e}");
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     }
+
+    ExitCode::SUCCESS
+}
+
+fn is_loopback(host: &str) -> bool {
+    host == "127.0.0.1" || host == "::1" || host == "localhost"
 }
