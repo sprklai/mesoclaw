@@ -167,7 +167,7 @@ async fn run_app(
 
         match event {
             AppEvent::Key(key) => {
-                let prev_notification = app.notification_text.take();
+                app.notification_text = None;
                 handler::handle_key_event(&mut app, key);
 
                 // Handle action signals from the handler
@@ -367,11 +367,12 @@ async fn run_app(
                 // Handle delete confirmation
                 if app.confirm_delete {
                     // Waiting for 'y' confirmation — notification already set
-                } else if prev_notification
+                } else if app
+                    .notification_text
                     .as_deref()
-                    .is_some_and(|t| t == "Delete session? (y/n)")
+                    .is_some_and(|t| t == "__delete_confirmed__")
                 {
-                    // 'y' was pressed (confirm_delete was just set to false after processing)
+                    app.notification_text = None;
                     delete_session(&mut app, client).await;
                 }
 
@@ -389,15 +390,16 @@ async fn run_app(
                     app.notification_text = Some("Refreshed".into());
                 }
 
-                // Load messages when entering chat mode
+                // Load messages when entering a different session in chat mode
                 if app.mode == app::AppMode::Chat
-                    && app.current_session_id.is_none()
                     && let Some(idx) = app.selected_session
                     && let Some(session) = app.sessions.get(idx)
                 {
                     let sid = session.id.clone();
-                    load_messages(&mut app, client, &sid).await;
-                    app.current_session_id = Some(sid);
+                    if app.current_session_id.as_deref() != Some(&sid) {
+                        load_messages(&mut app, client, &sid).await;
+                        app.current_session_id = Some(sid);
+                    }
                 }
             }
             AppEvent::Resize(_, _) => {
@@ -777,7 +779,9 @@ async fn send_message(
                     }
                 }
                 Ok(tungstenite::Message::Close(_)) | Err(_) => {
-                    let _ = tx.send(AppEvent::WsMessage(WsInbound::Done));
+                    let _ = tx.send(AppEvent::WsMessage(WsInbound::Error {
+                        error: "Connection closed unexpectedly".into(),
+                    }));
                     break;
                 }
                 _ => {}

@@ -57,9 +57,11 @@ pub fn render_status(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
+    if s.chars().count() <= max {
         s.to_string()
     } else {
-        format!("{}...", &s[..max])
+        let mut result: String = s.chars().take(max.saturating_sub(1)).collect();
+        result.push('\u{2026}');
+        result
     }
 }

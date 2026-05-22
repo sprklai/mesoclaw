@@ -1,8 +1,13 @@
+use std::sync::LazyLock;
+
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{Style as SynStyle, ThemeSet};
 use syntect::parsing::SyntaxSet;
+
+static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
+static THEME_SET: LazyLock<ThemeSet> = LazyLock::new(ThemeSet::load_defaults);
 
 /// Convert markdown text to styled ratatui lines.
 ///
@@ -161,14 +166,11 @@ fn parse_inline(text: &str) -> Vec<Span<'static>> {
 
 /// Highlight a code block using syntect.
 pub fn highlight_code(code: &str, language: &str) -> Vec<Line<'static>> {
-    let ss = SyntaxSet::load_defaults_newlines();
-    let ts = ThemeSet::load_defaults();
-
-    let syntax = ss
+    let syntax = SYNTAX_SET
         .find_syntax_by_token(language)
-        .unwrap_or_else(|| ss.find_syntax_plain_text());
+        .unwrap_or_else(|| SYNTAX_SET.find_syntax_plain_text());
 
-    let theme = &ts.themes["base16-ocean.dark"];
+    let theme = &THEME_SET.themes["base16-ocean.dark"];
     let mut highlighter = HighlightLines::new(syntax, theme);
 
     let mut lines = Vec::new();
@@ -178,7 +180,7 @@ pub fn highlight_code(code: &str, language: &str) -> Vec<Line<'static>> {
     )));
 
     for line in code.lines() {
-        let highlighted = highlighter.highlight_line(line, &ss).unwrap_or_default();
+        let highlighted = highlighter.highlight_line(line, &SYNTAX_SET).unwrap_or_default();
 
         let spans: Vec<Span<'static>> = highlighted
             .into_iter()

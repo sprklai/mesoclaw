@@ -70,8 +70,9 @@ pub fn render_chat(frame: &mut Frame, area: Rect, app: &App) {
                 app.theme.tool_call,
             )));
             if let Some(ref output) = tool.output {
-                let preview = if output.len() > 200 {
-                    format!("{}...", &output[..200])
+                let preview = if output.chars().count() > 200 {
+                    let truncated: String = output.chars().take(197).collect();
+                    format!("{truncated}...")
                 } else {
                     output.clone()
                 };

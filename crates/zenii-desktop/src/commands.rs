@@ -18,7 +18,7 @@ pub enum BootStatus {
 pub struct GatewayState {
     pub shutdown_tx: Option<oneshot::Sender<()>>,
     pub external_url: Option<String>,
-    pub boot_status: Arc<std::sync::Mutex<BootStatus>>,
+    pub boot_status: Arc<tokio::sync::Mutex<BootStatus>>,
 }
 
 /// Configuration for the gateway boot decision.
@@ -34,10 +34,21 @@ pub struct GatewayMode {
 pub fn resolve_gateway_mode() -> Result<GatewayMode, String> {
     match std::env::var("ZENII_GATEWAY_URL") {
         Ok(url_str) if !url_str.is_empty() => {
-            // Validate the URL
-            url::Url::parse(&url_str)
-                .map_err(|e| format!("Invalid ZENII_GATEWAY_URL '{url_str}': {e}"))?;
-            info!("Using external gateway at {url_str}");
+            let parsed =
+                url::Url::parse(&url_str).map_err(|e| format!("Invalid ZENII_GATEWAY_URL: {e}"))?;
+            if !matches!(parsed.scheme(), "http" | "https") {
+                return Err(format!(
+                    "ZENII_GATEWAY_URL must use http or https scheme, got '{}'",
+                    parsed.scheme()
+                ));
+            }
+            let safe_url = format!(
+                "{}://{}{}",
+                parsed.scheme(),
+                parsed.host_str().unwrap_or(""),
+                parsed.port().map(|p| format!(":{p}")).unwrap_or_default()
+            );
+            info!("Using external gateway at {safe_url}");
             Ok(GatewayMode {
                 external_url: Some(url_str),
             })
@@ -58,21 +69,20 @@ pub fn resolve_data_dir() -> std::path::PathBuf {
 ///
 /// This is called from the Tauri `.setup()` hook when no external URL is configured.
 /// Emits `gateway-ready` or `gateway-failed` Tauri events to notify the frontend.
-#[allow(clippy::unwrap_used)]
 pub fn boot_gateway(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let mode = resolve_gateway_mode().map_err(|e| e.to_string())?;
-    let boot_status = Arc::new(std::sync::Mutex::new(BootStatus::Booting));
 
     if mode.external_url.is_some() {
         // External gateway — just store the state, no embedded boot needed
-        *boot_status.lock().unwrap() = BootStatus::Ready;
         app.manage(Arc::new(tokio::sync::Mutex::new(GatewayState {
             shutdown_tx: None,
             external_url: mode.external_url,
-            boot_status,
+            boot_status: Arc::new(tokio::sync::Mutex::new(BootStatus::Ready)),
         })));
         return Ok(());
     }
+
+    let boot_status = Arc::new(tokio::sync::Mutex::new(BootStatus::Booting));
 
     // Load config
     let config_path = zenii_core::config::default_config_path();
@@ -117,14 +127,14 @@ pub fn boot_gateway(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
                 {
                     let msg = format!("Embedded gateway error: {e}");
                     tracing::error!("{msg}");
-                    *boot_status_clone.lock().unwrap() = BootStatus::Failed(msg.clone());
+                    *boot_status_clone.lock().await = BootStatus::Failed(msg.clone());
                     let _ = app_handle.emit("gateway-failed", msg);
                 }
             }
             Err(e) => {
                 let msg = format!("Failed to initialize services: {e}");
                 tracing::error!("{msg}");
-                *boot_status_clone.lock().unwrap() = BootStatus::Failed(msg.clone());
+                *boot_status_clone.lock().await = BootStatus::Failed(msg.clone());
                 let _ = app_handle.emit("gateway-failed", msg);
             }
         }
@@ -135,7 +145,7 @@ pub fn boot_gateway(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
     let app_handle_ready = app.handle().clone();
     tauri::async_runtime::spawn(async move {
         if ready_rx.await.is_ok() {
-            *boot_status_ready.lock().unwrap() = BootStatus::Ready;
+            *boot_status_ready.lock().await = BootStatus::Ready;
             let _ = app_handle_ready.emit("gateway-ready", ());
             info!("Embedded gateway is ready");
         }
@@ -148,6 +158,21 @@ pub fn boot_gateway(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
     })));
 
     Ok(())
+}
+
+/// Send gateway shutdown signal and wait briefly for WAL checkpoint.
+///
+/// Shared by the window close handler and tray quit handler to avoid duplication.
+pub fn request_gateway_shutdown(app: &tauri::AppHandle) {
+    if let Some(state) = app.try_state::<Arc<tokio::sync::Mutex<GatewayState>>>() {
+        if let Ok(mut guard) = state.try_lock()
+            && let Some(tx) = guard.shutdown_tx.take()
+        {
+            info!("Sending gateway shutdown signal");
+            let _ = tx.send(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
 }
 
 // --- IPC Commands ---
@@ -214,7 +239,7 @@ pub async fn get_boot_status(
     state: tauri::State<'_, Arc<tokio::sync::Mutex<GatewayState>>>,
 ) -> Result<BootStatus, String> {
     let guard = state.lock().await;
-    let status = guard.boot_status.lock().map_err(|e| e.to_string())?;
+    let status = guard.boot_status.lock().await;
     Ok(status.clone())
 }
 
@@ -364,6 +389,21 @@ mod tests {
         }
         let mode = resolve_gateway_mode().unwrap();
         assert!(mode.external_url.is_none());
+    }
+
+    // 7.2b — Non-HTTP scheme is rejected
+    #[test]
+    fn non_http_scheme_returns_error() {
+        let _guard = ENV_LOCK.lock();
+        unsafe {
+            std::env::set_var("ZENII_GATEWAY_URL", "file:///tmp/gateway");
+        }
+        let result = resolve_gateway_mode();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("http or https"));
+        unsafe {
+            std::env::remove_var("ZENII_GATEWAY_URL");
+        }
     }
 
     // 7.1c — Empty env var means embedded mode
