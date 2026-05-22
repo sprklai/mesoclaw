@@ -6,6 +6,7 @@ use tracing::warn;
 use crate::ai::adapter::{ToolCallEvent, ToolCallPhase};
 use crate::ai::agent::{TokenUsage, ZeniiAgent};
 use crate::ai::delegation::task::{DelegationTask, TaskResult, TaskStatus};
+use crate::ai::prompt::AssemblyRequest;
 use crate::event_bus::EventBus;
 
 pub struct SubAgent {
@@ -48,6 +49,21 @@ impl SubAgent {
             )
         };
 
+        let skill_count = state.skill_registry.list().await.len();
+        let cfg = state.config.load_full();
+        let assembly_request = AssemblyRequest {
+            boot_context: state.boot_context.clone(),
+            model_display: "delegation".into(),
+            session_id: Some(session.id.clone()),
+            user_message: Some(task.description.clone()),
+            conversation_summary: None,
+            channel_hint: None,
+            tool_count: tools.len(),
+            skill_count,
+            version: cfg.identity_name.clone(),
+        };
+        let preamble = state.prompt_strategy.assemble(&assembly_request).await?;
+
         // Create per-agent broadcast channel for tool events
         let (tool_tx, tool_rx) = broadcast::channel::<ToolCallEvent>(128);
 
@@ -57,7 +73,7 @@ impl SubAgent {
             None,
             state,
             Some(tool_tx),
-            None,
+            Some(&preamble),
             Some(tools),
             surface,
             skip_approval,

@@ -6,6 +6,7 @@ use tracing::{debug, info, warn};
 use crate::ai::agent::TokenUsage;
 use crate::ai::delegation::DelegationConfig;
 use crate::ai::delegation::task::{DelegationResult, DelegationTask, TaskResult, TaskStatus};
+use crate::ai::prompt::AssemblyRequest;
 use crate::event_bus::DelegationAgentInfo;
 use crate::{Result, ZeniiError};
 
@@ -155,15 +156,30 @@ impl Coordinator {
         let delegation_id = uuid::Uuid::new_v4().to_string();
         let start = std::time::Instant::now();
 
-        let decomp_model = self.config.decomposition_model.as_deref();
-        let agent = crate::ai::resolve_agent(decomp_model, state, None, None, surface).await?;
-
         let tool_names: Vec<String> = state
             .tools
             .to_vec()
             .iter()
             .map(|t| t.name().to_string())
             .collect();
+
+        let skill_count = state.skill_registry.list().await.len();
+        let cfg = state.config.load_full();
+        let assembly_request = AssemblyRequest {
+            boot_context: state.boot_context.clone(),
+            model_display: "delegation".into(),
+            session_id: Some(delegation_id.clone()),
+            user_message: Some(prompt.to_string()),
+            conversation_summary: None,
+            channel_hint: None,
+            tool_count: tool_names.len(),
+            skill_count,
+            version: cfg.identity_name.clone(),
+        };
+        let preamble = state.prompt_strategy.assemble(&assembly_request).await?;
+
+        let decomp_model = self.config.decomposition_model.as_deref();
+        let agent = crate::ai::resolve_agent(decomp_model, state, None, Some(&preamble), surface).await?;
 
         let tasks = self.decompose(prompt, &agent, &tool_names).await?;
         if tasks.is_empty() {

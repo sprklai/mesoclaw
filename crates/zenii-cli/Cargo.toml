@@ -31,9 +31,12 @@ tracing-appender = { workspace = true }
 directories = { workspace = true }
 tempfile = "3"
 openssl = { version = "0.10", features = ["vendored"], optional = true }
+percent-encoding = "2"
 
 [features]
 vendored-openssl = ["dep:openssl"]
+scheduler = []
+channels = []
 
 [lints]
 workspace = true

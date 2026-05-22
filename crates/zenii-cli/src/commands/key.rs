@@ -1,6 +1,7 @@
 use serde_json::json;
 
 use crate::client::ZeniiClient;
+use crate::commands::encode_path_segment;
 
 pub async fn set(client: &ZeniiClient, provider: &str, key: &str) -> Result<(), String> {
     let credential_key = format!("api_key:{provider}");
@@ -16,7 +17,7 @@ pub async fn set(client: &ZeniiClient, provider: &str, key: &str) -> Result<(), 
 pub async fn remove(client: &ZeniiClient, provider: &str) -> Result<(), String> {
     let credential_key = format!("api_key:{provider}");
     client
-        .delete(&format!("/credentials/{credential_key}"))
+        .delete(&format!("/credentials/{}", encode_path_segment(&credential_key)))
         .await?;
     println!("API key removed for provider/service: {provider}");
     Ok(())
@@ -45,7 +46,7 @@ pub async fn remove_channel(
 ) -> Result<(), String> {
     let credential_key = format!("channel:{channel}:{field}");
     client
-        .delete(&format!("/credentials/{credential_key}"))
+        .delete(&format!("/credentials/{}", encode_path_segment(&credential_key)))
         .await?;
     println!("Channel credential removed: {channel}/{field}");
     Ok(())
@@ -62,7 +63,9 @@ pub async fn set_raw(client: &ZeniiClient, key: &str, value: &str) -> Result<(),
 }
 
 pub async fn remove_raw(client: &ZeniiClient, key: &str) -> Result<(), String> {
-    client.delete(&format!("/credentials/{key}")).await?;
+    client
+        .delete(&format!("/credentials/{}", encode_path_segment(key)))
+        .await?;
     println!("Credential removed: {key}");
     Ok(())
 }

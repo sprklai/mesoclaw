@@ -81,6 +81,7 @@ enum Commands {
         action: ProviderAction,
     },
     /// Manage scheduled jobs
+    #[cfg(feature = "scheduler")]
     Schedule {
         #[command(subcommand)]
         action: ScheduleAction,
@@ -96,6 +97,7 @@ enum Commands {
         action: PluginAction,
     },
     /// View channel conversations and messages
+    #[cfg(feature = "channels")]
     Channel {
         #[command(subcommand)]
         action: ChannelAction,
@@ -216,6 +218,7 @@ enum KeyAction {
     List,
 }
 
+#[cfg(feature = "scheduler")]
 #[derive(Subcommand)]
 enum ScheduleAction {
     /// List all scheduled jobs
@@ -337,6 +340,7 @@ enum PluginAction {
     },
 }
 
+#[cfg(feature = "channels")]
 #[derive(Subcommand)]
 enum ChannelAction {
     /// List channel conversations
@@ -541,6 +545,7 @@ async fn main() {
             KeyAction::RemoveRaw { key } => commands::key::remove_raw(&client, &key).await,
             KeyAction::List => commands::key::list(&client).await,
         },
+        #[cfg(feature = "scheduler")]
         Commands::Schedule { action } => match action {
             ScheduleAction::List => commands::schedule::list(&client).await,
             ScheduleAction::Create {
@@ -621,6 +626,7 @@ async fn main() {
             PluginAction::Disable { name } => commands::plugin::disable(&client, &name).await,
             PluginAction::Info { name } => commands::plugin::info(&client, &name).await,
         },
+        #[cfg(feature = "channels")]
         Commands::Channel { action } => match action {
             ChannelAction::List { source } => {
                 commands::channel::list(&client, source.as_deref()).await
@@ -976,6 +982,7 @@ mod tests {
         assert!(matches!(cli.command, Commands::Completions { .. }));
     }
 
+    #[cfg(feature = "scheduler")]
     #[test]
     fn parse_schedule_list() {
         let cli = parse(&["zenii", "schedule", "list"]);
@@ -987,6 +994,7 @@ mod tests {
         ));
     }
 
+    #[cfg(feature = "scheduler")]
     #[test]
     fn parse_schedule_status() {
         let cli = parse(&["zenii", "schedule", "status"]);
@@ -998,6 +1006,7 @@ mod tests {
         ));
     }
 
+    #[cfg(feature = "scheduler")]
     #[test]
     fn parse_schedule_create_interval() {
         let cli = parse(&[

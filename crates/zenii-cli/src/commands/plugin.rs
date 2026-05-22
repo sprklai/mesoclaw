@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 use crate::client::ZeniiClient;
+use crate::commands::{encode_path_segment, truncate};
 
 #[derive(Deserialize)]
 struct PluginListItem {
@@ -130,7 +131,7 @@ pub async fn install(
 
 pub async fn remove(client: &ZeniiClient, name: &str) -> Result<(), String> {
     client
-        .delete(&format!("/plugins/{}", urlencoded(name)))
+        .delete(&format!("/plugins/{}", encode_path_segment(name)))
         .await?;
     println!("Removed plugin '{name}'");
     Ok(())
@@ -139,7 +140,7 @@ pub async fn remove(client: &ZeniiClient, name: &str) -> Result<(), String> {
 pub async fn update(client: &ZeniiClient, name: &str) -> Result<(), String> {
     let plugin: PluginDetail = client
         .post(
-            &format!("/plugins/{}/update", urlencoded(name)),
+            &format!("/plugins/{}/update", encode_path_segment(name)),
             &serde_json::json!({}),
         )
         .await?;
@@ -152,30 +153,46 @@ pub async fn update(client: &ZeniiClient, name: &str) -> Result<(), String> {
 }
 
 pub async fn enable(client: &ZeniiClient, name: &str) -> Result<(), String> {
+    let current: PluginDetail = client
+        .get(&format!("/plugins/{}", encode_path_segment(name)))
+        .await?;
+    if current.enabled {
+        println!("Plugin '{name}' is already enabled");
+        return Ok(());
+    }
     let plugin: PluginDetail = client
         .put(
-            &format!("/plugins/{}/toggle", urlencoded(name)),
+            &format!("/plugins/{}/toggle", encode_path_segment(name)),
             &serde_json::json!({}),
         )
         .await?;
-
-    let state = if plugin.enabled {
-        "enabled"
-    } else {
-        "disabled"
-    };
+    let state = if plugin.enabled { "enabled" } else { "disabled" };
     println!("Plugin '{name}' is now {state}");
     Ok(())
 }
 
 pub async fn disable(client: &ZeniiClient, name: &str) -> Result<(), String> {
-    // toggle endpoint flips state — call once to disable
-    enable(client, name).await
+    let current: PluginDetail = client
+        .get(&format!("/plugins/{}", encode_path_segment(name)))
+        .await?;
+    if !current.enabled {
+        println!("Plugin '{name}' is already disabled");
+        return Ok(());
+    }
+    let plugin: PluginDetail = client
+        .put(
+            &format!("/plugins/{}/toggle", encode_path_segment(name)),
+            &serde_json::json!({}),
+        )
+        .await?;
+    let state = if plugin.enabled { "enabled" } else { "disabled" };
+    println!("Plugin '{name}' is now {state}");
+    Ok(())
 }
 
 pub async fn info(client: &ZeniiClient, name: &str) -> Result<(), String> {
     let plugin: PluginDetail = client
-        .get(&format!("/plugins/{}", urlencoded(name)))
+        .get(&format!("/plugins/{}", encode_path_segment(name)))
         .await?;
 
     let meta = &plugin.manifest.plugin;
@@ -236,14 +253,3 @@ pub async fn info(client: &ZeniiClient, name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max.saturating_sub(3)])
-    }
-}
-
-fn urlencoded(s: &str) -> String {
-    s.replace(' ', "%20")
-}

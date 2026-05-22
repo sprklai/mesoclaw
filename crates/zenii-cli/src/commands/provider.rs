@@ -1,6 +1,7 @@
 use serde_json::json;
 
 use crate::client::ZeniiClient;
+use crate::commands::encode_path_segment;
 
 pub async fn list(client: &ZeniiClient) -> Result<(), String> {
     let providers: Vec<serde_json::Value> = client.get("/providers/with-key-status").await?;

@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 use crate::client::ZeniiClient;
+use crate::commands::{encode_path_segment, encode_query_value, truncate};
 
 #[derive(Deserialize)]
 struct ChannelSession {

@@ -1,4 +1,5 @@
 use std::io::{self, BufRead, Write};
+use std::time::Duration;
 
 use futures::{SinkExt, StreamExt};
 use serde_json::json;
@@ -43,16 +44,24 @@ pub async fn run(
     }
     println!();
 
-    let stdin = io::stdin();
-    let mut lines = stdin.lock().lines();
-
     loop {
         print!("> ");
         io::stdout().flush().unwrap_or(());
 
-        let line = match lines.next() {
-            Some(Ok(l)) => l,
-            _ => break,
+        // Acquire and release the stdin lock per iteration — never hold it across .await.
+        let line_opt = tokio::task::spawn_blocking(|| {
+            let mut buf = String::new();
+            match io::stdin().lock().read_line(&mut buf) {
+                Ok(0) | Err(_) => None,
+                Ok(_) => Some(buf),
+            }
+        })
+        .await
+        .unwrap_or(None);
+
+        let line = match line_opt {
+            Some(l) => l.trim().to_string(),
+            None => break,
         };
 
         let line = line.trim().to_string();
@@ -238,21 +247,30 @@ pub async fn run(
                             );
                             io::stderr().flush().unwrap_or(());
 
-                            // Read approval decision from stdin (blocking in spawn_blocking)
-                            let decision = tokio::task::spawn_blocking(|| {
-                                let mut input = String::new();
-                                if io::stdin().read_line(&mut input).is_ok() {
-                                    match input.trim() {
-                                        "a" | "approve" | "y" | "yes" => "approve",
-                                        "A" | "always" => "approve_always",
-                                        _ => "deny",
+                            let decision_result = tokio::time::timeout(
+                                Duration::from_secs(timeout),
+                                tokio::task::spawn_blocking(|| -> &'static str {
+                                    let mut input = String::new();
+                                    if io::stdin().lock().read_line(&mut input).is_ok() {
+                                        match input.trim() {
+                                            "a" | "approve" | "y" | "yes" => "approve",
+                                            "A" | "always" => "approve_always",
+                                            _ => "deny",
+                                        }
+                                    } else {
+                                        "deny"
                                     }
-                                } else {
+                                }),
+                            )
+                            .await;
+
+                            let decision = match decision_result {
+                                Ok(Ok(d)) => d,
+                                _ => {
+                                    eprintln!("\n    (auto-denied: timeout)");
                                     "deny"
                                 }
-                            })
-                            .await
-                            .unwrap_or("deny");
+                            };
 
                             let response = json!({
                                 "type": "approval_response",
