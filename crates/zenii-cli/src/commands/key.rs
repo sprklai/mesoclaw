@@ -17,7 +17,10 @@ pub async fn set(client: &ZeniiClient, provider: &str, key: &str) -> Result<(), 
 pub async fn remove(client: &ZeniiClient, provider: &str) -> Result<(), String> {
     let credential_key = format!("api_key:{provider}");
     client
-        .delete(&format!("/credentials/{}", encode_path_segment(&credential_key)))
+        .delete(&format!(
+            "/credentials/{}",
+            encode_path_segment(&credential_key)
+        ))
         .await?;
     println!("API key removed for provider/service: {provider}");
     Ok(())
@@ -46,7 +49,10 @@ pub async fn remove_channel(
 ) -> Result<(), String> {
     let credential_key = format!("channel:{channel}:{field}");
     client
-        .delete(&format!("/credentials/{}", encode_path_segment(&credential_key)))
+        .delete(&format!(
+            "/credentials/{}",
+            encode_path_segment(&credential_key)
+        ))
         .await?;
     println!("Channel credential removed: {channel}/{field}");
     Ok(())
@@ -140,7 +146,8 @@ mod tests {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             // space in provider name → api_key:my%20provider
-            when.method(DELETE).path("/credentials/api_key:my%20provider");
+            when.method(DELETE)
+                .path("/credentials/api_key:my%20provider");
             then.status(200).json_body(json!({}));
         });
 
@@ -169,7 +176,8 @@ mod tests {
     async fn remove_channel_normal_key() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
-            when.method(DELETE).path("/credentials/channel:telegram:token");
+            when.method(DELETE)
+                .path("/credentials/channel:telegram:token");
             then.status(200).json_body(json!({}));
         });
 
@@ -183,7 +191,8 @@ mod tests {
     async fn remove_channel_encodes_slash_in_field() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
-            when.method(DELETE).path("/credentials/channel:slack:bot%2Ftoken");
+            when.method(DELETE)
+                .path("/credentials/channel:slack:bot%2Ftoken");
             then.status(200).json_body(json!({}));
         });
 

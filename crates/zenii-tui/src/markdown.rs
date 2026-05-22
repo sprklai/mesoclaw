@@ -180,7 +180,9 @@ pub fn highlight_code(code: &str, language: &str) -> Vec<Line<'static>> {
     )));
 
     for line in code.lines() {
-        let highlighted = highlighter.highlight_line(line, &SYNTAX_SET).unwrap_or_default();
+        let highlighted = highlighter
+            .highlight_line(line, &SYNTAX_SET)
+            .unwrap_or_default();
 
         let spans: Vec<Span<'static>> = highlighted
             .into_iter()

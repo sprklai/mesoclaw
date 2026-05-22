@@ -246,7 +246,10 @@ impl Memory for SqliteMemoryStore {
                         })
                     })
                     .map_err(ZeniiError::from)?
-                    .filter_map(|r| r.map_err(|e| tracing::warn!("DB row error in memory_recall: {e}")).ok())
+                    .filter_map(|r| {
+                        r.map_err(|e| tracing::warn!("DB row error in memory_recall: {e}"))
+                            .ok()
+                    })
                     .collect::<Vec<_>>();
 
                 Ok(entries)
@@ -303,7 +306,10 @@ impl Memory for SqliteMemoryStore {
                     },
                 )
                 .map_err(ZeniiError::from)?
-                .filter_map(|r| r.map_err(|e| tracing::warn!("DB row error in memory_recall_vector: {e}")).ok())
+                .filter_map(|r| {
+                    r.map_err(|e| tracing::warn!("DB row error in memory_recall_vector: {e}"))
+                        .ok()
+                })
                 .collect::<Vec<_>>();
 
             Ok(entries)

@@ -15,7 +15,7 @@ pub mod schedule;
 pub mod wiki;
 pub mod workflow;
 
-use percent_encoding::{percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::{AsciiSet, CONTROLS, percent_encode};
 
 // Encodes characters that would break URL path segments (/, ?, #, %, space).
 // Preserves : and other safe path characters so existing credential keys are unchanged.

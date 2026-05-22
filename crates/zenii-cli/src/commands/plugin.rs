@@ -166,7 +166,11 @@ pub async fn enable(client: &ZeniiClient, name: &str) -> Result<(), String> {
             &serde_json::json!({}),
         )
         .await?;
-    let state = if plugin.enabled { "enabled" } else { "disabled" };
+    let state = if plugin.enabled {
+        "enabled"
+    } else {
+        "disabled"
+    };
     println!("Plugin '{name}' is now {state}");
     Ok(())
 }
@@ -185,7 +189,11 @@ pub async fn disable(client: &ZeniiClient, name: &str) -> Result<(), String> {
             &serde_json::json!({}),
         )
         .await?;
-    let state = if plugin.enabled { "enabled" } else { "disabled" };
+    let state = if plugin.enabled {
+        "enabled"
+    } else {
+        "disabled"
+    };
     println!("Plugin '{name}' is now {state}");
     Ok(())
 }
@@ -296,7 +304,11 @@ mod tests {
         let result = enable(&test_client(server.port()), "my-plugin").await;
         assert!(result.is_ok());
         assert_eq!(get_mock.hits(), 1);
-        assert_eq!(toggle_mock.hits(), 0, "toggle must not be called when already enabled");
+        assert_eq!(
+            toggle_mock.hits(),
+            0,
+            "toggle must not be called when already enabled"
+        );
     }
 
     // disable on already-disabled plugin must NOT call toggle
@@ -315,7 +327,11 @@ mod tests {
         let result = disable(&test_client(server.port()), "my-plugin").await;
         assert!(result.is_ok());
         assert_eq!(get_mock.hits(), 1);
-        assert_eq!(toggle_mock.hits(), 0, "toggle must not be called when already disabled");
+        assert_eq!(
+            toggle_mock.hits(),
+            0,
+            "toggle must not be called when already disabled"
+        );
     }
 
     // enable on a disabled plugin must call GET then PUT toggle
@@ -371,4 +387,3 @@ mod tests {
         assert!(result.is_ok());
     }
 }
-

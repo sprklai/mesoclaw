@@ -46,7 +46,10 @@ impl KeyringStore {
 
         let _ = entry.delete_credential(); // cleanup, ignore errors
 
-        Ok(Self { service_id, index_lock: tokio::sync::Mutex::new(()) })
+        Ok(Self {
+            service_id,
+            index_lock: tokio::sync::Mutex::new(()),
+        })
     }
 
     /// Build with a specific service ID (for testing).

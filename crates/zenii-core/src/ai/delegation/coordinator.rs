@@ -179,7 +179,8 @@ impl Coordinator {
         let preamble = state.prompt_strategy.assemble(&assembly_request).await?;
 
         let decomp_model = self.config.decomposition_model.as_deref();
-        let agent = crate::ai::resolve_agent(decomp_model, state, None, Some(&preamble), surface).await?;
+        let agent =
+            crate::ai::resolve_agent(decomp_model, state, None, Some(&preamble), surface).await?;
 
         let tasks = self.decompose(prompt, &agent, &tool_names).await?;
         if tasks.is_empty() {

@@ -34,7 +34,10 @@ pub fn render_sessions(frame: &mut Frame, area: Rect, app: &App) {
         .sessions
         .iter()
         .map(|s| {
-            let title_line = Line::from(Span::raw(truncate(&s.title, area.width.saturating_sub(4) as usize)));
+            let title_line = Line::from(Span::raw(truncate(
+                &s.title,
+                area.width.saturating_sub(4) as usize,
+            )));
             let meta = Line::from(Span::styled(
                 format!("  {} msgs", s.message_count),
                 Style::default().add_modifier(Modifier::DIM),

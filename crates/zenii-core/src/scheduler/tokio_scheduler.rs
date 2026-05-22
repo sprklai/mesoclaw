@@ -124,7 +124,10 @@ impl TokioScheduler {
                         row.get(11)?,
                     ))
                 })?
-                .filter_map(|r| r.map_err(|e| tracing::warn!("DB row error in load_jobs: {e}")).ok())
+                .filter_map(|r| {
+                    r.map_err(|e| tracing::warn!("DB row error in load_jobs: {e}"))
+                        .ok()
+                })
                 .collect();
             Ok(jobs)
         })
