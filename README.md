@@ -101,16 +101,45 @@ One Rust library crate (`zenii-core`) holds all business logic. Five thin binary
 
 | Domain | What it does |
 |--------|-------------|
-| **Memory** | Persistent semantic recall — BM25 field weighting, temporal decay, vector deduplication |
+| **Memory** | Persistent semantic recall — BM25 field weighting, temporal decay, vector deduplication, content-addressed dedup |
 | **Karpathy LLM Wiki** | Ingest PDFs, DOCX, PPTX, XLSX, images — knowledge graph, AI query, auto-lint |
 | **AI Agent** | Multi-step reasoning, tool use, streaming, delegation with human approvals |
-| **Tools (19)** | Shell, file ops, web search, process control, patch, memory, wiki — one registry, every interface |
+| **Tools (19)** | Shell, file ops, web search, process control, patch, memory, wiki — one registry, every interface. Tool output compression keeps context lean (configurable per-tool line/result limits) |
 | **Providers (6+)** | OpenAI · Anthropic · Gemini · OpenRouter · Vercel AI Gateway · Ollama · any OpenAI-compatible endpoint |
 | **Workflows** | TOML/YAML DAG chains — tools, conditionals, loops, parallel steps, run history, cancellation |
 | **Scheduler** | Cron + interval jobs, each run as a full agent turn with access to all tools |
 | **Channels** | Telegram · Discord · Slack — inbound routing, unified inbox, threaded conversations (feature-gated) |
 | **MCP** | Server: expose all tools to Claude Code, Cursor, Gemini CLI, Windsurf · Client: consume external MCP servers |
 | **Security** | OS keyring · AES-256-GCM encryption · surface-based permission model (CLI/desktop/TUI/MCP/API) |
+
+---
+
+## Model Routing Hints
+
+Prepend a hint prefix to any prompt to route it to a specialized model without changing your provider config:
+
+```bash
+# Route to a reasoning-capable model
+curl -s -X POST http://localhost:18981/chat \
+  -H "Authorization: Bearer $ZENII_TOKEN" \
+  -d '{"prompt":"hint:reasoning Explain how the Raft consensus algorithm handles leader election"}'
+
+# Route to a fast low-latency model
+curl -s -X POST http://localhost:18981/chat \
+  -H "Authorization: Bearer $ZENII_TOKEN" \
+  -d '{"prompt":"hint:fast What time is it?"}'
+```
+
+Configure each hint target in `config.toml`:
+
+```toml
+routing_hint_reasoning = "claude-opus-4-5"
+routing_hint_fast = "gpt-4o-mini"
+routing_hint_vision = "gpt-4o"
+routing_hint_summarize = "claude-haiku-3-5"
+```
+
+If a hint has no configured target, the default model is used and a warning is logged.
 
 ---
 

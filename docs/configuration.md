@@ -25,6 +25,8 @@ slug: /configuration
   - [Context Management](#context-management)
   - [Embeddings](#embeddings)
   - [Reasoning](#reasoning)
+  - [Model Routing](#model-routing)
+  - [Tool Output Compression](#tool-output-compression)
   - [Plugins](#plugins)
   - [Tool Permissions](#tool-permissions)
   - [Channels](#channels)
@@ -315,6 +317,44 @@ embedding_model = "BAAI/bge-small-en-v1.5"
 agent_max_continuations = 1
 tool_dedup_enabled = true
 agent_reasoning_guidance = "Think step by step before taking actions."
+```
+
+### Model Routing
+
+Route prompts with a `hint:` prefix to a specific model without changing the default provider. Each field accepts any model ID string supported by the configured providers. If a hint prefix is present but the field is unset, the default model is used and a warning is logged.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `routing_hint_reasoning` | Option\<String\> | `null` | Model to use when prompt starts with `hint:reasoning` |
+| `routing_hint_fast` | Option\<String\> | `null` | Model to use when prompt starts with `hint:fast` |
+| `routing_hint_vision` | Option\<String\> | `null` | Model to use when prompt starts with `hint:vision` |
+| `routing_hint_summarize` | Option\<String\> | `null` | Model to use when prompt starts with `hint:summarize` |
+
+```toml
+routing_hint_reasoning = "claude-opus-4-5"
+routing_hint_fast = "gpt-4o-mini"
+routing_hint_vision = "gpt-4o"
+routing_hint_summarize = "claude-haiku-3-5"
+```
+
+### Tool Output Compression
+
+Limits tool output size before it is included in the model context. Reduces token usage without dropping error payloads — when `success=false` the output is passed through unmodified.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `compression_enabled` | bool | `true` | Enable tool output compression globally |
+| `compression_max_output_chars` | usize | `8000` | Hard character ceiling applied to every tool output |
+| `compression_web_search_results` | usize | `5` | Maximum results kept from `web_search` output |
+| `compression_file_max_lines` | usize | `200` | Maximum lines kept from `file_read` output |
+| `compression_shell_max_lines` | usize | `100` | Maximum lines kept from `shell` output |
+
+```toml
+compression_enabled = true
+compression_max_output_chars = 8000
+compression_web_search_results = 5
+compression_file_max_lines = 200
+compression_shell_max_lines = 100
 ```
 
 ### Plugins

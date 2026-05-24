@@ -33,6 +33,9 @@ slug: /architecture
 - [Autonomous Reasoning Engine](#autonomous-reasoning-engine-phase-811)
 - [Semantic Memory and Embeddings](#semantic-memory-and-embeddings-phase-811)
   - [Memory Quality Improvements](#memory-quality-improvements)
+  - [Deterministic Chunking](#deterministic-chunking-quick-win)
+- [Model Routing with Hint Prefixes](#model-routing-with-hint-prefixes-quick-win)
+- [TokenJuice Tool Output Compression](#tokenjuice-tool-output-compression-quick-win)
 - [Phase 18 Hardening](#phase-18-hardening)
 - [Workflow Audit Hardening](#workflow-audit-hardening)
 - [Plugin Architecture](#plugin-architecture-phase-9)
@@ -1417,6 +1420,61 @@ Default λ=0.01 gives approximately a 70-day half-life. Configurable via `memory
 **Semantic Deduplication (M4)**
 
 Before inserting a new memory, `store()` checks whether any existing entry has a vector cosine similarity ≥ threshold. If so, the existing entry's content is updated in-place instead of creating a duplicate. Configurable via `memory_dedup_enabled` (default `true`) and `memory_dedup_threshold` (default `0.92`). Only active when an embedding provider is configured.
+
+### Deterministic Chunking
+
+Content-addressed memory IDs replace random UUIDs. The `id` of every `MemoryEntry` is now a SHA-256 hash of its content. A `content_hash TEXT` column with a UNIQUE index was added to the `memories` table in migration v15.
+
+**Write path**: before calling the embedding similarity check, `store()` computes the content hash and queries for an existing row with the same `content_hash`. On a match it returns immediately — no embedding call, no SQL write. On a miss it proceeds normally.
+
+**Benefits**:
+- Exact-duplicate detection is O#40;1#41; and free — no embedding API call required
+- Complements semantic deduplication #40;which catches near-duplicates#41; with a cheap exact-match gate
+- `MemoryEntry.content_hash: Option<String>` — present for all entries created after migration v15
+
+**Migration**: v15 adds `content_hash TEXT` + `CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_content_hash ON memories#40;content_hash#41;` inside a transaction.
+
+## Model Routing with Hint Prefixes
+
+`ModelRouter` in `crates/zenii-core/src/ai/routing.rs` inspects the first token of a prompt for one of 4 known hint prefixes and redirects the request to a pre-configured model before the normal provider resolution runs.
+
+**Hint prefixes**
+
+| Prefix | Intended use | Config field |
+|---|---|---|
+| `hint:reasoning` | Deep multi-step reasoning | `routing_hint_reasoning` |
+| `hint:fast` | Low-latency one-liners | `routing_hint_fast` |
+| `hint:vision` | Image-capable model | `routing_hint_vision` |
+| `hint:summarize` | Cheap summarization | `routing_hint_summarize` |
+
+All four fields are `Option<String>` in `AppConfig`. When a hint is present but its config field is `None`, the router emits `tracing::warn!` and falls through to the default model.
+
+**Call chain**: `resolve_agent_with_tools()` in `ai/agent.rs` calls `ModelRouter::route()` as the first step, before provider registry lookup and before default model resolution.
+
+## TokenJuice Tool Output Compression (Quick Win)
+
+`ToolOutputCompressor` in `crates/zenii-core/src/ai/compression.rs` is applied in all 5 `RigToolAdapter` factory methods. It runs on the raw JSON string returned by every tool call and enforces per-tool and global size limits before the output is included in the model context.
+
+**Per-tool rules**
+
+| Tool | Rule |
+|---|---|
+| `web_search` | Keep top-N results #40;`compression_web_search_results`#41;; truncate `content` field per result |
+| `file_read` | Keep first N lines #40;`compression_file_max_lines`#41; |
+| `shell` | Keep first N lines #40;`compression_shell_max_lines`#41; |
+| all | Hard ceiling of `compression_max_output_chars` characters |
+
+**Passthrough conditions**: compression is skipped when `compression_enabled = false` or when the tool output signals `success = false` #40;error payloads pass through unmodified#41;.
+
+**Config fields** #40;all in `AppConfig`#41;
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `compression_enabled` | bool | `true` | Global on/off switch |
+| `compression_max_output_chars` | usize | `8000` | Hard character ceiling for any tool output |
+| `compression_web_search_results` | usize | `5` | Max results kept from `web_search` output |
+| `compression_file_max_lines` | usize | `200` | Max lines kept from `file_read` output |
+| `compression_shell_max_lines` | usize | `100` | Max lines kept from `shell` output |
 
 ## Phase 18 Hardening
 
