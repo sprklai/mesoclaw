@@ -1451,7 +1451,7 @@ All four fields are `Option<String>` in `AppConfig`. When a hint is present but 
 
 **Call chain**: `resolve_agent_with_tools()` in `ai/agent.rs` calls `ModelRouter::route()` as the first step, before provider registry lookup and before default model resolution.
 
-## TokenJuice Tool Output Compression (Quick Win)
+## Tool Output Compression
 
 `ToolOutputCompressor` in `crates/zenii-core/src/ai/compression.rs` is applied in all 5 `RigToolAdapter` factory methods. It runs on the raw JSON string returned by every tool call and enforces per-tool and global size limits before the output is included in the model context.
 
