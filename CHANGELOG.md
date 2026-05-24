@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-05-24
+
+### Fixed
+- CI: apply rustfmt formatting to `ai/adapter.rs`, `ai/compression.rs`, `memory/sqlite_store.rs`
+
 ## [0.2.4] - 2026-05-24
 
 ### Added
