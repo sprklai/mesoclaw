@@ -65,6 +65,7 @@ pub struct MemoryEntry {
     pub score: f32,
     pub created_at: String,
     pub updated_at: String,
+    pub content_hash: Option<String>,
 }
 
 #[async_trait]

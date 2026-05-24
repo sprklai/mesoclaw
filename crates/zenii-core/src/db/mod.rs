@@ -396,6 +396,39 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    if version < 15 {
+        conn.execute_batch("BEGIN IMMEDIATE;")?;
+        // Add content_hash column to memories table if it exists.
+        // memories is created by run_memory_migrations (not here), so guard with IF EXISTS logic.
+        let memories_exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='memories'",
+                [],
+                |r| r.get::<_, i64>(0),
+            )
+            .map(|n| n > 0)
+            .unwrap_or(false);
+
+        if memories_exists {
+            let has_content_hash: bool = conn
+                .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='memories'")
+                .and_then(|mut stmt| stmt.query_row([], |row| row.get::<_, String>(0)))
+                .map(|sql| sql.contains("content_hash"))
+                .unwrap_or(false);
+
+            if !has_content_hash {
+                conn.execute_batch("ALTER TABLE memories ADD COLUMN content_hash TEXT;")?;
+            }
+
+            conn.execute_batch(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_content_hash
+                    ON memories(content_hash) WHERE content_hash IS NOT NULL;",
+            )?;
+        }
+
+        conn.execute_batch("PRAGMA user_version = 15; COMMIT;")?;
+    }
+
     Ok(())
 }
 
@@ -445,7 +478,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 14);
+        assert_eq!(version, 15);
     }
 
     #[test]
@@ -629,7 +662,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 14);
+        assert_eq!(version, 15);
     }
 
     // IN.9 — Migration v9 adds channel_key column and unique index
@@ -735,7 +768,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 14);
+        assert_eq!(version, 15);
     }
 
     // Migration v13 creates delegation_tasks table
@@ -749,7 +782,7 @@ mod tests {
         let version: u32 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 14);
+        assert_eq!(version, 15);
 
         // Verify table exists via SELECT
         let count: i64 = conn

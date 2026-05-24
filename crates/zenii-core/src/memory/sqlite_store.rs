@@ -1,14 +1,23 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 
 use crate::db::DbPool;
 use crate::{Result, ZeniiError};
+use rusqlite::OptionalExtension;
 
 use super::embeddings::EmbeddingProvider;
 use super::traits::{Memory, MemoryCategory, MemoryEntry};
 use super::vector_index::VectorIndex;
+
+fn content_hash(content: &str) -> String {
+    let mut h = Sha256::new();
+    h.update(content.as_bytes());
+    let result = h.finalize();
+    result.iter().map(|b| format!("{b:02x}")).collect()
+}
 
 pub struct SqliteMemoryStore {
     pool: DbPool,
@@ -125,6 +134,25 @@ impl SqliteMemoryStore {
             END;",
         )
         .map_err(|e| ZeniiError::Database(format!("memory migration failed: {e}")))?;
+
+        // Add content_hash column if not present (idempotent)
+        let has_content_hash: bool = conn
+            .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='memories'")
+            .and_then(|mut stmt| stmt.query_row([], |row| row.get::<_, String>(0)))
+            .map(|sql| sql.contains("content_hash"))
+            .unwrap_or(false);
+
+        if !has_content_hash {
+            conn.execute_batch("ALTER TABLE memories ADD COLUMN content_hash TEXT;")
+                .map_err(|e| ZeniiError::Database(format!("memory migration failed: {e}")))?;
+        }
+
+        conn.execute_batch(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_content_hash
+                ON memories(content_hash) WHERE content_hash IS NOT NULL;",
+        )
+        .map_err(|e| ZeniiError::Database(format!("memory migration failed: {e}")))?;
+
         Ok(())
     }
 
@@ -139,13 +167,34 @@ impl SqliteMemoryStore {
         let key = key.to_string();
         let content_str = content.to_string();
         let cat = category.to_string();
-        let id = uuid::Uuid::new_v4().to_string();
+        let hash = content_hash(content);
+        let hash_clone = hash.clone();
         let key_clone = key.clone();
         crate::db::with_db(&pool, move |conn| {
+            // Cheap exact-match dedup — fires before expensive embedding check.
+            let existing_key: Option<String> = conn
+                .query_row(
+                    "SELECT key FROM memories WHERE content_hash = ?1",
+                    rusqlite::params![hash_clone],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(ZeniiError::from)?;
+            if let Some(ref ek) = existing_key
+                && ek != &key_clone
+            {
+                return Err(ZeniiError::MemoryDuplicate(key_clone.clone()));
+            }
+            // If existing_key == key_clone, fall through to upsert (same key, possibly new category).
+
             conn.execute(
-                "INSERT INTO memories (id, key, content, category) VALUES (?1, ?2, ?3, ?4)
-                 ON CONFLICT(key) DO UPDATE SET content=excluded.content, category=excluded.category, updated_at=datetime('now')",
-                rusqlite::params![id, key_clone, content_str, cat],
+                "INSERT INTO memories (id, key, content, category, content_hash) VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(key) DO UPDATE SET
+                     content=excluded.content,
+                     category=excluded.category,
+                     content_hash=excluded.content_hash,
+                     updated_at=datetime('now')",
+                rusqlite::params![hash_clone, key_clone, content_str, cat, hash_clone],
             )
             .map_err(ZeniiError::from)?;
             Ok(())
@@ -226,7 +275,7 @@ impl Memory for SqliteMemoryStore {
             let all_entries = crate::db::with_db(&pool, move |conn| {
                 let mut stmt = conn
                     .prepare(
-                        "SELECT id, key, content, category, created_at, updated_at
+                        "SELECT id, key, content, category, created_at, updated_at, content_hash
                          FROM memories
                          ORDER BY updated_at DESC
                          LIMIT ?1 OFFSET ?2",
@@ -243,6 +292,7 @@ impl Memory for SqliteMemoryStore {
                             score: 1.0,
                             created_at: row.get(4)?,
                             updated_at: row.get(5)?,
+                            content_hash: row.get(6)?,
                         })
                     })
                     .map_err(ZeniiError::from)?
@@ -278,7 +328,7 @@ impl Memory for SqliteMemoryStore {
         );
         let fts_sql = format!(
             "SELECT m.id, m.key, m.content, m.category, m.created_at, m.updated_at,
-                {bm25_sql} as rank
+                {bm25_sql} as rank, m.content_hash
              FROM memories_fts f
              JOIN memories m ON m.rowid = f.rowid
              WHERE memories_fts MATCH ?1
@@ -302,6 +352,7 @@ impl Memory for SqliteMemoryStore {
                             score: row.get::<_, f64>(6)? as f32,
                             created_at: row.get(4)?,
                             updated_at: row.get(5)?,
+                            content_hash: row.get(7)?,
                         })
                     },
                 )
@@ -362,7 +413,7 @@ impl Memory for SqliteMemoryStore {
                     .collect::<Vec<_>>()
                     .join(", ");
                 let sql = format!(
-                    "SELECT id, key, content, category, created_at, updated_at FROM memories WHERE key IN ({})",
+                    "SELECT id, key, content, category, created_at, updated_at, content_hash FROM memories WHERE key IN ({})",
                     placeholders
                 );
 
@@ -384,6 +435,7 @@ impl Memory for SqliteMemoryStore {
                                 score: 0.0,
                                 created_at: row.get(4)?,
                                 updated_at: row.get(5)?,
+                                content_hash: row.get(6)?,
                             })
                         })
                         .map_err(ZeniiError::from)?;
@@ -818,11 +870,11 @@ mod tests {
         let (_dir, store) = setup().await;
         let store = store.with_decay(true, 0.1);
         store
-            .store("fresh", "rust programming language", MemoryCategory::Core)
+            .store("fresh", "rust programming language systems", MemoryCategory::Core)
             .await
             .unwrap();
         store
-            .store("stale", "rust programming language", MemoryCategory::Core)
+            .store("stale", "rust programming language memory", MemoryCategory::Core)
             .await
             .unwrap();
         {
@@ -852,11 +904,11 @@ mod tests {
         let (_dir, store) = setup().await;
         let store = store.with_decay(false, 0.1);
         store
-            .store("fresh", "rust programming language", MemoryCategory::Core)
+            .store("fresh", "rust programming language systems", MemoryCategory::Core)
             .await
             .unwrap();
         store
-            .store("stale", "rust programming language", MemoryCategory::Core)
+            .store("stale", "rust programming language memory", MemoryCategory::Core)
             .await
             .unwrap();
         {
@@ -899,6 +951,54 @@ mod tests {
             2,
             "without embeddings, both entries should be stored"
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn identical_content_returns_memory_duplicate_error() {
+        let (_dir, store) = setup().await;
+        store
+            .store("key-a", "duplicate content", MemoryCategory::Core)
+            .await
+            .unwrap();
+        let result = store
+            .store("key-b", "duplicate content", MemoryCategory::Core)
+            .await;
+        assert!(
+            matches!(result, Err(ZeniiError::MemoryDuplicate(_))),
+            "expected MemoryDuplicate, got: {result:?}"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn different_content_same_key_upserts_with_new_hash() {
+        let (_dir, store) = setup().await;
+        store
+            .store("k", "content-a", MemoryCategory::Core)
+            .await
+            .unwrap();
+        store
+            .store("k", "content-b", MemoryCategory::Core)
+            .await
+            .unwrap();
+        let results = store.recall("", 10, 0).await.unwrap();
+        assert_eq!(results.len(), 1, "upsert should not create a second row");
+        assert_eq!(results[0].content, "content-b");
+        let expected_hash = content_hash("content-b");
+        assert_eq!(
+            results[0].content_hash.as_deref(),
+            Some(expected_hash.as_str())
+        );
+    }
+
+    #[test]
+    fn content_hash_is_deterministic() {
+        let h1 = content_hash("hello world");
+        let h2 = content_hash("hello world");
+        let h3 = content_hash("different");
+        assert_eq!(h1, h2, "same input must produce same hash");
+        assert_ne!(h1, h3, "different inputs must produce different hashes");
+        // SHA-256 produces 64 hex chars
+        assert_eq!(h1.len(), 64);
     }
 
     // TODO: T4/T5 dedup with mock embedding provider — requires VectorIndex setup in tests

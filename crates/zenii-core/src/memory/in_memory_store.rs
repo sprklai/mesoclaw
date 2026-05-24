@@ -46,6 +46,7 @@ impl Memory for InMemoryStore {
             score: 1.0,
             created_at: now.clone(),
             updated_at: now,
+            content_hash: None,
         };
         memories.insert(key.to_string(), entry);
         Ok(())
