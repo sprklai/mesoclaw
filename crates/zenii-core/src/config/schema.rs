@@ -304,6 +304,16 @@ pub struct AppConfig {
     pub memory_dedup_enabled: bool,
     /// Cosine similarity threshold above which an incoming store() is treated as a duplicate.
     pub memory_dedup_threshold: f32,
+
+    // Model Routing: Hint Prefixes
+    /// hint:reasoning → this concrete "provider_id:model_id" string
+    pub routing_hint_reasoning: Option<String>,
+    /// hint:fast → this concrete "provider_id:model_id" string
+    pub routing_hint_fast: Option<String>,
+    /// hint:vision → this concrete "provider_id:model_id" string
+    pub routing_hint_vision: Option<String>,
+    /// hint:summarize → this concrete "provider_id:model_id" string
+    pub routing_hint_summarize: Option<String>,
 }
 
 /// Transport configuration for a single external MCP server.
@@ -604,6 +614,12 @@ impl Default for AppConfig {
             // Memory: Deduplication
             memory_dedup_enabled: true,
             memory_dedup_threshold: 0.92,
+
+            // Model Routing: Hint Prefixes
+            routing_hint_reasoning: None,
+            routing_hint_fast: None,
+            routing_hint_vision: None,
+            routing_hint_summarize: None,
         }
     }
 }

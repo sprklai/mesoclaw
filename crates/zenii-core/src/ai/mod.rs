@@ -6,6 +6,7 @@ pub mod prompt;
 pub mod provider_registry;
 pub mod providers;
 pub mod reasoning;
+pub mod routing;
 pub mod session;
 pub mod wiki_context_plugin;
 

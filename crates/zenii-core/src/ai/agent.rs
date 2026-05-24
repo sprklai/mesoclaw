@@ -71,6 +71,7 @@ use crate::gateway::state::AppState;
 
 use super::adapter::{RigToolAdapter, ToolCallCache, ToolCallEvent};
 use super::providers;
+use super::routing::ModelRouter;
 
 type OpenAIAgent = Agent<openai::completion::CompletionModel>;
 type AnthropicAgent = Agent<anthropic::completion::CompletionModel>;
@@ -387,6 +388,11 @@ pub async fn resolve_agent_with_tools(
     surface: &str,
     skip_approval: bool,
 ) -> Result<Arc<ZeniiAgent>> {
+    // Translate hint prefixes before any resolution
+    let config_guard = state.config.load();
+    let routed: Option<String> = ModelRouter::new(&config_guard).route(requested_model);
+    let requested_model: Option<&str> = routed.as_deref().or(requested_model);
+
     // Try requested model first, then last_used, then default model.
     // persist_model is written to last_used_model only after successful agent
     // construction so a bad model string doesn't pollute the fallback chain.
