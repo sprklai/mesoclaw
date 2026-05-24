@@ -257,9 +257,7 @@ impl RigToolAdapter {
     ) -> Vec<Box<dyn ToolDyn>> {
         tools
             .iter()
-            .map(|t| {
-                Box::new(Self::new(Arc::clone(t)).with_compressor(config)) as Box<dyn ToolDyn>
-            })
+            .map(|t| Box::new(Self::new(Arc::clone(t)).with_compressor(config)) as Box<dyn ToolDyn>)
             .collect()
     }
 
@@ -272,9 +270,8 @@ impl RigToolAdapter {
         tools
             .iter()
             .map(|t| {
-                Box::new(
-                    Self::new_with_events(Arc::clone(t), tx.clone()).with_compressor(config),
-                ) as Box<dyn ToolDyn>
+                Box::new(Self::new_with_events(Arc::clone(t), tx.clone()).with_compressor(config))
+                    as Box<dyn ToolDyn>
             })
             .collect()
     }

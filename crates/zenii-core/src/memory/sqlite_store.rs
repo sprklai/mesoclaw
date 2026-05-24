@@ -882,11 +882,19 @@ mod tests {
         let (_dir, store) = setup().await;
         let store = store.with_decay(true, 0.1);
         store
-            .store("fresh", "rust programming language systems", MemoryCategory::Core)
+            .store(
+                "fresh",
+                "rust programming language systems",
+                MemoryCategory::Core,
+            )
             .await
             .unwrap();
         store
-            .store("stale", "rust programming language memory", MemoryCategory::Core)
+            .store(
+                "stale",
+                "rust programming language memory",
+                MemoryCategory::Core,
+            )
             .await
             .unwrap();
         {
@@ -916,11 +924,19 @@ mod tests {
         let (_dir, store) = setup().await;
         let store = store.with_decay(false, 0.1);
         store
-            .store("fresh", "rust programming language systems", MemoryCategory::Core)
+            .store(
+                "fresh",
+                "rust programming language systems",
+                MemoryCategory::Core,
+            )
             .await
             .unwrap();
         store
-            .store("stale", "rust programming language memory", MemoryCategory::Core)
+            .store(
+                "stale",
+                "rust programming language memory",
+                MemoryCategory::Core,
+            )
             .await
             .unwrap();
         {

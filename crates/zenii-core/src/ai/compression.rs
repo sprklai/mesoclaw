@@ -99,7 +99,8 @@ impl ToolOutputCompressor {
         let cutoff = char_boundary_at_or_before(&s, self.max_output_chars);
         format!(
             "{}...[truncated at {} chars]",
-            &s[..cutoff], self.max_output_chars
+            &s[..cutoff],
+            self.max_output_chars
         )
     }
 }
@@ -185,7 +186,10 @@ mod tests {
     #[test]
     fn file_read_truncates_at_max_lines_with_marker() {
         let c = compressor();
-        let input: String = (1..=10).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+        let input: String = (1..=10)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
 
         let result = c.compress("file_read", &input, true);
         let lines: Vec<&str> = result.lines().collect();
@@ -202,7 +206,10 @@ mod tests {
     #[test]
     fn shell_truncates_at_max_lines() {
         let c = compressor();
-        let input: String = (1..=5).map(|i| format!("out {i}")).collect::<Vec<_>>().join("\n");
+        let input: String = (1..=5)
+            .map(|i| format!("out {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
 
         let result = c.compress("shell", &input, true);
         let lines: Vec<&str> = result.lines().collect();
@@ -260,6 +267,9 @@ mod tests {
         // Short output — ceiling not hit, no line rule for unknown tool
         let input = "hello world";
         let result = c.compress("system_info", input, true);
-        assert_eq!(result, input, "short unknown-tool output should be unchanged");
+        assert_eq!(
+            result, input,
+            "short unknown-tool output should be unchanged"
+        );
     }
 }
