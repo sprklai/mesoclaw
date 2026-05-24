@@ -391,6 +391,9 @@ pub async fn resolve_agent_with_tools(
     // Translate hint prefixes before any resolution
     let config_guard = state.config.load();
     let routed: Option<String> = ModelRouter::new(&config_guard).route(requested_model);
+    if routed.is_some() && requested_model.is_none() {
+        tracing::warn!("routing hint resolved without explicit model request");
+    }
     let requested_model: Option<&str> = routed.as_deref().or(requested_model);
 
     // Try requested model first, then last_used, then default model.
@@ -434,20 +437,18 @@ pub async fn resolve_agent_with_tools(
             )));
         }
 
-        let config = state.config.load();
-
         let tools = tool_override.unwrap_or_else(|| {
             crate::security::permissions::PermissionResolver::executable_tools(
-                &config.tool_permissions,
+                &config_guard.tool_permissions,
                 surface,
                 &state.tools,
             )
         });
 
         // Create per-request dedup cache if enabled
-        let dedup_cache = if config.tool_dedup_enabled {
+        let dedup_cache = if config_guard.tool_dedup_enabled {
             Some(Arc::new(ToolCallCache::with_limits(
-                config.tool_call_limits.clone(),
+                config_guard.tool_call_limits.clone(),
             )))
         } else {
             None
@@ -461,7 +462,7 @@ pub async fn resolve_agent_with_tools(
                 provider.provider.requires_api_key,
                 state.credentials.as_ref(),
                 &tools,
-                &config,
+                &config_guard,
                 tx,
                 preamble_override,
                 dedup_cache,
@@ -486,7 +487,7 @@ pub async fn resolve_agent_with_tools(
                 provider.provider.requires_api_key,
                 state.credentials.as_ref(),
                 &tools,
-                &config,
+                &config_guard,
                 preamble_override,
                 dedup_cache,
             )
