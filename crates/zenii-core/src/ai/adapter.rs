@@ -267,10 +267,15 @@ impl RigToolAdapter {
     pub fn from_tools_with_events(
         tools: &[Arc<dyn Tool>],
         tx: broadcast::Sender<ToolCallEvent>,
+        config: &crate::config::AppConfig,
     ) -> Vec<Box<dyn ToolDyn>> {
         tools
             .iter()
-            .map(|t| Box::new(Self::new_with_events(Arc::clone(t), tx.clone())) as Box<dyn ToolDyn>)
+            .map(|t| {
+                Box::new(
+                    Self::new_with_events(Arc::clone(t), tx.clone()).with_compressor(config),
+                ) as Box<dyn ToolDyn>
+            })
             .collect()
     }
 
@@ -279,12 +284,15 @@ impl RigToolAdapter {
         tools: &[Arc<dyn Tool>],
         tx: broadcast::Sender<ToolCallEvent>,
         cache: Arc<ToolCallCache>,
+        config: &crate::config::AppConfig,
     ) -> Vec<Box<dyn ToolDyn>> {
         tools
             .iter()
             .map(|t| {
                 Box::new(
-                    Self::new_with_events(Arc::clone(t), tx.clone()).with_cache(Arc::clone(&cache)),
+                    Self::new_with_events(Arc::clone(t), tx.clone())
+                        .with_compressor(config)
+                        .with_cache(Arc::clone(&cache)),
                 ) as Box<dyn ToolDyn>
             })
             .collect()
@@ -831,7 +839,8 @@ mod tests {
             Arc::new(MockTool { name: "tool_a" }),
             Arc::new(MockTool { name: "tool_b" }),
         ];
-        let adapters = RigToolAdapter::from_tools_with_events(&tools, tx);
+        let config = crate::config::AppConfig::default();
+        let adapters = RigToolAdapter::from_tools_with_events(&tools, tx, &config);
 
         assert_eq!(adapters.len(), 2);
 

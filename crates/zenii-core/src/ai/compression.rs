@@ -62,14 +62,15 @@ impl ToolOutputCompressor {
                 .take(self.web_search_results)
                 .map(|mut v| {
                     if let Some(obj) = v.as_object_mut() {
-                        for val in obj.values_mut() {
-                            if let Some(s) = val.as_str()
+                        let content_fields =
+                            ["snippet", "body", "content", "description", "summary"];
+                        for key in &content_fields {
+                            if let Some(val) = obj.get_mut(*key)
+                                && let Some(s) = val.as_str()
                                 && s.len() > 300
                             {
-                                *val = serde_json::Value::String(format!(
-                                    "{}...",
-                                    &s[..char_boundary_at_or_before(s, 300)]
-                                ));
+                                let cutoff = char_boundary_at_or_before(s, 300);
+                                *val = serde_json::Value::String(format!("{}...", &s[..cutoff]));
                             }
                         }
                     }
