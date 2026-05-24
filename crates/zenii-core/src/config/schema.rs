@@ -193,6 +193,18 @@ pub struct AppConfig {
     /// Unlisted tools are unlimited. Default: `{"web_search": 1}`.
     pub tool_call_limits: HashMap<String, usize>,
 
+    // TokenJuice: Tool Output Compression
+    /// Enable tool output compression to reduce token usage in LLM context windows.
+    pub compression_enabled: bool,
+    /// Hard character ceiling applied to all compressed tool outputs.
+    pub compression_max_output_chars: usize,
+    /// Maximum number of web search results to keep after compression.
+    pub compression_web_search_results: usize,
+    /// Maximum number of lines to keep for file_read tool output.
+    pub compression_file_max_lines: usize,
+    /// Maximum number of lines to keep for shell tool output.
+    pub compression_shell_max_lines: usize,
+
     // Phase 8.13: Prompt Efficiency
     pub prompt_max_preamble_tokens: usize,
     pub prompt_compact_identity: bool,
@@ -524,6 +536,13 @@ impl Default for AppConfig {
             // Tool Deduplication
             tool_dedup_enabled: true,
             tool_call_limits: HashMap::from([("web_search".into(), 5)]),
+
+            // TokenJuice: Tool Output Compression
+            compression_enabled: true,
+            compression_max_output_chars: 8000,
+            compression_web_search_results: 3,
+            compression_file_max_lines: 200,
+            compression_shell_max_lines: 100,
 
             // Notification Routing
             notification_routing: NotificationRouting::default(),

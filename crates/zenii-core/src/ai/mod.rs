@@ -1,5 +1,6 @@
 pub mod adapter;
 pub mod agent;
+pub mod compression;
 pub mod context;
 pub mod delegation;
 pub mod prompt;

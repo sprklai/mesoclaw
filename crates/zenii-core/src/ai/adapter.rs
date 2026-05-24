@@ -12,6 +12,7 @@ use rig::wasm_compat::WasmBoxedFuture;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
+use crate::ai::compression::ToolOutputCompressor;
 use crate::tools::Tool;
 
 /// Cached result from a tool call.
@@ -183,6 +184,7 @@ pub struct RigToolAdapter {
     surface: String,
     approval_timeout_secs: u64,
     permission_state: crate::security::permissions::PermissionState,
+    compressor: ToolOutputCompressor,
 }
 
 impl RigToolAdapter {
@@ -196,6 +198,7 @@ impl RigToolAdapter {
             surface: "desktop".into(),
             approval_timeout_secs: 120,
             permission_state: crate::security::permissions::PermissionState::Allowed,
+            compressor: ToolOutputCompressor::default(),
         }
     }
 
@@ -210,7 +213,14 @@ impl RigToolAdapter {
             surface: "desktop".into(),
             approval_timeout_secs: 120,
             permission_state: crate::security::permissions::PermissionState::Allowed,
+            compressor: ToolOutputCompressor::default(),
         }
+    }
+
+    /// Attach a compressor configured from `AppConfig` (builder pattern).
+    pub fn with_compressor(mut self, config: &crate::config::AppConfig) -> Self {
+        self.compressor = ToolOutputCompressor::from_config(config);
+        self
     }
 
     /// Attach an approval broker for interactive tool approval.
@@ -547,7 +557,8 @@ impl ToolDyn for RigToolAdapter {
 
             match exec_result {
                 Ok(result) => {
-                    let output = serde_json::to_string(&result).map_err(ToolError::JsonError)?;
+                    let raw = serde_json::to_string(&result).map_err(ToolError::JsonError)?;
+                    let output = self.compressor.compress(&tool_name, &raw, result.success);
 
                     // Store in cache and record execution
                     if let Some(ref cache) = self.cache {
