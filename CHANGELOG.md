@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-05-24
+
+### Added
+- AI: model routing with hint prefixes (`hint:reasoning`, `hint:fast`, `hint:vision`, `hint:summarize`) — configurable via `routing_hint_*` fields in `AppConfig`
+- AI: tool output compression middleware (`ToolOutputCompressor`) — per-tool rules for web search, file read, and shell output; configurable char ceiling
+
+### Changed
+- Memory: content-addressed IDs — SHA-256 of content replaces random UUID, with fast exact-match dedup before embedding similarity check
+- Memory: DB migration v15 adds `content_hash` column and UNIQUE index on `memories` table
+
+### Fixed
+- AI: warn via tracing when a routing hint has no configured target model
+- AI: remove duplicate `AppConfig` load in `resolve_agent_with_tools`
+
 ## [0.2.3] - 2026-05-22
 
 ### Fixed
