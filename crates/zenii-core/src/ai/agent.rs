@@ -117,7 +117,7 @@ impl ZeniiAgent {
         tools: &[Arc<dyn Tool>],
     ) -> Result<Self> {
         let api_key = providers::resolve_api_key(config, credentials).await?;
-        let rig_tools = RigToolAdapter::from_tools(tools);
+        let rig_tools = RigToolAdapter::from_tools(tools, config);
 
         let preamble = config
             .agent_system_prompt
@@ -186,9 +186,9 @@ impl ZeniiAgent {
             providers::resolve_api_key_for_provider(provider_id, requires_api_key, credentials)
                 .await?;
         let rig_tools = if let Some(ref cache) = dedup_cache {
-            RigToolAdapter::from_tools_with_cache(tools, Arc::clone(cache))
+            RigToolAdapter::from_tools_with_cache(tools, Arc::clone(cache), config)
         } else {
-            RigToolAdapter::from_tools(tools)
+            RigToolAdapter::from_tools(tools, config)
         };
 
         let preamble = preamble_override.unwrap_or_else(|| {
@@ -259,6 +259,7 @@ impl ZeniiAgent {
             surface,
             config.approval_timeout_secs,
             &config.tool_permissions,
+            config,
         );
 
         let preamble = preamble_override.unwrap_or_else(|| {
@@ -765,7 +766,8 @@ mod tests {
             Arc::new(CounterTool { name: "step1" }),
             Arc::new(CounterTool { name: "step2" }),
         ];
-        let adapters = RigToolAdapter::from_tools(&tools);
+        let config = AppConfig::default();
+        let adapters = RigToolAdapter::from_tools(&tools, &config);
 
         let r1 = adapters[0].call("{}".into()).await.unwrap();
         let p1: ToolResult = serde_json::from_str(&r1).unwrap();

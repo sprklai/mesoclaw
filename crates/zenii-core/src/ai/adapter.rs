@@ -251,10 +251,15 @@ impl RigToolAdapter {
     }
 
     /// Convert a list of Zenii tools into boxed rig ToolDyn objects.
-    pub fn from_tools(tools: &[Arc<dyn Tool>]) -> Vec<Box<dyn ToolDyn>> {
+    pub fn from_tools(
+        tools: &[Arc<dyn Tool>],
+        config: &crate::config::AppConfig,
+    ) -> Vec<Box<dyn ToolDyn>> {
         tools
             .iter()
-            .map(|t| Box::new(Self::new(Arc::clone(t))) as Box<dyn ToolDyn>)
+            .map(|t| {
+                Box::new(Self::new(Arc::clone(t)).with_compressor(config)) as Box<dyn ToolDyn>
+            })
             .collect()
     }
 
@@ -289,12 +294,16 @@ impl RigToolAdapter {
     pub fn from_tools_with_cache(
         tools: &[Arc<dyn Tool>],
         cache: Arc<ToolCallCache>,
+        config: &crate::config::AppConfig,
     ) -> Vec<Box<dyn ToolDyn>> {
         tools
             .iter()
             .map(|t| {
-                Box::new(Self::new(Arc::clone(t)).with_cache(Arc::clone(&cache)))
-                    as Box<dyn ToolDyn>
+                Box::new(
+                    Self::new(Arc::clone(t))
+                        .with_compressor(config)
+                        .with_cache(Arc::clone(&cache)),
+                ) as Box<dyn ToolDyn>
             })
             .collect()
     }
@@ -310,6 +319,7 @@ impl RigToolAdapter {
         surface: &str,
         timeout_secs: u64,
         permissions: &crate::security::permissions::ToolPermissions,
+        config: &crate::config::AppConfig,
     ) -> Vec<Box<dyn ToolDyn>> {
         tools
             .iter()
@@ -320,8 +330,9 @@ impl RigToolAdapter {
                     t.risk_level(),
                     surface,
                 );
-                let mut adapter =
-                    Self::new_with_events(Arc::clone(t), tx.clone()).with_permission(perm);
+                let mut adapter = Self::new_with_events(Arc::clone(t), tx.clone())
+                    .with_compressor(config)
+                    .with_permission(perm);
                 if let Some(ref cache) = cache {
                     adapter = adapter.with_cache(Arc::clone(cache));
                 }
@@ -721,11 +732,12 @@ mod tests {
     // 1.1.5 — adapter from multiple tools
     #[test]
     fn adapter_from_multiple_tools() {
+        let config = crate::config::AppConfig::default();
         let tools: Vec<Arc<dyn Tool>> = vec![
             Arc::new(MockTool { name: "tool_a" }),
             Arc::new(MockTool { name: "tool_b" }),
         ];
-        let rig_tools = RigToolAdapter::from_tools(&tools);
+        let rig_tools = RigToolAdapter::from_tools(&tools, &config);
 
         assert_eq!(rig_tools.len(), 2);
         assert_eq!(rig_tools[0].name(), "tool_a");
