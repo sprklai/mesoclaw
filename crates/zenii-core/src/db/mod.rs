@@ -410,10 +410,14 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             .unwrap_or(false);
 
         if memories_exists {
+            // Use PRAGMA table_info for reliable column detection (avoids false positives
+            // from comments or other column names that contain "content_hash" as a substring).
             let has_content_hash: bool = conn
-                .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='memories'")
-                .and_then(|mut stmt| stmt.query_row([], |row| row.get::<_, String>(0)))
-                .map(|sql| sql.contains("content_hash"))
+                .prepare(
+                    "SELECT COUNT(*) FROM pragma_table_info('memories') WHERE name = 'content_hash'",
+                )
+                .and_then(|mut stmt| stmt.query_row([], |row| row.get::<_, i64>(0)))
+                .map(|n| n > 0)
                 .unwrap_or(false);
 
             if !has_content_hash {

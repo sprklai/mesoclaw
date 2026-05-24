@@ -6,7 +6,6 @@ use tokio::sync::Mutex;
 
 use crate::db::DbPool;
 use crate::{Result, ZeniiError};
-use rusqlite::OptionalExtension;
 
 use super::embeddings::EmbeddingProvider;
 use super::traits::{Memory, MemoryCategory, MemoryEntry};
@@ -98,11 +97,15 @@ impl SqliteMemoryStore {
         self
     }
 
-    /// Run the memory-specific migrations (FTS5 tables, triggers)
+    /// Run the memory-specific migrations (FTS5 tables, triggers).
+    /// All DDL is wrapped in a single transaction for atomicity.
     pub fn run_memory_migrations(pool: &DbPool) -> Result<()> {
-        let conn = pool.blocking_lock();
+        let mut conn = pool.blocking_lock();
+
+        // Create base tables, virtual FTS5 table, and triggers in one atomic batch.
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS memories (
+            "BEGIN IMMEDIATE;
+            CREATE TABLE IF NOT EXISTS memories (
                 id TEXT PRIMARY KEY,
                 key TEXT NOT NULL UNIQUE,
                 content TEXT NOT NULL,
@@ -131,27 +134,42 @@ impl SqliteMemoryStore {
                 VALUES ('delete', old.rowid, old.key, old.content, old.category);
                 INSERT INTO memories_fts(rowid, key, content, category)
                 VALUES (new.rowid, new.key, new.content, new.category);
-            END;",
+            END;
+            COMMIT;",
         )
         .map_err(|e| ZeniiError::Database(format!("memory migration failed: {e}")))?;
 
-        // Add content_hash column if not present (idempotent)
+        // Add content_hash column and unique index atomically.
+        // Use PRAGMA table_info for reliable column detection (avoids false positives
+        // from comments or other column names that contain "content_hash" as a substring).
+        // The read-only check is safe outside the transaction; the DDL is inside it.
         let has_content_hash: bool = conn
-            .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='memories'")
-            .and_then(|mut stmt| stmt.query_row([], |row| row.get::<_, String>(0)))
-            .map(|sql| sql.contains("content_hash"))
+            .prepare(
+                "SELECT COUNT(*) FROM pragma_table_info('memories') WHERE name = 'content_hash'",
+            )
+            .and_then(|mut stmt| stmt.query_row([], |row| row.get::<_, i64>(0)))
+            .map(|n| n > 0)
             .unwrap_or(false);
 
-        if !has_content_hash {
-            conn.execute_batch("ALTER TABLE memories ADD COLUMN content_hash TEXT;")
+        {
+            let tx = conn
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(|e| ZeniiError::Database(format!("memory migration failed: {e}")))?;
+
+            if !has_content_hash {
+                tx.execute_batch("ALTER TABLE memories ADD COLUMN content_hash TEXT;")
+                    .map_err(|e| ZeniiError::Database(format!("memory migration failed: {e}")))?;
+            }
+
+            tx.execute_batch(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_content_hash
+                    ON memories(content_hash) WHERE content_hash IS NOT NULL;",
+            )
+            .map_err(|e| ZeniiError::Database(format!("memory migration failed: {e}")))?;
+
+            tx.commit()
                 .map_err(|e| ZeniiError::Database(format!("memory migration failed: {e}")))?;
         }
-
-        conn.execute_batch(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_content_hash
-                ON memories(content_hash) WHERE content_hash IS NOT NULL;",
-        )
-        .map_err(|e| ZeniiError::Database(format!("memory migration failed: {e}")))?;
 
         Ok(())
     }
@@ -168,36 +186,30 @@ impl SqliteMemoryStore {
         let content_str = content.to_string();
         let cat = category.to_string();
         let hash = content_hash(content);
-        let hash_clone = hash.clone();
         let key_clone = key.clone();
         crate::db::with_db(&pool, move |conn| {
-            // Cheap exact-match dedup — fires before expensive embedding check.
-            let existing_key: Option<String> = conn
-                .query_row(
-                    "SELECT key FROM memories WHERE content_hash = ?1",
-                    rusqlite::params![hash_clone],
-                    |row| row.get(0),
-                )
-                .optional()
-                .map_err(ZeniiError::from)?;
-            if let Some(ref ek) = existing_key
-                && ek != &key_clone
-            {
-                return Err(ZeniiError::MemoryDuplicate(key_clone.clone()));
-            }
-            // If existing_key == key_clone, fall through to upsert (same key, possibly new category).
-
-            conn.execute(
+            // Attempt upsert on key. If a different row already holds the same content_hash,
+            // the UNIQUE index on content_hash fires a SQLITE_CONSTRAINT_UNIQUE error.
+            // We map that to MemoryDuplicate to avoid the SELECT→check→INSERT TOCTOU race.
+            let result = conn.execute(
                 "INSERT INTO memories (id, key, content, category, content_hash) VALUES (?1, ?2, ?3, ?4, ?5)
                  ON CONFLICT(key) DO UPDATE SET
                      content=excluded.content,
                      category=excluded.category,
                      content_hash=excluded.content_hash,
                      updated_at=datetime('now')",
-                rusqlite::params![hash_clone, key_clone, content_str, cat, hash_clone],
-            )
-            .map_err(ZeniiError::from)?;
-            Ok(())
+                rusqlite::params![hash, key_clone, content_str, cat, hash],
+            );
+
+            match result {
+                Ok(_) => Ok(()),
+                Err(rusqlite::Error::SqliteFailure(err, _))
+                    if err.code == rusqlite::ErrorCode::ConstraintViolation =>
+                {
+                    Err(ZeniiError::MemoryDuplicate(key_clone.clone()))
+                }
+                Err(e) => Err(ZeniiError::from(e)),
+            }
         })
         .await?;
 
