@@ -17,7 +17,7 @@ on:
         description: "Publish GitHub release"
         required: false
         type: boolean
-        default: true
+        default: false
       build_docker:
         description: "Build and push Docker image (~3 hours, multi-arch). Use /release-tag patch --docker to trigger."
         required: false
